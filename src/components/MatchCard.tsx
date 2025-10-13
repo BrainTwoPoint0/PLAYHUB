@@ -32,7 +32,9 @@ interface MatchCardProps {
 
 export default function MatchCard({ match }: MatchCardProps) {
   const product = match.products?.[0]
-  const price = product ? formatPrice(product.price_amount, product.currency) : 'N/A'
+  const price = product
+    ? formatPrice(product.price_amount, product.currency)
+    : 'N/A'
 
   return (
     <Link href={`/matches/${match.id}`}>
@@ -77,27 +79,47 @@ export default function MatchCard({ match }: MatchCardProps) {
           <div className="p-5">
             {/* Teams */}
             <h3 className="text-xl font-bold text-[var(--timberwolf)] mb-2 line-clamp-1">
-              {match.home_team} <span className="text-[var(--ash-grey)]/50">vs</span> {match.away_team}
+              {match.home_team}{' '}
+              <span className="text-[var(--ash-grey)]/50">vs</span>{' '}
+              {match.away_team}
             </h3>
 
             {/* Competition */}
             {match.competition && (
-              <p className="text-sm text-[var(--ash-grey)]/80 mb-4 font-medium">{match.competition}</p>
+              <p className="text-sm text-[var(--ash-grey)]/80 mb-4 font-medium">
+                {match.competition}
+              </p>
             )}
 
             {/* Meta Info */}
             <div className="flex items-center gap-4 text-sm text-[var(--ash-grey)]/60">
               {match.venue && (
                 <div className="flex items-center gap-1.5">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                      clipRule="evenodd"
+                    />
                   </svg>
                   <span className="line-clamp-1">{match.venue}</span>
                 </div>
               )}
               <div className="flex items-center gap-1.5">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                <svg
+                  className="w-4 h-4"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
+                    clipRule="evenodd"
+                  />
                 </svg>
                 <span>{formatDate(match.match_date)}</span>
               </div>

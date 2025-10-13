@@ -76,6 +76,7 @@ See `docs/playhub-implementation-plan.md` for full schema details.
 ## 🎯 Features (Planned)
 
 ### Phase 1 (MVP)
+
 - [x] Repository setup
 - [x] Supabase integration
 - [ ] Database schema implementation
@@ -85,12 +86,14 @@ See `docs/playhub-implementation-plan.md` for full schema details.
 - [ ] User library page
 
 ### Phase 2
+
 - [ ] Organization storefronts
 - [ ] Content upload interface
 - [ ] Advanced search & filters
 - [ ] Video provider integrations (Veo, Spiideo, Pixellot)
 
 ### Phase 3
+
 - [ ] Subscription/season pass features
 - [ ] Analytics dashboard
 - [ ] Mobile optimization

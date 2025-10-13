@@ -19,7 +19,8 @@ export default function PurchaseSuccessPage({
           Purchase Complete!
         </h1>
         <p className="text-xl text-[var(--ash-grey)] mb-8">
-          Thank you for your purchase. You now have lifetime access to this match.
+          Thank you for your purchase. You now have lifetime access to this
+          match.
         </p>
 
         {/* Session ID */}
@@ -54,7 +55,8 @@ export default function PurchaseSuccessPage({
         {/* Info Box */}
         <div className="p-6 bg-black/20 border border-[var(--ash-grey)]/10 rounded-2xl">
           <p className="text-[var(--ash-grey)]/80 text-sm">
-            A confirmation email has been sent to your email address. You can now watch your purchased match anytime from your library.
+            A confirmation email has been sent to your email address. You can
+            now watch your purchased match anytime from your library.
           </p>
         </div>
       </div>

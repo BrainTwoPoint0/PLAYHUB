@@ -27,7 +27,9 @@ export default function HomePage() {
                 Buy & Watch
               </span>
               <br />
-              <span className="text-[var(--timberwolf)]">Professional Matches</span>
+              <span className="text-[var(--timberwolf)]">
+                Professional Matches
+              </span>
             </h1>
 
             <p className="text-xl md:text-2xl text-zinc-400 mb-10 max-w-2xl mx-auto leading-relaxed">
@@ -63,16 +65,28 @@ export default function HomePage() {
               className="mt-16 flex flex-wrap items-center justify-center gap-12"
             >
               <div className="text-center">
-                <div className="text-3xl font-bold text-[var(--accent-purple)]">500+</div>
-                <div className="text-sm text-[var(--ash-grey)]/60 mt-1">Match Recordings</div>
+                <div className="text-3xl font-bold text-[var(--accent-purple)]">
+                  500+
+                </div>
+                <div className="text-sm text-[var(--ash-grey)]/60 mt-1">
+                  Match Recordings
+                </div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-[var(--accent-blue)]">50+</div>
-                <div className="text-sm text-[var(--ash-grey)]/60 mt-1">Sports Organizations</div>
+                <div className="text-3xl font-bold text-[var(--accent-blue)]">
+                  50+
+                </div>
+                <div className="text-sm text-[var(--ash-grey)]/60 mt-1">
+                  Sports Organizations
+                </div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-[var(--accent-green)]">HD</div>
-                <div className="text-sm text-[var(--ash-grey)]/60 mt-1">Quality Streaming</div>
+                <div className="text-3xl font-bold text-[var(--accent-green)]">
+                  HD
+                </div>
+                <div className="text-sm text-[var(--ash-grey)]/60 mt-1">
+                  Quality Streaming
+                </div>
               </div>
             </motion.div>
           </motion.div>
@@ -91,7 +105,9 @@ export default function HomePage() {
             <h2 className="text-4xl md:text-5xl font-bold text-[var(--timberwolf)] mb-4">
               Simple. Fast. Secure.
             </h2>
-            <p className="text-xl text-[var(--ash-grey)]">Three steps to watch any match</p>
+            <p className="text-xl text-[var(--ash-grey)]">
+              Three steps to watch any match
+            </p>
           </motion.div>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
@@ -101,22 +117,22 @@ export default function HomePage() {
                 title: 'Find Your Match',
                 desc: 'Browse our marketplace of professional recordings',
                 icon: '🔍',
-                color: 'var(--accent-purple)'
+                color: 'var(--accent-purple)',
               },
               {
                 num: '2',
                 title: 'Secure Payment',
                 desc: 'One-time payment, instant access to your content',
                 icon: '💳',
-                color: 'var(--accent-blue)'
+                color: 'var(--accent-blue)',
               },
               {
                 num: '3',
                 title: 'Watch Forever',
                 desc: 'Stream anytime in HD. No ads, no limits',
                 icon: '▶️',
-                color: 'var(--accent-green)'
-              }
+                color: 'var(--accent-green)',
+              },
             ].map((step, i) => (
               <motion.div
                 key={i}
@@ -128,13 +144,27 @@ export default function HomePage() {
               >
                 <div
                   className="absolute inset-0 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{background: `radial-gradient(circle, ${step.color}20 0%, transparent 70%)`}}
+                  style={{
+                    background: `radial-gradient(circle, ${step.color}20 0%, transparent 70%)`,
+                  }}
                 />
-                <div className="relative p-8 bg-black/20 border border-[var(--ash-grey)]/10 rounded-2xl hover:shadow-lg transition-all" style={{borderColor: `${step.color}40`}}>
+                <div
+                  className="relative p-8 bg-black/20 border border-[var(--ash-grey)]/10 rounded-2xl hover:shadow-lg transition-all"
+                  style={{ borderColor: `${step.color}40` }}
+                >
                   <div className="text-5xl mb-4">{step.icon}</div>
-                  <div className="text-sm font-mono mb-2" style={{color: step.color}}>STEP {step.num}</div>
-                  <h3 className="text-2xl font-bold text-[var(--timberwolf)] mb-3">{step.title}</h3>
-                  <p className="text-[var(--ash-grey)]/80 leading-relaxed">{step.desc}</p>
+                  <div
+                    className="text-sm font-mono mb-2"
+                    style={{ color: step.color }}
+                  >
+                    STEP {step.num}
+                  </div>
+                  <h3 className="text-2xl font-bold text-[var(--timberwolf)] mb-3">
+                    {step.title}
+                  </h3>
+                  <p className="text-[var(--ash-grey)]/80 leading-relaxed">
+                    {step.desc}
+                  </p>
                 </div>
               </motion.div>
             ))}
@@ -185,7 +215,8 @@ export default function HomePage() {
               Turn Your Matches Into Revenue
             </h3>
             <p className="text-lg text-[var(--ash-grey)] mb-8">
-              Upload your recordings, set your price, and reach a global audience of fans and scouts.
+              Upload your recordings, set your price, and reach a global
+              audience of fans and scouts.
             </p>
             <Button
               variant="outline"

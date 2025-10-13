@@ -14,10 +14,11 @@ export default async function LibraryPage() {
     redirect('/auth/login')
   }
 
-  // Fetch user's purchased matches
-  const { data: purchases, error } = await supabase
+  // Fetch user's purchased matches (type assertion for PLAYHUB tables)
+  const { data: purchases, error } = await (supabase as any)
     .from('playhub_purchases')
-    .select(`
+    .select(
+      `
       *,
       match_recording:playhub_match_recordings(
         *,
@@ -25,7 +26,8 @@ export default async function LibraryPage() {
         organization:organizations(name),
         products:playhub_products(id, price_amount, currency, is_available)
       )
-    `)
+    `
+    )
     .eq('user_id', user.id)
     .eq('status', 'completed')
     .order('purchased_at', { ascending: false })
@@ -34,7 +36,8 @@ export default async function LibraryPage() {
     console.error('Error fetching library:', error)
   }
 
-  const purchasedMatches = purchases?.map(p => p.match_recording).filter(Boolean) || []
+  const purchasedMatches =
+    purchases?.map((p: any) => p.match_recording).filter(Boolean) || []
 
   return (
     <div className="container mx-auto px-5 py-8">
@@ -51,7 +54,9 @@ export default async function LibraryPage() {
       {/* Stats */}
       <div className="mb-8 p-4 bg-zinc-900 border border-[var(--ash-grey)]/20 rounded-lg">
         <p className="text-[var(--ash-grey)]">
-          <span className="text-[var(--timberwolf)] font-semibold">{purchasedMatches.length}</span>{' '}
+          <span className="text-[var(--timberwolf)] font-semibold">
+            {purchasedMatches.length}
+          </span>{' '}
           {purchasedMatches.length === 1 ? 'match' : 'matches'} in your library
         </p>
       </div>

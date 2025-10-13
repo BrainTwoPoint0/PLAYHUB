@@ -11,7 +11,8 @@ export default function Footer() {
               PLAYHUB
             </h3>
             <p className="text-[var(--ash-grey)] text-sm">
-              Your marketplace for professional match recordings and highlight reels.
+              Your marketplace for professional match recordings and highlight
+              reels.
             </p>
           </div>
 
@@ -69,7 +70,8 @@ export default function Footer() {
         {/* Copyright */}
         <div className="mt-8 pt-8 border-t border-[var(--ash-grey)]/10">
           <p className="text-center text-sm text-[var(--ash-grey)]">
-            © {new Date().getFullYear()} PLAYHUB. Part of the PLAYBACK Sports ecosystem.
+            © {new Date().getFullYear()} PLAYHUB. Part of the PLAYBACK Sports
+            ecosystem.
           </p>
         </div>
       </div>

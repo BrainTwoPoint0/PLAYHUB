@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
-    let profile = null
+    let profile: any = null
     if (user) {
       // Get user's profile if authenticated
       const { data: profileData } = await supabase
@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
     // Get product and match details
     const { data: product, error: productError } = await supabase
       .from('playhub_products')
-      .select(`
+      .select(
+        `
         *,
         match_recording:playhub_match_recordings(
           id,
@@ -46,7 +47,8 @@ export async function GET(request: NextRequest) {
           home_team,
           away_team
         )
-      `)
+      `
+      )
       .eq('id', productId)
       .eq('is_available', true)
       .single()
@@ -58,7 +60,9 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const match = product.match_recording
+    // Type assertion for nested relation
+    const productData = product as any
+    const match = productData.match_recording
 
     // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
@@ -67,18 +71,18 @@ export async function GET(request: NextRequest) {
       line_items: [
         {
           price_data: {
-            currency: product.currency.toLowerCase(),
+            currency: productData.currency.toLowerCase(),
             product_data: {
               name: `${match.home_team} vs ${match.away_team}`,
-              description: product.description || match.title,
+              description: productData.description || match.title,
             },
-            unit_amount: Math.round(product.price_amount * 100), // Convert to cents
+            unit_amount: Math.round(productData.price_amount * 100), // Convert to cents
           },
           quantity: 1,
         },
       ],
       metadata: {
-        product_id: product.id,
+        product_id: productData.id,
         match_recording_id: match.id,
         user_id: user?.id || 'guest',
         profile_id: profile?.id || 'guest',

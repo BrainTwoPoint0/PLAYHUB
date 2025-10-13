@@ -15,7 +15,11 @@ interface MatchDetailClientProps {
   hasAccess: boolean
 }
 
-export default function MatchDetailClient({ match, product, hasAccess }: MatchDetailClientProps) {
+export default function MatchDetailClient({
+  match,
+  product,
+  hasAccess,
+}: MatchDetailClientProps) {
   const [isLoading, setIsLoading] = useState(false)
 
   const handlePurchase = async () => {
@@ -113,14 +117,18 @@ export default function MatchDetailClient({ match, product, hasAccess }: MatchDe
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-2 gap-6">
                   <div className="p-4 bg-zinc-800 rounded-lg">
-                    <p className="text-[var(--ash-grey)] mb-2 text-sm uppercase tracking-wide">Date</p>
+                    <p className="text-[var(--ash-grey)] mb-2 text-sm uppercase tracking-wide">
+                      Date
+                    </p>
                     <p className="text-[var(--timberwolf)] font-semibold text-lg">
                       {formatDate(match.match_date)}
                     </p>
                   </div>
                   {match.venue && (
                     <div className="p-4 bg-zinc-800 rounded-lg">
-                      <p className="text-[var(--ash-grey)] mb-2 text-sm uppercase tracking-wide">Venue</p>
+                      <p className="text-[var(--ash-grey)] mb-2 text-sm uppercase tracking-wide">
+                        Venue
+                      </p>
                       <p className="text-[var(--timberwolf)] font-semibold text-lg">
                         {match.venue}
                       </p>
@@ -128,7 +136,9 @@ export default function MatchDetailClient({ match, product, hasAccess }: MatchDe
                   )}
                   {match.organization && (
                     <div className="p-4 bg-zinc-800 rounded-lg">
-                      <p className="text-[var(--ash-grey)] mb-2 text-sm uppercase tracking-wide">Organization</p>
+                      <p className="text-[var(--ash-grey)] mb-2 text-sm uppercase tracking-wide">
+                        Organization
+                      </p>
                       <p className="text-[var(--timberwolf)] font-semibold text-lg">
                         {match.organization.name}
                       </p>
@@ -136,7 +146,9 @@ export default function MatchDetailClient({ match, product, hasAccess }: MatchDe
                   )}
                   {match.duration_seconds && (
                     <div className="p-4 bg-zinc-800 rounded-lg">
-                      <p className="text-[var(--ash-grey)] mb-2 text-sm uppercase tracking-wide">Duration</p>
+                      <p className="text-[var(--ash-grey)] mb-2 text-sm uppercase tracking-wide">
+                        Duration
+                      </p>
                       <p className="text-[var(--timberwolf)] font-semibold text-lg">
                         {Math.floor(match.duration_seconds / 60)} minutes
                       </p>
@@ -146,8 +158,12 @@ export default function MatchDetailClient({ match, product, hasAccess }: MatchDe
 
                 {match.description && (
                   <div className="pt-6 border-t border-[var(--ash-grey)]/10">
-                    <h3 className="text-xl font-bold text-[var(--timberwolf)] mb-3">About This Match</h3>
-                    <p className="text-[var(--ash-grey)] leading-relaxed text-lg">{match.description}</p>
+                    <h3 className="text-xl font-bold text-[var(--timberwolf)] mb-3">
+                      About This Match
+                    </h3>
+                    <p className="text-[var(--ash-grey)] leading-relaxed text-lg">
+                      {match.description}
+                    </p>
                   </div>
                 )}
               </CardContent>
@@ -193,12 +209,13 @@ export default function MatchDetailClient({ match, product, hasAccess }: MatchDe
                         className="w-full bg-[var(--timberwolf)] text-[var(--night)] hover:bg-[var(--ash-grey)] text-lg py-6 shadow-lg"
                         asChild
                       >
-                        <Link href={`/library`}>
-                          Watch Now →
-                        </Link>
+                        <Link href={`/library`}>Watch Now →</Link>
                       </Button>
                     ) : (
-                      <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                      <motion.div
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
                         <Button
                           onClick={handlePurchase}
                           disabled={isLoading}

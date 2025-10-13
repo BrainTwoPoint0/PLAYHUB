@@ -1,21 +1,21 @@
-import { cn } from '@/lib/utils';
-import { AnimatePresence, motion } from 'motion/react';
-import Link from 'next/link';
-import { useState } from 'react';
+import { cn } from '@/lib/utils'
+import { AnimatePresence, motion } from 'motion/react'
+import Link from 'next/link'
+import { useState } from 'react'
 
 export const HoverEffect = ({
   items,
   className,
 }: {
   items: {
-    title: string;
-    description: string;
-    link: string;
-    logoUrl: string;
-  }[];
-  className?: string;
+    title: string
+    description: string
+    link: string
+    logoUrl: string
+  }[]
+  className?: string
 }) => {
-  let [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  let [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
 
   return (
     <div
@@ -56,17 +56,17 @@ export const HoverEffect = ({
         </Link>
       ))}
     </div>
-  );
-};
+  )
+}
 
 export const Card = ({
   className,
   children,
   logoUrl,
 }: {
-  className?: string;
-  children: React.ReactNode;
-  logoUrl: string;
+  className?: string
+  children: React.ReactNode
+  logoUrl: string
 }) => {
   return (
     <div
@@ -89,27 +89,27 @@ export const Card = ({
         <div className="p-4">{children}</div>
       </div>
     </div>
-  );
-};
+  )
+}
 export const CardTitle = ({
   className,
   children,
 }: {
-  className?: string;
-  children: React.ReactNode;
+  className?: string
+  children: React.ReactNode
 }) => {
   return (
     <h4 className={cn('text-zinc-100 font-bold tracking-wide mt-4', className)}>
       {children}
     </h4>
-  );
-};
+  )
+}
 export const CardDescription = ({
   className,
   children,
 }: {
-  className?: string;
-  children: React.ReactNode;
+  className?: string
+  children: React.ReactNode
 }) => {
   return (
     <p
@@ -120,5 +120,5 @@ export const CardDescription = ({
     >
       {children}
     </p>
-  );
-};
+  )
+}

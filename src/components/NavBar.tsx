@@ -38,13 +38,11 @@ export default function NavBar() {
           <div className="h-10 w-20 bg-zinc-800 animate-pulse rounded-md" />
         ) : user ? (
           <>
-            <span className="text-sm text-[var(--ash-grey)]">
-              {user.email}
-            </span>
+            <span className="text-sm text-[var(--ash-grey)]">{user.email}</span>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.location.href = '/api/auth/signout'}
+              onClick={() => (window.location.href = '/api/auth/signout')}
             >
               Sign Out
             </Button>
@@ -57,9 +55,7 @@ export default function NavBar() {
               </Button>
             </Link>
             <Link href="/auth/register">
-              <Button size="sm">
-                Sign Up
-              </Button>
+              <Button size="sm">Sign Up</Button>
             </Link>
           </>
         )}

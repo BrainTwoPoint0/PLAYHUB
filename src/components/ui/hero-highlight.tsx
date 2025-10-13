@@ -1,63 +1,63 @@
-'use client';
-import { cn } from '@/lib/utils';
+'use client'
+import { cn } from '@/lib/utils'
 import {
   useMotionValue,
   motion,
   useMotionTemplate,
   animate,
-} from 'motion/react';
-import React, { useEffect, useState } from 'react';
+} from 'motion/react'
+import React, { useEffect, useState } from 'react'
 
 export const HeroHighlight = ({
   children,
   className,
   containerClassName,
 }: {
-  children: React.ReactNode;
-  className?: string;
-  containerClassName?: string;
+  children: React.ReactNode
+  className?: string
+  containerClassName?: string
 }) => {
-  let mouseX = useMotionValue(0);
-  let mouseY = useMotionValue(0);
-  const [isHoverable, setIsHoverable] = useState(false);
+  let mouseX = useMotionValue(0)
+  let mouseY = useMotionValue(0)
+  const [isHoverable, setIsHoverable] = useState(false)
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(pointer: fine)');
-    setIsHoverable(mediaQuery.matches);
+    const mediaQuery = window.matchMedia('(pointer: fine)')
+    setIsHoverable(mediaQuery.matches)
 
     const handleChange = (e: MediaQueryListEvent) => {
-      setIsHoverable(e.matches);
-    };
+      setIsHoverable(e.matches)
+    }
 
-    mediaQuery.addEventListener('change', handleChange);
+    mediaQuery.addEventListener('change', handleChange)
 
     return () => {
-      mediaQuery.removeEventListener('change', handleChange);
-    };
-  }, []);
+      mediaQuery.removeEventListener('change', handleChange)
+    }
+  }, [])
 
   useEffect(() => {
     if (!isHoverable) {
       const updatePosition = () => {
-        const randomX = Math.random() * window.innerWidth;
-        const randomY = Math.random() * window.innerHeight;
-        animate(mouseX, randomX, { duration: 2 });
-        animate(mouseY, randomY, { duration: 2 });
-      };
+        const randomX = Math.random() * window.innerWidth
+        const randomY = Math.random() * window.innerHeight
+        animate(mouseX, randomX, { duration: 2 })
+        animate(mouseY, randomY, { duration: 2 })
+      }
 
-      const interval = setInterval(updatePosition, 2000);
-      updatePosition();
+      const interval = setInterval(updatePosition, 2000)
+      updatePosition()
 
-      return () => clearInterval(interval);
+      return () => clearInterval(interval)
     }
-  }, [isHoverable, mouseX, mouseY]);
+  }, [isHoverable, mouseX, mouseY])
 
   const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!isHoverable || !event.currentTarget) return;
-    const { left, top } = event.currentTarget.getBoundingClientRect();
-    mouseX.set(event.clientX - left);
-    mouseY.set(event.clientY - top);
-  };
+    if (!isHoverable || !event.currentTarget) return
+    const { left, top } = event.currentTarget.getBoundingClientRect()
+    mouseX.set(event.clientX - left)
+    mouseY.set(event.clientY - top)
+  }
 
   return (
     <div
@@ -90,15 +90,15 @@ export const HeroHighlight = ({
 
       <div className={cn('relative z-20', className)}>{children}</div>
     </div>
-  );
-};
+  )
+}
 
 export const Highlight = ({
   children,
   className,
 }: {
-  children: React.ReactNode;
-  className?: string;
+  children: React.ReactNode
+  className?: string
 }) => {
   return (
     <motion.span
@@ -125,5 +125,5 @@ export const Highlight = ({
     >
       {children}
     </motion.span>
-  );
-};
+  )
+}

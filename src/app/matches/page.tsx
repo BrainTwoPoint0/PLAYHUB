@@ -13,23 +13,30 @@ export default function MatchesPage() {
     async function fetchMatches() {
       const supabase = createClient()
 
-      const { data, error } = await supabase
+      // Type assertion for PLAYHUB tables
+      const { data, error } = await (supabase as any)
         .from('playhub_match_recordings')
-        .select(`
+        .select(
+          `
           *,
           sport:sports(name),
           organization:organizations(name),
           products:playhub_products(id, price_amount, currency, is_available)
-        `)
+        `
+        )
         .eq('status', 'published')
         .order('match_date', { ascending: false })
 
       if (error) {
         console.error('Error fetching matches:', error)
       } else {
-        const publishedMatches = data?.filter(match =>
-          match.products && match.products.length > 0 && match.products.some((p: any) => p.is_available)
-        ) || []
+        const publishedMatches =
+          data?.filter(
+            (match: any) =>
+              match.products &&
+              match.products.length > 0 &&
+              match.products.some((p: any) => p.is_available)
+          ) || []
         setMatches(publishedMatches)
       }
       setLoading(false)
