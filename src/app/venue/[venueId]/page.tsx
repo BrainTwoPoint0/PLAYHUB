@@ -706,7 +706,8 @@ export default function VenueManagementPage() {
                       : 'bg-muted'
                   }`}
                 >
-                  <div className="flex items-center gap-4">
+                  {/* Top row: Play button + Info + Status */}
+                  <div className="flex items-start gap-3">
                     {/* Play Button */}
                     {recording.s3_key && (
                       <Button
@@ -739,12 +740,12 @@ export default function VenueManagementPage() {
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-medium truncate">
                           {recording.title}
                         </p>
                         <span
-                          className={`text-xs px-2 py-0.5 rounded ${
+                          className={`text-xs px-2 py-0.5 rounded flex-shrink-0 ${
                             recording.status === 'published'
                               ? 'bg-green-500/20 text-green-500'
                               : recording.status === 'scheduled'
@@ -760,13 +761,15 @@ export default function VenueManagementPage() {
                         {formatTime(recording.match_date)}
                       </p>
                     </div>
+                  </div>
 
-                    {/* Access Count & Manage */}
+                  {/* Bottom row: Access count & Actions */}
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-700/50">
+                    <span className="text-sm text-muted-foreground">
+                      {recording.accessCount || 0} user
+                      {(recording.accessCount || 0) === 1 ? '' : 's'}
+                    </span>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">
-                        {recording.accessCount || 0} user
-                        {(recording.accessCount || 0) === 1 ? '' : 's'}
-                      </span>
                       <Button
                         variant="outline"
                         size="sm"
