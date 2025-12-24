@@ -51,6 +51,16 @@ interface Scene {
   name: string
 }
 
+interface Admin {
+  id: string
+  role: string
+  createdAt: string
+  userId: string
+  fullName: string | null
+  email: string | null
+  isCurrentUser: boolean
+}
+
 export default function VenueManagementPage() {
   const params = useParams()
   const venueId = params.venueId as string
@@ -91,6 +101,17 @@ export default function VenueManagementPage() {
 
   // Public link
   const [generatingLink, setGeneratingLink] = useState<string | null>(null)
+
+  // Recordings section state
+  const [showAllRecordings, setShowAllRecordings] = useState(false)
+  const RECORDINGS_PREVIEW_COUNT = 10
+
+  // Admin management state
+  const [admins, setAdmins] = useState<Admin[]>([])
+  const [showAdminSection, setShowAdminSection] = useState(false)
+  const [newAdminEmail, setNewAdminEmail] = useState('')
+  const [addingAdmin, setAddingAdmin] = useState(false)
+  const [removingAdminId, setRemovingAdminId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchVenueData()
@@ -243,6 +264,70 @@ export default function VenueManagementPage() {
       setError('Failed to generate public link')
     } finally {
       setGeneratingLink(null)
+    }
+  }
+
+  async function fetchAdmins() {
+    try {
+      const res = await fetch(`/api/venue/${venueId}/admins`)
+      const data = await res.json()
+      if (data.admins) {
+        setAdmins(data.admins)
+      }
+    } catch (err) {
+      console.error('Failed to fetch admins:', err)
+    }
+  }
+
+  async function handleAddAdmin(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newAdminEmail.trim()) return
+
+    setAddingAdmin(true)
+    try {
+      const res = await fetch(`/api/venue/${venueId}/admins`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: newAdminEmail.trim() }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Failed to add admin')
+        return
+      }
+
+      setSuccess('Admin added successfully!')
+      setNewAdminEmail('')
+      fetchAdmins()
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError('Failed to add admin')
+    } finally {
+      setAddingAdmin(false)
+    }
+  }
+
+  async function handleRemoveAdmin(memberId: string) {
+    setRemovingAdminId(memberId)
+    try {
+      const res = await fetch(`/api/venue/${venueId}/admins/${memberId}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Failed to remove admin')
+        return
+      }
+
+      setSuccess('Admin removed successfully!')
+      fetchAdmins()
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError('Failed to remove admin')
+    } finally {
+      setRemovingAdminId(null)
     }
   }
 
@@ -609,7 +694,10 @@ export default function VenueManagementPage() {
             </p>
           ) : (
             <div className="space-y-3">
-              {recordings.map((recording) => (
+              {(showAllRecordings
+                ? recordings
+                : recordings.slice(0, RECORDINGS_PREVIEW_COUNT)
+              ).map((recording) => (
                 <div
                   key={recording.id}
                   className={`p-4 rounded-md ${
@@ -703,9 +791,110 @@ export default function VenueManagementPage() {
                   </div>
                 </div>
               ))}
+
+              {/* Show more/less button */}
+              {recordings.length > RECORDINGS_PREVIEW_COUNT && (
+                <Button
+                  variant="ghost"
+                  className="w-full mt-2"
+                  onClick={() => setShowAllRecordings(!showAllRecordings)}
+                >
+                  {showAllRecordings
+                    ? 'Show less'
+                    : `Show all ${recordings.length} recordings`}
+                </Button>
+              )}
             </div>
           )}
         </CardContent>
+      </Card>
+
+      {/* Venue Admins Section */}
+      <Card className="mt-6">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle>Venue Admins</CardTitle>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowAdminSection(!showAdminSection)
+                if (!showAdminSection && admins.length === 0) {
+                  fetchAdmins()
+                }
+              }}
+            >
+              {showAdminSection ? 'Hide' : 'Manage Admins'}
+            </Button>
+          </div>
+          <CardDescription>
+            Users who can manage this venue and its recordings
+          </CardDescription>
+        </CardHeader>
+        {showAdminSection && (
+          <CardContent className="space-y-4">
+            {/* Add new admin */}
+            <form onSubmit={handleAddAdmin} className="flex gap-2">
+              <Input
+                type="email"
+                value={newAdminEmail}
+                onChange={(e) => setNewAdminEmail(e.target.value)}
+                placeholder="admin@example.com"
+                className="flex-1"
+              />
+              <Button type="submit" disabled={addingAdmin || !newAdminEmail}>
+                {addingAdmin ? 'Adding...' : 'Add Admin'}
+              </Button>
+            </form>
+
+            {/* Admin list */}
+            <div className="space-y-2">
+              {admins.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Loading admins...
+                </p>
+              ) : (
+                admins.map((admin) => (
+                  <div
+                    key={admin.id}
+                    className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-lg"
+                  >
+                    <div>
+                      <p className="font-medium">
+                        {admin.fullName || admin.email || 'Unknown'}
+                        {admin.isCurrentUser && (
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            (you)
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {admin.email}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                        {admin.role.replace('_', ' ')}
+                      </span>
+                      {!admin.isCurrentUser && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveAdmin(admin.id)}
+                          disabled={removingAdminId === admin.id}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                        >
+                          {removingAdminId === admin.id
+                            ? 'Removing...'
+                            : 'Remove'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        )}
       </Card>
 
       {/* Access Modal */}
