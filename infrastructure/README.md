@@ -5,6 +5,7 @@ AWS infrastructure for PLAYHUB recording sync and live streaming.
 ## Components
 
 ### Recording Sync Lambda
+
 Automatically syncs Spiideo recordings to S3 every 15 minutes.
 
 - **Lambda**: `playhub-sync-recordings`
@@ -13,6 +14,7 @@ Automatically syncs Spiideo recordings to S3 every 15 minutes.
 - **Alerting**: SNS email notifications on failure
 
 ### Live Streaming (Future)
+
 - MediaLive channels
 - MediaPackage endpoints
 - CloudFront distribution
@@ -49,10 +51,10 @@ terraform apply -target=aws_lambda_function.sync_recordings \
 
 ### Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `SYNC_ENDPOINT` | PLAYHUB sync API URL |
-| `SYNC_API_KEY` | API key for authentication |
+| Variable        | Description                |
+| --------------- | -------------------------- |
+| `SYNC_ENDPOINT` | PLAYHUB sync API URL       |
+| `SYNC_API_KEY`  | API key for authentication |
 
 ### Manual Trigger
 
@@ -71,23 +73,25 @@ cat response.json
 ### Monitoring & Alerts
 
 **CloudWatch Alarms** (email to admin@playbacksports.ai):
+
 - **Error Alarm**: Triggers if Lambda fails
 - **Timeout Alarm**: Triggers if Lambda runs > 14 minutes (warning before timeout)
 
 After deployment, you'll receive a confirmation email from AWS SNS - click the link to activate alerts.
 
 **View Logs:**
+
 - Log group: `/aws/lambda/playhub-sync-recordings`
 - Metrics: AWS Lambda console
 
 ## Cost Estimate
 
-| Resource | Monthly Cost |
-|----------|--------------|
+| Resource                                  | Monthly Cost    |
+| ----------------------------------------- | --------------- |
 | Lambda (720 invocations × 15 min × 256MB) | ~$0 (free tier) |
-| EventBridge | Free |
-| CloudWatch Logs | ~$0 (under 5GB) |
-| **Total** | **~$0/month** |
+| EventBridge                               | Free            |
+| CloudWatch Logs                           | ~$0 (under 5GB) |
+| **Total**                                 | **~$0/month**   |
 
 ## Architecture
 

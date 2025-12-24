@@ -1,61 +1,82 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth/context'
-import { Button } from '@/components/ui/button'
+
+const navItems = [{ href: '/recordings', label: 'My Recordings' }]
 
 export default function NavBar() {
   const { user, loading } = useAuth()
+  const [hasVenues, setHasVenues] = useState(false)
+
+  useEffect(() => {
+    if (user) {
+      fetch('/api/venue')
+        .then((res) => res.json())
+        .then((data) => {
+          setHasVenues(data.venues?.length > 0)
+        })
+        .catch(() => setHasVenues(false))
+    } else {
+      setHasVenues(false)
+    }
+  }, [user])
 
   return (
-    <nav className="container mx-auto flex p-5 items-center justify-between border-b border-[var(--ash-grey)]/20">
-      {/* Logo */}
-      <Link href="/" className="text-2xl font-bold text-[var(--timberwolf)]">
+    <nav className="container mx-auto flex p-5 items-center">
+      <Link href="/" className="text-xl font-semibold text-[var(--timberwolf)]">
         PLAYHUB
       </Link>
 
-      {/* Navigation Links */}
-      <div className="hidden md:flex items-center space-x-6">
-        <Link
-          href="/matches"
-          className="text-[var(--timberwolf)] hover:text-[var(--ash-grey)] transition-colors"
-        >
-          Browse Matches
-        </Link>
-        {user && (
+      <div className="hidden md:flex ml-4 pl-4 border-l border-[var(--timberwolf)] items-center gap-6">
+        {navItems.map(({ href, label }) => (
           <Link
-            href="/library"
-            className="text-[var(--timberwolf)] hover:text-[var(--ash-grey)] transition-colors"
+            key={href}
+            href={href}
+            className="text-sm text-[var(--ash-grey)] hover:text-[var(--timberwolf)] transition-colors"
           >
-            My Library
+            {label}
+          </Link>
+        ))}
+        {hasVenues && (
+          <Link
+            href="/venue"
+            className="text-sm text-[var(--ash-grey)] hover:text-[var(--timberwolf)] transition-colors"
+          >
+            Manage Venue
           </Link>
         )}
       </div>
 
-      {/* Auth Buttons */}
-      <div className="flex items-center space-x-4">
+      <div className="ml-auto flex items-center gap-4">
         {loading ? (
-          <div className="h-10 w-20 bg-zinc-800 animate-pulse rounded-md" />
+          <div className="h-8 w-16 bg-zinc-800/50 animate-pulse rounded" />
         ) : user ? (
           <>
-            <span className="text-sm text-[var(--ash-grey)]">{user.email}</span>
-            <Button
-              variant="outline"
-              size="sm"
+            <span className="text-sm text-[var(--ash-grey)] hidden sm:block">
+              {user.email}
+            </span>
+            <button
               onClick={() => (window.location.href = '/api/auth/signout')}
+              className="text-sm text-[var(--ash-grey)] hover:text-[var(--timberwolf)] transition-colors"
             >
-              Sign Out
-            </Button>
+              Sign out
+            </button>
           </>
         ) : (
           <>
-            <Link href="/auth/login">
-              <Button variant="ghost" size="sm">
-                Sign In
-              </Button>
+            <Link
+              href="/auth/login"
+              className="text-sm text-[var(--ash-grey)] hover:text-[var(--timberwolf)] transition-colors"
+            >
+              Sign in
             </Link>
-            <Link href="/auth/register">
-              <Button size="sm">Sign Up</Button>
+            <Link
+              href="/auth/register"
+              className="text-sm bg-[var(--timberwolf)] text-[var(--night)] px-4 py-2 rounded hover:bg-[var(--ash-grey)] transition-colors"
+            >
+              Sign up
             </Link>
           </>
         )}

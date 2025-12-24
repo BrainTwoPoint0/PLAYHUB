@@ -9,6 +9,10 @@ import {
   generateRecordingKey,
 } from '@/lib/s3/client'
 import { getGames, getProductions } from '@/lib/spiideo/client'
+import {
+  checkRecordingAccess,
+  getAccessibleRecordings,
+} from '@/lib/recordings/access-control'
 
 const ACCOUNT_ID = process.env.SPIIDEO_KUWAIT_ACCOUNT_ID!
 const SYNC_API_KEY = process.env.SYNC_API_KEY
@@ -19,35 +23,32 @@ function verifyApiKey(request: Request): boolean {
   return apiKey === SYNC_API_KEY && !!SYNC_API_KEY
 }
 
-// Type for match recordings (not yet in generated types)
-interface MatchRecording {
-  id: string
-  title: string
-  description?: string
-  match_date: string
-  home_team: string
-  away_team: string
-  s3_bucket?: string
-  s3_key?: string
-  status: string
-  spiideo_game_id?: string
-  spiideo_production_id?: string
-  transferred_at?: string
-  created_at?: string
-}
-
 // GET - List recordings or get playback URL
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
   const action = searchParams.get('action')
 
-  const supabase = (await createClient()) as any
+  const supabase = await createClient()
+
+  // Get current user for access checks
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   try {
     // Get playback URL for a specific recording
     if (id && action === 'playback') {
-      const { data: recording, error } = await supabase
+      // Check access first
+      const accessCheck = await checkRecordingAccess(id, user?.id || null)
+      if (!accessCheck.hasAccess) {
+        return NextResponse.json(
+          { error: 'Access denied', reason: accessCheck.reason },
+          { status: 403 }
+        )
+      }
+
+      const { data: recording, error } = await (supabase as any)
         .from('playhub_match_recordings')
         .select('*')
         .eq('id', id)
@@ -79,7 +80,16 @@ export async function GET(request: Request) {
 
     // Get download URL for a specific recording
     if (id && action === 'download') {
-      const { data: recording, error } = await supabase
+      // Check access first
+      const accessCheck = await checkRecordingAccess(id, user?.id || null)
+      if (!accessCheck.hasAccess) {
+        return NextResponse.json(
+          { error: 'Access denied', reason: accessCheck.reason },
+          { status: 403 }
+        )
+      }
+
+      const { data: recording, error } = await (supabase as any)
         .from('playhub_match_recordings')
         .select('*')
         .eq('id', id)
@@ -117,7 +127,16 @@ export async function GET(request: Request) {
 
     // Get single recording by ID
     if (id) {
-      const { data: recording, error } = await supabase
+      // Check access first
+      const accessCheck = await checkRecordingAccess(id, user?.id || null)
+      if (!accessCheck.hasAccess) {
+        return NextResponse.json(
+          { error: 'Access denied', reason: accessCheck.reason },
+          { status: 403 }
+        )
+      }
+
+      const { data: recording, error } = await (supabase as any)
         .from('playhub_match_recordings')
         .select('*')
         .eq('id', id)
@@ -133,10 +152,30 @@ export async function GET(request: Request) {
       return NextResponse.json(recording)
     }
 
-    // List all recordings
-    const { data: recordings, error } = await supabase
+    // List recordings - only return those user has access to
+    if (!user) {
+      return NextResponse.json({
+        total: 0,
+        recordings: [],
+        message: 'Login required to view recordings',
+      })
+    }
+
+    // Get IDs of recordings user can access
+    const accessibleIds = await getAccessibleRecordings(user.id)
+
+    if (accessibleIds.length === 0) {
+      return NextResponse.json({
+        total: 0,
+        recordings: [],
+      })
+    }
+
+    // Fetch only accessible recordings
+    const { data: recordings, error } = await (supabase as any)
       .from('playhub_match_recordings')
       .select('*')
+      .in('id', accessibleIds)
       .order('match_date', { ascending: false })
 
     if (error) {
@@ -224,7 +263,11 @@ export async function POST(request: Request) {
         }
 
         // Use the same key generation as the transfer endpoint (including match date)
-        const s3Key = generateRecordingKey(game.id, liveProduction.id, game.scheduledStartTime)
+        const s3Key = generateRecordingKey(
+          game.id,
+          liveProduction.id,
+          game.scheduledStartTime
+        )
         const inS3 = await fileExists(s3Key)
 
         if (!inS3) {

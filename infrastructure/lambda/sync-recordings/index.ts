@@ -2,10 +2,7 @@
 // Uses shared Spiideo account, maps scenes to venues
 // Triggered by EventBridge every 15 minutes
 
-import {
-  S3Client,
-  HeadObjectCommand,
-} from '@aws-sdk/client-s3'
+import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
 import { Readable } from 'stream'
 import { createClient } from '@supabase/supabase-js'
@@ -146,9 +143,13 @@ async function createDownloadOutput(productionId: string): Promise<Output> {
   })
 }
 
-async function getOutputProgress(outputId: string): Promise<{ progress: number }> {
+async function getOutputProgress(
+  outputId: string
+): Promise<{ progress: number }> {
   const progress = await spiideoFetch(`/v1/outputs/${outputId}/progress`)
-  return { progress: typeof progress === 'number' ? progress : progress.progress }
+  return {
+    progress: typeof progress === 'number' ? progress : progress.progress,
+  }
 }
 
 async function getDownloadUri(outputId: string): Promise<string> {
@@ -158,7 +159,9 @@ async function getDownloadUri(outputId: string): Promise<string> {
 // Get all scenes for scene name lookup
 async function getScenes(): Promise<Array<{ id: string; name: string }>> {
   try {
-    const data = await spiideoFetch(`/v1/scenes?accountId=${SPIIDEO_ACCOUNT_ID}`)
+    const data = await spiideoFetch(
+      `/v1/scenes?accountId=${SPIIDEO_ACCOUNT_ID}`
+    )
     return data.content || []
   } catch {
     return []
@@ -166,7 +169,11 @@ async function getScenes(): Promise<Array<{ id: string; name: string }>> {
 }
 
 // S3 helpers
-function generateS3Key(gameId: string, productionId: string, matchDate: string): string {
+function generateS3Key(
+  gameId: string,
+  productionId: string,
+  matchDate: string
+): string {
   const date = new Date(matchDate).toISOString().split('T')[0]
   return `recordings/${date}/${gameId}/${productionId}.mp4`
 }
@@ -180,14 +187,22 @@ async function s3KeyExists(key: string): Promise<boolean> {
   }
 }
 
-async function uploadToS3(downloadUrl: string, s3Key: string): Promise<{ size: number }> {
+async function uploadToS3(
+  downloadUrl: string,
+  s3Key: string
+): Promise<{ size: number }> {
   const response = await fetch(downloadUrl)
   if (!response.ok) {
     throw new Error(`Failed to download: ${response.status}`)
   }
 
-  const contentLength = parseInt(response.headers.get('content-length') || '0', 10)
-  console.log(`Downloading ${Math.round(contentLength / 1024 / 1024)}MB video...`)
+  const contentLength = parseInt(
+    response.headers.get('content-length') || '0',
+    10
+  )
+  console.log(
+    `Downloading ${Math.round(contentLength / 1024 / 1024)}MB video...`
+  )
 
   const webStream = response.body
   if (!webStream) {
@@ -212,10 +227,13 @@ async function uploadToS3(downloadUrl: string, s3Key: string): Promise<{ size: n
 
 // Database helpers
 async function getExistingGameIds(): Promise<Set<string>> {
+  // Only consider games as "existing" if already synced to S3
+  // This allows scheduled games to be picked up once finished
   const { data } = await supabase
     .from('playhub_match_recordings')
     .select('spiideo_game_id')
     .not('spiideo_game_id', 'is', null)
+    .not('s3_key', 'is', null)
 
   return new Set(data?.map((r) => r.spiideo_game_id) || [])
 }
@@ -278,7 +296,12 @@ async function syncGame(
     const production = productions.find((p) => p.type === 'live')
 
     if (!production) {
-      return { gameId: game.id, title, status: 'error', message: 'No live production found' }
+      return {
+        gameId: game.id,
+        title,
+        status: 'error',
+        message: 'No live production found',
+      }
     }
 
     // Get organization from scene mapping
@@ -295,7 +318,14 @@ async function syncGame(
     // Check if already in S3
     const s3Key = generateS3Key(game.id, production.id, game.scheduledStartTime)
     if (await s3KeyExists(s3Key)) {
-      await saveRecording(game, production.id, s3Key, 0, organizationId, pitchName)
+      await saveRecording(
+        game,
+        production.id,
+        s3Key,
+        0,
+        organizationId,
+        pitchName
+      )
       return {
         gameId: game.id,
         title,
@@ -345,7 +375,14 @@ async function syncGame(
     const { size } = await uploadToS3(downloadUri, s3Key)
 
     // Save to Supabase
-    await saveRecording(game, production.id, s3Key, size, organizationId, pitchName)
+    await saveRecording(
+      game,
+      production.id,
+      s3Key,
+      size,
+      organizationId,
+      pitchName
+    )
 
     return {
       gameId: game.id,
@@ -367,7 +404,10 @@ async function syncGame(
 }
 
 // Lambda handler
-export const handler = async (): Promise<{ statusCode: number; body: string }> => {
+export const handler = async (): Promise<{
+  statusCode: number
+  body: string
+}> => {
   console.log('Starting recording sync...')
 
   try {
@@ -378,7 +418,9 @@ export const handler = async (): Promise<{ statusCode: number; body: string }> =
       getExistingGameIds(),
     ])
 
-    console.log(`Loaded ${sceneMappings.size} scene mappings, ${scenes.length} scenes`)
+    console.log(
+      `Loaded ${sceneMappings.size} scene mappings, ${scenes.length} scenes`
+    )
     console.log(`Found ${existingGameIds.size} existing recordings`)
 
     // Get finished games
@@ -402,7 +444,9 @@ export const handler = async (): Promise<{ statusCode: number; body: string }> =
 
     // Sync the oldest unsynced game first (one per run to avoid timeout)
     const gameToSync = gamesToSync[gamesToSync.length - 1]
-    console.log(`Syncing: ${gameToSync.title || gameToSync.description} (scene: ${gameToSync.sceneId})`)
+    console.log(
+      `Syncing: ${gameToSync.title || gameToSync.description} (scene: ${gameToSync.sceneId})`
+    )
 
     const result = await syncGame(gameToSync, sceneMappings, scenes)
     console.log(`Result: ${result.status} - ${result.message}`)

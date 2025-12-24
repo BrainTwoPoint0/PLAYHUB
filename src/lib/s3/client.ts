@@ -250,4 +250,3 @@ export async function moveFile(
 export function getBucketName(): string {
   return S3_BUCKET
 }
-
