@@ -7,11 +7,11 @@ import { isVenueAdmin } from '@/lib/recordings/access-control'
 const SPIIDEO_API_BASE = 'https://api-public.spiideo.com'
 const SPIIDEO_TOKEN_URL = 'https://auth-play.spiideo.net/oauth2/token'
 
-// Shared Spiideo account credentials from environment
-const SPIIDEO_CLIENT_ID = process.env.SPIIDEO_CLIENT_ID!
-const SPIIDEO_CLIENT_SECRET = process.env.SPIIDEO_CLIENT_SECRET!
-const SPIIDEO_ACCOUNT_ID = process.env.SPIIDEO_ACCOUNT_ID!
-const SPIIDEO_USER_ID = process.env.SPIIDEO_USER_ID!
+// Shared Spiideo account credentials from environment (Kuwait)
+const SPIIDEO_CLIENT_ID = process.env.SPIIDEO_KUWAIT_CLIENT_ID!
+const SPIIDEO_CLIENT_SECRET = process.env.SPIIDEO_KUWAIT_CLIENT_SECRET!
+const SPIIDEO_ACCOUNT_ID = process.env.SPIIDEO_KUWAIT_ACCOUNT_ID!
+const SPIIDEO_USER_ID = process.env.SPIIDEO_PLAYBACK_ADMIN_USER_ID!
 
 async function getAccessToken(): Promise<string> {
   const basicAuth = Buffer.from(
