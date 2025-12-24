@@ -32,3 +32,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Infrastructure - Terraform
+infrastructure/terraform/.terraform/
+infrastructure/terraform/*.tfstate
+infrastructure/terraform/*.tfstate.backup
+infrastructure/terraform/terraform.tfvars
+
+# Infrastructure - Lambda
+infrastructure/lambda/**/node_modules/
+infrastructure/lambda/**/dist/
+infrastructure/lambda/**/*.zip

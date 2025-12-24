@@ -1,0 +1,24 @@
+# PLAYHUB Terraform Variables
+# Copy this file to terraform.tfvars and fill in the values
+
+# AWS Region
+aws_region = "eu-west-2"
+
+# Environment
+environment = "production"
+
+# Sync Lambda Configuration
+sync_endpoint = "https://playhub.playbacksports.ai/api/recordings/sync"
+sync_api_key  = "your-sync-api-key-here"
+
+# Alert email (you'll need to confirm subscription via email)
+alert_email = "admin@playbacksports.ai"
+
+# CloudFront Signed URLs (required for main.tf)
+# Generate with: openssl genrsa -out private_key.pem 2048
+#                openssl rsa -in private_key.pem -pubout -out public_key.pem
+cloudfront_public_key = <<-EOF
+-----BEGIN PUBLIC KEY-----
+YOUR_PUBLIC_KEY_HERE
+-----END PUBLIC KEY-----
+EOF
