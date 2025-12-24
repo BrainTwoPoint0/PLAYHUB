@@ -27,7 +27,10 @@ export default function NavBar() {
   return (
     <nav className="container mx-auto p-5">
       <div className="flex items-center">
-        <Link href="/" className="text-xl font-semibold text-[var(--timberwolf)]">
+        <Link
+          href="/"
+          className="text-xl font-semibold text-[var(--timberwolf)]"
+        >
           PLAYHUB
         </Link>
 
@@ -119,7 +122,9 @@ export default function NavBar() {
       {/* Mobile menu */}
       {mobileMenuOpen && user && (
         <div className="md:hidden mt-4 pt-4 border-t border-zinc-700 space-y-3">
-          <p className="text-xs text-[var(--ash-grey)] truncate">{user.email}</p>
+          <p className="text-xs text-[var(--ash-grey)] truncate">
+            {user.email}
+          </p>
           {navItems.map(({ href, label }) => (
             <Link
               key={href}
