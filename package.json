@@ -10,7 +10,7 @@
     "format": "prettier . --write"
   },
   "dependencies": {
-    "@aws-sdk/client-medialive": "^3.946.0",
+    "@aws-sdk/client-medialive": "^3.958.0",
     "@aws-sdk/client-s3": "^3.948.0",
     "@aws-sdk/cloudfront-signer": "^3.946.0",
     "@aws-sdk/lib-storage": "^3.948.0",
@@ -31,6 +31,7 @@
     "next": "14.2.3",
     "react": "^18",
     "react-dom": "^18",
+    "resend": "^6.6.0",
     "stripe": "^17.5.0",
     "tailwind-merge": "^2.6.0"
   },
