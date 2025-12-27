@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { HlsPlayer } from '@/components/streaming/HlsPlayer'
 
 interface Recording {
   id: string
@@ -59,6 +60,18 @@ interface Admin {
   fullName: string | null
   email: string | null
   isCurrentUser: boolean
+}
+
+interface StreamChannel {
+  id: string
+  name: string
+  state: string
+  rtmp?: {
+    url: string
+    streamKey: string
+    fullUrl: string
+  }
+  playbackUrl?: string
 }
 
 export default function VenueManagementPage() {
@@ -113,9 +126,34 @@ export default function VenueManagementPage() {
   const [addingAdmin, setAddingAdmin] = useState(false)
   const [removingAdminId, setRemovingAdminId] = useState<string | null>(null)
 
+  // Live streaming state
+  const [channels, setChannels] = useState<StreamChannel[]>([])
+  const [showStreamingSection, setShowStreamingSection] = useState(false)
+  const [loadingChannels, setLoadingChannels] = useState(false)
+  const [creatingChannel, setCreatingChannel] = useState(false)
+  const [newChannelName, setNewChannelName] = useState('')
+  const [startingChannelId, setStartingChannelId] = useState<string | null>(null)
+  const [stoppingChannelId, setStoppingChannelId] = useState<string | null>(null)
+  const [deletingChannelId, setDeletingChannelId] = useState<string | null>(null)
+  const [copiedField, setCopiedField] = useState<string | null>(null)
+
   useEffect(() => {
     fetchVenueData()
   }, [venueId])
+
+  // Poll for channel state changes
+  useEffect(() => {
+    if (!showStreamingSection || channels.length === 0) return
+
+    const hasTransitionalState = channels.some((c) =>
+      ['CREATING', 'STARTING', 'STOPPING', 'DELETING'].includes(c.state)
+    )
+
+    if (hasTransitionalState) {
+      const interval = setInterval(fetchChannels, 5000)
+      return () => clearInterval(interval)
+    }
+  }, [channels, showStreamingSection])
 
   async function fetchVenueData() {
     try {
@@ -254,9 +292,16 @@ export default function VenueManagementPage() {
         const fullUrl = data.shareUrl.startsWith('/')
           ? `${window.location.origin}${data.shareUrl}`
           : data.shareUrl
-        await navigator.clipboard.writeText(fullUrl)
-        setSuccess('Public link copied to clipboard!')
-        setTimeout(() => setSuccess(null), 3000)
+
+        // Try to copy to clipboard, with fallback for Safari/strict browsers
+        try {
+          await navigator.clipboard.writeText(fullUrl)
+          setSuccess('Public link copied to clipboard!')
+          setTimeout(() => setSuccess(null), 3000)
+        } catch (clipboardErr) {
+          // Clipboard failed (Safari permissions) - show prompt for manual copy
+          window.prompt('Copy this link:', fullUrl)
+        }
       } else {
         setError('Failed to generate public link')
       }
@@ -332,6 +377,172 @@ export default function VenueManagementPage() {
       setError('Failed to remove admin')
     } finally {
       setRemovingAdminId(null)
+    }
+  }
+
+  // Streaming functions
+  async function fetchChannels() {
+    try {
+      setLoadingChannels(true)
+      const res = await fetch(`/api/streaming/channels?venueId=${venueId}`)
+      const data = await res.json()
+
+      if (data.channels) {
+        // Fetch full details for each channel to get RTMP credentials
+        const channelsWithDetails = await Promise.all(
+          data.channels.map(async (ch: any) => {
+            try {
+              const detailRes = await fetch(`/api/streaming/channels/${ch.id}`)
+              const detailData = await detailRes.json()
+              return detailData.channel || ch
+            } catch {
+              return ch
+            }
+          })
+        )
+        setChannels(channelsWithDetails)
+      }
+    } catch (err) {
+      console.error('Failed to fetch channels:', err)
+    } finally {
+      setLoadingChannels(false)
+    }
+  }
+
+  async function handleCreateChannel(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newChannelName.trim()) return
+
+    setCreatingChannel(true)
+    try {
+      const res = await fetch('/api/streaming/channels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newChannelName.trim(),
+          venueId,
+        }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Failed to create channel')
+        return
+      }
+
+      setNewChannelName('')
+      setSuccess('Channel created! It may take a minute to become ready.')
+      setTimeout(() => setSuccess(null), 5000)
+      fetchChannels()
+    } catch (err) {
+      setError('Failed to create channel')
+    } finally {
+      setCreatingChannel(false)
+    }
+  }
+
+  async function handleStartChannel(channelId: string) {
+    if (!confirm('Starting the stream will begin AWS billing (~$0.35/hour). Continue?')) {
+      return
+    }
+
+    setStartingChannelId(channelId)
+    try {
+      const res = await fetch(`/api/streaming/channels/${channelId}/start`, {
+        method: 'POST',
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Failed to start channel')
+        return
+      }
+
+      setSuccess('Channel starting... It may take 1-2 minutes.')
+      setTimeout(() => setSuccess(null), 5000)
+      fetchChannels()
+    } catch (err) {
+      setError('Failed to start channel')
+    } finally {
+      setStartingChannelId(null)
+    }
+  }
+
+  async function handleStopChannel(channelId: string) {
+    setStoppingChannelId(channelId)
+    try {
+      const res = await fetch(`/api/streaming/channels/${channelId}/stop`, {
+        method: 'POST',
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Failed to stop channel')
+        return
+      }
+
+      setSuccess('Channel stopping... Billing will stop when it reaches IDLE.')
+      setTimeout(() => setSuccess(null), 5000)
+      fetchChannels()
+    } catch (err) {
+      setError('Failed to stop channel')
+    } finally {
+      setStoppingChannelId(null)
+    }
+  }
+
+  async function handleDeleteChannel(channelId: string) {
+    if (!confirm('Are you sure you want to delete this channel? This cannot be undone.')) {
+      return
+    }
+
+    setDeletingChannelId(channelId)
+    try {
+      const res = await fetch(`/api/streaming/channels/${channelId}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Failed to delete channel')
+        return
+      }
+
+      setSuccess('Channel deleted successfully!')
+      setTimeout(() => setSuccess(null), 3000)
+      fetchChannels()
+    } catch (err) {
+      setError('Failed to delete channel')
+    } finally {
+      setDeletingChannelId(null)
+    }
+  }
+
+  async function copyToClipboard(text: string, fieldName: string) {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedField(fieldName)
+      setTimeout(() => setCopiedField(null), 2000)
+    } catch {
+      // Clipboard failed (Safari permissions) - show prompt for manual copy
+      window.prompt('Copy this value:', text)
+    }
+  }
+
+  function getStateColor(state: string) {
+    switch (state) {
+      case 'RUNNING':
+        return 'bg-green-500/20 text-green-500'
+      case 'IDLE':
+        return 'bg-gray-500/20 text-gray-400'
+      case 'STARTING':
+      case 'STOPPING':
+      case 'CREATING':
+        return 'bg-yellow-500/20 text-yellow-500'
+      case 'DELETING':
+        return 'bg-red-500/20 text-red-500'
+      default:
+        return 'bg-gray-500/20 text-gray-400'
     }
   }
 
@@ -652,6 +863,188 @@ export default function VenueManagementPage() {
           )}
         </Card>
       )}
+
+      {/* Live Streaming Section */}
+      <Card className="mb-6">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Live Streaming</CardTitle>
+              <CardDescription>
+                Manage live stream channels for this venue
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowStreamingSection(!showStreamingSection)
+                if (!showStreamingSection && channels.length === 0) {
+                  fetchChannels()
+                }
+              }}
+            >
+              {showStreamingSection ? 'Hide' : 'Manage Streams'}
+            </Button>
+          </div>
+        </CardHeader>
+        {showStreamingSection && (
+          <CardContent className="space-y-4">
+            {/* Create new channel form */}
+            <form onSubmit={handleCreateChannel} className="flex gap-2">
+              <Input
+                value={newChannelName}
+                onChange={(e) => setNewChannelName(e.target.value)}
+                placeholder="Channel name (e.g., Pitch 1 Live)"
+                className="flex-1"
+              />
+              <Button type="submit" disabled={creatingChannel || !newChannelName.trim()}>
+                {creatingChannel ? 'Creating...' : '+ Create Channel'}
+              </Button>
+            </form>
+
+            {/* Channels list */}
+            {loadingChannels ? (
+              <p className="text-sm text-muted-foreground">Loading channels...</p>
+            ) : channels.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No streaming channels yet. Create one to get started.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {channels.map((channel) => (
+                  <div
+                    key={channel.id}
+                    className="p-4 bg-zinc-800/50 rounded-lg space-y-3"
+                  >
+                    {/* Channel header */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{channel.name}</span>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded ${getStateColor(channel.state)}`}
+                        >
+                          {channel.state}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {channel.state === 'IDLE' && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleStartChannel(channel.id)}
+                            disabled={startingChannelId === channel.id}
+                          >
+                            {startingChannelId === channel.id ? 'Starting...' : 'Start'}
+                          </Button>
+                        )}
+                        {channel.state === 'RUNNING' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleStopChannel(channel.id)}
+                            disabled={stoppingChannelId === channel.id}
+                          >
+                            {stoppingChannelId === channel.id ? 'Stopping...' : 'Stop'}
+                          </Button>
+                        )}
+                        {(channel.state === 'IDLE' || channel.state === 'CREATING') && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                            onClick={() => handleDeleteChannel(channel.id)}
+                            disabled={deletingChannelId === channel.id}
+                          >
+                            {deletingChannelId === channel.id ? 'Deleting...' : 'Delete'}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* RTMP credentials (show when not CREATING) */}
+                    {channel.state !== 'CREATING' && channel.rtmp && (
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground w-24">RTMP URL:</span>
+                          <code className="flex-1 bg-zinc-900 px-2 py-1 rounded text-xs truncate">
+                            {channel.rtmp.url}
+                          </code>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => copyToClipboard(channel.rtmp!.url, `rtmp-${channel.id}`)}
+                          >
+                            {copiedField === `rtmp-${channel.id}` ? 'Copied!' : 'Copy'}
+                          </Button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground w-24">Stream Key:</span>
+                          <code className="flex-1 bg-zinc-900 px-2 py-1 rounded text-xs truncate">
+                            {channel.rtmp.streamKey}
+                          </code>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => copyToClipboard(channel.rtmp!.streamKey, `key-${channel.id}`)}
+                          >
+                            {copiedField === `key-${channel.id}` ? 'Copied!' : 'Copy'}
+                          </Button>
+                        </div>
+                        {channel.playbackUrl && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground w-24">Playback:</span>
+                            <code className="flex-1 bg-zinc-900 px-2 py-1 rounded text-xs truncate">
+                              {channel.playbackUrl}
+                            </code>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => copyToClipboard(channel.playbackUrl!, `hls-${channel.id}`)}
+                            >
+                              {copiedField === `hls-${channel.id}` ? 'Copied!' : 'Copy'}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Video player when RUNNING */}
+                    {channel.state === 'RUNNING' && channel.playbackUrl && (
+                      <div className="mt-3">
+                        <p className="text-xs text-muted-foreground mb-2">Live Preview:</p>
+                        <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                          <HlsPlayer
+                            src={channel.playbackUrl}
+                            className="w-full h-full"
+                            autoPlay
+                            muted
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* State-specific messages */}
+                    {channel.state === 'CREATING' && (
+                      <p className="text-xs text-yellow-500">
+                        Channel is being created. This may take a minute...
+                      </p>
+                    )}
+                    {channel.state === 'STARTING' && (
+                      <p className="text-xs text-yellow-500">
+                        Channel is starting. This may take 1-2 minutes. Billing has started.
+                      </p>
+                    )}
+                    {channel.state === 'STOPPING' && (
+                      <p className="text-xs text-yellow-500">
+                        Channel is stopping. Billing will stop when it reaches IDLE.
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
 
       {/* Recordings List */}
       <Card>
