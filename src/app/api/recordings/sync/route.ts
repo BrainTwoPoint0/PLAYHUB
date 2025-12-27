@@ -19,6 +19,7 @@ import {
   fileExists,
 } from '@/lib/s3/client'
 import { createServiceClient } from '@/lib/supabase/server'
+import { sendRecordingReadyEmail } from '@/lib/email'
 
 const ACCOUNT_ID = process.env.SPIIDEO_KUWAIT_ACCOUNT_ID!
 const SYNC_API_KEY = process.env.SYNC_API_KEY
@@ -331,7 +332,7 @@ async function transferGame(
   const uploadResult = await uploadFromUrl(downloadUri, s3Key)
 
   // Save to Supabase
-  const { error: dbError } = await supabase
+  const { data: upsertedRecording, error: dbError } = await supabase
     .from('playhub_match_recordings')
     .upsert(
       {
@@ -351,6 +352,8 @@ async function transferGame(
       },
       { onConflict: 'spiideo_game_id' }
     )
+    .select('id, organization_id')
+    .single()
 
   if (dbError) {
     return {
@@ -362,6 +365,17 @@ async function transferGame(
     }
   }
 
+  // Notify users with access that the recording is ready
+  if (upsertedRecording?.id) {
+    await notifyUsersRecordingReady(
+      supabase,
+      upsertedRecording.id,
+      game.title || game.description || 'Untitled',
+      game.scheduledStartTime,
+      upsertedRecording.organization_id
+    )
+  }
+
   return {
     gameId: game.id,
     title: game.title || game.description || 'Unknown',
@@ -369,5 +383,82 @@ async function transferGame(
     status: 'transferred',
     message: `Transferred ${Math.round(uploadResult.size / 1024 / 1024)}MB to S3`,
     s3Key: uploadResult.s3Key,
+  }
+}
+
+// Notify all users with access that a recording is ready
+async function notifyUsersRecordingReady(
+  supabase: any,
+  recordingId: string,
+  recordingTitle: string,
+  matchDate: string,
+  organizationId?: string
+) {
+  try {
+    // Get venue name
+    let venueName: string | undefined
+    if (organizationId) {
+      const { data: venue } = await supabase
+        .from('organizations')
+        .select('name')
+        .eq('id', organizationId)
+        .single()
+      venueName = venue?.name
+    }
+
+    // Get all users with access to this recording
+    const { data: accessRights } = await supabase
+      .from('playhub_access_rights')
+      .select('user_id, invited_email')
+      .eq('match_recording_id', recordingId)
+      .eq('is_active', true)
+
+    if (!accessRights || accessRights.length === 0) return
+
+    // Get emails for users with user_id
+    const userIds = accessRights
+      .map((a: any) => a.user_id)
+      .filter((id: string | null) => id !== null)
+
+    let userEmails: string[] = []
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('email')
+        .in('user_id', userIds)
+
+      userEmails = profiles?.map((p: any) => p.email).filter(Boolean) || []
+    }
+
+    // Also include invited emails
+    const invitedEmails = accessRights
+      .map((a: any) => a.invited_email)
+      .filter((email: string | null) => email !== null)
+
+    const allEmails = Array.from(new Set([...userEmails, ...invitedEmails]))
+
+    // Format match date
+    const formattedDate = new Date(matchDate).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    })
+
+    // Send emails
+    await Promise.all(
+      allEmails.map((email) =>
+        sendRecordingReadyEmail({
+          toEmail: email,
+          recordingTitle,
+          matchDate: formattedDate,
+          venueName,
+        })
+      )
+    )
+
+    console.log(`Sent recording ready notifications to ${allEmails.length} users`)
+  } catch (error) {
+    console.error('Failed to send recording ready notifications:', error)
   }
 }

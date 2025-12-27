@@ -297,10 +297,14 @@ export default function VenueManagementPage() {
         return
       }
 
-      setSuccess('Admin added successfully!')
+      if (data.invited) {
+        setSuccess('Invitation email sent! They will be added as admin after creating an account.')
+      } else {
+        setSuccess('Admin added successfully!')
+        fetchAdmins()
+      }
       setNewAdminEmail('')
-      fetchAdmins()
-      setTimeout(() => setSuccess(null), 3000)
+      setTimeout(() => setSuccess(null), 5000)
     } catch (err) {
       setError('Failed to add admin')
     } finally {
@@ -835,6 +839,18 @@ export default function VenueManagementPage() {
         </CardHeader>
         {showAdminSection && (
           <CardContent className="space-y-4">
+            {/* Success/Error messages */}
+            {success && (
+              <div className="bg-green-500/10 text-green-500 p-3 rounded-md text-sm">
+                {success}
+              </div>
+            )}
+            {error && (
+              <div className="bg-red-500/10 text-red-500 p-3 rounded-md text-sm">
+                {error}
+              </div>
+            )}
+
             {/* Add new admin */}
             <form onSubmit={handleAddAdmin} className="flex gap-2">
               <Input

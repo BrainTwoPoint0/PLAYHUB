@@ -1,6 +1,6 @@
 // GET/POST /api/recordings/[id]/access - List and grant access to a recording
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   isVenueAdmin,
@@ -8,6 +8,7 @@ import {
   grantRecordingAccess,
   grantRecordingAccessBulk,
 } from '@/lib/recordings/access-control'
+import { sendRecordingAccessEmail, sendRecordingAssignedEmail } from '@/lib/email'
 
 export async function GET(
   request: NextRequest,
@@ -77,10 +78,12 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const serviceClient = createServiceClient()
+
   // Get recording to check organization
-  const { data: recording, error: recordingError } = await (supabase as any)
+  const { data: recording, error: recordingError } = await (serviceClient as any)
     .from('playhub_match_recordings')
-    .select('id, organization_id')
+    .select('id, organization_id, title')
     .eq('id', recordingId)
     .single()
 
@@ -98,6 +101,24 @@ export async function POST(
       )
     }
   }
+
+  // Get venue name for email
+  let venueName: string | undefined
+  if (recording.organization_id) {
+    const { data: venue } = await serviceClient
+      .from('organizations')
+      .select('name')
+      .eq('id', recording.organization_id)
+      .single()
+    venueName = venue?.name
+  }
+
+  // Get inviter's name
+  const { data: inviterProfile } = await serviceClient
+    .from('profiles')
+    .select('full_name')
+    .eq('user_id', user.id)
+    .single()
 
   const body = await request.json()
   const { emails, email, expiresAt, notes } = body
@@ -134,6 +155,23 @@ export async function POST(
       return NextResponse.json({ error: result.error }, { status: 500 })
     }
 
+    // Send appropriate email based on whether user exists
+    if (result.userExists) {
+      await sendRecordingAssignedEmail({
+        toEmail: emailList[0],
+        recordingTitle: recording.title,
+        venueName,
+        assignedBy: inviterProfile?.full_name || undefined,
+      })
+    } else {
+      await sendRecordingAccessEmail({
+        toEmail: emailList[0],
+        recordingTitle: recording.title,
+        venueName,
+        inviterName: inviterProfile?.full_name || undefined,
+      })
+    }
+
     return NextResponse.json({
       success: true,
       accessId: result.accessId,
@@ -149,6 +187,26 @@ export async function POST(
       expiresAt: expiresAt ? new Date(expiresAt) : undefined,
       notes,
     }
+  )
+
+  // Send email notifications for successful grants
+  const successfulResults = result.results.filter((r) => r.success)
+  await Promise.all(
+    successfulResults.map((r) =>
+      r.userExists
+        ? sendRecordingAssignedEmail({
+            toEmail: r.email,
+            recordingTitle: recording.title,
+            venueName,
+            assignedBy: inviterProfile?.full_name || undefined,
+          })
+        : sendRecordingAccessEmail({
+            toEmail: r.email,
+            recordingTitle: recording.title,
+            venueName,
+            inviterName: inviterProfile?.full_name || undefined,
+          })
+    )
   )
 
   return NextResponse.json({

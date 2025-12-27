@@ -233,7 +233,7 @@ export async function grantRecordingAccess(
     expiresAt?: Date
     notes?: string
   }
-): Promise<{ success: boolean; error?: string; accessId?: string }> {
+): Promise<{ success: boolean; error?: string; accessId?: string; userExists?: boolean }> {
   if (!options.userId && !options.email) {
     return { success: false, error: 'Either userId or email must be provided' }
   }
@@ -243,6 +243,7 @@ export async function grantRecordingAccess(
 
   // If email provided, check if user exists
   let targetUserId = options.userId
+  let userExists = !!options.userId
   if (options.email && !options.userId) {
     const { data: existingUser } = await supabase
       .from('profiles')
@@ -252,6 +253,7 @@ export async function grantRecordingAccess(
 
     if (existingUser) {
       targetUserId = existingUser.user_id
+      userExists = true
     }
   }
 
@@ -296,7 +298,7 @@ export async function grantRecordingAccess(
       console.error('Failed to update recording access:', error)
       return { success: false, error: error.message }
     }
-    return { success: true, accessId: existingAccess.id }
+    return { success: true, accessId: existingAccess.id, userExists }
   }
 
   // Insert new access grant
@@ -322,7 +324,7 @@ export async function grantRecordingAccess(
     return { success: false, error: error.message }
   }
 
-  return { success: true, accessId: data?.id }
+  return { success: true, accessId: data?.id, userExists }
 }
 
 /**
@@ -338,7 +340,7 @@ export async function grantRecordingAccessBulk(
   }
 ): Promise<{
   success: boolean
-  results: Array<{ email: string; success: boolean; error?: string }>
+  results: Array<{ email: string; success: boolean; error?: string; userExists?: boolean }>
 }> {
   const results = await Promise.all(
     emails.map(async (email) => {
@@ -347,7 +349,7 @@ export async function grantRecordingAccessBulk(
         expiresAt: options?.expiresAt,
         notes: options?.notes,
       })
-      return { email, success: result.success, error: result.error }
+      return { email, success: result.success, error: result.error, userExists: result.userExists }
     })
   )
 
@@ -420,18 +422,27 @@ export async function listRecordingAccess(
     })
   }
 
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    recordingId: row.match_recording_id,
-    userId: row.user_id,
-    userEmail: row.user_id ? userEmails[row.user_id] || null : null,
-    invitedEmail: row.invited_email,
-    grantedBy: row.granted_by,
-    grantedAt: row.granted_at,
-    expiresAt: row.expires_at,
-    isActive: row.is_active,
-    notes: row.notes,
-  }))
+  // Filter out entries where user was deleted (has user_id but no profile)
+  // Keep entries with invited_email (user hasn't signed up yet)
+  return (data || [])
+    .filter((row: any) => {
+      // Keep if no user_id (invited by email, not signed up)
+      if (!row.user_id) return true
+      // Keep if user_id has a corresponding profile
+      return userEmails[row.user_id] !== undefined
+    })
+    .map((row: any) => ({
+      id: row.id,
+      recordingId: row.match_recording_id,
+      userId: row.user_id,
+      userEmail: row.user_id ? userEmails[row.user_id] || null : null,
+      invitedEmail: row.invited_email,
+      grantedBy: row.granted_by,
+      grantedAt: row.granted_at,
+      expiresAt: row.expires_at,
+      isActive: row.is_active,
+      notes: row.notes,
+    }))
 }
 
 /**

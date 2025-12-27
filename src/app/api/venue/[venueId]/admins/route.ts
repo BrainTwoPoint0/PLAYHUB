@@ -4,6 +4,7 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
+import { sendAdminInviteEmail } from '@/lib/email'
 
 export async function GET(
   request: NextRequest,
@@ -63,15 +64,18 @@ export async function GET(
     )
   }
 
-  const admins = (members || []).map((m: any) => ({
-    id: m.id,
-    role: m.role,
-    createdAt: m.created_at,
-    userId: m.profiles?.user_id,
-    fullName: m.profiles?.full_name,
-    email: m.profiles?.email,
-    isCurrentUser: m.profiles?.user_id === user.id,
-  }))
+  // Filter out members with deleted profiles and map to response format
+  const admins = (members || [])
+    .filter((m: any) => m.profiles !== null)
+    .map((m: any) => ({
+      id: m.id,
+      role: m.role,
+      createdAt: m.created_at,
+      userId: m.profiles?.user_id,
+      fullName: m.profiles?.full_name,
+      email: m.profiles?.email,
+      isCurrentUser: m.profiles?.user_id === user.id,
+    }))
 
   return NextResponse.json({ admins })
 }
@@ -115,6 +119,20 @@ export async function POST(
 
   const serviceClient = createServiceClient()
 
+  // Get venue name for the email
+  const { data: venue } = await serviceClient
+    .from('organizations')
+    .select('name')
+    .eq('id', venueId)
+    .single()
+
+  // Get inviter's name
+  const { data: inviterProfile } = await serviceClient
+    .from('profiles')
+    .select('full_name')
+    .eq('user_id', user.id)
+    .single()
+
   // Find user by email
   const { data: targetProfile } = await serviceClient
     .from('profiles')
@@ -123,10 +141,39 @@ export async function POST(
     .single()
 
   if (!targetProfile) {
-    return NextResponse.json(
-      { error: 'No user found with this email. They must sign up first.' },
-      { status: 404 }
-    )
+    // User doesn't exist - store pending invite and send email
+    const { error: inviteError } = await (serviceClient as any)
+      .from('playhub_pending_admin_invites')
+      .upsert(
+        {
+          organization_id: venueId,
+          invited_email: email.toLowerCase(),
+          role,
+          invited_by: user.id,
+          invited_at: new Date().toISOString(),
+        },
+        { onConflict: 'organization_id,invited_email' }
+      )
+
+    if (inviteError) {
+      console.error('Failed to store pending invite:', inviteError)
+      return NextResponse.json(
+        { error: 'Failed to send invitation' },
+        { status: 500 }
+      )
+    }
+
+    await sendAdminInviteEmail({
+      toEmail: email.toLowerCase(),
+      venueName: venue?.name || 'a venue',
+      inviterName: inviterProfile?.full_name || undefined,
+    })
+
+    return NextResponse.json({
+      success: true,
+      invited: true,
+      message: 'Invitation email sent. They will be added as admin after creating an account.',
+    })
   }
 
   // Check if already an admin
