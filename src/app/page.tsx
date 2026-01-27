@@ -1,6 +1,9 @@
+'use client'
+
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Play } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
+import { Gotcha } from 'gotcha-feedback'
 
 export default function HomePage() {
   return (
@@ -95,6 +98,24 @@ export default function HomePage() {
             >
               Get in touch →
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Feedback Section */}
+      <section className="border-t border-[var(--ash-grey)]/10">
+        <div className="container mx-auto px-5 py-12">
+          <div className="flex items-center justify-center gap-4">
+            <span className="text-[var(--ash-grey)] text-sm">
+              How do you like PLAYHUB so far?
+            </span>
+            <Gotcha
+              elementId="homepage-feedback"
+              mode="vote"
+              position="inline"
+              theme="dark"
+              showOnHover={false}
+            />
           </div>
         </div>
       </section>
