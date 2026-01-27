@@ -85,13 +85,17 @@ export async function createRtmpInput(
     throw new Error('MEDIALIVE_INPUT_SECURITY_GROUP_ID environment variable is required')
   }
 
+  // Use short stream keys (some RTMP clients have issues with long keys)
+  // Format: rtmp://server:1935/live/stream-key (app=live, key=shortId)
+  const shortId = streamId.slice(-8) // Last 8 chars of streamId
+
   const inputParams: CreateInputCommandInput = {
     Name: `playhub-${name}-${streamId}`,
     Type: InputType.RTMP_PUSH,
     InputSecurityGroups: [inputSecurityGroupId],
     Destinations: [
-      { StreamName: `stream-${streamId}-primary` },
-      { StreamName: `stream-${streamId}-backup` },
+      { StreamName: `live/${shortId}` },
+      { StreamName: `live/${shortId}-b` },
     ],
     Tags: {
       Project: 'PLAYHUB',

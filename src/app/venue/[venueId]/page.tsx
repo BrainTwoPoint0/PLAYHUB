@@ -137,6 +137,14 @@ export default function VenueManagementPage() {
   const [deletingChannelId, setDeletingChannelId] = useState<string | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
+  // Live stream scheduling state
+  const [showStreamScheduleForm, setShowStreamScheduleForm] = useState(false)
+  const [streamTitle, setStreamTitle] = useState('')
+  const [streamSceneId, setStreamSceneId] = useState('')
+  const [streamStartTime, setStreamStartTime] = useState('')
+  const [streamEndTime, setStreamEndTime] = useState('')
+  const [schedulingStream, setSchedulingStream] = useState(false)
+
   useEffect(() => {
     fetchVenueData()
   }, [venueId])
@@ -546,6 +554,56 @@ export default function VenueManagementPage() {
     }
   }
 
+  // Schedule live stream function
+  async function handleScheduleLiveStream(e: React.FormEvent) {
+    e.preventDefault()
+
+    if (!streamTitle || !streamSceneId || !streamStartTime || !streamEndTime) {
+      setError('Please fill in all required fields')
+      return
+    }
+
+    setSchedulingStream(true)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/streaming/spiideo/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          venueId,
+          title: streamTitle,
+          sceneId: streamSceneId,
+          scheduledStartTime: new Date(streamStartTime).toISOString(),
+          scheduledStopTime: new Date(streamEndTime).toISOString(),
+          sport: 'football',
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to schedule live stream')
+      }
+
+      setSuccess(
+        `Live stream scheduled! Playback URL: ${data.channel.playbackUrl}`
+      )
+      setTimeout(() => setSuccess(null), 15000)
+
+      // Reset form and refresh channels
+      setStreamTitle('')
+      setStreamStartTime('')
+      setStreamEndTime('')
+      setShowStreamScheduleForm(false)
+      fetchChannels()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to schedule live stream')
+    } finally {
+      setSchedulingStream(false)
+    }
+  }
+
   async function handlePlayRecording(recording: Recording) {
     if (playingId === recording.id) {
       setPlayingId(null)
@@ -902,6 +960,93 @@ export default function VenueManagementPage() {
               </Button>
             </form>
 
+            {/* Schedule Live Stream */}
+            <div className="p-4 bg-zinc-800/30 rounded-lg border border-zinc-700/50">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h4 className="font-medium">Schedule Live Stream</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Create a Spiideo recording + MediaLive stream in one step
+                  </p>
+                </div>
+                {!showStreamScheduleForm && (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setShowStreamScheduleForm(true)
+                      // Set default scene if available
+                      if (scenes.length > 0 && !streamSceneId) {
+                        setStreamSceneId(scenes[0].id)
+                      }
+                    }}
+                  >
+                    + Schedule Stream
+                  </Button>
+                )}
+              </div>
+
+              {showStreamScheduleForm && (
+                <form onSubmit={handleScheduleLiveStream} className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-sm text-muted-foreground">Title *</label>
+                      <Input
+                        value={streamTitle}
+                        onChange={(e) => setStreamTitle(e.target.value)}
+                        placeholder="Match title"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-muted-foreground">Camera/Pitch *</label>
+                      <select
+                        value={streamSceneId}
+                        onChange={(e) => setStreamSceneId(e.target.value)}
+                        className="w-full bg-zinc-900 border border-zinc-700 rounded-md px-3 py-2 text-sm"
+                        required
+                      >
+                        {scenes.map((scene) => (
+                          <option key={scene.id} value={scene.id}>
+                            {scene.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-sm text-muted-foreground">Start Time *</label>
+                      <Input
+                        type="datetime-local"
+                        value={streamStartTime}
+                        onChange={(e) => setStreamStartTime(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-muted-foreground">End Time *</label>
+                      <Input
+                        type="datetime-local"
+                        value={streamEndTime}
+                        onChange={(e) => setStreamEndTime(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setShowStreamScheduleForm(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={schedulingStream}>
+                      {schedulingStream ? 'Setting up...' : 'Create & Start Stream'}
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </div>
+
             {/* Channels list */}
             {loadingChannels ? (
               <p className="text-sm text-muted-foreground">Loading channels...</p>
@@ -1097,11 +1242,10 @@ export default function VenueManagementPage() {
               ).map((recording) => (
                 <div
                   key={recording.id}
-                  className={`p-4 rounded-md ${
-                    playingId === recording.id
-                      ? 'bg-primary/10 border border-primary/30'
-                      : 'bg-muted'
-                  }`}
+                  className={`p-4 rounded-md ${playingId === recording.id
+                    ? 'bg-primary/10 border border-primary/30'
+                    : 'bg-muted'
+                    }`}
                 >
                   {/* Top row: Play button + Info + Status */}
                   <div className="flex items-start gap-3">
@@ -1142,13 +1286,12 @@ export default function VenueManagementPage() {
                           {recording.title}
                         </p>
                         <span
-                          className={`text-xs px-2 py-0.5 rounded flex-shrink-0 ${
-                            recording.status === 'published'
-                              ? 'bg-green-500/20 text-green-500'
-                              : recording.status === 'scheduled'
-                                ? 'bg-yellow-500/20 text-yellow-500'
-                                : 'bg-gray-500/20 text-gray-500'
-                          }`}
+                          className={`text-xs px-2 py-0.5 rounded flex-shrink-0 ${recording.status === 'published'
+                            ? 'bg-green-500/20 text-green-500'
+                            : recording.status === 'scheduled'
+                              ? 'bg-yellow-500/20 text-yellow-500'
+                              : 'bg-gray-500/20 text-gray-500'
+                            }`}
                         >
                           {recording.status}
                         </span>
