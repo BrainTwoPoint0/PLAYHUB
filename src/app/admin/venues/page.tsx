@@ -92,8 +92,12 @@ export default function AdminVenuesPage() {
                       <p className="text-xs text-muted-foreground">Admins</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold">{venue.recordingCount}</p>
-                      <p className="text-xs text-muted-foreground">Recordings</p>
+                      <p className="text-2xl font-bold">
+                        {venue.recordingCount}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Recordings
+                      </p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">

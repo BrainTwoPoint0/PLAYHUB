@@ -32,8 +32,12 @@ export async function getAdminStats() {
   ] = await Promise.all([
     supabase.from('profiles').select('*', { count: 'exact', head: true }),
     supabase.from('organizations').select('*', { count: 'exact', head: true }),
-    supabase.from('playhub_match_recordings').select('*', { count: 'exact', head: true }),
-    supabase.from('playhub_pending_admin_invites').select('*', { count: 'exact', head: true }),
+    supabase
+      .from('playhub_match_recordings')
+      .select('*', { count: 'exact', head: true }),
+    supabase
+      .from('playhub_pending_admin_invites')
+      .select('*', { count: 'exact', head: true }),
   ])
 
   // Get recent activity
@@ -67,13 +71,15 @@ export async function getAllVenues() {
 
   const { data: venues } = await supabase
     .from('organizations')
-    .select(`
+    .select(
+      `
       id,
       name,
       slug,
       logo_url,
       created_at
-    `)
+    `
+    )
     .order('name', { ascending: true })
 
   if (!venues) return []
@@ -98,11 +104,13 @@ export async function getAllVenues() {
   const recordingCountMap: Record<string, number> = {}
 
   memberCounts?.forEach((m: any) => {
-    adminCountMap[m.organization_id] = (adminCountMap[m.organization_id] || 0) + 1
+    adminCountMap[m.organization_id] =
+      (adminCountMap[m.organization_id] || 0) + 1
   })
 
   recordingCounts?.forEach((r: any) => {
-    recordingCountMap[r.organization_id] = (recordingCountMap[r.organization_id] || 0) + 1
+    recordingCountMap[r.organization_id] =
+      (recordingCountMap[r.organization_id] || 0) + 1
   })
 
   return venues.map((v: any) => ({
@@ -120,7 +128,9 @@ export async function getAllUsers() {
 
   const { data: users } = await supabase
     .from('profiles')
-    .select('id, user_id, full_name, username, email, is_platform_admin, created_at')
+    .select(
+      'id, user_id, full_name, username, email, is_platform_admin, created_at'
+    )
     .order('created_at', { ascending: false })
 
   return users || []
@@ -134,7 +144,8 @@ export async function getAllRecordings() {
 
   const { data: recordings } = await supabase
     .from('playhub_match_recordings')
-    .select(`
+    .select(
+      `
       id,
       title,
       status,
@@ -144,13 +155,16 @@ export async function getAllRecordings() {
       organization_id,
       s3_key,
       created_at
-    `)
+    `
+    )
     .order('created_at', { ascending: false })
 
   if (!recordings) return []
 
   // Get venue names
-  const orgIds = Array.from(new Set(recordings.map((r: any) => r.organization_id).filter(Boolean)))
+  const orgIds = Array.from(
+    new Set(recordings.map((r: any) => r.organization_id).filter(Boolean))
+  )
 
   let venueMap: Record<string, string> = {}
   if (orgIds.length > 0) {
@@ -174,7 +188,8 @@ export async function getAllRecordings() {
 
   const accessCountMap: Record<string, number> = {}
   accessCounts?.forEach((a: any) => {
-    accessCountMap[a.match_recording_id] = (accessCountMap[a.match_recording_id] || 0) + 1
+    accessCountMap[a.match_recording_id] =
+      (accessCountMap[a.match_recording_id] || 0) + 1
   })
 
   return recordings.map((r: any) => ({
@@ -229,7 +244,10 @@ export async function deleteUser(
 
   // Prevent deleting platform admins
   if (targetProfile.is_platform_admin) {
-    return { success: false, error: 'Cannot delete a platform admin. Remove admin status first.' }
+    return {
+      success: false,
+      error: 'Cannot delete a platform admin. Remove admin status first.',
+    }
   }
 
   // Delete in order: profile first (cascades to related data), then auth user
@@ -242,24 +260,33 @@ export async function deleteUser(
 
     if (profileDeleteError) {
       console.error('Error deleting profile:', profileDeleteError)
-      return { success: false, error: profileDeleteError.message || 'Failed to delete profile' }
+      return {
+        success: false,
+        error: profileDeleteError.message || 'Failed to delete profile',
+      }
     }
 
     // Step 2: Delete auth user via direct SQL (more reliable than admin API)
     const { error: authDeleteError } = await supabase.rpc('delete_auth_user', {
-      user_id: targetProfile.user_id
+      user_id: targetProfile.user_id,
     })
 
     if (authDeleteError) {
       console.error('Error deleting auth user:', authDeleteError)
       // Profile is already deleted, so user can't access anything
       // But warn that auth record remains
-      return { success: true, warning: 'Profile deleted but auth record may remain' }
+      return {
+        success: true,
+        warning: 'Profile deleted but auth record may remain',
+      }
     }
 
     return { success: true }
   } catch (err: any) {
     console.error('Exception deleting user:', err)
-    return { success: false, error: err?.message || 'Unexpected error deleting user' }
+    return {
+      success: false,
+      error: err?.message || 'Unexpected error deleting user',
+    }
   }
 }

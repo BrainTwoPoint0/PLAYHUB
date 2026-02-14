@@ -233,7 +233,12 @@ export async function grantRecordingAccess(
     expiresAt?: Date
     notes?: string
   }
-): Promise<{ success: boolean; error?: string; accessId?: string; userExists?: boolean }> {
+): Promise<{
+  success: boolean
+  error?: string
+  accessId?: string
+  userExists?: boolean
+}> {
   if (!options.userId && !options.email) {
     return { success: false, error: 'Either userId or email must be provided' }
   }
@@ -340,7 +345,12 @@ export async function grantRecordingAccessBulk(
   }
 ): Promise<{
   success: boolean
-  results: Array<{ email: string; success: boolean; error?: string; userExists?: boolean }>
+  results: Array<{
+    email: string
+    success: boolean
+    error?: string
+    userExists?: boolean
+  }>
 }> {
   const results = await Promise.all(
     emails.map(async (email) => {
@@ -349,7 +359,12 @@ export async function grantRecordingAccessBulk(
         expiresAt: options?.expiresAt,
         notes: options?.notes,
       })
-      return { email, success: result.success, error: result.error, userExists: result.userExists }
+      return {
+        email,
+        success: result.success,
+        error: result.error,
+        userExists: result.userExists,
+      }
     })
   )
 

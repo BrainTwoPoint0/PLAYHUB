@@ -75,10 +75,7 @@ export default function AdminLayout({
           <p className="text-muted-foreground mb-6">
             You do not have permission to access the admin area.
           </p>
-          <Link
-            href="/"
-            className="text-[var(--timberwolf)] hover:underline"
-          >
+          <Link href="/" className="text-[var(--timberwolf)] hover:underline">
             Go back home
           </Link>
         </div>
@@ -128,9 +125,7 @@ export default function AdminLayout({
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 p-8">
-        {children}
-      </main>
+      <main className="flex-1 p-8">{children}</main>
     </div>
   )
 }

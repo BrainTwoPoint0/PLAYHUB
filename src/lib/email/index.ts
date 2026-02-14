@@ -3,7 +3,8 @@ import { Resend } from 'resend'
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 const FROM_EMAIL = 'PLAYHUB <admin@playbacksports.ai>'
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://playhub.playbacksports.ai'
+const APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL || 'https://playhub.playbacksports.ai'
 
 interface SendEmailResult {
   success: boolean
@@ -121,11 +122,15 @@ export async function sendRecordingAccessEmail(params: {
               ${actionText}
             </a>
 
-            ${!shareUrl ? `
+            ${
+              !shareUrl
+                ? `
             <p style="font-size: 14px; color: #b9baa3; margin-top: 32px;">
               Already have an account? <a href="${APP_URL}/auth/login" style="color: #d6d5c9;">Sign in here</a> to view your recordings.
             </p>
-            ` : ''}
+            `
+                : ''
+            }
 
             <hr style="border: none; border-top: 1px solid #333; margin: 32px 0;">
 

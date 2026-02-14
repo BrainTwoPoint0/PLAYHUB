@@ -31,9 +31,10 @@ function LoginForm() {
 
   useEffect(() => {
     if (user) {
-      router.push('/')
+      const redirect = searchParams.get('redirect')
+      router.push(redirect || '/')
     }
-  }, [user, router])
+  }, [user, router, searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -57,7 +58,8 @@ function LoginForm() {
       if (error) {
         setError(getAuthErrorMessage(error))
       } else {
-        router.push('/')
+        const redirect = searchParams.get('redirect')
+        router.push(redirect || '/')
       }
     } catch {
       setError('An unexpected error occurred. Please try again.')

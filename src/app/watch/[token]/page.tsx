@@ -1,8 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { useAuth } from '@/lib/auth/context'
+import { Bookmark, BookmarkCheck, Loader2 } from 'lucide-react'
 
 interface Recording {
   id: string
@@ -17,16 +20,29 @@ interface Recording {
 
 export default function PublicWatchPage() {
   const params = useParams()
+  const router = useRouter()
   const token = params.token as string
+  const { user, loading: authLoading } = useAuth()
 
   const [recording, setRecording] = useState<Recording | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [checkingAccess, setCheckingAccess] = useState(false)
+
   useEffect(() => {
     fetchRecording()
   }, [token])
+
+  // Check if user already has access when they're signed in and recording is loaded
+  useEffect(() => {
+    if (user && recording && !authLoading) {
+      checkExistingAccess(recording.id)
+    }
+  }, [user, recording, authLoading])
 
   async function fetchRecording() {
     try {
@@ -45,6 +61,48 @@ export default function PublicWatchPage() {
       setError('Failed to load recording')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function checkExistingAccess(recordingId: string) {
+    try {
+      setCheckingAccess(true)
+      const res = await fetch(`/api/recordings/${recordingId}/check-access`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.hasAccess) {
+          setSaved(true)
+        }
+      }
+    } catch {
+      // Ignore errors - just means we can't check, button stays as "Save"
+    } finally {
+      setCheckingAccess(false)
+    }
+  }
+
+  async function handleSave() {
+    if (!user) {
+      // Redirect to login with return URL
+      router.push(`/auth/login?redirect=/watch/${token}`)
+      return
+    }
+
+    if (!recording) return
+
+    try {
+      setSaving(true)
+      const res = await fetch(`/api/recordings/${recording.id}/save`, {
+        method: 'POST',
+      })
+
+      if (res.ok) {
+        setSaved(true)
+      }
+    } catch {
+      // Silently fail - user can try again
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -114,6 +172,31 @@ export default function PublicWatchPage() {
             ) : (
               <div className="aspect-video bg-zinc-900 rounded-lg flex items-center justify-center">
                 <p className="text-muted-foreground">Video not available</p>
+              </div>
+            )}
+
+            {/* Save to Library Button */}
+            {!authLoading && (
+              <div className="flex justify-center pt-2">
+                {saved ? (
+                  <Button variant="outline" disabled className="gap-2">
+                    <BookmarkCheck className="h-4 w-4" />
+                    Saved to Library
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleSave}
+                    disabled={saving || checkingAccess}
+                    className="gap-2"
+                  >
+                    {saving ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Bookmark className="h-4 w-4" />
+                    )}
+                    {saving ? 'Saving...' : 'Save to My Library'}
+                  </Button>
+                )}
               </div>
             )}
 

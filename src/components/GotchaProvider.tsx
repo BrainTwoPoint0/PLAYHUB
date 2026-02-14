@@ -9,9 +9,5 @@ export function GotchaProvider({ children }: { children: React.ReactNode }) {
     return <>{children}</>
   }
 
-  return (
-    <Provider apiKey={apiKey}>
-      {children}
-    </Provider>
-  )
+  return <Provider apiKey={apiKey}>{children}</Provider>
 }

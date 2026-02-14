@@ -62,7 +62,10 @@ export default function AdminRecordingsPage() {
     return matchesSearch && matchesStatus
   })
 
-  const statuses = ['all', ...Array.from(new Set(recordings.map((r) => r.status)))]
+  const statuses = [
+    'all',
+    ...Array.from(new Set(recordings.map((r) => r.status))),
+  ]
 
   if (loading) {
     return <p className="text-muted-foreground">Loading recordings...</p>

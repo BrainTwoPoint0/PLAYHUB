@@ -52,13 +52,21 @@ export async function POST(request: NextRequest) {
     if (body.gameId) {
       const game = await getGame(body.gameId)
       if (!game) {
-        return NextResponse.json({ error: 'Spiideo game not found' }, { status: 404 })
+        return NextResponse.json(
+          { error: 'Spiideo game not found' },
+          { status: 404 }
+        )
       }
       gameId = game.id
       gameTitle = game.title
     }
     // Option 2: Create new game with schedule details
-    else if (body.title && body.sceneId && body.scheduledStartTime && body.scheduledStopTime) {
+    else if (
+      body.title &&
+      body.sceneId &&
+      body.scheduledStartTime &&
+      body.scheduledStopTime
+    ) {
       const newGame = await createGame({
         accountId: config.accountId!,
         title: body.title,
@@ -74,7 +82,10 @@ export async function POST(request: NextRequest) {
       gameTitle = newGame.title
     } else {
       return NextResponse.json(
-        { error: 'Either gameId OR (title, sceneId, scheduledStartTime, scheduledStopTime) required' },
+        {
+          error:
+            'Either gameId OR (title, sceneId, scheduledStartTime, scheduledStopTime) required',
+        },
         { status: 400 }
       )
     }
@@ -150,7 +161,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error setting up live stream:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to set up live stream' },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to set up live stream',
+      },
       { status: 500 }
     )
   }

@@ -132,9 +132,15 @@ export default function VenueManagementPage() {
   const [loadingChannels, setLoadingChannels] = useState(false)
   const [creatingChannel, setCreatingChannel] = useState(false)
   const [newChannelName, setNewChannelName] = useState('')
-  const [startingChannelId, setStartingChannelId] = useState<string | null>(null)
-  const [stoppingChannelId, setStoppingChannelId] = useState<string | null>(null)
-  const [deletingChannelId, setDeletingChannelId] = useState<string | null>(null)
+  const [startingChannelId, setStartingChannelId] = useState<string | null>(
+    null
+  )
+  const [stoppingChannelId, setStoppingChannelId] = useState<string | null>(
+    null
+  )
+  const [deletingChannelId, setDeletingChannelId] = useState<string | null>(
+    null
+  )
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
   // Live stream scheduling state
@@ -351,7 +357,9 @@ export default function VenueManagementPage() {
       }
 
       if (data.invited) {
-        setSuccess('Invitation email sent! They will be added as admin after creating an account.')
+        setSuccess(
+          'Invitation email sent! They will be added as admin after creating an account.'
+        )
       } else {
         setSuccess('Admin added successfully!')
         fetchAdmins()
@@ -450,7 +458,11 @@ export default function VenueManagementPage() {
   }
 
   async function handleStartChannel(channelId: string) {
-    if (!confirm('Starting the stream will begin AWS billing (~$0.35/hour). Continue?')) {
+    if (
+      !confirm(
+        'Starting the stream will begin AWS billing (~$0.35/hour). Continue?'
+      )
+    ) {
       return
     }
 
@@ -500,7 +512,11 @@ export default function VenueManagementPage() {
   }
 
   async function handleDeleteChannel(channelId: string) {
-    if (!confirm('Are you sure you want to delete this channel? This cannot be undone.')) {
+    if (
+      !confirm(
+        'Are you sure you want to delete this channel? This cannot be undone.'
+      )
+    ) {
       return
     }
 
@@ -598,7 +614,9 @@ export default function VenueManagementPage() {
       setShowStreamScheduleForm(false)
       fetchChannels()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to schedule live stream')
+      setError(
+        err instanceof Error ? err.message : 'Failed to schedule live stream'
+      )
     } finally {
       setSchedulingStream(false)
     }
@@ -735,7 +753,11 @@ export default function VenueManagementPage() {
           <p className="text-muted-foreground">Venue Management</p>
         </div>
         {venueCount > 1 && (
-          <Button variant="outline" className="self-start sm:self-auto" onClick={() => router.push('/venue')}>
+          <Button
+            variant="outline"
+            className="self-start sm:self-auto"
+            onClick={() => router.push('/venue')}
+          >
             Switch Venue
           </Button>
         )}
@@ -748,7 +770,10 @@ export default function VenueManagementPage() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
               <CardTitle>Schedule Recording</CardTitle>
               {!showScheduleForm && (
-                <Button className="w-full md:w-auto" onClick={() => setShowScheduleForm(true)}>
+                <Button
+                  className="w-full md:w-auto"
+                  onClick={() => setShowScheduleForm(true)}
+                >
                   + New Recording
                 </Button>
               )}
@@ -949,14 +974,21 @@ export default function VenueManagementPage() {
         {showStreamingSection && (
           <CardContent className="space-y-4">
             {/* Create new channel form */}
-            <form onSubmit={handleCreateChannel} className="flex flex-col sm:flex-row gap-2">
+            <form
+              onSubmit={handleCreateChannel}
+              className="flex flex-col sm:flex-row gap-2"
+            >
               <Input
                 value={newChannelName}
                 onChange={(e) => setNewChannelName(e.target.value)}
                 placeholder="Channel name (e.g., Pitch 1 Live)"
                 className="flex-1"
               />
-              <Button type="submit" className="w-full sm:w-auto" disabled={creatingChannel || !newChannelName.trim()}>
+              <Button
+                type="submit"
+                className="w-full sm:w-auto"
+                disabled={creatingChannel || !newChannelName.trim()}
+              >
                 {creatingChannel ? 'Creating...' : '+ Create Channel'}
               </Button>
             </form>
@@ -991,7 +1023,9 @@ export default function VenueManagementPage() {
                 <form onSubmit={handleScheduleLiveStream} className="space-y-3">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <label className="text-sm text-muted-foreground">Title *</label>
+                      <label className="text-sm text-muted-foreground">
+                        Title *
+                      </label>
                       <Input
                         value={streamTitle}
                         onChange={(e) => setStreamTitle(e.target.value)}
@@ -1000,7 +1034,9 @@ export default function VenueManagementPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-muted-foreground">Camera/Pitch *</label>
+                      <label className="text-sm text-muted-foreground">
+                        Camera/Pitch *
+                      </label>
                       <select
                         value={streamSceneId}
                         onChange={(e) => setStreamSceneId(e.target.value)}
@@ -1015,7 +1051,9 @@ export default function VenueManagementPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="text-sm text-muted-foreground">Start Time *</label>
+                      <label className="text-sm text-muted-foreground">
+                        Start Time *
+                      </label>
                       <Input
                         type="datetime-local"
                         value={streamStartTime}
@@ -1024,7 +1062,9 @@ export default function VenueManagementPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-muted-foreground">End Time *</label>
+                      <label className="text-sm text-muted-foreground">
+                        End Time *
+                      </label>
                       <Input
                         type="datetime-local"
                         value={streamEndTime}
@@ -1042,7 +1082,9 @@ export default function VenueManagementPage() {
                       Cancel
                     </Button>
                     <Button type="submit" disabled={schedulingStream}>
-                      {schedulingStream ? 'Setting up...' : 'Create & Start Stream'}
+                      {schedulingStream
+                        ? 'Setting up...'
+                        : 'Create & Start Stream'}
                     </Button>
                   </div>
                 </form>
@@ -1051,7 +1093,9 @@ export default function VenueManagementPage() {
 
             {/* Channels list */}
             {loadingChannels ? (
-              <p className="text-sm text-muted-foreground">Loading channels...</p>
+              <p className="text-sm text-muted-foreground">
+                Loading channels...
+              </p>
             ) : channels.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
                 No streaming channels yet. Create one to get started.
@@ -1080,7 +1124,9 @@ export default function VenueManagementPage() {
                             onClick={() => handleStartChannel(channel.id)}
                             disabled={startingChannelId === channel.id}
                           >
-                            {startingChannelId === channel.id ? 'Starting...' : 'Start'}
+                            {startingChannelId === channel.id
+                              ? 'Starting...'
+                              : 'Start'}
                           </Button>
                         )}
                         {channel.state === 'RUNNING' && (
@@ -1090,10 +1136,13 @@ export default function VenueManagementPage() {
                             onClick={() => handleStopChannel(channel.id)}
                             disabled={stoppingChannelId === channel.id}
                           >
-                            {stoppingChannelId === channel.id ? 'Stopping...' : 'Stop'}
+                            {stoppingChannelId === channel.id
+                              ? 'Stopping...'
+                              : 'Stop'}
                           </Button>
                         )}
-                        {(channel.state === 'IDLE' || channel.state === 'CREATING') && (
+                        {(channel.state === 'IDLE' ||
+                          channel.state === 'CREATING') && (
                           <Button
                             size="sm"
                             variant="ghost"
@@ -1101,7 +1150,9 @@ export default function VenueManagementPage() {
                             onClick={() => handleDeleteChannel(channel.id)}
                             disabled={deletingChannelId === channel.id}
                           >
-                            {deletingChannelId === channel.id ? 'Deleting...' : 'Delete'}
+                            {deletingChannelId === channel.id
+                              ? 'Deleting...'
+                              : 'Delete'}
                           </Button>
                         )}
                       </div>
@@ -1111,7 +1162,9 @@ export default function VenueManagementPage() {
                     {channel.state !== 'CREATING' && channel.rtmp && (
                       <div className="space-y-2 text-sm">
                         <div>
-                          <span className="text-muted-foreground text-xs block mb-1">RTMP URL</span>
+                          <span className="text-muted-foreground text-xs block mb-1">
+                            RTMP URL
+                          </span>
                           <div className="flex items-center gap-2">
                             <code className="flex-1 min-w-0 bg-zinc-900 px-2 py-1 rounded text-xs truncate">
                               {channel.rtmp.url}
@@ -1120,14 +1173,23 @@ export default function VenueManagementPage() {
                               size="sm"
                               variant="ghost"
                               className="flex-shrink-0"
-                              onClick={() => copyToClipboard(channel.rtmp!.url, `rtmp-${channel.id}`)}
+                              onClick={() =>
+                                copyToClipboard(
+                                  channel.rtmp!.url,
+                                  `rtmp-${channel.id}`
+                                )
+                              }
                             >
-                              {copiedField === `rtmp-${channel.id}` ? 'Copied!' : 'Copy'}
+                              {copiedField === `rtmp-${channel.id}`
+                                ? 'Copied!'
+                                : 'Copy'}
                             </Button>
                           </div>
                         </div>
                         <div>
-                          <span className="text-muted-foreground text-xs block mb-1">Stream Key</span>
+                          <span className="text-muted-foreground text-xs block mb-1">
+                            Stream Key
+                          </span>
                           <div className="flex items-center gap-2">
                             <code className="flex-1 min-w-0 bg-zinc-900 px-2 py-1 rounded text-xs truncate">
                               {channel.rtmp.streamKey}
@@ -1136,15 +1198,24 @@ export default function VenueManagementPage() {
                               size="sm"
                               variant="ghost"
                               className="flex-shrink-0"
-                              onClick={() => copyToClipboard(channel.rtmp!.streamKey, `key-${channel.id}`)}
+                              onClick={() =>
+                                copyToClipboard(
+                                  channel.rtmp!.streamKey,
+                                  `key-${channel.id}`
+                                )
+                              }
                             >
-                              {copiedField === `key-${channel.id}` ? 'Copied!' : 'Copy'}
+                              {copiedField === `key-${channel.id}`
+                                ? 'Copied!'
+                                : 'Copy'}
                             </Button>
                           </div>
                         </div>
                         {channel.playbackUrl && (
                           <div>
-                            <span className="text-muted-foreground text-xs block mb-1">Playback</span>
+                            <span className="text-muted-foreground text-xs block mb-1">
+                              Playback
+                            </span>
                             <div className="flex items-center gap-2">
                               <code className="flex-1 min-w-0 bg-zinc-900 px-2 py-1 rounded text-xs truncate">
                                 {channel.playbackUrl}
@@ -1153,9 +1224,16 @@ export default function VenueManagementPage() {
                                 size="sm"
                                 variant="ghost"
                                 className="flex-shrink-0"
-                                onClick={() => copyToClipboard(channel.playbackUrl!, `hls-${channel.id}`)}
+                                onClick={() =>
+                                  copyToClipboard(
+                                    channel.playbackUrl!,
+                                    `hls-${channel.id}`
+                                  )
+                                }
                               >
-                                {copiedField === `hls-${channel.id}` ? 'Copied!' : 'Copy'}
+                                {copiedField === `hls-${channel.id}`
+                                  ? 'Copied!'
+                                  : 'Copy'}
                               </Button>
                             </div>
                           </div>
@@ -1166,7 +1244,9 @@ export default function VenueManagementPage() {
                     {/* Video player when RUNNING */}
                     {channel.state === 'RUNNING' && channel.playbackUrl && (
                       <div className="mt-3">
-                        <p className="text-xs text-muted-foreground mb-2">Live Preview:</p>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Live Preview:
+                        </p>
                         <div className="aspect-video bg-black rounded-lg overflow-hidden">
                           <HlsPlayer
                             src={channel.playbackUrl}
@@ -1186,12 +1266,14 @@ export default function VenueManagementPage() {
                     )}
                     {channel.state === 'STARTING' && (
                       <p className="text-xs text-yellow-500">
-                        Channel is starting. This may take 1-2 minutes. Billing has started.
+                        Channel is starting. This may take 1-2 minutes. Billing
+                        has started.
                       </p>
                     )}
                     {channel.state === 'STOPPING' && (
                       <p className="text-xs text-yellow-500">
-                        Channel is stopping. Billing will stop when it reaches IDLE.
+                        Channel is stopping. Billing will stop when it reaches
+                        IDLE.
                       </p>
                     )}
                   </div>
@@ -1253,10 +1335,11 @@ export default function VenueManagementPage() {
               ).map((recording) => (
                 <div
                   key={recording.id}
-                  className={`p-4 rounded-md ${playingId === recording.id
-                    ? 'bg-primary/10 border border-primary/30'
-                    : 'bg-muted'
-                    }`}
+                  className={`p-4 rounded-md ${
+                    playingId === recording.id
+                      ? 'bg-primary/10 border border-primary/30'
+                      : 'bg-muted'
+                  }`}
                 >
                   {/* Top row: Play button + Info + Status */}
                   <div className="flex items-start gap-3">
@@ -1297,12 +1380,13 @@ export default function VenueManagementPage() {
                           {recording.title}
                         </p>
                         <span
-                          className={`text-xs px-2 py-0.5 rounded flex-shrink-0 ${recording.status === 'published'
-                            ? 'bg-green-500/20 text-green-500'
-                            : recording.status === 'scheduled'
-                              ? 'bg-yellow-500/20 text-yellow-500'
-                              : 'bg-gray-500/20 text-gray-500'
-                            }`}
+                          className={`text-xs px-2 py-0.5 rounded flex-shrink-0 ${
+                            recording.status === 'published'
+                              ? 'bg-green-500/20 text-green-500'
+                              : recording.status === 'scheduled'
+                                ? 'bg-yellow-500/20 text-yellow-500'
+                                : 'bg-gray-500/20 text-gray-500'
+                          }`}
                         >
                           {recording.status}
                         </span>
@@ -1402,7 +1486,10 @@ export default function VenueManagementPage() {
             )}
 
             {/* Add new admin */}
-            <form onSubmit={handleAddAdmin} className="flex flex-col sm:flex-row gap-2">
+            <form
+              onSubmit={handleAddAdmin}
+              className="flex flex-col sm:flex-row gap-2"
+            >
               <Input
                 type="email"
                 value={newAdminEmail}
@@ -1410,7 +1497,11 @@ export default function VenueManagementPage() {
                 placeholder="admin@example.com"
                 className="flex-1"
               />
-              <Button type="submit" className="w-full sm:w-auto" disabled={addingAdmin || !newAdminEmail}>
+              <Button
+                type="submit"
+                className="w-full sm:w-auto"
+                disabled={addingAdmin || !newAdminEmail}
+              >
                 {addingAdmin ? 'Adding...' : 'Add Admin'}
               </Button>
             </form>

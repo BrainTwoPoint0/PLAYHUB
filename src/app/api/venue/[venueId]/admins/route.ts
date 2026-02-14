@@ -172,7 +172,8 @@ export async function POST(
     return NextResponse.json({
       success: true,
       invited: true,
-      message: 'Invitation email sent. They will be added as admin after creating an account.',
+      message:
+        'Invitation email sent. They will be added as admin after creating an account.',
     })
   }
 

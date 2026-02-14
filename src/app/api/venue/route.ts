@@ -111,7 +111,9 @@ async function processPendingAdminInvites(
         .eq('id', invite.id)
     }
 
-    console.log(`Processed ${pendingInvites.length} pending admin invites for ${userEmail}`)
+    console.log(
+      `Processed ${pendingInvites.length} pending admin invites for ${userEmail}`
+    )
   } catch (error) {
     console.error('Error processing pending admin invites:', error)
   }

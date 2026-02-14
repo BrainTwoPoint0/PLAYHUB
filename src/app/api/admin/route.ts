@@ -81,7 +81,10 @@ export async function POST(request: NextRequest) {
     case 'toggleAdmin': {
       const { profileId, isAdmin: makeAdmin } = body
       if (!profileId) {
-        return NextResponse.json({ error: 'profileId required' }, { status: 400 })
+        return NextResponse.json(
+          { error: 'profileId required' },
+          { status: 400 }
+        )
       }
       const result = await togglePlatformAdmin(profileId, makeAdmin)
       return NextResponse.json(result)
@@ -90,7 +93,10 @@ export async function POST(request: NextRequest) {
     case 'deleteUser': {
       const { profileId } = body
       if (!profileId) {
-        return NextResponse.json({ error: 'profileId required' }, { status: 400 })
+        return NextResponse.json(
+          { error: 'profileId required' },
+          { status: 400 }
+        )
       }
       const result = await deleteUser(profileId, user.id)
       if (!result.success) {

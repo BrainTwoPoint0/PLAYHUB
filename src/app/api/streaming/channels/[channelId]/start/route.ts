@@ -5,7 +5,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { mediaLiveClient } from '@/lib/aws/medialive'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
-import { DescribeChannelCommand, MediaLiveClient } from '@aws-sdk/client-medialive'
+import {
+  DescribeChannelCommand,
+  MediaLiveClient,
+} from '@aws-sdk/client-medialive'
 
 // Helper to get channel's venueId from AWS tags
 async function getChannelVenueId(channelId: string): Promise<string | null> {

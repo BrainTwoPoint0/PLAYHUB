@@ -245,10 +245,11 @@ export default function HomePage() {
               <FadeIn
                 key={stat.label}
                 delay={i * 100}
-                className={`text-center ${i < stats.length - 1
+                className={`text-center ${
+                  i < stats.length - 1
                     ? 'md:border-r md:border-[var(--ash-grey)]/10'
                     : ''
-                  }`}
+                }`}
               >
                 <p className="text-3xl md:text-5xl font-extrabold text-[var(--timberwolf)] mb-1">
                   <CountUp target={stat.value} suffix={stat.suffix} />
@@ -358,9 +359,6 @@ export default function HomePage() {
           </FadeIn>
         </div>
       </section>
-
-
-
     </div>
   )
 }

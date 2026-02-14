@@ -457,7 +457,9 @@ async function notifyUsersRecordingReady(
       )
     )
 
-    console.log(`Sent recording ready notifications to ${allEmails.length} users`)
+    console.log(
+      `Sent recording ready notifications to ${allEmails.length} users`
+    )
   } catch (error) {
     console.error('Failed to send recording ready notifications:', error)
   }

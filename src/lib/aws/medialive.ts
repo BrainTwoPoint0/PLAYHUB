@@ -82,7 +82,9 @@ export async function createRtmpInput(
   // Input security group is required for RTMP inputs
   const inputSecurityGroupId = process.env.MEDIALIVE_INPUT_SECURITY_GROUP_ID
   if (!inputSecurityGroupId) {
-    throw new Error('MEDIALIVE_INPUT_SECURITY_GROUP_ID environment variable is required')
+    throw new Error(
+      'MEDIALIVE_INPUT_SECURITY_GROUP_ID environment variable is required'
+    )
   }
 
   // Use short stream keys (some RTMP clients have issues with long keys)

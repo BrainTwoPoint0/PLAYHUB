@@ -8,7 +8,10 @@ import {
   grantRecordingAccess,
   grantRecordingAccessBulk,
 } from '@/lib/recordings/access-control'
-import { sendRecordingAccessEmail, sendRecordingAssignedEmail } from '@/lib/email'
+import {
+  sendRecordingAccessEmail,
+  sendRecordingAssignedEmail,
+} from '@/lib/email'
 
 export async function GET(
   request: NextRequest,
@@ -81,7 +84,9 @@ export async function POST(
   const serviceClient = createServiceClient()
 
   // Get recording to check organization
-  const { data: recording, error: recordingError } = await (serviceClient as any)
+  const { data: recording, error: recordingError } = await (
+    serviceClient as any
+  )
     .from('playhub_match_recordings')
     .select('id, organization_id, title')
     .eq('id', recordingId)

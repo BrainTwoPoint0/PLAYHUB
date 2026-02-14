@@ -78,7 +78,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (!venueId) {
-      return NextResponse.json({ error: 'venueId is required' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'venueId is required' },
+        { status: 400 }
+      )
     }
 
     // Check authorization - platform admin or venue admin
@@ -91,7 +94,8 @@ export async function POST(request: NextRequest) {
 
     // Generate a streamId if not provided
     const finalStreamId =
-      streamId || `${venueId.slice(0, 8)}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      streamId ||
+      `${venueId.slice(0, 8)}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
     const channel = await mediaLiveClient.createChannel({
       name,

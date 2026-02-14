@@ -204,10 +204,14 @@ export default function AdminUsersPage() {
                   </div>
                   <div className="col-span-2 text-right flex items-center justify-end gap-2">
                     <Button
-                      variant={user.is_platform_admin ? 'destructive' : 'outline'}
+                      variant={
+                        user.is_platform_admin ? 'destructive' : 'outline'
+                      }
                       size="sm"
                       onClick={() => toggleAdmin(user)}
-                      disabled={togglingId === user.id || deletingId === user.id}
+                      disabled={
+                        togglingId === user.id || deletingId === user.id
+                      }
                     >
                       {togglingId === user.id
                         ? '...'
@@ -219,9 +223,17 @@ export default function AdminUsersPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDelete(user)}
-                      disabled={deletingId === user.id || togglingId === user.id || user.is_platform_admin}
+                      disabled={
+                        deletingId === user.id ||
+                        togglingId === user.id ||
+                        user.is_platform_admin
+                      }
                       className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                      title={user.is_platform_admin ? 'Remove admin status first' : 'Delete user'}
+                      title={
+                        user.is_platform_admin
+                          ? 'Remove admin status first'
+                          : 'Delete user'
+                      }
                     >
                       {deletingId === user.id ? '...' : 'Delete'}
                     </Button>
