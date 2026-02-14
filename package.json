@@ -10,7 +10,8 @@
     "format": "prettier . --write",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "release": "npm run format && npm run lint && npm test && npm run test:integration && npm run build"
   },
   "dependencies": {
     "@aws-sdk/client-medialive": "^3.958.0",
