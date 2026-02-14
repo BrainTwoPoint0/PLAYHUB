@@ -110,11 +110,11 @@ export default function RecordingsPage() {
           transition={{ duration: 0.5 }}
           className="mb-12"
         >
-          <h1 className="text-5xl md:text-6xl font-bold text-[var(--timberwolf)] mb-4">
+          <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold text-[var(--timberwolf)] mb-4">
             My Recordings
           </h1>
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <p className="text-xl text-[var(--ash-grey)]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <p className="text-base md:text-xl text-[var(--ash-grey)]">
               Match recordings you have access to
             </p>
             <div className="px-4 py-2 bg-black/30 border border-[var(--ash-grey)]/20 rounded-xl">
@@ -136,7 +136,7 @@ export default function RecordingsPage() {
             className="mb-8 bg-black/50 border border-[var(--ash-grey)]/20 rounded-2xl overflow-hidden"
           >
             <div className="p-4 border-b border-[var(--ash-grey)]/20 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
+              <h2 className="text-sm md:text-lg font-semibold text-[var(--timberwolf)] truncate mr-2">
                 Now Playing: {recordings.find((r) => r.id === playingId)?.title}
               </h2>
               <button
@@ -193,10 +193,10 @@ export default function RecordingsPage() {
             className="text-center py-24"
           >
             <div className="text-7xl mb-6 opacity-30">🔒</div>
-            <p className="text-3xl font-bold text-[var(--timberwolf)] mb-3">
+            <p className="text-2xl md:text-3xl font-bold text-[var(--timberwolf)] mb-3">
               Login Required
             </p>
-            <p className="text-lg text-[var(--ash-grey)]/60 mb-6">
+            <p className="text-base md:text-lg text-[var(--ash-grey)]/60 mb-6">
               Please log in to view your recordings
             </p>
             <a
@@ -220,71 +220,74 @@ export default function RecordingsPage() {
                     : 'border-[var(--ash-grey)]/10 hover:border-[var(--ash-grey)]/30'
                 }`}
               >
-                <div className="p-5 flex items-center gap-5">
-                  {/* Play Button */}
-                  <button
-                    onClick={() => handlePlay(recording)}
-                    disabled={loadingPlayback}
-                    className={`flex-shrink-0 w-14 h-14 rounded-full flex items-center justify-center transition-all ${
-                      playingId === recording.id
-                        ? 'bg-[var(--accent-purple)] text-white'
-                        : 'bg-white/10 text-[var(--timberwolf)] hover:bg-white/20'
-                    }`}
-                  >
-                    {loadingPlayback && playingId !== recording.id ? (
-                      <svg
-                        className="w-6 h-6 animate-spin"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
+                <div className="p-4 md:p-5 space-y-3">
+                  {/* Top row: Play button + Info */}
+                  <div className="flex items-center gap-3 md:gap-5">
+                    {/* Play Button */}
+                    <button
+                      onClick={() => handlePlay(recording)}
+                      disabled={loadingPlayback}
+                      className={`flex-shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-all ${
+                        playingId === recording.id
+                          ? 'bg-[var(--accent-purple)] text-white'
+                          : 'bg-white/10 text-[var(--timberwolf)] hover:bg-white/20'
+                      }`}
+                    >
+                      {loadingPlayback && playingId !== recording.id ? (
+                        <svg
+                          className="w-5 h-5 md:w-6 md:h-6 animate-spin"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                      ) : playingId === recording.id ? (
+                        <svg
+                          className="w-5 h-5 md:w-6 md:h-6"
                           fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
-                    ) : playingId === recording.id ? (
-                      <svg
-                        className="w-6 h-6"
-                        fill="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                      </svg>
-                    ) : (
-                      <svg
-                        className="w-6 h-6 ml-1"
-                        fill="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    )}
-                  </button>
+                          viewBox="0 0 24 24"
+                        >
+                          <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                        </svg>
+                      ) : (
+                        <svg
+                          className="w-5 h-5 md:w-6 md:h-6 ml-0.5"
+                          fill="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      )}
+                    </button>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-[var(--timberwolf)] truncate">
-                      {recording.title}
-                    </h3>
-                    <div className="flex items-center gap-4 mt-1 text-sm text-[var(--ash-grey)]/60">
-                      <span>{formatDateTime(recording.match_date)}</span>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base md:text-lg font-semibold text-[var(--timberwolf)] truncate">
+                        {recording.title}
+                      </h3>
+                      <div className="mt-1 text-sm text-[var(--ash-grey)]/60">
+                        <span>{formatDateTime(recording.match_date)}</span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Actions */}
+                  {/* Actions row */}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleShare(recording)}
-                      className={`px-4 py-2 border rounded-lg text-sm transition-colors flex items-center gap-2 ${
+                      className={`flex-1 md:flex-none px-4 py-2 border rounded-lg text-sm transition-colors flex items-center justify-center gap-2 ${
                         copiedId === recording.id
                           ? 'bg-green-500/20 border-green-500/50 text-green-400'
                           : 'bg-white/5 hover:bg-white/10 border-[var(--ash-grey)]/20 text-[var(--timberwolf)]'
@@ -328,7 +331,7 @@ export default function RecordingsPage() {
                     </button>
                     <button
                       onClick={() => handleDownload(recording)}
-                      className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-[var(--ash-grey)]/20 rounded-lg text-sm text-[var(--timberwolf)] transition-colors flex items-center gap-2"
+                      className="flex-1 md:flex-none px-4 py-2 bg-white/5 hover:bg-white/10 border border-[var(--ash-grey)]/20 rounded-lg text-sm text-[var(--timberwolf)] transition-colors flex items-center justify-center gap-2"
                     >
                       <svg
                         className="w-4 h-4"
@@ -358,10 +361,10 @@ export default function RecordingsPage() {
             className="text-center py-24"
           >
             <div className="text-7xl mb-6 opacity-30">🎬</div>
-            <p className="text-3xl font-bold text-[var(--timberwolf)] mb-3">
+            <p className="text-2xl md:text-3xl font-bold text-[var(--timberwolf)] mb-3">
               No recordings yet
             </p>
-            <p className="text-lg text-[var(--ash-grey)]/60">
+            <p className="text-base md:text-lg text-[var(--ash-grey)]/60">
               Recordings will appear here once transferred from Spiideo
             </p>
           </motion.div>

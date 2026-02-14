@@ -702,7 +702,7 @@ export default function VenueManagementPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6 max-w-4xl">
+      <div className="container mx-auto px-4 py-6 md:px-6 max-w-4xl">
         <p className="text-muted-foreground">Loading...</p>
       </div>
     )
@@ -710,7 +710,7 @@ export default function VenueManagementPage() {
 
   if (error && !venue) {
     return (
-      <div className="container mx-auto p-6 max-w-4xl">
+      <div className="container mx-auto px-4 py-6 md:px-6 max-w-4xl">
         <Card>
           <CardContent className="p-6">
             <p className="text-red-500">{error}</p>
@@ -728,14 +728,14 @@ export default function VenueManagementPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="flex items-center justify-between mb-8">
+    <div className="container mx-auto px-4 py-6 md:px-6 max-w-4xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8">
         <div>
-          <h1 className="text-3xl font-bold">{venue?.name}</h1>
+          <h1 className="text-2xl md:text-3xl font-bold">{venue?.name}</h1>
           <p className="text-muted-foreground">Venue Management</p>
         </div>
         {venueCount > 1 && (
-          <Button variant="outline" onClick={() => router.push('/venue')}>
+          <Button variant="outline" className="self-start sm:self-auto" onClick={() => router.push('/venue')}>
             Switch Venue
           </Button>
         )}
@@ -745,10 +745,10 @@ export default function VenueManagementPage() {
       {scenes.length > 0 && (
         <Card className="mb-6">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
               <CardTitle>Schedule Recording</CardTitle>
               {!showScheduleForm && (
-                <Button onClick={() => setShowScheduleForm(true)}>
+                <Button className="w-full md:w-auto" onClick={() => setShowScheduleForm(true)}>
                   + New Recording
                 </Button>
               )}
@@ -925,7 +925,7 @@ export default function VenueManagementPage() {
       {/* Live Streaming Section */}
       <Card className="mb-6">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
             <div>
               <CardTitle>Live Streaming</CardTitle>
               <CardDescription>
@@ -934,6 +934,7 @@ export default function VenueManagementPage() {
             </div>
             <Button
               variant="outline"
+              className="w-full md:w-auto"
               onClick={() => {
                 setShowStreamingSection(!showStreamingSection)
                 if (!showStreamingSection && channels.length === 0) {
@@ -948,21 +949,21 @@ export default function VenueManagementPage() {
         {showStreamingSection && (
           <CardContent className="space-y-4">
             {/* Create new channel form */}
-            <form onSubmit={handleCreateChannel} className="flex gap-2">
+            <form onSubmit={handleCreateChannel} className="flex flex-col sm:flex-row gap-2">
               <Input
                 value={newChannelName}
                 onChange={(e) => setNewChannelName(e.target.value)}
                 placeholder="Channel name (e.g., Pitch 1 Live)"
                 className="flex-1"
               />
-              <Button type="submit" disabled={creatingChannel || !newChannelName.trim()}>
+              <Button type="submit" className="w-full sm:w-auto" disabled={creatingChannel || !newChannelName.trim()}>
                 {creatingChannel ? 'Creating...' : '+ Create Channel'}
               </Button>
             </form>
 
             {/* Schedule Live Stream */}
             <div className="p-4 bg-zinc-800/30 rounded-lg border border-zinc-700/50">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                 <div>
                   <h4 className="font-medium">Schedule Live Stream</h4>
                   <p className="text-sm text-muted-foreground">
@@ -972,6 +973,7 @@ export default function VenueManagementPage() {
                 {!showStreamScheduleForm && (
                   <Button
                     size="sm"
+                    className="w-full sm:w-auto"
                     onClick={() => {
                       setShowStreamScheduleForm(true)
                       // Set default scene if available
@@ -1031,7 +1033,7 @@ export default function VenueManagementPage() {
                       />
                     </div>
                   </div>
-                  <div className="flex gap-2 justify-end">
+                  <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
                     <Button
                       type="button"
                       variant="ghost"
@@ -1062,7 +1064,7 @@ export default function VenueManagementPage() {
                     className="p-4 bg-zinc-800/50 rounded-lg space-y-3"
                   >
                     {/* Channel header */}
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{channel.name}</span>
                         <span
@@ -1108,45 +1110,54 @@ export default function VenueManagementPage() {
                     {/* RTMP credentials (show when not CREATING) */}
                     {channel.state !== 'CREATING' && channel.rtmp && (
                       <div className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground w-24">RTMP URL:</span>
-                          <code className="flex-1 bg-zinc-900 px-2 py-1 rounded text-xs truncate">
-                            {channel.rtmp.url}
-                          </code>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => copyToClipboard(channel.rtmp!.url, `rtmp-${channel.id}`)}
-                          >
-                            {copiedField === `rtmp-${channel.id}` ? 'Copied!' : 'Copy'}
-                          </Button>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground w-24">Stream Key:</span>
-                          <code className="flex-1 bg-zinc-900 px-2 py-1 rounded text-xs truncate">
-                            {channel.rtmp.streamKey}
-                          </code>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => copyToClipboard(channel.rtmp!.streamKey, `key-${channel.id}`)}
-                          >
-                            {copiedField === `key-${channel.id}` ? 'Copied!' : 'Copy'}
-                          </Button>
-                        </div>
-                        {channel.playbackUrl && (
+                        <div>
+                          <span className="text-muted-foreground text-xs block mb-1">RTMP URL</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground w-24">Playback:</span>
-                            <code className="flex-1 bg-zinc-900 px-2 py-1 rounded text-xs truncate">
-                              {channel.playbackUrl}
+                            <code className="flex-1 min-w-0 bg-zinc-900 px-2 py-1 rounded text-xs truncate">
+                              {channel.rtmp.url}
                             </code>
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => copyToClipboard(channel.playbackUrl!, `hls-${channel.id}`)}
+                              className="flex-shrink-0"
+                              onClick={() => copyToClipboard(channel.rtmp!.url, `rtmp-${channel.id}`)}
                             >
-                              {copiedField === `hls-${channel.id}` ? 'Copied!' : 'Copy'}
+                              {copiedField === `rtmp-${channel.id}` ? 'Copied!' : 'Copy'}
                             </Button>
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground text-xs block mb-1">Stream Key</span>
+                          <div className="flex items-center gap-2">
+                            <code className="flex-1 min-w-0 bg-zinc-900 px-2 py-1 rounded text-xs truncate">
+                              {channel.rtmp.streamKey}
+                            </code>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="flex-shrink-0"
+                              onClick={() => copyToClipboard(channel.rtmp!.streamKey, `key-${channel.id}`)}
+                            >
+                              {copiedField === `key-${channel.id}` ? 'Copied!' : 'Copy'}
+                            </Button>
+                          </div>
+                        </div>
+                        {channel.playbackUrl && (
+                          <div>
+                            <span className="text-muted-foreground text-xs block mb-1">Playback</span>
+                            <div className="flex items-center gap-2">
+                              <code className="flex-1 min-w-0 bg-zinc-900 px-2 py-1 rounded text-xs truncate">
+                                {channel.playbackUrl}
+                              </code>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="flex-shrink-0"
+                                onClick={() => copyToClipboard(channel.playbackUrl!, `hls-${channel.id}`)}
+                              >
+                                {copiedField === `hls-${channel.id}` ? 'Copied!' : 'Copy'}
+                              </Button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1203,8 +1214,8 @@ export default function VenueManagementPage() {
           {/* Video Player */}
           {playingId && playbackUrl && (
             <div className="mb-6 bg-black rounded-lg overflow-hidden">
-              <div className="p-3 border-b border-white/10 flex items-center justify-between">
-                <span className="text-sm font-medium">
+              <div className="p-3 border-b border-white/10 flex items-center justify-between gap-2">
+                <span className="text-sm font-medium truncate min-w-0">
                   Now Playing:{' '}
                   {recordings.find((r) => r.id === playingId)?.title}
                 </span>
@@ -1304,7 +1315,7 @@ export default function VenueManagementPage() {
                   </div>
 
                   {/* Bottom row: Access count & Actions */}
-                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-700/50">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-3 pt-3 border-t border-zinc-700/50 gap-2">
                     <span className="text-sm text-muted-foreground">
                       {recording.accessCount || 0} user
                       {(recording.accessCount || 0) === 1 ? '' : 's'}
@@ -1313,6 +1324,7 @@ export default function VenueManagementPage() {
                       <Button
                         variant="outline"
                         size="sm"
+                        className="flex-1 sm:flex-none"
                         onClick={() => getPublicLink(recording)}
                         disabled={
                           generatingLink === recording.id ||
@@ -1326,6 +1338,7 @@ export default function VenueManagementPage() {
                       <Button
                         variant="outline"
                         size="sm"
+                        className="flex-1 sm:flex-none"
                         onClick={() => openAccessModal(recording)}
                       >
                         Manage Access
@@ -1355,10 +1368,11 @@ export default function VenueManagementPage() {
       {/* Venue Admins Section */}
       <Card className="mt-6">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
             <CardTitle>Venue Admins</CardTitle>
             <Button
               variant="outline"
+              className="w-full md:w-auto"
               onClick={() => {
                 setShowAdminSection(!showAdminSection)
                 if (!showAdminSection && admins.length === 0) {
@@ -1388,7 +1402,7 @@ export default function VenueManagementPage() {
             )}
 
             {/* Add new admin */}
-            <form onSubmit={handleAddAdmin} className="flex gap-2">
+            <form onSubmit={handleAddAdmin} className="flex flex-col sm:flex-row gap-2">
               <Input
                 type="email"
                 value={newAdminEmail}
@@ -1396,7 +1410,7 @@ export default function VenueManagementPage() {
                 placeholder="admin@example.com"
                 className="flex-1"
               />
-              <Button type="submit" disabled={addingAdmin || !newAdminEmail}>
+              <Button type="submit" className="w-full sm:w-auto" disabled={addingAdmin || !newAdminEmail}>
                 {addingAdmin ? 'Adding...' : 'Add Admin'}
               </Button>
             </form>
@@ -1411,10 +1425,10 @@ export default function VenueManagementPage() {
                 admins.map((admin) => (
                   <div
                     key={admin.id}
-                    className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-lg"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-zinc-800/50 rounded-lg"
                   >
-                    <div>
-                      <p className="font-medium">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">
                         {admin.fullName || admin.email || 'Unknown'}
                         {admin.isCurrentUser && (
                           <span className="ml-2 text-xs text-muted-foreground">
@@ -1422,11 +1436,11 @@ export default function VenueManagementPage() {
                           </span>
                         )}
                       </p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-muted-foreground truncate">
                         {admin.email}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
                         {admin.role.replace('_', ' ')}
                       </span>
@@ -1466,7 +1480,7 @@ export default function VenueManagementPage() {
                 <label className="text-sm font-medium">
                   Grant access (emails, comma-separated)
                 </label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Input
                     value={newEmails}
                     onChange={(e) => setNewEmails(e.target.value)}
@@ -1474,6 +1488,7 @@ export default function VenueManagementPage() {
                     className="flex-1"
                   />
                   <Button
+                    className="w-full sm:w-auto"
                     onClick={handleGrantAccess}
                     disabled={grantingAccess || !newEmails}
                   >
