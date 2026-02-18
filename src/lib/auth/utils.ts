@@ -4,7 +4,7 @@ import { User } from '@supabase/supabase-js'
 
 // Server-side auth utilities (for server components and API routes only)
 export async function getUser(): Promise<User | null> {
-  const supabase = createClient()
+  const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -27,7 +27,7 @@ export async function requireNoAuth(): Promise<void> {
 }
 
 export async function getUserProfile(userId: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: profile, error } = await supabase
     .from('profiles')
     .select('*')
@@ -41,7 +41,7 @@ export async function createUserProfile(
   user: User,
   additionalData?: Record<string, any>
 ) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const profileData = {
     user_id: user.id,

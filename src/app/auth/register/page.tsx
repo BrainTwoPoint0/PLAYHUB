@@ -3,17 +3,15 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useAuth } from '@/lib/auth/context'
-import { createClient } from '@/lib/supabase/client'
 import {
+  useAuth,
   validateEmail,
   validatePassword,
   validateUsername,
   getAuthErrorMessage,
-} from '@/lib/auth/shared'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+} from '@braintwopoint0/playback-commons/auth'
+import { createClient } from '@braintwopoint0/playback-commons/supabase'
+import { Button, Input, Label } from '@braintwopoint0/playback-commons/ui'
 import { LoadingSpinner } from '@/components/ui/loading'
 import {
   AlertCircle,

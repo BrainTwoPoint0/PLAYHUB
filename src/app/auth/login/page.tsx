@@ -3,11 +3,12 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { useAuth } from '@/lib/auth/context'
-import { validateEmail, getAuthErrorMessage } from '@/lib/auth/shared'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import {
+  useAuth,
+  validateEmail,
+  getAuthErrorMessage,
+} from '@braintwopoint0/playback-commons/auth'
+import { Button, Input, Label } from '@braintwopoint0/playback-commons/ui'
 import { LoadingSpinner } from '@/components/ui/loading'
 import { AlertCircle, Eye, EyeOff, Mail, Lock } from 'lucide-react'
 

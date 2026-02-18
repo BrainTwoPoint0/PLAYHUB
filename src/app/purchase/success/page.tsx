@@ -1,11 +1,12 @@
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { Button } from '@braintwopoint0/playback-commons/ui'
 
-export default function PurchaseSuccessPage({
+export default async function PurchaseSuccessPage({
   searchParams,
 }: {
-  searchParams: { session_id?: string }
+  searchParams: Promise<{ session_id?: string }>
 }) {
+  const resolvedSearchParams = await searchParams
   return (
     <div className="min-h-screen bg-[var(--night)] flex items-center justify-center px-5">
       <div className="max-w-2xl w-full text-center">
@@ -24,11 +25,11 @@ export default function PurchaseSuccessPage({
         </p>
 
         {/* Session ID */}
-        {searchParams.session_id && (
+        {resolvedSearchParams.session_id && (
           <div className="mb-8 p-4 bg-black/20 border border-[var(--ash-grey)]/10 rounded-xl">
             <p className="text-sm text-[var(--ash-grey)]/60 mb-1">Order ID</p>
             <p className="text-sm text-[var(--ash-grey)] font-mono">
-              {searchParams.session_id}
+              {resolvedSearchParams.session_id}
             </p>
           </div>
         )}

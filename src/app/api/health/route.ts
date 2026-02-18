@@ -111,10 +111,7 @@ async function checkSupabase(): Promise<ServiceStatus> {
       .from('profiles')
       .select('id', { head: true, count: 'exact' })
       .limit(0)
-    const { error } = await withTimeout(
-      Promise.resolve(query),
-      CHECK_TIMEOUT
-    )
+    const { error } = await withTimeout(Promise.resolve(query), CHECK_TIMEOUT)
     if (error) throw error
     return {
       name: 'supabase',

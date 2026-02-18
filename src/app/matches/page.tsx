@@ -1,6 +1,6 @@
 'use client'
 
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@braintwopoint0/playback-commons/supabase'
 import MatchCard from '@/components/MatchCard'
 import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'

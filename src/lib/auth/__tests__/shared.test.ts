@@ -6,7 +6,7 @@ import {
   hasRole,
   hasAnyRole,
   getAuthErrorMessage,
-} from '@/lib/auth/shared'
+} from '@braintwopoint0/playback-commons/auth'
 import type { User } from '@supabase/supabase-js'
 
 // Helper to create a minimal User-like object

@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { formatPrice, formatDate, formatDateTime } from '@/lib/utils'
+import {
+  formatPrice,
+  formatDate,
+  formatDateTime,
+} from '@braintwopoint0/playback-commons/utils'
 
 describe('formatPrice', () => {
   it('formats GBP by default', () => {

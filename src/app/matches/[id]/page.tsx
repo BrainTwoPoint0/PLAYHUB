@@ -5,8 +5,9 @@ import MatchDetailClient from './MatchDetailClient'
 export default async function MatchDetailPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
+  const { id } = await params
   const supabase = await createClient()
 
   // Fetch match with all details (type assertion for PLAYHUB tables)
@@ -20,7 +21,7 @@ export default async function MatchDetailPage({
       products:playhub_products(*)
     `
     )
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('status', 'published')
     .single()
 
@@ -53,7 +54,7 @@ export default async function MatchDetailPage({
         .from('playhub_access_rights')
         .select('id')
         .eq('profile_id', profileData.id)
-        .eq('match_recording_id', params.id)
+        .eq('match_recording_id', id)
         .single()
 
       hasAccess = !!access

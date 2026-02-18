@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { useAuth } from '@/lib/auth/context'
+import { useAuth } from '@braintwopoint0/playback-commons/auth'
 
 const navItems = [{ href: '/recordings', label: 'My Recordings' }]
 

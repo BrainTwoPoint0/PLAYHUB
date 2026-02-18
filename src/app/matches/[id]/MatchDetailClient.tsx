@@ -3,10 +3,15 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion } from 'motion/react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { formatPrice, formatDate } from '@/lib/utils'
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Badge,
+  Button,
+} from '@braintwopoint0/playback-commons/ui'
+import { formatPrice, formatDate } from '@braintwopoint0/playback-commons/utils'
 import { useState } from 'react'
 
 interface MatchDetailClientProps {

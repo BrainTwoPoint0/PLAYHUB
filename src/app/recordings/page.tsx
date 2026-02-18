@@ -1,8 +1,9 @@
 'use client'
 
 import { motion } from 'motion/react'
-import { useEffect, useState } from 'react'
-import { formatDateTime } from '@/lib/utils'
+import { useEffect, useMemo, useState } from 'react'
+import { formatDateTime } from '@braintwopoint0/playback-commons/utils'
+import { FadeIn } from '@/components/FadeIn'
 
 interface Recording {
   id: string
@@ -26,6 +27,49 @@ export default function RecordingsPage() {
   const [loadingPlayback, setLoadingPlayback] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [loginRequired, setLoginRequired] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [sortBy, setSortBy] = useState('date_desc')
+  const PREVIEW_COUNT = 15
+
+  const hasActiveFilters = dateFrom || dateTo
+
+  const filteredRecordings = useMemo(() => {
+    let result = [...recordings]
+
+    if (dateFrom) {
+      result = result.filter((r) => r.match_date >= dateFrom)
+    }
+    if (dateTo) {
+      const toEnd = dateTo + 'T23:59:59'
+      result = result.filter((r) => r.match_date <= toEnd)
+    }
+
+    switch (sortBy) {
+      case 'date_asc':
+        result.sort((a, b) => a.match_date.localeCompare(b.match_date))
+        break
+      case 'date_desc':
+        result.sort((a, b) => b.match_date.localeCompare(a.match_date))
+        break
+      case 'title_asc':
+        result.sort((a, b) => a.title.localeCompare(b.title))
+        break
+      case 'title_desc':
+        result.sort((a, b) => b.title.localeCompare(a.title))
+        break
+    }
+
+    return result
+  }, [recordings, dateFrom, dateTo, sortBy])
+
+  const clearFilters = () => {
+    setDateFrom('')
+    setDateTo('')
+    setSortBy('date_desc')
+    setShowAll(false)
+  }
 
   useEffect(() => {
     async function fetchRecordings() {
@@ -104,29 +148,91 @@ export default function RecordingsPage() {
     <div className="min-h-screen bg-[var(--night)]">
       <div className="container mx-auto px-5 py-16">
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mb-12"
-        >
+        <FadeIn className="mb-12">
+          <p className="text-[var(--ash-grey)] text-xs font-semibold tracking-[0.25em] uppercase mb-3">
+            Your Library
+          </p>
           <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold text-[var(--timberwolf)] mb-4">
             My Recordings
           </h1>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-            <p className="text-base md:text-xl text-[var(--ash-grey)]">
-              Match recordings you have access to
-            </p>
-            <div className="px-4 py-2 bg-black/30 border border-[var(--ash-grey)]/20 rounded-xl">
-              <span className="text-2xl font-bold text-[var(--timberwolf)]">
-                {loading ? '...' : recordings.length}
-              </span>
-              <span className="text-[var(--ash-grey)]/60 ml-2">
-                {recordings.length === 1 ? 'recording' : 'recordings'}
-              </span>
+          <p className="text-base md:text-xl text-[var(--ash-grey)] mb-6">
+            Match recordings you have access to
+          </p>
+
+          {/* Filters row */}
+          <div className="flex flex-wrap items-stretch justify-center md:justify-between gap-x-3 gap-y-4">
+            {/* Left: date pickers */}
+            {!loading && !loginRequired && recordings.length > 0 ? (
+              <div className="flex items-end gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm text-[var(--ash-grey)]">From</label>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => {
+                      setDateFrom(e.target.value)
+                      setShowAll(false)
+                    }}
+                    className="h-9 min-w-[130px] px-3 rounded-md border border-[var(--ash-grey)]/20 bg-white/5 text-sm text-[var(--timberwolf)] outline-none [&::-webkit-calendar-picker-indicator]:invert"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm text-[var(--ash-grey)]">To</label>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => {
+                      setDateTo(e.target.value)
+                      setShowAll(false)
+                    }}
+                    className="h-9 min-w-[130px] px-3 rounded-md border border-[var(--ash-grey)]/20 bg-white/5 text-sm text-[var(--timberwolf)] outline-none [&::-webkit-calendar-picker-indicator]:invert"
+                  />
+                </div>
+
+                {hasActiveFilters && (
+                  <button
+                    onClick={clearFilters}
+                    className="h-9 px-3 text-sm text-[var(--ash-grey)] hover:text-[var(--timberwolf)] transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div />
+            )}
+
+            {/* Right: count + sort */}
+            <div className="flex items-stretch gap-3">
+              <div className="px-4 py-3 flex items-center bg-black/30 border border-[var(--ash-grey)]/20 rounded-xl">
+                <span className="text-xl font-bold text-[var(--timberwolf)]">
+                  {loading
+                    ? '...'
+                    : hasActiveFilters
+                      ? `${filteredRecordings.length} of ${recordings.length}`
+                      : recordings.length}
+                </span>
+                <span className="text-[var(--ash-grey)]/60 ml-2 text-sm">
+                  {recordings.length === 1 ? 'recording' : 'recordings'}
+                </span>
+              </div>
+
+              {!loading && !loginRequired && recordings.length > 0 && (
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="px-3 pr-8 rounded-xl border border-[var(--ash-grey)]/20 bg-black/30 text-sm text-[var(--timberwolf)] appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%23888%22%20d%3D%22M6%208L1%203h10z%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat outline-none"
+                >
+                  <option value="date_desc">Newest first</option>
+                  <option value="date_asc">Oldest first</option>
+                  <option value="title_asc">Title A-Z</option>
+                  <option value="title_desc">Title Z-A</option>
+                </select>
+              )}
             </div>
           </div>
-        </motion.div>
+        </FadeIn>
 
         {/* Video Player Modal */}
         {playingId && playbackUrl && (
@@ -174,15 +280,24 @@ export default function RecordingsPage() {
 
         {/* Recordings List */}
         {loading ? (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-pulse">
             {[1, 2, 3, 4, 5].map((i) => (
-              <motion.div
+              <div
                 key={i}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 0.3, y: 0 }}
-                transition={{ duration: 0.4, delay: i * 0.05 }}
-                className="h-24 bg-black/20 border border-[var(--ash-grey)]/10 rounded-xl animate-pulse"
-              />
+                className="bg-black/30 border border-[var(--ash-grey)]/10 rounded-xl p-4 md:p-5 space-y-3"
+              >
+                <div className="flex items-center gap-3 md:gap-5">
+                  <div className="flex-shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-full bg-[var(--ash-grey)]/10" />
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="h-5 bg-[var(--ash-grey)]/10 rounded w-3/5" />
+                    <div className="h-3 bg-[var(--ash-grey)]/10 rounded w-2/5" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 md:flex-none h-9 w-24 bg-[var(--ash-grey)]/10 rounded-lg" />
+                  <div className="flex-1 md:flex-none h-9 w-28 bg-[var(--ash-grey)]/10 rounded-lg" />
+                </div>
+              </div>
             ))}
           </div>
         ) : loginRequired ? (
@@ -208,21 +323,21 @@ export default function RecordingsPage() {
           </motion.div>
         ) : recordings.length > 0 ? (
           <div className="space-y-4">
-            {recordings.map((recording, idx) => (
-              <motion.div
+            {(showAll
+              ? filteredRecordings
+              : filteredRecordings.slice(0, PREVIEW_COUNT)
+            ).map((recording) => (
+              <div
                 key={recording.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: idx * 0.03 }}
-                className={`bg-black/30 border rounded-xl overflow-hidden transition-all ${
+                className={`bg-black/30 border rounded-xl overflow-hidden transition-colors ${
                   playingId === recording.id
                     ? 'border-[var(--accent-purple)] shadow-lg shadow-purple-500/20'
                     : 'border-[var(--ash-grey)]/10 hover:border-[var(--ash-grey)]/30'
                 }`}
               >
-                <div className="p-4 md:p-5 space-y-3">
-                  {/* Top row: Play button + Info */}
-                  <div className="flex items-center gap-3 md:gap-5">
+                <div className="p-4 md:p-5 space-y-3 md:space-y-0 md:flex md:items-center md:gap-5">
+                  {/* Play button + Info */}
+                  <div className="flex items-center gap-3 md:gap-5 flex-1 min-w-0">
                     {/* Play Button */}
                     <button
                       onClick={() => handlePlay(recording)}
@@ -283,8 +398,8 @@ export default function RecordingsPage() {
                     </div>
                   </div>
 
-                  {/* Actions row */}
-                  <div className="flex items-center gap-2">
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 md:flex-shrink-0">
                     <button
                       onClick={() => handleShare(recording)}
                       className={`flex-1 md:flex-none px-4 py-2 border rounded-lg text-sm transition-colors flex items-center justify-center gap-2 ${
@@ -350,8 +465,18 @@ export default function RecordingsPage() {
                     </button>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
+            {filteredRecordings.length > PREVIEW_COUNT && (
+              <button
+                onClick={() => setShowAll(!showAll)}
+                className="w-full py-3 text-sm text-[var(--timberwolf)] hover:bg-white/5 border border-[var(--ash-grey)]/10 rounded-xl transition-colors"
+              >
+                {showAll
+                  ? 'Show less'
+                  : `Show all ${filteredRecordings.length} recordings`}
+              </button>
+            )}
           </div>
         ) : (
           <motion.div

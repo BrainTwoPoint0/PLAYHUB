@@ -1,6 +1,7 @@
 // Spiideo API Client for PLAYHUB
 // Handles OAuth2 authentication and API calls to Spiideo
 // Supports multiple Spiideo accounts (Play and Perform)
+// Documentation: https://docs-public.spiideo.com
 
 const SPIIDEO_API_BASE = 'https://api-public.spiideo.com'
 const SPIIDEO_TOKEN_URL = 'https://auth-play.spiideo.net/oauth2/token'

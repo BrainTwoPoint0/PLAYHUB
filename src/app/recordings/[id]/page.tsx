@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@braintwopoint0/playback-commons/ui'
+import { FadeIn } from '@/components/FadeIn'
 import { ArrowLeft } from 'lucide-react'
 
 interface Recording {
@@ -66,126 +66,176 @@ export default function RecordingPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6 max-w-4xl">
-        <p className="text-muted-foreground">Loading...</p>
+      <div className="min-h-screen bg-[var(--night)]">
+        <div className="container mx-auto px-5 py-16 max-w-4xl animate-pulse">
+          {/* Back button skeleton */}
+          <div className="bg-[var(--ash-grey)]/10 rounded h-9 w-[170px] mb-6" />
+          {/* Card skeleton */}
+          <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-black/20">
+            <div className="p-6 pb-3 space-y-2">
+              <div className="bg-[var(--ash-grey)]/10 rounded h-7 w-[260px]" />
+              <div className="bg-[var(--ash-grey)]/10 rounded h-4 w-[200px]" />
+            </div>
+            <div className="px-6 pb-6 space-y-4">
+              {/* Video placeholder */}
+              <div className="aspect-video bg-black/30 rounded-lg" />
+              {/* Info grid skeleton */}
+              <div className="grid grid-cols-2 gap-4 pt-4">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="bg-[var(--ash-grey)]/10 rounded h-3 w-[80px]" />
+                    <div className="bg-[var(--ash-grey)]/10 rounded h-5 w-[120px]" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="container mx-auto p-6 max-w-4xl">
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-red-500 mb-4">{error}</p>
+      <div className="min-h-screen bg-[var(--night)]">
+        <div className="container mx-auto px-5 py-16 max-w-4xl">
+          <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-6">
+            <p className="text-red-400 mb-4">{error}</p>
             <Button
               variant="outline"
               onClick={() => router.push('/recordings')}
+              className="border-[var(--ash-grey)]/20 text-[var(--timberwolf)] hover:bg-white/10"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Recordings
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     )
   }
 
   if (!recording) {
     return (
-      <div className="container mx-auto p-6 max-w-4xl">
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-muted-foreground">Recording not found</p>
+      <div className="min-h-screen bg-[var(--night)]">
+        <div className="container mx-auto px-5 py-16 max-w-4xl">
+          <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-6">
+            <p className="text-[var(--ash-grey)]">Recording not found</p>
             <Button
               variant="outline"
               onClick={() => router.push('/recordings')}
-              className="mt-4"
+              className="mt-4 border-[var(--ash-grey)]/20 text-[var(--timberwolf)] hover:bg-white/10"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Recordings
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <Button
-        variant="ghost"
-        onClick={() => router.push('/recordings')}
-        className="mb-4"
-      >
-        <ArrowLeft className="w-4 h-4 mr-2" />
-        Back to Recordings
-      </Button>
+    <div className="min-h-screen bg-[var(--night)]">
+      <div className="container mx-auto px-5 py-16 max-w-4xl">
+        <Button
+          variant="ghost"
+          onClick={() => router.push('/recordings')}
+          className="mb-6 text-[var(--timberwolf)] hover:bg-white/10"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Recordings
+        </Button>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{recording.title}</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            {formatDate(recording.matchDate)}
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Video Player */}
-          {videoUrl ? (
-            <div className="aspect-video bg-black rounded-lg overflow-hidden">
-              <video
-                src={videoUrl}
-                controls
-                className="w-full h-full"
-                poster=""
-              >
-                Your browser does not support the video tag.
-              </video>
-            </div>
-          ) : (
-            <div className="aspect-video bg-zinc-900 rounded-lg flex items-center justify-center">
-              <p className="text-muted-foreground">
-                {recording.status === 'scheduled'
-                  ? 'Recording not yet available'
-                  : recording.status === 'processing'
-                    ? 'Recording is being processed...'
-                    : 'Video not available'}
+        <FadeIn>
+          <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
+            <div className="p-6 pb-3">
+              <h1 className="text-2xl md:text-3xl font-bold text-[var(--timberwolf)]">
+                {recording.title}
+              </h1>
+              <p className="text-sm text-[var(--ash-grey)] mt-1">
+                {formatDate(recording.matchDate)}
               </p>
             </div>
-          )}
+            <div className="px-6 pb-6 space-y-4">
+              {/* Video Player */}
+              {videoUrl ? (
+                <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                  <video
+                    src={videoUrl}
+                    controls
+                    className="w-full h-full"
+                    poster=""
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
+              ) : (
+                <div className="aspect-video bg-black/30 rounded-lg flex items-center justify-center border border-[var(--ash-grey)]/10">
+                  <p className="text-[var(--ash-grey)]">
+                    {recording.status === 'scheduled'
+                      ? 'Recording not yet available'
+                      : recording.status === 'processing'
+                        ? 'Recording is being processed...'
+                        : 'Video not available'}
+                  </p>
+                </div>
+              )}
 
-          {/* Match Info */}
-          <div className="grid grid-cols-2 gap-4 pt-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Home Team</p>
-              <p className="font-medium">{recording.homeTeam}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Away Team</p>
-              <p className="font-medium">{recording.awayTeam}</p>
-            </div>
-            {recording.venue && (
-              <div>
-                <p className="text-sm text-muted-foreground">Venue</p>
-                <p className="font-medium">{recording.venue}</p>
+              {/* Match Info */}
+              <div className="grid grid-cols-2 gap-4 pt-4">
+                <div>
+                  <p className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)] mb-1">
+                    Home Team
+                  </p>
+                  <p className="font-medium text-[var(--timberwolf)]">
+                    {recording.homeTeam}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)] mb-1">
+                    Away Team
+                  </p>
+                  <p className="font-medium text-[var(--timberwolf)]">
+                    {recording.awayTeam}
+                  </p>
+                </div>
+                {recording.venue && (
+                  <div>
+                    <p className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)] mb-1">
+                      Venue
+                    </p>
+                    <p className="font-medium text-[var(--timberwolf)]">
+                      {recording.venue}
+                    </p>
+                  </div>
+                )}
+                {recording.pitchName && (
+                  <div>
+                    <p className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)] mb-1">
+                      Pitch
+                    </p>
+                    <p className="font-medium text-[var(--timberwolf)]">
+                      {recording.pitchName}
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
-            {recording.pitchName && (
-              <div>
-                <p className="text-sm text-muted-foreground">Pitch</p>
-                <p className="font-medium">{recording.pitchName}</p>
-              </div>
-            )}
+
+              {recording.description && (
+                <div className="pt-4 border-t border-[var(--ash-grey)]/10">
+                  <p className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)] mb-1">
+                    Description
+                  </p>
+                  <p className="text-[var(--timberwolf)]">
+                    {recording.description}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
-
-          {recording.description && (
-            <div className="pt-4 border-t">
-              <p className="text-sm text-muted-foreground">Description</p>
-              <p>{recording.description}</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        </FadeIn>
+      </div>
     </div>
   )
 }

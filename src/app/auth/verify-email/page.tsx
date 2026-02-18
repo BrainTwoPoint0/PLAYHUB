@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Mail } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button } from '@braintwopoint0/playback-commons/ui'
 
 export default function VerifyEmailPage() {
   return (

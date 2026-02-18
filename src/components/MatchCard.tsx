@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'motion/react'
-import { formatPrice, formatDate } from '@/lib/utils'
+import { formatPrice, formatDate } from '@braintwopoint0/playback-commons/utils'
 
 interface MatchCardProps {
   match: {
