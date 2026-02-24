@@ -28,7 +28,7 @@ export interface ClubSyncStatus {
 export async function getCachedClubData(
   clubSlug: string
 ): Promise<CachedClubData | null> {
-  const supabase = createServiceClient()
+  const supabase = createServiceClient() as any
 
   // Get club record
   const { data: club } = await supabase
@@ -55,7 +55,7 @@ export async function getCachedClubData(
     .eq('veo_club_slug', club.veo_club_slug)
 
   const membersByTeam = new Map<string, VeoMember[]>()
-  for (const m of members || []) {
+  for (const m of (members || []) as any[]) {
     const key = m.veo_team_slug
     if (!membersByTeam.has(key)) membersByTeam.set(key, [])
     membersByTeam.get(key)!.push({
@@ -69,7 +69,7 @@ export async function getCachedClubData(
 
   return {
     clubName: club.name,
-    teams: teams.map((t) => ({
+    teams: teams.map((t: any) => ({
       id: t.veo_team_id || '',
       slug: t.veo_team_slug,
       name: t.name,
@@ -90,7 +90,7 @@ export async function writeCachedClubData(
   veoClubSlug: string,
   data: { clubName: string; teams: (VeoTeam & { members: VeoMember[] })[] }
 ): Promise<void> {
-  const supabase = createServiceClient()
+  const supabase = createServiceClient() as any
 
   // Upsert club record
   const { error: clubError } = await supabase.from('playhub_veo_clubs').upsert(
@@ -113,26 +113,31 @@ export async function writeCachedClubData(
     .from('playhub_veo_members')
     .delete()
     .eq('veo_club_slug', veoClubSlug)
-  if (delMembersError) throw new Error(`Failed to delete members: ${delMembersError.message}`)
+  if (delMembersError)
+    throw new Error(`Failed to delete members: ${delMembersError.message}`)
 
   const { error: delTeamsError } = await supabase
     .from('playhub_veo_teams')
     .delete()
     .eq('veo_club_slug', veoClubSlug)
-  if (delTeamsError) throw new Error(`Failed to delete teams: ${delTeamsError.message}`)
+  if (delTeamsError)
+    throw new Error(`Failed to delete teams: ${delTeamsError.message}`)
 
   // Insert fresh teams
   if (data.teams.length > 0) {
-    const { error: teamsError } = await supabase.from('playhub_veo_teams').insert(
-      data.teams.map((t) => ({
-        veo_team_id: t.id,
-        veo_team_slug: t.slug,
-        veo_club_slug: veoClubSlug,
-        name: t.name,
-        member_count: t.members.length,
-      }))
-    )
-    if (teamsError) throw new Error(`Failed to insert teams: ${teamsError.message}`)
+    const { error: teamsError } = await supabase
+      .from('playhub_veo_teams')
+      .insert(
+        data.teams.map((t) => ({
+          veo_team_id: t.id,
+          veo_team_slug: t.slug,
+          veo_club_slug: veoClubSlug,
+          name: t.name,
+          member_count: t.members.length,
+        }))
+      )
+    if (teamsError)
+      throw new Error(`Failed to insert teams: ${teamsError.message}`)
   }
 
   // Insert fresh members
@@ -150,8 +155,11 @@ export async function writeCachedClubData(
   )
 
   if (allMembers.length > 0) {
-    const { error: membersError } = await supabase.from('playhub_veo_members').insert(allMembers)
-    if (membersError) throw new Error(`Failed to insert members: ${membersError.message}`)
+    const { error: membersError } = await supabase
+      .from('playhub_veo_members')
+      .insert(allMembers)
+    if (membersError)
+      throw new Error(`Failed to insert members: ${membersError.message}`)
   }
 }
 
@@ -162,7 +170,7 @@ export async function writeCachedClubData(
 export async function getClubSyncStatus(
   clubSlug: string
 ): Promise<ClubSyncStatus | null> {
-  const supabase = createServiceClient()
+  const supabase = createServiceClient() as any
 
   const { data: club } = await supabase
     .from('playhub_veo_clubs')
@@ -189,7 +197,7 @@ export async function setSyncStatus(
   status: 'syncing' | 'error',
   error?: string
 ): Promise<void> {
-  const supabase = createServiceClient()
+  const supabase = createServiceClient() as any
 
   await supabase.from('playhub_veo_clubs').upsert(
     {
@@ -197,7 +205,7 @@ export async function setSyncStatus(
       club_slug: clubSlug,
       name: clubSlug, // placeholder, will be overwritten on success
       sync_status: status,
-      sync_error: status === 'error' ? (error || 'Unknown error') : null,
+      sync_error: status === 'error' ? error || 'Unknown error' : null,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'club_slug' }

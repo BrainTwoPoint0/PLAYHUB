@@ -40,7 +40,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   }
 
   const body = await request.json().catch(() => ({}))
-  const mode: 'dry-run' | 'execute' = body.mode === 'execute' ? 'execute' : 'dry-run'
+  const mode: 'dry-run' | 'execute' =
+    body.mode === 'execute' ? 'execute' : 'dry-run'
 
   try {
     // 1. Fetch Veo teams+members
@@ -68,8 +69,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       .select('email')
       .eq('club_slug', clubSlug)
 
-    const exceptionEmails = new Set(
-      (exceptionsData || []).map((e: { email: string }) => e.email.toLowerCase())
+    const exceptionEmails = new Set<string>(
+      (exceptionsData || []).map((e: { email: string }) =>
+        e.email.toLowerCase()
+      )
     )
 
     // 4. Find removable members
