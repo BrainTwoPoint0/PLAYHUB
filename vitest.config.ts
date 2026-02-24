@@ -8,6 +8,10 @@ export default defineConfig({
         __dirname,
         './src/lib/__mocks__/next-navigation.ts'
       ),
+      '@braintwopoint0/playback-commons/playerdata': path.resolve(
+        __dirname,
+        '../packages/commons/src/playerdata/index.ts'
+      ),
     },
   },
   test: {
