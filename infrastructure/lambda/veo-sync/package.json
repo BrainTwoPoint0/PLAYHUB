@@ -1,0 +1,16 @@
+{
+  "name": "playhub-veo-sync",
+  "version": "1.0.0",
+  "description": "Lambda to trigger Veo Clubhouse cleanup via PLAYHUB API",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "esbuild index.ts --bundle --platform=node --target=node20 --outfile=dist/index.js",
+    "package": "npm run build && cd dist && zip -r ../dist.zip index.js",
+    "deploy": "npm run package && cd ../../terraform && terraform apply -target=aws_lambda_function.veo_sync"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.0.0"
+  }
+}
