@@ -4,9 +4,7 @@ import type { VeoMember, VeoTeam } from '../client'
 import type { AcademySubscriber } from '@/lib/academy/stripe'
 
 // Helper to build a minimal VeoMember
-function member(
-  overrides: Partial<VeoMember> & { email: string }
-): VeoMember {
+function member(overrides: Partial<VeoMember> & { email: string }): VeoMember {
   return {
     id: overrides.id || overrides.email,
     name: overrides.name || overrides.email.split('@')[0],
@@ -54,9 +52,7 @@ function sub(
 describe('findRemovableMembers', () => {
   it('marks canceled players as removable', () => {
     const teams = [
-      team('team-a', 'Team A', [
-        member({ email: 'alice@test.com' }),
-      ]),
+      team('team-a', 'Team A', [member({ email: 'alice@test.com' })]),
     ]
     const subscribers = [sub('alice@test.com', 'canceled')]
 
@@ -69,9 +65,7 @@ describe('findRemovableMembers', () => {
 
   it('does NOT mark active subscribers as removable', () => {
     const teams = [
-      team('team-a', 'Team A', [
-        member({ email: 'active@test.com' }),
-      ]),
+      team('team-a', 'Team A', [member({ email: 'active@test.com' })]),
     ]
     const subscribers = [sub('active@test.com', 'active')]
 
@@ -82,9 +76,7 @@ describe('findRemovableMembers', () => {
 
   it('does NOT mark scholarship users as removable even if canceled', () => {
     const teams = [
-      team('team-a', 'Team A', [
-        member({ email: 'scholar@test.com' }),
-      ]),
+      team('team-a', 'Team A', [member({ email: 'scholar@test.com' })]),
     ]
     const subscribers = [sub('scholar@test.com', 'canceled', true)]
 
@@ -95,9 +87,7 @@ describe('findRemovableMembers', () => {
 
   it('moves excepted users to excepted list instead of removable', () => {
     const teams = [
-      team('team-a', 'Team A', [
-        member({ email: 'excepted@test.com' }),
-      ]),
+      team('team-a', 'Team A', [member({ email: 'excepted@test.com' })]),
     ]
     const subscribers = [sub('excepted@test.com', 'canceled')]
     const exceptions = new Set(['excepted@test.com'])
@@ -124,9 +114,7 @@ describe('findRemovableMembers', () => {
 
   it('skips members with no Stripe subscription record', () => {
     const teams = [
-      team('team-a', 'Team A', [
-        member({ email: 'unknown@test.com' }),
-      ]),
+      team('team-a', 'Team A', [member({ email: 'unknown@test.com' })]),
     ]
 
     const result = findRemovableMembers(teams, [], new Set())
@@ -136,9 +124,7 @@ describe('findRemovableMembers', () => {
 
   it('uses best status when subscriber has multiple entries', () => {
     const teams = [
-      team('team-a', 'Team A', [
-        member({ email: 'multi@test.com' }),
-      ]),
+      team('team-a', 'Team A', [member({ email: 'multi@test.com' })]),
     ]
     // Same email with both active and canceled — active should win
     const subscribers = [
@@ -153,9 +139,7 @@ describe('findRemovableMembers', () => {
 
   it('handles case-insensitive email matching', () => {
     const teams = [
-      team('team-a', 'Team A', [
-        member({ email: 'Alice@Test.COM' }),
-      ]),
+      team('team-a', 'Team A', [member({ email: 'Alice@Test.COM' })]),
     ]
     const subscribers = [sub('alice@test.com', 'canceled')]
 
@@ -170,9 +154,7 @@ describe('findRemovableMembers', () => {
         member({ email: 'alice@test.com' }),
         member({ email: 'bob@test.com' }),
       ]),
-      team('team-b', 'Team B', [
-        member({ email: 'charlie@test.com' }),
-      ]),
+      team('team-b', 'Team B', [member({ email: 'charlie@test.com' })]),
     ]
     const subscribers = [
       sub('alice@test.com', 'canceled'),

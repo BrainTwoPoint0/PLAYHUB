@@ -49,14 +49,20 @@ describe('invitePlayer', () => {
       }),
     })
 
-    const result = await invitePlayer('club-slug', 'team-slug', 'test@example.com')
+    const result = await invitePlayer(
+      'club-slug',
+      'team-slug',
+      'test@example.com'
+    )
 
     expect(result.success).toBe(true)
     expect(result.message).toContain('Invitation sent')
     expect(api).toHaveBeenCalledWith(
       'POST',
       '/api/app/clubs/club-slug/teams/team-slug/addressed-invitations/',
-      { invitations: [{ email: 'test@example.com', permission_role: 'viewer' }] }
+      {
+        invitations: [{ email: 'test@example.com', permission_role: 'viewer' }],
+      }
     )
   })
 
@@ -70,7 +76,11 @@ describe('invitePlayer', () => {
       }),
     })
 
-    const result = await invitePlayer('club-slug', 'team-slug', 'test@example.com')
+    const result = await invitePlayer(
+      'club-slug',
+      'team-slug',
+      'test@example.com'
+    )
 
     expect(result.success).toBe(true)
     expect(result.message).toContain('already has a pending invitation')
@@ -83,7 +93,11 @@ describe('invitePlayer', () => {
       body: JSON.stringify({ detail: 'Permission denied' }),
     })
 
-    const result = await invitePlayer('club-slug', 'team-slug', 'test@example.com')
+    const result = await invitePlayer(
+      'club-slug',
+      'team-slug',
+      'test@example.com'
+    )
 
     expect(result.success).toBe(false)
     expect(result.message).toContain('Failed to invite')
@@ -102,14 +116,24 @@ describe('removeMember', () => {
     api.mockResolvedValueOnce({
       status: 200,
       body: JSON.stringify([
-        { id: 'member-123', email: 'player@example.com', name: 'Player', status: 'active', permission_role: 'viewer' },
+        {
+          id: 'member-123',
+          email: 'player@example.com',
+          name: 'Player',
+          status: 'active',
+          permission_role: 'viewer',
+        },
       ]),
     })
 
     // DELETE member - success
     api.mockResolvedValueOnce({ status: 204, body: '' })
 
-    const result = await removeMember('club-slug', 'team-slug', 'player@example.com')
+    const result = await removeMember(
+      'club-slug',
+      'team-slug',
+      'player@example.com'
+    )
 
     expect(result.success).toBe(true)
     expect(result.message).toContain('Removed')
@@ -129,14 +153,22 @@ describe('removeMember', () => {
     api.mockResolvedValueOnce({
       status: 200,
       body: JSON.stringify([
-        { id: 'inv-456', public_identifier: 'inv-456', email: 'player@example.com' },
+        {
+          id: 'inv-456',
+          public_identifier: 'inv-456',
+          email: 'player@example.com',
+        },
       ]),
     })
 
     // DELETE invitation - success
     api.mockResolvedValueOnce({ status: 204, body: '' })
 
-    const result = await removeMember('club-slug', 'team-slug', 'player@example.com')
+    const result = await removeMember(
+      'club-slug',
+      'team-slug',
+      'player@example.com'
+    )
 
     expect(result.success).toBe(true)
     expect(result.message).toContain('Revoked invitation')
@@ -154,7 +186,11 @@ describe('removeMember', () => {
     // GET addressed-invitations - empty
     api.mockResolvedValueOnce({ status: 200, body: JSON.stringify([]) })
 
-    const result = await removeMember('club-slug', 'team-slug', 'unknown@example.com')
+    const result = await removeMember(
+      'club-slug',
+      'team-slug',
+      'unknown@example.com'
+    )
 
     expect(result.success).toBe(false)
     expect(result.message).toContain('not found')
@@ -166,12 +202,22 @@ describe('removeMember', () => {
     api.mockResolvedValueOnce({
       status: 200,
       body: JSON.stringify([
-        { id: 'member-789', email: 'Player@Example.COM', name: 'Player', status: 'active', permission_role: 'viewer' },
+        {
+          id: 'member-789',
+          email: 'Player@Example.COM',
+          name: 'Player',
+          status: 'active',
+          permission_role: 'viewer',
+        },
       ]),
     })
     api.mockResolvedValueOnce({ status: 204, body: '' })
 
-    const result = await removeMember('club-slug', 'team-slug', 'player@example.com')
+    const result = await removeMember(
+      'club-slug',
+      'team-slug',
+      'player@example.com'
+    )
 
     expect(result.success).toBe(true)
   })

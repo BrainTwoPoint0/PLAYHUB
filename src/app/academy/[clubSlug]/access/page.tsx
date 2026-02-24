@@ -83,10 +83,14 @@ function timeAgo(dateString: string): string {
 
 function roleLabel(veoRole: string): string {
   switch (veoRole) {
-    case 'coach': return 'Coach'
-    case 'admin': return 'Admin'
-    case 'owner': return 'Owner'
-    default: return veoRole
+    case 'coach':
+      return 'Coach'
+    case 'admin':
+      return 'Admin'
+    case 'owner':
+      return 'Owner'
+    default:
+      return veoRole
   }
 }
 
@@ -418,7 +422,9 @@ export default function AcademyAccessPage() {
                   Sync Exceptions
                 </span>
                 <span className="text-xs text-[var(--ash-grey)]">
-                  {exceptions.length} {exceptions.length === 1 ? 'user' : 'users'} exempt from auto-removal
+                  {exceptions.length}{' '}
+                  {exceptions.length === 1 ? 'user' : 'users'} exempt from
+                  auto-removal
                 </span>
               </div>
             </button>
@@ -427,7 +433,9 @@ export default function AcademyAccessPage() {
                 {/* Add exception form */}
                 <div className="flex items-end gap-2">
                   <div className="flex-1">
-                    <label className="text-xs text-[var(--ash-grey)] mb-1 block">Email</label>
+                    <label className="text-xs text-[var(--ash-grey)] mb-1 block">
+                      Email
+                    </label>
                     <input
                       type="email"
                       value={newExceptionEmail}
@@ -437,7 +445,9 @@ export default function AcademyAccessPage() {
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="text-xs text-[var(--ash-grey)] mb-1 block">Reason (optional)</label>
+                    <label className="text-xs text-[var(--ash-grey)] mb-1 block">
+                      Reason (optional)
+                    </label>
                     <input
                       type="text"
                       value={newExceptionReason}
@@ -458,7 +468,9 @@ export default function AcademyAccessPage() {
 
                 {/* Exception list */}
                 {exceptions.length === 0 ? (
-                  <p className="text-xs text-[var(--ash-grey)]">No exceptions configured.</p>
+                  <p className="text-xs text-[var(--ash-grey)]">
+                    No exceptions configured.
+                  </p>
                 ) : (
                   <div className="divide-y divide-[var(--ash-grey)]/5">
                     {exceptions.map((exc) => (
@@ -467,7 +479,9 @@ export default function AcademyAccessPage() {
                         className="flex items-center justify-between py-2 text-sm"
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <span className="text-[var(--timberwolf)] truncate">{exc.email}</span>
+                          <span className="text-[var(--timberwolf)] truncate">
+                            {exc.email}
+                          </span>
                           {exc.reason && (
                             <span className="text-xs text-[var(--ash-grey)] truncate">
                               {exc.reason}
@@ -504,7 +518,9 @@ export default function AcademyAccessPage() {
                   : 'border-[var(--ash-grey)]/20 text-[var(--ash-grey)] hover:text-[var(--timberwolf)]'
               }`}
             >
-              {filterNoSub ? 'Showing: Players without subscription' : 'Filter: Players no sub'}
+              {filterNoSub
+                ? 'Showing: Players without subscription'
+                : 'Filter: Players no sub'}
             </button>
             <button
               onClick={expandAll}
@@ -538,9 +554,7 @@ export default function AcademyAccessPage() {
                 const teamNoSub = team.members.filter(
                   (m) => m.isPlayer && !m.hasSubscription
                 ).length
-                const teamStaff = team.members.filter(
-                  (m) => !m.isPlayer
-                ).length
+                const teamStaff = team.members.filter((m) => !m.isPlayer).length
                 const displayMembers = filterNoSub
                   ? team.members.filter((m) => m.isPlayer && !m.hasSubscription)
                   : team.members

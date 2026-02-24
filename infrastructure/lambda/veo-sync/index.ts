@@ -5,7 +5,9 @@
 
 const PLAYHUB_URL = process.env.PLAYHUB_URL!
 const SYNC_API_KEY = process.env.SYNC_API_KEY!
-const CLUB_SLUGS = (process.env.CLUB_SLUGS || 'cfa,sefa').split(',').map(s => s.trim())
+const CLUB_SLUGS = (process.env.CLUB_SLUGS || 'cfa,sefa')
+  .split(',')
+  .map((s) => s.trim())
 const SYNC_MODE = (process.env.SYNC_MODE || 'dry-run') as 'dry-run' | 'execute'
 
 interface EventPayload {
@@ -167,12 +169,16 @@ async function runCleanupSync(): Promise<ClubResult[]> {
 // Handler — route based on event.action
 // ============================================================================
 
-export const handler = async (event: EventPayload = {}): Promise<{
+export const handler = async (
+  event: EventPayload = {}
+): Promise<{
   statusCode: number
   body: string
 }> => {
   const action = event.action || 'cleanup-sync'
-  console.log(`Veo sync Lambda invoked (action: ${action}, clubs: ${CLUB_SLUGS.join(', ')})`)
+  console.log(
+    `Veo sync Lambda invoked (action: ${action}, clubs: ${CLUB_SLUGS.join(', ')})`
+  )
 
   let results: ClubResult[]
 
@@ -182,7 +188,7 @@ export const handler = async (event: EventPayload = {}): Promise<{
     results = await runCleanupSync()
   }
 
-  const hasErrors = results.some(r => r.status === 'error')
+  const hasErrors = results.some((r) => r.status === 'error')
 
   return {
     statusCode: hasErrors ? 207 : 200,

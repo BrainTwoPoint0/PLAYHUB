@@ -35,9 +35,7 @@ export async function GET() {
     .in('role', ['club_admin', 'league_admin'])
     .eq('is_active', true)
 
-  const orgIds = new Set(
-    (memberships || []).map((m: any) => m.organization_id)
-  )
+  const orgIds = new Set((memberships || []).map((m: any) => m.organization_id))
 
   const accessibleClubs = getAllClubs().filter(
     (club) => club.organizationId && orgIds.has(club.organizationId)

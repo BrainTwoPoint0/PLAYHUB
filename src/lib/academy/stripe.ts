@@ -335,14 +335,16 @@ export async function getAcademySummary(
 
     for (const sub of subscriptions) {
       // Skip incomplete payment attempts — not real subscribers
-      if (sub.status === 'incomplete' || sub.status === 'incomplete_expired') continue
+      if (sub.status === 'incomplete' || sub.status === 'incomplete_expired')
+        continue
 
       // Look up registration info for this subscriber
       const customer = sub.customer as Stripe.Customer
       const email = customer?.email?.toLowerCase() || null
       const reg = email ? registrations.get(email) : undefined
       const rawTeam = reg?.registrationTeam || 'unknown'
-      const regTeam = rawTeam === 'unknown' ? 'unknown' : normalizeTeamSlug(rawTeam)
+      const regTeam =
+        rawTeam === 'unknown' ? 'unknown' : normalizeTeamSlug(rawTeam)
 
       // Detect scholarship via subscription coupon (100% off)
       const scholarship = isScholarshipSubscription(sub)
@@ -350,7 +352,12 @@ export async function getAcademySummary(
 
       // Track per registration team
       if (!regTeamCounts[regTeam]) {
-        regTeamCounts[regTeam] = { active: 0, pastDue: 0, canceled: 0, trialing: 0 }
+        regTeamCounts[regTeam] = {
+          active: 0,
+          pastDue: 0,
+          canceled: 0,
+          trialing: 0,
+        }
       }
 
       switch (sub.status) {
@@ -456,7 +463,8 @@ export async function getAcademySubscribers(
   for (const { price, subscriptions } of clubData) {
     for (const sub of subscriptions) {
       // Skip incomplete payment attempts — not real subscribers
-      if (sub.status === 'incomplete' || sub.status === 'incomplete_expired') continue
+      if (sub.status === 'incomplete' || sub.status === 'incomplete_expired')
+        continue
 
       const customer = sub.customer as Stripe.Customer
       const item = sub.items.data[0]
@@ -464,7 +472,9 @@ export async function getAcademySubscribers(
       const reg = email ? registrations.get(email) : undefined
 
       const rawRegTeam = reg?.registrationTeam || null
-      const normalizedRegTeam = rawRegTeam ? normalizeTeamSlug(rawRegTeam) : null
+      const normalizedRegTeam = rawRegTeam
+        ? normalizeTeamSlug(rawRegTeam)
+        : null
 
       subscribers.push({
         subscriptionId: sub.id,
@@ -482,9 +492,7 @@ export async function getAcademySubscribers(
         currentPeriodStart: new Date(
           sub.current_period_start * 1000
         ).toISOString(),
-        currentPeriodEnd: new Date(
-          sub.current_period_end * 1000
-        ).toISOString(),
+        currentPeriodEnd: new Date(sub.current_period_end * 1000).toISOString(),
         canceledAt: sub.canceled_at
           ? new Date(sub.canceled_at * 1000).toISOString()
           : null,
@@ -527,7 +535,8 @@ export async function getSubscribersByProduct(
 
   for (const { price, subscriptions } of clubData) {
     for (const sub of subscriptions) {
-      if (sub.status === 'incomplete' || sub.status === 'incomplete_expired') continue
+      if (sub.status === 'incomplete' || sub.status === 'incomplete_expired')
+        continue
 
       const customer = sub.customer as Stripe.Customer
       const item = sub.items.data[0]
@@ -535,7 +544,9 @@ export async function getSubscribersByProduct(
       const reg = email ? registrations.get(email) : undefined
 
       const rawRegTeam = reg?.registrationTeam || null
-      const normalizedRegTeam = rawRegTeam ? normalizeTeamSlug(rawRegTeam) : null
+      const normalizedRegTeam = rawRegTeam
+        ? normalizeTeamSlug(rawRegTeam)
+        : null
 
       subscribers.push({
         subscriptionId: sub.id,
@@ -553,9 +564,7 @@ export async function getSubscribersByProduct(
         currentPeriodStart: new Date(
           sub.current_period_start * 1000
         ).toISOString(),
-        currentPeriodEnd: new Date(
-          sub.current_period_end * 1000
-        ).toISOString(),
+        currentPeriodEnd: new Date(sub.current_period_end * 1000).toISOString(),
         canceledAt: sub.canceled_at
           ? new Date(sub.canceled_at * 1000).toISOString()
           : null,

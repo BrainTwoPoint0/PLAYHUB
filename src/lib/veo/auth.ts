@@ -89,15 +89,16 @@ async function attemptLogin(): Promise<{
   }
 
   // Now on auth.veo.co — wait for the login form to render
-  const emailInput = await page.waitForSelector(
-    'input[type="email"], input[name="email"], input[type="text"]',
-    { timeout: 15000 }
-  ).catch(() => null)
+  const emailInput = await page
+    .waitForSelector(
+      'input[type="email"], input[name="email"], input[type="text"]',
+      { timeout: 15000 }
+    )
+    .catch(() => null)
 
-  const passwordInput = await page.waitForSelector(
-    'input[type="password"]',
-    { timeout: 5000 }
-  ).catch(() => null)
+  const passwordInput = await page
+    .waitForSelector('input[type="password"]', { timeout: 5000 })
+    .catch(() => null)
 
   if (!emailInput || !passwordInput) {
     await browser.close()
@@ -141,7 +142,9 @@ async function login(): Promise<{
   for (let attempt = 1; attempt <= MAX_LOGIN_RETRIES; attempt++) {
     const result = await attemptLogin()
     if (result) return result
-    console.warn(`Veo login attempt ${attempt}/${MAX_LOGIN_RETRIES} failed, retrying...`)
+    console.warn(
+      `Veo login attempt ${attempt}/${MAX_LOGIN_RETRIES} failed, retrying...`
+    )
   }
   throw new Error(`Veo login failed after ${MAX_LOGIN_RETRIES} attempts`)
 }

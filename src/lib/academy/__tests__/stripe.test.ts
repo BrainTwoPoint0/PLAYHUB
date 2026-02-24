@@ -52,9 +52,7 @@ import {
 // Test data factories
 // ============================================================================
 
-function makePrice(
-  overrides: Partial<Stripe.Price> = {}
-): Stripe.Price {
+function makePrice(overrides: Partial<Stripe.Price> = {}): Stripe.Price {
   return {
     id: 'price_u9',
     object: 'price',
@@ -132,7 +130,9 @@ function paginatedResponse<T>(items: T[]) {
 // Default: return a single price with no subscriptions
 function setupEmptyClub() {
   ;(mockStripeInstance as any).prices.list.mockReturnValue(asyncIterable([]))
-  ;(mockStripeInstance as any).checkout.sessions.list.mockReturnValue(paginatedResponse([]))
+  ;(mockStripeInstance as any).checkout.sessions.list.mockReturnValue(
+    paginatedResponse([])
+  )
 }
 
 // Setup a club with given prices and subscriptions
@@ -157,7 +157,9 @@ function setupClubData(
     }
   )
   // Default: no checkout sessions (tests can override)
-  ;(mockStripeInstance as any).checkout.sessions.list.mockReturnValue(paginatedResponse([]))
+  ;(mockStripeInstance as any).checkout.sessions.list.mockReturnValue(
+    paginatedResponse([])
+  )
 }
 
 // ============================================================================
@@ -198,7 +200,10 @@ describe('getAcademySummary', () => {
           makeSubscription({ status: 'active' }),
           makeSubscription({ status: 'active' }),
           makeSubscription({ status: 'past_due' }),
-          makeSubscription({ status: 'canceled', canceled_at: Math.floor(Date.now() / 1000) - 5 * 86400 }),
+          makeSubscription({
+            status: 'canceled',
+            canceled_at: Math.floor(Date.now() / 1000) - 5 * 86400,
+          }),
           makeSubscription({ status: 'trialing' }),
         ],
       },
@@ -245,7 +250,11 @@ describe('getAcademySummary', () => {
             status: 'active',
             unitAmount: 1500,
             discount: {
-              coupon: { percent_off: 100, id: 'coupon_scholarship', name: 'SEFA Scholarship' },
+              coupon: {
+                percent_off: 100,
+                id: 'coupon_scholarship',
+                name: 'SEFA Scholarship',
+              },
             },
           } as any),
         ],
@@ -302,7 +311,10 @@ describe('getAcademySummary', () => {
         price: u10Price,
         subscriptions: [
           makeSubscription({ status: 'active' }),
-          makeSubscription({ status: 'canceled', canceled_at: Math.floor(Date.now() / 1000) - 5 * 86400 }),
+          makeSubscription({
+            status: 'canceled',
+            canceled_at: Math.floor(Date.now() / 1000) - 5 * 86400,
+          }),
         ],
       },
     ])
@@ -425,7 +437,6 @@ describe('getAcademyRevenue', () => {
     const sub = makeSubscription({ id: 'sub_1', status: 'active' } as any)
 
     setupClubData([{ price, subscriptions: [sub] }])
-
     ;(mockStripeInstance as any).invoices.list.mockReturnValue(
       asyncIterable([
         { id: 'inv_1', amount_paid: 3000, currency: 'gbp', status: 'paid' },

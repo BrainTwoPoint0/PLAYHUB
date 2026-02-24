@@ -263,11 +263,9 @@ export async function setMatchPrivacy(
   privacy: 'public' | 'private'
 ): Promise<VeoResult> {
   return withSession(async (session) => {
-    const res = await session.api(
-      'PATCH',
-      `/api/app/matches/${matchSlug}/`,
-      { privacy }
-    )
+    const res = await session.api('PATCH', `/api/app/matches/${matchSlug}/`, {
+      privacy,
+    })
 
     const data = parseBody(res.body)
 
@@ -303,7 +301,10 @@ export async function listClubsAndTeams(): Promise<
     )
 
     if (clubsRes.status !== 200) {
-      return { success: false, message: `Failed to list clubs: ${clubsRes.status}` }
+      return {
+        success: false,
+        message: `Failed to list clubs: ${clubsRes.status}`,
+      }
     }
 
     const clubs: VeoClub[] = parseBody(clubsRes.body) || []
@@ -393,7 +394,9 @@ export async function listTeamMembers(
  */
 export async function listClubTeamsWithMembers(
   clubSlug: string
-): Promise<VeoResult<{ clubName: string; teams: (VeoTeam & { members: VeoMember[] })[] }>> {
+): Promise<
+  VeoResult<{ clubName: string; teams: (VeoTeam & { members: VeoMember[] })[] }>
+> {
   return withSession(async (session) => {
     // Fetch teams
     const teamsRes = await session.api(
@@ -402,7 +405,10 @@ export async function listClubTeamsWithMembers(
     )
 
     if (teamsRes.status !== 200) {
-      return { success: false, message: `Failed to list teams: ${teamsRes.status}` }
+      return {
+        success: false,
+        message: `Failed to list teams: ${teamsRes.status}`,
+      }
     }
 
     const teams: VeoTeam[] = parseBody(teamsRes.body) || []

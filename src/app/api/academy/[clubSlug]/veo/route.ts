@@ -6,7 +6,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { getClubBySlug, getAllProductIds } from '@/lib/academy/config'
 import { getCachedClubData } from '@/lib/veo/cache'
-import { getAcademySubscribers, getSubscribersByProduct, clearCache } from '@/lib/academy/stripe'
+import {
+  getAcademySubscribers,
+  getSubscribersByProduct,
+  clearCache,
+} from '@/lib/academy/stripe'
 
 export async function GET(
   request: NextRequest,
@@ -64,25 +68,39 @@ export async function GET(
 
     if (!cachedData) {
       return NextResponse.json(
-        { error: 'No cached data. Click "Sync Now" to populate.', needsSync: true },
+        {
+          error: 'No cached data. Click "Sync Now" to populate.',
+          needsSync: true,
+        },
         { status: 404 }
       )
     }
 
     // Build email → subscriber lookup (lowercase), prefer active status on duplicates
     const statusPriority: Record<string, number> = {
-      active: 0, trialing: 1, past_due: 2, canceled: 3,
+      active: 0,
+      trialing: 1,
+      past_due: 2,
+      canceled: 3,
     }
     const subsByEmail = new Map<
       string,
-      { status: string; isScholarship: boolean; registrationTeam: string | null }
+      {
+        status: string
+        isScholarship: boolean
+        registrationTeam: string | null
+      }
     >()
     for (const sub of subscribers) {
       if (sub.customerEmail) {
         const email = sub.customerEmail.toLowerCase()
         const existing = subsByEmail.get(email)
         // Keep the better status (active > trialing > past_due > canceled)
-        if (!existing || (statusPriority[sub.status] ?? 9) < (statusPriority[existing.status] ?? 9)) {
+        if (
+          !existing ||
+          (statusPriority[sub.status] ?? 9) <
+            (statusPriority[existing.status] ?? 9)
+        ) {
           subsByEmail.set(email, {
             status: sub.status,
             isScholarship: sub.isScholarship,
