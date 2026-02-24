@@ -36,7 +36,7 @@ next-env.d.ts
 # Infrastructure - Terraform
 infrastructure/terraform/.terraform/
 infrastructure/terraform/*.tfstate
-infrastructure/terraform/*.tfstate.backup
+infrastructure/terraform/*.tfstate.*backup
 infrastructure/terraform/terraform.tfvars
 
 # Infrastructure - Lambda
