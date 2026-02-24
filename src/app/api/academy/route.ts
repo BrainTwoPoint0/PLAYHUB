@@ -1,0 +1,54 @@
+// GET /api/academy - List clubs the current user can access
+
+import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+import { isPlatformAdmin } from '@/lib/admin/auth'
+import { getAllClubs, type AcademyClub } from '@/lib/academy/config'
+import { createServiceClient } from '@/lib/supabase/server'
+
+export async function GET() {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const isAdmin = await isPlatformAdmin(user.id)
+
+  if (isAdmin) {
+    // Platform admins see all clubs
+    return NextResponse.json({ clubs: getAllClubs(), role: 'platform_admin' })
+  }
+
+  // Check which clubs this user is an admin for (via organization_members)
+  const serviceClient = createServiceClient() as any
+
+  const { data: memberships } = await serviceClient
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', user.id)
+    .in('role', ['club_admin', 'league_admin'])
+    .eq('is_active', true)
+
+  const orgIds = new Set(
+    (memberships || []).map((m: any) => m.organization_id)
+  )
+
+  const accessibleClubs = getAllClubs().filter(
+    (club) => club.organizationId && orgIds.has(club.organizationId)
+  )
+
+  if (accessibleClubs.length === 0) {
+    return NextResponse.json(
+      { error: 'You do not have access to any academy clubs' },
+      { status: 403 }
+    )
+  }
+
+  return NextResponse.json({ clubs: accessibleClubs, role: 'club_admin' })
+}
