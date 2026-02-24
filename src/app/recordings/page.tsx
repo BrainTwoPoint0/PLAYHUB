@@ -1,9 +1,35 @@
 'use client'
 
 import { motion } from 'motion/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatDateTime } from '@braintwopoint0/playback-commons/utils'
+import { createClient } from '@braintwopoint0/playback-commons/supabase'
 import { FadeIn } from '@/components/FadeIn'
+import { VideoPlayer } from '@/components/video/VideoPlayer'
+import { Lock, Globe, Pencil, Trash2, Plus } from 'lucide-react'
+import {
+  Button,
+  Badge,
+  Input,
+  Label,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@braintwopoint0/playback-commons/ui'
+import type {
+  RecordingEvent,
+  EventType,
+  EventVisibility,
+  EventTeam,
+} from '@/lib/recordings/event-types'
+import {
+  EVENT_TYPES,
+  EVENT_TYPE_LABELS,
+  EVENT_TYPE_COLORS,
+  formatTimestamp,
+} from '@/lib/recordings/event-types'
 
 interface Recording {
   id: string
@@ -19,6 +45,177 @@ interface Recording {
   spiideo_game_id?: string
 }
 
+// ─── Tag Form ────────────────────────────────────────────────────
+
+interface TagFormData {
+  event_type: EventType
+  timestamp_seconds: number
+  team: EventTeam | null
+  label: string
+  visibility: EventVisibility
+}
+
+function TagForm({
+  initial,
+  homeTeam,
+  awayTeam,
+  onSubmit,
+  onCancel,
+  submitLabel,
+}: {
+  initial: TagFormData
+  homeTeam: string
+  awayTeam: string
+  onSubmit: (data: TagFormData) => void
+  onCancel: () => void
+  submitLabel: string
+}) {
+  const [form, setForm] = useState<TagFormData>(initial)
+
+  return (
+    <div className="space-y-3 p-4 rounded-lg border border-[var(--ash-grey)]/10 bg-white/[0.03]">
+      {/* Event type */}
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)]">
+          Event Type
+        </Label>
+        <Select
+          value={form.event_type}
+          onValueChange={(val) =>
+            setForm({ ...form, event_type: val as EventType })
+          }
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {EVENT_TYPES.map((type) => (
+              <SelectItem key={type} value={type}>
+                {EVENT_TYPE_LABELS[type]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Timestamp */}
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)]">
+          Timestamp
+        </Label>
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            min="0"
+            step="0.1"
+            value={form.timestamp_seconds}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                timestamp_seconds: Math.max(0, parseFloat(e.target.value) || 0),
+              })
+            }
+            className="w-24"
+          />
+          <span className="text-xs text-[var(--ash-grey)]">
+            {formatTimestamp(form.timestamp_seconds)}
+          </span>
+        </div>
+      </div>
+
+      {/* Team */}
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)]">
+          Team (optional)
+        </Label>
+        <div className="flex gap-2">
+          {[
+            { value: null, label: 'None' },
+            { value: 'home' as const, label: homeTeam },
+            { value: 'away' as const, label: awayTeam },
+          ].map((opt) => (
+            <Button
+              key={opt.label}
+              type="button"
+              size="sm"
+              variant={form.team === opt.value ? 'default' : 'outline'}
+              onClick={() => setForm({ ...form, team: opt.value })}
+              className={
+                form.team === opt.value
+                  ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 hover:bg-emerald-500/30 text-xs'
+                  : 'border-[var(--ash-grey)]/20 text-[var(--ash-grey)] hover:border-[var(--ash-grey)]/40 text-xs'
+              }
+            >
+              {opt.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* Label */}
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)]">
+          Label (optional)
+        </Label>
+        <Input
+          type="text"
+          value={form.label}
+          onChange={(e) => setForm({ ...form, label: e.target.value })}
+          placeholder="e.g. Player name, notes..."
+        />
+      </div>
+
+      {/* Visibility */}
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)]">
+          Visibility
+        </Label>
+        <div className="flex gap-2">
+          {[
+            { value: 'public' as const, label: 'Public', icon: Globe },
+            { value: 'private' as const, label: 'Private', icon: Lock },
+          ].map((opt) => (
+            <Button
+              key={opt.value}
+              type="button"
+              size="sm"
+              variant={form.visibility === opt.value ? 'default' : 'outline'}
+              onClick={() => setForm({ ...form, visibility: opt.value })}
+              className={
+                form.visibility === opt.value
+                  ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 hover:bg-emerald-500/30 text-xs gap-1.5'
+                  : 'border-[var(--ash-grey)]/20 text-[var(--ash-grey)] hover:border-[var(--ash-grey)]/40 text-xs gap-1.5'
+              }
+            >
+              <opt.icon className="w-3 h-3" />
+              {opt.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-2 pt-1">
+        <Button
+          onClick={() => onSubmit(form)}
+          size="sm"
+          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+        >
+          {submitLabel}
+        </Button>
+        <Button
+          onClick={onCancel}
+          size="sm"
+          variant="ghost"
+          className="text-[var(--ash-grey)] hover:bg-white/10 text-xs"
+        >
+          Cancel
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default function RecordingsPage() {
   const [recordings, setRecordings] = useState<Recording[]>([])
   const [loading, setLoading] = useState(true)
@@ -28,6 +225,13 @@ export default function RecordingsPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [loginRequired, setLoginRequired] = useState(false)
   const [showAll, setShowAll] = useState(false)
+
+  // Event tagging state
+  const [events, setEvents] = useState<RecordingEvent[]>([])
+  const [userId, setUserId] = useState<string | null>(null)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [addFormTimestamp, setAddFormTimestamp] = useState(0)
+  const [editingEventId, setEditingEventId] = useState<string | null>(null)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [sortBy, setSortBy] = useState('date_desc')
@@ -93,17 +297,125 @@ export default function RecordingsPage() {
     }
 
     fetchRecordings()
+    fetchCurrentUser()
   }, [])
+
+  async function fetchCurrentUser() {
+    try {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      setUserId(user?.id || null)
+    } catch {
+      // Not logged in
+    }
+  }
+
+  async function fetchEvents(recordingId: string) {
+    try {
+      const res = await fetch(`/api/recordings/${recordingId}/events`)
+      if (res.ok) {
+        const data = await res.json()
+        setEvents(data.events || [])
+      }
+    } catch {
+      setEvents([])
+    }
+  }
+
+  const handleAddTag = useCallback((timestampSeconds: number) => {
+    setAddFormTimestamp(Math.round(timestampSeconds * 100) / 100)
+    setShowAddForm(true)
+    setEditingEventId(null)
+  }, [])
+
+  async function handleCreateEvent(recordingId: string, data: TagFormData) {
+    try {
+      const res = await fetch(`/api/recordings/${recordingId}/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_type: data.event_type,
+          timestamp_seconds: data.timestamp_seconds,
+          team: data.team,
+          label: data.label || null,
+          visibility: data.visibility,
+        }),
+      })
+      if (res.ok) {
+        const result = await res.json()
+        setEvents((prev) =>
+          [...prev, result.event].sort(
+            (a, b) => a.timestamp_seconds - b.timestamp_seconds
+          )
+        )
+        setShowAddForm(false)
+      }
+    } catch {}
+  }
+
+  async function handleUpdateEvent(
+    recordingId: string,
+    eventId: string,
+    data: TagFormData
+  ) {
+    try {
+      const res = await fetch(
+        `/api/recordings/${recordingId}/events/${eventId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_type: data.event_type,
+            timestamp_seconds: data.timestamp_seconds,
+            team: data.team,
+            label: data.label || null,
+            visibility: data.visibility,
+          }),
+        }
+      )
+      if (res.ok) {
+        const result = await res.json()
+        setEvents((prev) =>
+          prev
+            .map((e) => (e.id === eventId ? result.event : e))
+            .sort((a, b) => a.timestamp_seconds - b.timestamp_seconds)
+        )
+        setEditingEventId(null)
+      }
+    } catch {}
+  }
+
+  async function handleDeleteEvent(recordingId: string, eventId: string) {
+    try {
+      const res = await fetch(
+        `/api/recordings/${recordingId}/events/${eventId}`,
+        {
+          method: 'DELETE',
+        }
+      )
+      if (res.ok) {
+        setEvents((prev) => prev.filter((e) => e.id !== eventId))
+      }
+    } catch {}
+  }
 
   const handlePlay = async (recording: Recording) => {
     if (playingId === recording.id) {
       // Already playing, close it
       setPlayingId(null)
       setPlaybackUrl(null)
+      setEvents([])
+      setShowAddForm(false)
+      setEditingEventId(null)
       return
     }
 
     setLoadingPlayback(true)
+    setEvents([])
+    setShowAddForm(false)
+    setEditingEventId(null)
     try {
       const res = await fetch(
         `/api/recordings?id=${recording.id}&action=playback`
@@ -112,6 +424,7 @@ export default function RecordingsPage() {
       if (data.playbackUrl) {
         setPlayingId(recording.id)
         setPlaybackUrl(data.playbackUrl)
+        fetchEvents(recording.id)
       }
     } catch (error) {
       console.error('Error getting playback URL:', error)
@@ -235,48 +548,210 @@ export default function RecordingsPage() {
         </FadeIn>
 
         {/* Video Player Modal */}
-        {playingId && playbackUrl && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-8 bg-black/50 border border-[var(--ash-grey)]/20 rounded-2xl overflow-hidden"
-          >
-            <div className="p-4 border-b border-[var(--ash-grey)]/20 flex items-center justify-between">
-              <h2 className="text-sm md:text-lg font-semibold text-[var(--timberwolf)] truncate mr-2">
-                Now Playing: {recordings.find((r) => r.id === playingId)?.title}
-              </h2>
-              <button
-                onClick={() => {
-                  setPlayingId(null)
-                  setPlaybackUrl(null)
-                }}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+        {playingId &&
+          playbackUrl &&
+          (() => {
+            const playingRecording = recordings.find((r) => r.id === playingId)
+            const canEdit = !!userId
+            return (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-8 bg-black/50 border border-[var(--ash-grey)]/20 rounded-2xl overflow-hidden"
               >
-                <svg
-                  className="w-5 h-5 text-[var(--ash-grey)]"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
+                <div className="p-4 border-b border-[var(--ash-grey)]/20 flex items-center justify-between">
+                  <h2 className="text-sm md:text-lg font-semibold text-[var(--timberwolf)] truncate mr-2">
+                    Now Playing: {playingRecording?.title}
+                  </h2>
+                  <button
+                    onClick={() => {
+                      setPlayingId(null)
+                      setPlaybackUrl(null)
+                      setEvents([])
+                      setShowAddForm(false)
+                      setEditingEventId(null)
+                    }}
+                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  >
+                    <svg
+                      className="w-5 h-5 text-[var(--ash-grey)]"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+                <div className="aspect-video bg-black">
+                  <VideoPlayer
+                    src={playbackUrl}
+                    events={events}
+                    canEdit={canEdit}
+                    onAddTag={handleAddTag}
+                    className="w-full h-full"
                   />
-                </svg>
-              </button>
-            </div>
-            <div className="aspect-video bg-black">
-              <video
-                src={playbackUrl}
-                controls
-                autoPlay
-                className="w-full h-full"
-              />
-            </div>
-          </motion.div>
-        )}
+                </div>
+
+                {/* Event Tags Panel */}
+                <div className="p-4 border-t border-[var(--ash-grey)]/20">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-[var(--timberwolf)]">
+                      Event Tags
+                    </h3>
+                    {canEdit && !showAddForm && (
+                      <Button
+                        onClick={() => handleAddTag(0)}
+                        size="sm"
+                        variant="ghost"
+                        className="text-emerald-400 hover:bg-emerald-500/10 text-xs gap-1 h-7"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Add Tag
+                      </Button>
+                    )}
+                  </div>
+
+                  {showAddForm && playingRecording && (
+                    <div className="mb-3">
+                      <TagForm
+                        initial={{
+                          event_type: 'goal',
+                          timestamp_seconds: addFormTimestamp,
+                          team: null,
+                          label: '',
+                          visibility: 'public',
+                        }}
+                        homeTeam={playingRecording.home_team}
+                        awayTeam={playingRecording.away_team}
+                        onSubmit={(data) => handleCreateEvent(playingId, data)}
+                        onCancel={() => setShowAddForm(false)}
+                        submitLabel="Add Tag"
+                      />
+                    </div>
+                  )}
+
+                  {events.length === 0 && !showAddForm ? (
+                    <p className="text-xs text-[var(--ash-grey)]">
+                      No events tagged yet.
+                      {canEdit
+                        ? ' Click "Add Tag" or use the Tag button in the player.'
+                        : ''}
+                    </p>
+                  ) : (
+                    <div className="space-y-1 max-h-64 overflow-y-auto">
+                      {events.map((event) => {
+                        const isOwn = event.created_by === userId
+                        const isEditing = editingEventId === event.id
+
+                        if (isEditing && playingRecording) {
+                          return (
+                            <TagForm
+                              key={event.id}
+                              initial={{
+                                event_type: event.event_type,
+                                timestamp_seconds: event.timestamp_seconds,
+                                team: event.team,
+                                label: event.label || '',
+                                visibility: event.visibility,
+                              }}
+                              homeTeam={playingRecording.home_team}
+                              awayTeam={playingRecording.away_team}
+                              onSubmit={(data) =>
+                                handleUpdateEvent(playingId, event.id, data)
+                              }
+                              onCancel={() => setEditingEventId(null)}
+                              submitLabel="Save"
+                            />
+                          )
+                        }
+
+                        return (
+                          <div
+                            key={event.id}
+                            className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-white/[0.03] transition-colors group"
+                          >
+                            <div
+                              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                              style={{
+                                backgroundColor:
+                                  EVENT_TYPE_COLORS[event.event_type],
+                              }}
+                            />
+                            <button
+                              onClick={() => {
+                                const video = document.querySelector('video')
+                                if (video)
+                                  video.currentTime = event.timestamp_seconds
+                              }}
+                              className="text-xs font-mono text-emerald-400 hover:text-emerald-300 w-12 text-left flex-shrink-0"
+                            >
+                              {formatTimestamp(event.timestamp_seconds)}
+                            </button>
+                            <Badge
+                              variant="outline"
+                              className="text-xs flex-shrink-0"
+                              style={{
+                                backgroundColor:
+                                  EVENT_TYPE_COLORS[event.event_type] + '20',
+                                color: EVENT_TYPE_COLORS[event.event_type],
+                                borderColor:
+                                  EVENT_TYPE_COLORS[event.event_type] + '40',
+                              }}
+                            >
+                              {EVENT_TYPE_LABELS[event.event_type]}
+                            </Badge>
+                            {event.team && playingRecording && (
+                              <span className="text-xs text-[var(--ash-grey)]">
+                                {event.team === 'home'
+                                  ? playingRecording.home_team
+                                  : playingRecording.away_team}
+                              </span>
+                            )}
+                            {event.label && (
+                              <span className="text-xs text-[var(--timberwolf)] truncate">
+                                {event.label}
+                              </span>
+                            )}
+                            {event.visibility === 'private' && (
+                              <Lock className="w-3 h-3 text-[var(--ash-grey)] flex-shrink-0 ml-auto" />
+                            )}
+                            {isOwn && (
+                              <div className="flex gap-1 ml-auto opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setEditingEventId(event.id)}
+                                  className="h-6 w-6 text-[var(--ash-grey)] hover:text-[var(--timberwolf)] hover:bg-white/10"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() =>
+                                    handleDeleteEvent(playingId, event.id)
+                                  }
+                                  className="h-6 w-6 text-[var(--ash-grey)] hover:text-red-400 hover:bg-red-500/10"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )
+          })()}
 
         {/* Recordings List */}
         {loading ? (
