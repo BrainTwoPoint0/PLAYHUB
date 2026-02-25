@@ -46,3 +46,6 @@ infrastructure/lambda/**/*.zip
 
 # Supabase migrations (schema changes applied manually)
 supabase/migrations/
+
+# Local Netlify folder
+.netlify

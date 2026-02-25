@@ -3,9 +3,14 @@
 //   - "cache-sync"   → Scrape Veo directly via Playwright and write to Supabase
 //   - "cleanup-sync" → Remove canceled subscribers from Veo (calls PLAYHUB API)
 
-import { getVeoSession, listClubTeamsWithMembers } from './veo-scraper'
+import {
+  getVeoSession,
+  listClubTeamsWithMembers,
+  listClubRecordings,
+  setMatchPrivacy,
+} from './veo-scraper'
 import { writeCachedClubData, setSyncStatus } from './cache-writer'
-import { CLUB_VEO_SLUGS } from './config'
+import { CLUB_VEO_SLUGS, PUBLIC_RECORDING_TEAMS } from './config'
 
 const PLAYHUB_URL = process.env.PLAYHUB_URL!
 const SYNC_API_KEY = process.env.SYNC_API_KEY!
@@ -15,7 +20,7 @@ const CLUB_SLUGS = (process.env.CLUB_SLUGS || 'cfa,sefa')
 const SYNC_MODE = (process.env.SYNC_MODE || 'dry-run') as 'dry-run' | 'execute'
 
 interface EventPayload {
-  action?: 'cache-sync' | 'cleanup-sync'
+  action?: 'cache-sync' | 'cleanup-sync' | 'privacy-sync'
   clubSlug?: string // Optional: sync only this club (for manual triggers)
 }
 
@@ -198,6 +203,104 @@ async function runCleanupSync(): Promise<ClubResult[]> {
 }
 
 // ============================================================================
+// Privacy Sync — set all recordings to private (except excepted teams)
+// ============================================================================
+
+async function runPrivacySync(
+  onlyClub?: string
+): Promise<ClubResult[]> {
+  const results: ClubResult[] = []
+  const slugs = onlyClub ? [onlyClub] : CLUB_SLUGS
+
+  for (const clubSlug of slugs) {
+    const veoClubSlug = CLUB_VEO_SLUGS[clubSlug]
+    if (!veoClubSlug) {
+      results.push({
+        clubSlug,
+        action: 'privacy-sync',
+        status: 'error',
+        error: `No Veo slug configured for club "${clubSlug}"`,
+      })
+      continue
+    }
+
+    let session: Awaited<ReturnType<typeof getVeoSession>> | null = null
+    try {
+      const start = Date.now()
+      console.log(`Privacy sync: ${clubSlug} (veo: ${veoClubSlug})...`)
+
+      session = await getVeoSession()
+
+      const recordings = await listClubRecordings(session, veoClubSlug)
+      const exceptedTeams = PUBLIC_RECORDING_TEAMS[veoClubSlug] || []
+
+      let totalSetPrivate = 0
+      let totalAlreadyPrivate = 0
+      let totalSkipped = 0
+      let totalErrors = 0
+
+      for (const rec of recordings) {
+        // Skip recordings belonging to excepted teams
+        if (rec.team && exceptedTeams.includes(rec.team)) {
+          totalSkipped++
+          continue
+        }
+
+        if (rec.privacy === 'private') {
+          totalAlreadyPrivate++
+          continue
+        }
+
+        const res = await setMatchPrivacy(session, rec.slug, 'private')
+        if (res.status === 200) {
+          totalSetPrivate++
+          console.log(
+            `  Set private: ${rec.title} (${rec.slug}) [team: ${rec.team || 'none'}] [was: ${rec.privacy}]`
+          )
+        } else {
+          totalErrors++
+          console.error(
+            `  Failed to set private: ${rec.title} (${rec.slug}) — HTTP ${res.status}`
+          )
+        }
+        // Rate limit: wait 1s between PATCH calls
+        await new Promise((r) => setTimeout(r, 1000))
+      }
+
+      const elapsed = `${((Date.now() - start) / 1000).toFixed(1)}s`
+
+      results.push({
+        clubSlug,
+        action: 'privacy-sync',
+        status: totalErrors > 0 ? 'error' : 'success',
+        executedCount: totalSetPrivate,
+        exceptedCount: totalSkipped,
+        elapsed,
+        error:
+          totalErrors > 0 ? `${totalErrors} recordings failed` : undefined,
+      })
+
+      console.log(
+        `${clubSlug} privacy-sync: ${totalSetPrivate} set private, ${totalAlreadyPrivate} already private, ${totalSkipped} skipped (excepted), ${totalErrors} errors (${elapsed})`
+      )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      console.error(`${clubSlug} privacy-sync error:`, message)
+      results.push({
+        clubSlug,
+        action: 'privacy-sync',
+        status: 'error',
+        error: message,
+      })
+    } finally {
+      await session?.close().catch(() => {})
+    }
+  }
+
+  return results
+}
+
+// ============================================================================
 // Handler — route based on event.action
 // ============================================================================
 
@@ -262,6 +365,8 @@ export const handler = async (
 
   if (action === 'cache-sync') {
     results = await runCacheSync(targetClub)
+  } else if (action === 'privacy-sync') {
+    results = await runPrivacySync(targetClub)
   } else {
     results = await runCleanupSync()
   }

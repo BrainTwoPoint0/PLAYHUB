@@ -37,6 +37,13 @@ export interface VeoMember {
   permission_role: string
 }
 
+export interface VeoRecording {
+  slug: string
+  title: string
+  privacy: string
+  team: string
+}
+
 // ============================================================================
 // Auth: login to Veo via headless Chromium
 // ============================================================================
@@ -183,7 +190,7 @@ export async function getVeoSession(): Promise<VeoSession> {
         }
         const res = await fetch(url, opts)
         const text = await res.text()
-        return { status: res.status, body: text.substring(0, 50000) }
+        return { status: res.status, body: text.substring(0, 500000) }
       },
       { url: fullUrl, method, body, bearer, csrf }
     )
@@ -242,4 +249,64 @@ export async function listClubTeamsWithMembers(
   }
 
   return { clubName: clubSlug, teams: result }
+}
+
+// ============================================================================
+// Privacy sync: list club recordings, set privacy
+// ============================================================================
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+export async function listClubRecordings(
+  session: VeoSession,
+  clubSlug: string
+): Promise<VeoRecording[]> {
+  const allRecordings: VeoRecording[] = []
+  let page = 1
+
+  while (true) {
+    const res = await session.api(
+      'GET',
+      `/api/app/clubs/${clubSlug}/recordings/?filter=own&page_size=100&page=${page}`
+    )
+
+    if (res.status !== 200) {
+      throw new Error(
+        `Failed to list recordings for ${clubSlug}: HTTP ${res.status}`
+      )
+    }
+
+    const parsed = parseBody(res.body)
+    if (!parsed) break
+
+    // Handle paginated { count, next, results: [...] } or plain array
+    const items: VeoRecording[] = Array.isArray(parsed)
+      ? parsed
+      : parsed?.results || []
+
+    allRecordings.push(...items)
+    console.log(`Page ${page}: ${items.length} recordings (total: ${allRecordings.length})`)
+
+    // Stop if fewer than page_size results (last page)
+    if (items.length < 100) break
+
+    // For paginated objects, also check the next field
+    if (!Array.isArray(parsed) && !parsed?.next) break
+
+    await sleep(2000)
+    page++
+  }
+
+  return allRecordings
+}
+
+export async function setMatchPrivacy(
+  session: VeoSession,
+  matchSlug: string,
+  privacy: string
+): Promise<{ status: number }> {
+  const res = await session.api('PATCH', `/api/app/matches/${matchSlug}/`, {
+    privacy,
+  })
+  return { status: res.status }
 }
