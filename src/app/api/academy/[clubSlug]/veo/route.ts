@@ -57,11 +57,30 @@ export async function GET(
     const productIds = getAllProductIds(club)
     const additionalIds = productIds.slice(1) // skip primary (fetched via clubSlug)
 
-    const [cachedData, primarySubs, ...additionalSubs] = await Promise.all([
-      getCachedClubData(clubSlug),
-      getAcademySubscribers(clubSlug),
-      ...additionalIds.map((pid) => getSubscribersByProduct(pid)),
-    ])
+    let cachedData, primarySubs: Awaited<ReturnType<typeof getAcademySubscribers>>, additionalSubs: Awaited<ReturnType<typeof getSubscribersByProduct>>[]
+    try {
+      cachedData = await getCachedClubData(clubSlug)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error(`getCachedClubData failed (${clubSlug}):`, msg)
+      return NextResponse.json({ error: 'Failed to fetch Veo data', detail: `Supabase cache read failed: ${msg}` }, { status: 500 })
+    }
+
+    try {
+      primarySubs = await getAcademySubscribers(clubSlug)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error(`getAcademySubscribers failed (${clubSlug}):`, msg)
+      return NextResponse.json({ error: 'Failed to fetch Veo data', detail: `Stripe subscribers failed: ${msg}` }, { status: 500 })
+    }
+
+    try {
+      additionalSubs = await Promise.all(additionalIds.map((pid) => getSubscribersByProduct(pid)))
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error(`getSubscribersByProduct failed (${clubSlug}):`, msg)
+      return NextResponse.json({ error: 'Failed to fetch Veo data', detail: `Stripe additional products failed: ${msg}` }, { status: 500 })
+    }
 
     // Merge all subscribers, dedup by email (keep first/best match)
     const subscribers = [...primarySubs, ...additionalSubs.flat()]
