@@ -2,11 +2,25 @@
 // Used by the read endpoint (fast reads) and cache-sync endpoint (writes)
 
 import { createServiceClient } from '@/lib/supabase/server'
-import type { VeoTeam, VeoMember } from './client'
 
 // ============================================================================
-// Types
+// Types (duplicated from client.ts to avoid importing Playwright transitively)
 // ============================================================================
+
+interface VeoTeam {
+  id: string
+  slug: string
+  name: string
+  member_count: number
+}
+
+interface VeoMember {
+  id: string
+  email: string
+  name: string
+  status: string
+  permission_role: string
+}
 
 export interface CachedClubData {
   clubName: string
