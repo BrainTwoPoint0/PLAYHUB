@@ -148,9 +148,11 @@ export async function GET(
       lastSyncedAt: cachedData.lastSyncedAt,
     })
   } catch (error) {
-    console.error(`Academy Veo API error (${clubSlug}):`, error)
+    const message = error instanceof Error ? error.message : String(error)
+    const stack = error instanceof Error ? error.stack : undefined
+    console.error(`Academy Veo API error (${clubSlug}):`, message, stack)
     return NextResponse.json(
-      { error: 'Failed to fetch Veo data' },
+      { error: 'Failed to fetch Veo data', detail: message },
       { status: 500 }
     )
   }
