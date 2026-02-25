@@ -1,99 +1,61 @@
 // POST /api/academy/[clubSlug]/veo/cache-sync
-// Triggers a fresh Veo ClubHouse scrape and writes results to Supabase cache.
-// Auth: x-api-key (Lambda) OR platform admin session (manual Sync Now button)
+// Triggers Veo ClubHouse sync via AWS Lambda (async invocation).
+// Lambda scrapes Veo and writes directly to Supabase in the background.
+// Auth: platform admin session (manual Sync Now button)
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { getClubBySlug } from '@/lib/academy/config'
-import { listClubTeamsWithMembers } from '@/lib/veo/client'
-import { writeCachedClubData, setSyncStatus } from '@/lib/veo/cache'
+import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda'
 
-const SYNC_API_KEY = process.env.SYNC_API_KEY
+const VEO_SYNC_LAMBDA_NAME =
+  process.env.VEO_SYNC_LAMBDA_NAME || 'playhub-veo-sync'
 
 type RouteContext = { params: Promise<{ clubSlug: string }> }
 
-async function isAuthorized(request: NextRequest): Promise<boolean> {
-  // Check API key first (Lambda calls)
-  const apiKey = request.headers.get('x-api-key')
-  if (apiKey && apiKey === SYNC_API_KEY && !!SYNC_API_KEY) {
-    return true
-  }
-
-  // Check platform admin session (manual Sync Now)
+export async function POST(request: NextRequest, { params }: RouteContext) {
+  // Auth: platform admin only
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (user) {
-    return isPlatformAdmin(user.id)
-  }
-
-  return false
-}
-
-export async function POST(request: NextRequest, { params }: RouteContext) {
-  if (!(await isAuthorized(request))) {
+  if (!user || !(await isPlatformAdmin(user.id))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const { clubSlug } = await params
   const club = getClubBySlug(clubSlug)
-  if (!club) {
+  if (!club || !club.veoClubSlug) {
     return NextResponse.json({ error: 'Club not found' }, { status: 404 })
   }
 
-  if (!club.veoClubSlug) {
-    return NextResponse.json(
-      { error: 'No Veo club configured for this academy' },
-      { status: 404 }
-    )
-  }
-
-  const startTime = Date.now()
-
   try {
-    // Mark as syncing
-    await setSyncStatus(clubSlug, club.veoClubSlug, 'syncing')
-
-    // Fetch fresh data from Veo via Playwright
-    const veoResult = await listClubTeamsWithMembers(club.veoClubSlug)
-
-    if (!veoResult.success || !veoResult.data) {
-      await setSyncStatus(
-        clubSlug,
-        club.veoClubSlug,
-        'error',
-        veoResult.message || 'Failed to fetch Veo data'
-      )
-      return NextResponse.json(
-        { error: 'Failed to fetch Veo data', message: veoResult.message },
-        { status: 500 }
-      )
-    }
-
-    // Write to cache
-    await writeCachedClubData(clubSlug, club.veoClubSlug, veoResult.data)
-
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-    const teamCount = veoResult.data.teams.length
-    const memberCount = veoResult.data.teams.reduce(
-      (sum, t) => sum + t.members.length,
-      0
+    const lambda = new LambdaClient({
+      region: process.env.PLAYHUB_AWS_REGION || 'eu-west-2',
+      credentials: {
+        accessKeyId: process.env.PLAYHUB_AWS_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.PLAYHUB_AWS_SECRET_ACCESS_KEY!,
+      },
+    })
+    await lambda.send(
+      new InvokeCommand({
+        FunctionName: VEO_SYNC_LAMBDA_NAME,
+        InvocationType: 'Event', // Async — Lambda runs in background
+        Payload: Buffer.from(
+          JSON.stringify({ action: 'cache-sync', clubSlug })
+        ),
+      })
     )
 
     return NextResponse.json({
       success: true,
       clubSlug,
-      stats: { teams: teamCount, members: memberCount },
-      elapsed: `${elapsed}s`,
+      message: 'Sync started — data will update shortly',
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Sync failed'
     console.error(`Cache sync error (${clubSlug}):`, error)
-
-    await setSyncStatus(clubSlug, club.veoClubSlug, 'error', message)
-
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

@@ -1,7 +1,7 @@
 # ============================================================================
-# VEO CLUBHOUSE CLEANUP LAMBDA + EVENTBRIDGE
-# Removes canceled subscribers from Veo Clubhouse on a daily schedule
-# Calls PLAYHUB API endpoint — all logic lives in the app
+# VEO CLUBHOUSE SYNC LAMBDA + EVENTBRIDGE
+# cache-sync: Scrapes Veo directly via Playwright + writes to Supabase
+# cleanup-sync: Calls PLAYHUB API to remove canceled subscribers
 # ============================================================================
 
 variable "playhub_url" {
@@ -25,6 +25,30 @@ variable "veo_sync_mode" {
   description = "Sync mode: dry-run or execute"
   type        = string
   default     = "dry-run"
+}
+
+variable "veo_email" {
+  description = "Veo account email for Playwright login"
+  type        = string
+  sensitive   = true
+}
+
+variable "veo_password" {
+  description = "Veo account password for Playwright login"
+  type        = string
+  sensitive   = true
+}
+
+# NOTE: supabase_url and supabase_service_key are declared in sync-lambda.tf
+
+# Chromium Lambda Layer — uploaded to S3 (too large for direct upload)
+# Contains @sparticuz/chromium binary (~59MB). Function zip has playwright-core only (~2.5MB).
+resource "aws_lambda_layer_version" "chromium" {
+  s3_bucket           = var.s3_bucket
+  s3_key              = "lambda/chromium-layer.zip"
+  layer_name          = "${var.project_name}-chromium"
+  compatible_runtimes = ["nodejs20.x"]
+  description         = "Chromium binary for Playwright (from @sparticuz/chromium)"
 }
 
 # IAM Role for Veo Sync Lambda
@@ -73,18 +97,23 @@ resource "aws_lambda_function" "veo_sync" {
   role          = aws_iam_role.veo_sync_lambda.arn
   handler       = "index.handler"
   runtime       = "nodejs20.x"
-  timeout       = 120
-  memory_size   = 128
+  timeout       = 300
+  memory_size   = 2048
 
   filename         = "${path.module}/../lambda/veo-sync/dist.zip"
   source_code_hash = filebase64sha256("${path.module}/../lambda/veo-sync/dist.zip")
+  layers           = [aws_lambda_layer_version.chromium.arn]
 
   environment {
     variables = {
-      PLAYHUB_URL  = var.playhub_url
-      SYNC_API_KEY = var.sync_api_key
-      CLUB_SLUGS   = var.veo_sync_club_slugs
-      SYNC_MODE    = var.veo_sync_mode
+      PLAYHUB_URL              = var.playhub_url
+      SYNC_API_KEY             = var.sync_api_key
+      CLUB_SLUGS               = var.veo_sync_club_slugs
+      SYNC_MODE                = var.veo_sync_mode
+      VEO_EMAIL                = var.veo_email
+      VEO_PASSWORD             = var.veo_password
+      SUPABASE_URL             = var.supabase_url
+      SUPABASE_SERVICE_ROLE_KEY = var.supabase_service_key
     }
   }
 
@@ -206,3 +235,4 @@ output "veo_cache_sync_schedule_arn" {
   value       = aws_cloudwatch_event_rule.veo_cache_sync_schedule.arn
   description = "Veo cache sync EventBridge schedule rule ARN"
 }
+

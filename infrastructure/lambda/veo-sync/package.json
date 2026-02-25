@@ -1,12 +1,18 @@
 {
   "name": "playhub-veo-sync",
-  "version": "1.0.0",
-  "description": "Lambda to trigger Veo Clubhouse cleanup via PLAYHUB API",
+  "version": "2.0.0",
+  "description": "Lambda for Veo Clubhouse scraping (cache-sync) and cleanup",
   "main": "dist/index.js",
   "scripts": {
-    "build": "esbuild index.ts --bundle --platform=node --target=node20 --outfile=dist/index.js",
-    "package": "npm run build && cd dist && zip -r ../dist.zip index.js",
-    "deploy": "npm run package && cd ../../terraform && terraform apply -target=aws_lambda_function.veo_sync"
+    "build": "esbuild index.ts --bundle --platform=node --target=node20 --outfile=dist/index.js --external:@sparticuz/chromium --external:playwright-core",
+    "package": "npm run build && rm -rf dist/node_modules && mkdir -p dist/node_modules && cp -r node_modules/playwright-core dist/node_modules/ && rm -f dist.zip && cd dist && zip -r ../dist.zip .",
+    "package:layer": "rm -rf chromium-layer && mkdir -p chromium-layer/nodejs/node_modules && cp -r node_modules/@sparticuz node_modules/follow-redirects node_modules/tar-fs node_modules/streamx node_modules/bare-events node_modules/b4a node_modules/fast-fifo node_modules/text-decoder chromium-layer/nodejs/node_modules/ && rm -f chromium-layer.zip && cd chromium-layer && zip -r ../chromium-layer.zip .",
+    "deploy": "npm run package && npm run package:layer && cd ../../terraform && terraform apply -target=aws_lambda_layer_version.chromium -target=aws_lambda_function.veo_sync"
+  },
+  "dependencies": {
+    "playwright-core": "^1.49.0",
+    "@sparticuz/chromium": "^131.0.0",
+    "@supabase/supabase-js": "^2.50.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

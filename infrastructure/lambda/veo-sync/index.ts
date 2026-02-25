@@ -1,7 +1,11 @@
 // Lambda function for Veo Clubhouse operations
 // Routes between two actions based on EventBridge event payload:
-//   - "cache-sync"   → Refresh Veo data cache in Supabase (every 4 hours)
-//   - "cleanup-sync" → Remove canceled subscribers from Veo (daily)
+//   - "cache-sync"   → Scrape Veo directly via Playwright and write to Supabase
+//   - "cleanup-sync" → Remove canceled subscribers from Veo (calls PLAYHUB API)
+
+import { getVeoSession, listClubTeamsWithMembers } from './veo-scraper'
+import { writeCachedClubData, setSyncStatus } from './cache-writer'
+import { CLUB_VEO_SLUGS } from './config'
 
 const PLAYHUB_URL = process.env.PLAYHUB_URL!
 const SYNC_API_KEY = process.env.SYNC_API_KEY!
@@ -12,6 +16,15 @@ const SYNC_MODE = (process.env.SYNC_MODE || 'dry-run') as 'dry-run' | 'execute'
 
 interface EventPayload {
   action?: 'cache-sync' | 'cleanup-sync'
+  clubSlug?: string // Optional: sync only this club (for manual triggers)
+}
+
+// Lambda Function URL events have requestContext; EventBridge events don't
+interface FunctionUrlEvent {
+  requestContext?: { http?: { method: string } }
+  headers?: Record<string, string>
+  body?: string
+  isBase64Encoded?: boolean
 }
 
 interface ClubResult {
@@ -31,58 +44,77 @@ interface ClubResult {
 }
 
 // ============================================================================
-// Cache Sync — refresh Veo data in Supabase
+// Cache Sync — scrape Veo directly via Playwright and write to Supabase
 // ============================================================================
 
-async function runCacheSync(): Promise<ClubResult[]> {
+async function runCacheSync(
+  onlyClub?: string
+): Promise<ClubResult[]> {
   const results: ClubResult[] = []
+  const slugs = onlyClub ? [onlyClub] : CLUB_SLUGS
 
-  for (const clubSlug of CLUB_SLUGS) {
+  for (const clubSlug of slugs) {
+    const veoClubSlug = CLUB_VEO_SLUGS[clubSlug]
+    if (!veoClubSlug) {
+      results.push({
+        clubSlug,
+        action: 'cache-sync',
+        status: 'error',
+        error: `No Veo slug configured for club "${clubSlug}"`,
+      })
+      continue
+    }
+
+    let session: Awaited<ReturnType<typeof getVeoSession>> | null = null
     try {
-      console.log(`Cache sync: ${clubSlug}...`)
+      const start = Date.now()
+      console.log(`Cache sync: ${clubSlug} (veo: ${veoClubSlug})...`)
 
-      const response = await fetch(
-        `${PLAYHUB_URL}/api/academy/${clubSlug}/veo/cache-sync`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': SYNC_API_KEY,
-          },
-        }
+      // Mark as syncing
+      await setSyncStatus(clubSlug, veoClubSlug, 'syncing')
+
+      // Open browser session and scrape
+      session = await getVeoSession()
+      const data = await listClubTeamsWithMembers(session, veoClubSlug)
+
+      // Write to Supabase
+      await writeCachedClubData(clubSlug, veoClubSlug, data)
+
+      const totalMembers = data.teams.reduce(
+        (sum, t) => sum + t.members.length,
+        0
       )
+      const elapsed = `${((Date.now() - start) / 1000).toFixed(1)}s`
 
-      if (!response.ok) {
-        const text = await response.text()
-        results.push({
-          clubSlug,
-          action: 'cache-sync',
-          status: 'error',
-          error: `HTTP ${response.status}: ${text}`,
-        })
-        continue
-      }
-
-      const data = await response.json()
       results.push({
         clubSlug,
         action: 'cache-sync',
         status: 'success',
-        teams: data.stats?.teams ?? 0,
-        members: data.stats?.members ?? 0,
-        elapsed: data.elapsed,
+        teams: data.teams.length,
+        members: totalMembers,
+        elapsed,
       })
 
-      console.log(`${clubSlug} cache-sync: ${JSON.stringify(data.stats)}`)
+      console.log(
+        `${clubSlug} cache-sync: ${data.teams.length} teams, ${totalMembers} members (${elapsed})`
+      )
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       console.error(`${clubSlug} cache-sync error:`, message)
+
+      // Mark as error in Supabase
+      await setSyncStatus(clubSlug, veoClubSlug, 'error', message).catch(
+        () => {}
+      )
+
       results.push({
         clubSlug,
         action: 'cache-sync',
         status: 'error',
         error: message,
       })
+    } finally {
+      await session?.close().catch(() => {})
     }
   }
 
@@ -169,21 +201,67 @@ async function runCleanupSync(): Promise<ClubResult[]> {
 // Handler — route based on event.action
 // ============================================================================
 
+function parseEvent(raw: EventPayload | FunctionUrlEvent): EventPayload {
+  // Function URL events have requestContext
+  if ('requestContext' in raw && raw.requestContext) {
+    const urlEvent = raw as FunctionUrlEvent
+    try {
+      const body = urlEvent.body
+        ? JSON.parse(
+            urlEvent.isBase64Encoded
+              ? Buffer.from(urlEvent.body, 'base64').toString()
+              : urlEvent.body
+          )
+        : {}
+
+      // Verify API key for Function URL calls
+      const apiKey =
+        body.apiKey || urlEvent.headers?.['x-api-key'] || ''
+      if (apiKey !== SYNC_API_KEY) {
+        throw new Error('Unauthorized')
+      }
+
+      return {
+        action: body.action || 'cache-sync',
+        clubSlug: body.clubSlug,
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message === 'Unauthorized') throw e
+      return { action: 'cache-sync' }
+    }
+  }
+  // Direct invocation (EventBridge)
+  return raw as EventPayload
+}
+
 export const handler = async (
-  event: EventPayload = {}
+  event: EventPayload | FunctionUrlEvent = {}
 ): Promise<{
   statusCode: number
+  headers?: Record<string, string>
   body: string
 }> => {
-  const action = event.action || 'cleanup-sync'
+  let payload: EventPayload
+  try {
+    payload = parseEvent(event)
+  } catch {
+    return {
+      statusCode: 401,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'Unauthorized' }),
+    }
+  }
+
+  const action = payload.action || 'cleanup-sync'
+  const targetClub = payload.clubSlug
   console.log(
-    `Veo sync Lambda invoked (action: ${action}, clubs: ${CLUB_SLUGS.join(', ')})`
+    `Veo sync Lambda invoked (action: ${action}, club: ${targetClub || 'all'}, clubs: ${CLUB_SLUGS.join(', ')})`
   )
 
   let results: ClubResult[]
 
   if (action === 'cache-sync') {
-    results = await runCacheSync()
+    results = await runCacheSync(targetClub)
   } else {
     results = await runCleanupSync()
   }
@@ -192,6 +270,7 @@ export const handler = async (
 
   return {
     statusCode: hasErrors ? 207 : 200,
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, results }),
   }
 }

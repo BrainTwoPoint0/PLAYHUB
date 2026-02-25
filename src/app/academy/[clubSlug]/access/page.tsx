@@ -167,8 +167,17 @@ export default function AcademyAccessPage() {
         setError(json.error || 'Sync failed')
         return
       }
-      // Refresh data after sync completes
-      await fetchVeoData()
+      // Lambda runs async — poll until data refreshes (~20-30s)
+      const prevSync = data?.lastSyncedAt
+      for (let i = 0; i < 12; i++) {
+        await new Promise((r) => setTimeout(r, 5000))
+        const res2 = await fetch(`/api/academy/${clubSlug}/veo`)
+        const json2 = await res2.json()
+        if (!json2.error) {
+          setData(json2)
+          if (json2.lastSyncedAt && json2.lastSyncedAt !== prevSync) break
+        }
+      }
     } catch {
       setError('Sync request failed')
     } finally {
