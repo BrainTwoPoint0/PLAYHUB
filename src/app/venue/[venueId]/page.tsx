@@ -284,8 +284,8 @@ export default function VenueManagementPage() {
         console.error('Scenes fetch failed:', e)
       }
 
-      // Fetch billing data (non-blocking)
-      fetchBillingData()
+      // Fetch billing data
+      await fetchBillingData()
     } catch (err) {
       setError('Failed to load venue data')
     } finally {
@@ -866,6 +866,36 @@ export default function VenueManagementPage() {
                 <div className="bg-[var(--ash-grey)]/10 rounded h-3 w-[260px]" />
               </div>
               <div className="bg-[var(--ash-grey)]/10 rounded h-10 w-[130px]" />
+            </div>
+          </div>
+
+          {/* Billing skeleton */}
+          <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
+            <div className="p-5">
+              {/* Header row */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div className="space-y-1.5">
+                  <div className="bg-[var(--ash-grey)]/10 rounded h-5 w-[60px]" />
+                  <div className="bg-[var(--ash-grey)]/10 rounded h-3 w-[100px]" />
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="bg-[var(--ash-grey)]/10 rounded h-6 w-[80px]" />
+                  <div className="bg-[var(--ash-grey)]/10 rounded h-6 w-[70px]" />
+                </div>
+              </div>
+              {/* 4-column financial grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-[var(--ash-grey)]/[0.06]">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="bg-[var(--night)] p-3.5 space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-1.5 w-1.5 rounded-full bg-[var(--ash-grey)]/10" />
+                      <div className="bg-[var(--ash-grey)]/10 rounded h-2.5 w-[60px]" />
+                    </div>
+                    <div className="bg-[var(--ash-grey)]/10 rounded h-6 w-[90px]" />
+                    <div className="bg-[var(--ash-grey)]/10 rounded h-2.5 w-[70px]" />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
