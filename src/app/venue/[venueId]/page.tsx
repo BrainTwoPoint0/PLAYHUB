@@ -91,7 +91,8 @@ interface BillingSummary {
   playhubCollectedCount: number
   playhubCollectedRevenue: number
   playhubOwesVenue: number
-  venueKeeps: number // venue's profit share they retain
+  venueKeeps: number // venue's profit share they retain (venue-collected only)
+  venueTotalProfit: number // total venue profit from both sources
   netBalance: number // positive = venue owes PLAYHUB, negative = PLAYHUB owes venue
   dailyTarget: number
   todayCount: number
@@ -1077,7 +1078,7 @@ export default function VenueManagementPage() {
                         className="text-lg font-semibold text-emerald-400"
                         style={{ fontVariantNumeric: 'tabular-nums' }}
                       >
-                        {billingSummary.venueKeeps.toFixed(3)}
+                        {billingSummary.venueTotalProfit.toFixed(3)}
                         <span className="text-[10px] font-normal text-[var(--ash-grey)]/50 ml-1">
                           {billingSummary.currency}
                         </span>

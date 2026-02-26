@@ -144,6 +144,9 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   // Net: positive = venue owes PLAYHUB, negative = PLAYHUB owes venue
   const netBalance = venueOwesPlayhub - playhubOwesVenue
 
+  // Total venue profit from both sources
+  const venueTotalProfit = venueKeeps + playhubOwesVenue
+
   return NextResponse.json({
     totalRevenue: Number(totalRevenue.toFixed(3)),
     count,
@@ -152,6 +155,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     venueCollectedRevenue: Number(venueCollectedRevenue.toFixed(3)),
     venueOwesPlayhub: Number(venueOwesPlayhub.toFixed(3)),
     venueKeeps: Number(venueKeeps.toFixed(3)),
+    venueTotalProfit: Number(venueTotalProfit.toFixed(3)),
     playhubCollectedCount,
     playhubCollectedRevenue: Number(playhubCollectedRevenue.toFixed(3)),
     playhubOwesVenue: Number(playhubOwesVenue.toFixed(3)),
