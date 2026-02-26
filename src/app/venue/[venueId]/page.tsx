@@ -3,6 +3,20 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Button, Input } from '@braintwopoint0/playback-commons/ui'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from '@braintwopoint0/playback-commons/ui'
+import type { ChartConfig } from '@braintwopoint0/playback-commons/ui'
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ReferenceLine,
+} from 'recharts'
 import { FadeIn } from '@/components/FadeIn'
 import { HlsPlayer } from '@/components/streaming/HlsPlayer'
 
@@ -65,6 +79,56 @@ interface StreamChannel {
     fullUrl: string
   }
   playbackUrl?: string
+}
+
+interface BillingSummary {
+  totalRevenue: number
+  currency: string
+  count: number
+  venueCollectedCount: number
+  venueCollectedRevenue: number
+  venueOwesPlayhub: number
+  playhubCollectedCount: number
+  playhubCollectedRevenue: number
+  playhubOwesVenue: number
+  venueKeeps: number // venue's profit share they retain
+  netBalance: number // positive = venue owes PLAYHUB, negative = PLAYHUB owes venue
+  dailyTarget: number
+  todayCount: number
+}
+
+interface DailyStats {
+  days: Array<{
+    date: string
+    total: number
+    byScene: Record<string, number>
+    revenue: number
+  }>
+  averagePerDay: number
+  dailyTarget: number
+  scenes: string[]
+  currency: string
+}
+
+interface BillingConfig {
+  default_billable_amount: number
+  currency: string
+  daily_recording_target: number
+  is_active: boolean
+}
+
+interface Invoice {
+  id: string
+  period_start: string
+  period_end: string
+  venue_collected_count: number
+  venue_owes_playhub: number
+  playhub_collected_count: number
+  playhub_owes_venue: number
+  net_amount: number
+  currency: string
+  stripe_invoice_id: string | null
+  status: string
 }
 
 export default function VenueManagementPage() {
@@ -135,6 +199,17 @@ export default function VenueManagementPage() {
     null
   )
   const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  // Billing state
+  const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(
+    null
+  )
+  const [billingConfig, setBillingConfig] = useState<BillingConfig | null>(null)
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [dailyStats, setDailyStats] = useState<DailyStats | null>(null)
+  const [showBillingSection, setShowBillingSection] = useState(false)
+  const [isBillable, setIsBillable] = useState(true)
+  const [billableAmount, setBillableAmount] = useState('')
 
   // Live stream scheduling state
   const [showStreamScheduleForm, setShowStreamScheduleForm] = useState(false)
@@ -207,10 +282,47 @@ export default function VenueManagementPage() {
         // Scenes not available - scheduling will be disabled
         console.error('Scenes fetch failed:', e)
       }
+
+      // Fetch billing data (non-blocking)
+      fetchBillingData()
     } catch (err) {
       setError('Failed to load venue data')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function fetchBillingData() {
+    try {
+      const [configRes, summaryRes, invoicesRes] = await Promise.all([
+        fetch(`/api/venue/${venueId}/billing`),
+        fetch(`/api/venue/${venueId}/billing/summary`),
+        fetch(`/api/venue/${venueId}/billing/invoices`),
+      ])
+      const [configData, summaryData, invoicesData] = await Promise.all([
+        configRes.json(),
+        summaryRes.json(),
+        invoicesRes.json(),
+      ])
+      if (configData.config) {
+        setBillingConfig(configData.config)
+        setBillableAmount(
+          String(configData.config.default_billable_amount || '')
+        )
+      }
+      if (!summaryData.error) setBillingSummary(summaryData)
+      if (invoicesData.invoices) setInvoices(invoicesData.invoices)
+    } catch {
+      // Billing data is supplementary — don't block the page
+    }
+
+    // Fetch daily stats separately so it can't break billing
+    try {
+      const res = await fetch(`/api/venue/${venueId}/billing/daily-stats`)
+      const data = await res.json()
+      if (!data.error) setDailyStats(data)
+    } catch {
+      // Chart is optional
     }
   }
 
@@ -665,6 +777,9 @@ export default function VenueManagementPage() {
           awayTeam: awayTeam || 'Away',
           pitchName: scenes.find((s) => s.id === sceneId)?.name || null,
           accessEmails: emails.length > 0 ? emails : undefined,
+          isBillable,
+          billableAmount:
+            isBillable && billableAmount ? Number(billableAmount) : undefined,
         }),
       })
 
@@ -724,7 +839,7 @@ export default function VenueManagementPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--night)]">
-        <div className="container mx-auto px-5 py-16 max-w-4xl animate-pulse">
+        <div className="container mx-auto px-5 py-16 max-w-6xl animate-pulse">
           {/* Header skeleton */}
           <div className="flex items-center justify-between mb-8">
             <div className="space-y-2">
@@ -803,7 +918,7 @@ export default function VenueManagementPage() {
   if (error && !venue) {
     return (
       <div className="min-h-screen bg-[var(--night)]">
-        <div className="container mx-auto px-5 py-16 max-w-4xl">
+        <div className="container mx-auto px-5 py-16 max-w-6xl">
           <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-6">
             <p className="text-red-400">{error}</p>
             <Button
@@ -821,7 +936,7 @@ export default function VenueManagementPage() {
 
   return (
     <div className="min-h-screen bg-[var(--night)]">
-      <div className="container mx-auto px-5 py-16 max-w-4xl">
+      <div className="container mx-auto px-5 py-16 max-w-6xl">
         <FadeIn>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8">
             <div>
@@ -843,6 +958,438 @@ export default function VenueManagementPage() {
             )}
           </div>
         </FadeIn>
+
+        {/* Billing Overview */}
+        {billingConfig?.is_active && (
+          <FadeIn delay={100}>
+            <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/8 bg-white/[0.02]">
+              <div className="p-5">
+                {/* Header row */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                  <div>
+                    <h2 className="text-base font-semibold text-[var(--timberwolf)]">
+                      Billing
+                    </h2>
+                    <p className="text-[11px] text-[var(--ash-grey)]/70 mt-0.5">
+                      {new Date().toLocaleDateString('en-GB', {
+                        month: 'long',
+                        year: 'numeric',
+                      })}
+                    </p>
+                  </div>
+                  {billingSummary && (
+                    <div className="flex items-center gap-3 sm:gap-4 text-sm">
+                      <div>
+                        <span
+                          className="text-[var(--timberwolf)] font-semibold text-base sm:text-lg"
+                          style={{ fontVariantNumeric: 'tabular-nums' }}
+                        >
+                          {billingSummary.totalRevenue.toFixed(3)}
+                        </span>
+                        <span className="text-[var(--ash-grey)]/60 ml-1 text-xs">
+                          {billingSummary.currency}
+                        </span>
+                      </div>
+                      <div className="border-l border-[var(--ash-grey)]/10 pl-3 sm:pl-4">
+                        <span
+                          className="text-[var(--timberwolf)] font-medium"
+                          style={{ fontVariantNumeric: 'tabular-nums' }}
+                        >
+                          {billingSummary.count}
+                        </span>
+                        <span className="text-[var(--ash-grey)]/60 ml-1 text-xs">
+                          recordings
+                        </span>
+                      </div>
+                      {billingSummary.dailyTarget > 0 && (
+                        <div className="border-l border-[var(--ash-grey)]/10 pl-3 sm:pl-4">
+                          <span
+                            className="text-[var(--timberwolf)] font-medium"
+                            style={{ fontVariantNumeric: 'tabular-nums' }}
+                          >
+                            {billingSummary.todayCount}
+                          </span>
+                          <span className="text-[var(--ash-grey)]/60 text-xs">
+                            /{billingSummary.dailyTarget} today
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Financial summary — 3 columns with 1px gap borders */}
+                {billingSummary && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-[var(--ash-grey)]/[0.06] mb-4">
+                    {/* Venue-collected revenue */}
+                    <div className="bg-[var(--night)] p-3.5">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <div className="h-1.5 w-1.5 rounded-full bg-amber-400/60" />
+                        <p className="text-[10px] text-[var(--ash-grey)]/60 uppercase tracking-widest">
+                          At venue
+                        </p>
+                      </div>
+                      <p
+                        className="text-lg font-semibold text-[var(--timberwolf)]"
+                        style={{ fontVariantNumeric: 'tabular-nums' }}
+                      >
+                        {billingSummary.venueCollectedRevenue.toFixed(3)}
+                        <span className="text-[10px] font-normal text-[var(--ash-grey)]/50 ml-1">
+                          {billingSummary.currency}
+                        </span>
+                      </p>
+                      <p className="text-[10px] text-[var(--ash-grey)]/40 mt-1">
+                        {billingSummary.venueCollectedCount} recording
+                        {billingSummary.venueCollectedCount === 1 ? '' : 's'}
+                      </p>
+                    </div>
+                    {/* Online-collected revenue */}
+                    <div className="bg-[var(--night)] p-3.5">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <div className="h-1.5 w-1.5 rounded-full bg-indigo-400/60" />
+                        <p className="text-[10px] text-[var(--ash-grey)]/60 uppercase tracking-widest">
+                          Online
+                        </p>
+                      </div>
+                      <p
+                        className="text-lg font-semibold text-[var(--timberwolf)]"
+                        style={{ fontVariantNumeric: 'tabular-nums' }}
+                      >
+                        {billingSummary.playhubCollectedRevenue.toFixed(3)}
+                        <span className="text-[10px] font-normal text-[var(--ash-grey)]/50 ml-1">
+                          {billingSummary.currency}
+                        </span>
+                      </p>
+                      <p className="text-[10px] text-[var(--ash-grey)]/40 mt-1">
+                        {billingSummary.playhubCollectedCount} recording
+                        {billingSummary.playhubCollectedCount === 1 ? '' : 's'}
+                      </p>
+                    </div>
+                    {/* Venue profit share */}
+                    <div className="bg-[var(--night)] p-3.5">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-400/60" />
+                        <p className="text-[10px] text-[var(--ash-grey)]/60 uppercase tracking-widest">
+                          Your profit
+                        </p>
+                      </div>
+                      <p
+                        className="text-lg font-semibold text-emerald-400"
+                        style={{ fontVariantNumeric: 'tabular-nums' }}
+                      >
+                        {billingSummary.venueKeeps.toFixed(3)}
+                        <span className="text-[10px] font-normal text-[var(--ash-grey)]/50 ml-1">
+                          {billingSummary.currency}
+                        </span>
+                      </p>
+                      <p className="text-[10px] text-[var(--ash-grey)]/40 mt-1">
+                        {billingSummary.count} recording
+                        {billingSummary.count === 1 ? '' : 's'} this month
+                      </p>
+                    </div>
+                    {/* Net settlement */}
+                    <div className="bg-[var(--night)] p-3.5">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <div
+                          className={`h-1.5 w-1.5 rounded-full ${billingSummary.netBalance > 0 ? 'bg-amber-400/60' : billingSummary.netBalance < 0 ? 'bg-emerald-400/60' : 'bg-[var(--ash-grey)]/40'}`}
+                        />
+                        <p className="text-[10px] text-[var(--ash-grey)]/60 uppercase tracking-widest">
+                          Net settlement
+                        </p>
+                      </div>
+                      <p
+                        className="text-lg font-semibold text-[var(--timberwolf)]"
+                        style={{ fontVariantNumeric: 'tabular-nums' }}
+                      >
+                        {Math.abs(billingSummary.netBalance).toFixed(3)}
+                        <span className="text-[10px] font-normal text-[var(--ash-grey)]/50 ml-1">
+                          {billingSummary.currency}
+                        </span>
+                      </p>
+                      <p className="text-[10px] text-[var(--ash-grey)]/40 mt-1">
+                        {billingSummary.netBalance > 0
+                          ? 'venue owes PLAYBACK'
+                          : billingSummary.netBalance < 0
+                            ? 'PLAYBACK owes venue'
+                            : 'settled'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Daily recordings chart */}
+                {dailyStats && dailyStats.scenes.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] text-[var(--ash-grey)]/60 uppercase tracking-widest">
+                        Daily activity
+                      </p>
+                      {dailyStats.scenes.length > 1 && (
+                        <div className="flex items-center gap-3">
+                          {dailyStats.scenes.map((scene, i) => (
+                            <div
+                              key={scene}
+                              className="flex items-center gap-1 text-[10px] text-[var(--ash-grey)]/50"
+                            >
+                              <div
+                                className="h-1.5 w-1.5 rounded-full"
+                                style={{
+                                  backgroundColor: [
+                                    '#6366f1',
+                                    '#22c55e',
+                                    '#f59e0b',
+                                    '#ef4444',
+                                    '#06b6d4',
+                                    '#ec4899',
+                                    '#8b5cf6',
+                                    '#14b8a6',
+                                  ][i % 8],
+                                }}
+                              />
+                              {scene}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <ChartContainer
+                      config={
+                        Object.fromEntries(
+                          dailyStats.scenes.map((scene, i) => [
+                            scene,
+                            {
+                              label: scene,
+                              color: [
+                                '#6366f1',
+                                '#22c55e',
+                                '#f59e0b',
+                                '#ef4444',
+                                '#06b6d4',
+                                '#ec4899',
+                                '#8b5cf6',
+                                '#14b8a6',
+                              ][i % 8],
+                            },
+                          ])
+                        ) as ChartConfig
+                      }
+                      className="aspect-[2/1] sm:aspect-[3/1] md:aspect-[4/1] w-full"
+                    >
+                      <AreaChart
+                        data={dailyStats.days.map((d) => ({
+                          date: d.date.slice(8),
+                          ...d.byScene,
+                          total: d.total,
+                        }))}
+                        margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
+                      >
+                        <defs>
+                          {dailyStats.scenes.map((scene, i) => {
+                            const color = [
+                              '#6366f1',
+                              '#22c55e',
+                              '#f59e0b',
+                              '#ef4444',
+                              '#06b6d4',
+                              '#ec4899',
+                              '#8b5cf6',
+                              '#14b8a6',
+                            ][i % 8]
+                            return (
+                              <linearGradient
+                                key={scene}
+                                id={`fill-${i}`}
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="1"
+                              >
+                                <stop
+                                  offset="5%"
+                                  stopColor={color}
+                                  stopOpacity={0.25}
+                                />
+                                <stop
+                                  offset="95%"
+                                  stopColor={color}
+                                  stopOpacity={0}
+                                />
+                              </linearGradient>
+                            )
+                          })}
+                        </defs>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="rgba(185,186,163,0.05)"
+                          vertical={false}
+                        />
+                        <XAxis
+                          dataKey="date"
+                          tick={{ fill: 'rgba(185,186,163,0.4)', fontSize: 9 }}
+                          axisLine={false}
+                          tickLine={false}
+                          interval="preserveStartEnd"
+                        />
+                        <YAxis
+                          allowDecimals={false}
+                          tick={{ fill: 'rgba(185,186,163,0.4)', fontSize: 9 }}
+                          axisLine={false}
+                          tickLine={false}
+                          width={20}
+                        />
+                        <ChartTooltip
+                          content={
+                            <ChartTooltipContent
+                              indicator="dot"
+                              labelFormatter={(value) => {
+                                const dayNum =
+                                  typeof value === 'string'
+                                    ? value
+                                    : String(value)
+                                const now = new Date()
+                                return `${dayNum} ${now.toLocaleDateString('en-GB', { month: 'short' })}`
+                              }}
+                            />
+                          }
+                        />
+                        {dailyStats.scenes.map((scene, i) => {
+                          const color = [
+                            '#6366f1',
+                            '#22c55e',
+                            '#f59e0b',
+                            '#ef4444',
+                            '#06b6d4',
+                            '#ec4899',
+                            '#8b5cf6',
+                            '#14b8a6',
+                          ][i % 8]
+                          return (
+                            <Area
+                              key={scene}
+                              dataKey={scene}
+                              type="monotone"
+                              stackId="a"
+                              stroke={color}
+                              fill={`url(#fill-${i})`}
+                              strokeWidth={1.5}
+                            />
+                          )
+                        })}
+                        {/* Target line */}
+                        {dailyStats.dailyTarget > 0 && (
+                          <ReferenceLine
+                            y={dailyStats.dailyTarget}
+                            stroke="rgba(245,158,11,0.35)"
+                            strokeDasharray="6 3"
+                            label={{
+                              value: `Target: ${dailyStats.dailyTarget}/day`,
+                              position: 'insideTopRight',
+                              fill: 'rgba(245,158,11,0.5)',
+                              fontSize: 9,
+                            }}
+                          />
+                        )}
+                        {/* Average line */}
+                        {dailyStats.averagePerDay > 0 && (
+                          <ReferenceLine
+                            y={dailyStats.averagePerDay}
+                            stroke="rgba(99,102,241,0.4)"
+                            strokeDasharray="3 3"
+                            label={{
+                              value: `Avg: ${dailyStats.averagePerDay}/day`,
+                              position: 'insideBottomRight',
+                              fill: 'rgba(99,102,241,0.6)',
+                              fontSize: 9,
+                            }}
+                          />
+                        )}
+                      </AreaChart>
+                    </ChartContainer>
+                  </div>
+                )}
+              </div>
+
+              {/* Invoice toggle */}
+              <div className="px-5 pb-4">
+                <button
+                  className="text-[11px] text-[var(--ash-grey)]/40 hover:text-[var(--ash-grey)] transition-colors"
+                  onClick={() => {
+                    setShowBillingSection(!showBillingSection)
+                    if (!showBillingSection) fetchBillingData()
+                  }}
+                >
+                  {showBillingSection
+                    ? 'Hide invoices'
+                    : 'View invoices \u2192'}
+                </button>
+              </div>
+
+              {/* Invoices */}
+              {showBillingSection && (
+                <div className="px-5 pb-5 border-t border-[var(--ash-grey)]/[0.06] pt-4 space-y-2">
+                  {invoices.length === 0 ? (
+                    <p className="text-xs text-[var(--ash-grey)]/50">
+                      No invoices yet
+                    </p>
+                  ) : (
+                    invoices.map((inv) => {
+                      const net = Number(inv.net_amount)
+                      const totalRecordings =
+                        inv.venue_collected_count + inv.playhub_collected_count
+                      return (
+                        <div
+                          key={inv.id}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-white/[0.02] rounded-lg border border-[var(--ash-grey)]/[0.06]"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-[var(--timberwolf)]">
+                              {new Date(inv.period_start).toLocaleDateString(
+                                'en-GB',
+                                { month: 'long', year: 'numeric' }
+                              )}
+                            </p>
+                            <p className="text-[11px] text-[var(--ash-grey)]/50">
+                              {totalRecordings} recording
+                              {totalRecordings === 1 ? '' : 's'}
+                              {inv.venue_collected_count > 0 &&
+                                inv.playhub_collected_count > 0 &&
+                                ` (${inv.venue_collected_count} venue, ${inv.playhub_collected_count} online)`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span
+                              className={`text-sm font-medium ${net >= 0 ? 'text-[var(--timberwolf)]' : 'text-emerald-400'}`}
+                              style={{ fontVariantNumeric: 'tabular-nums' }}
+                            >
+                              {net >= 0 ? '' : '-'}
+                              {Math.abs(net).toFixed(3)} {inv.currency}
+                            </span>
+                            <span className="text-[10px] text-[var(--ash-grey)]/40">
+                              {net >= 0 ? 'owed' : 'due to venue'}
+                            </span>
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                inv.status === 'paid'
+                                  ? 'bg-emerald-500/10 text-emerald-400'
+                                  : inv.status === 'pending'
+                                    ? 'bg-amber-500/10 text-amber-400'
+                                    : inv.status === 'overdue'
+                                      ? 'bg-red-500/10 text-red-400'
+                                      : 'bg-gray-500/10 text-gray-400'
+                              }`}
+                            >
+                              {inv.status}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+          </FadeIn>
+        )}
 
         {/* Schedule Recording */}
         {scenes.length > 0 && (
@@ -1018,6 +1565,43 @@ export default function VenueManagementPage() {
                         recording is ready)
                       </p>
                     </div>
+
+                    {/* Paid recording */}
+                    {billingConfig?.is_active && (
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isBillable}
+                            onChange={(e) => setIsBillable(e.target.checked)}
+                            className="w-4 h-4 rounded border-[var(--ash-grey)]/20 bg-white/5 accent-[var(--timberwolf)]"
+                          />
+                          <span className="text-sm font-medium text-[var(--timberwolf)]">
+                            Paid recording
+                          </span>
+                        </label>
+                        {isBillable && (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              step="0.001"
+                              min="0"
+                              value={billableAmount}
+                              onChange={(e) =>
+                                setBillableAmount(e.target.value)
+                              }
+                              placeholder={String(
+                                billingConfig.default_billable_amount || '5.000'
+                              )}
+                              className={`w-32 ${inputClass}`}
+                            />
+                            <span className="text-sm text-[var(--ash-grey)]">
+                              {billingConfig.currency || 'KWD'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {error && (
                       <div className="bg-red-500/10 text-red-400 p-3 rounded-lg">

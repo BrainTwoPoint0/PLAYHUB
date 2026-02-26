@@ -196,13 +196,13 @@ After:   Lambda → Playwright (playwright-core + @sparticuz/chromium) → Veo �
 
 ## Bugs Encountered & Fixed
 
-| Bug | Cause | Fix |
-|-----|-------|-----|
-| Retry loop bypassed | `throw` instead of `return null` when tokens not captured | Changed to `return null` with warning log |
-| `ERR_INSUFFICIENT_RESOURCES` | 1024MB Lambda not enough for Chromium | Bumped to 2048MB |
-| Netlify build failure | TypeScript compiled Lambda files importing `@sparticuz/chromium` | Added `"infrastructure"` to tsconfig exclude |
-| 500 on GET endpoint | `STRIPE_SECRET_KEY` on Netlify was set to test key | User updated Netlify env var to live key |
-| Lambda Function URL 403 | AWS account blocks public Lambda Function URLs | Switched to `@aws-sdk/client-lambda` direct invocation |
+| Bug                          | Cause                                                            | Fix                                                    |
+| ---------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------ |
+| Retry loop bypassed          | `throw` instead of `return null` when tokens not captured        | Changed to `return null` with warning log              |
+| `ERR_INSUFFICIENT_RESOURCES` | 1024MB Lambda not enough for Chromium                            | Bumped to 2048MB                                       |
+| Netlify build failure        | TypeScript compiled Lambda files importing `@sparticuz/chromium` | Added `"infrastructure"` to tsconfig exclude           |
+| 500 on GET endpoint          | `STRIPE_SECRET_KEY` on Netlify was set to test key               | User updated Netlify env var to live key               |
+| Lambda Function URL 403      | AWS account blocks public Lambda Function URLs                   | Switched to `@aws-sdk/client-lambda` direct invocation |
 
 ## Verification
 

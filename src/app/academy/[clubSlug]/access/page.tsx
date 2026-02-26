@@ -28,10 +28,19 @@ interface VeoTeam {
   members: VeoMember[]
 }
 
+interface StripeOnlySubscriber {
+  email: string
+  name: string | null
+  status: string
+  isScholarship: boolean
+  registrationTeam: string | null
+}
+
 interface VeoData {
   clubName: string
   veoClubSlug: string
   teams: VeoTeam[]
+  stripeOnlySubscribers: StripeOnlySubscriber[]
   lastSyncedAt: string | null
 }
 
@@ -118,6 +127,9 @@ export default function AcademyAccessPage() {
   const [newExceptionEmail, setNewExceptionEmail] = useState('')
   const [newExceptionReason, setNewExceptionReason] = useState('')
   const [exceptionsLoading, setExceptionsLoading] = useState(false)
+
+  // Stripe-only subscribers state
+  const [stripeOnlyOpen, setStripeOnlyOpen] = useState(false)
 
   useEffect(() => {
     fetchVeoData()
@@ -382,7 +394,7 @@ export default function AcademyAccessPage() {
 
         {/* Summary */}
         <FadeIn delay={100}>
-          <div className="grid gap-4 grid-cols-4 mb-6">
+          <div className="grid gap-4 grid-cols-5 mb-6">
             <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-4">
               <p className="text-xs text-[var(--ash-grey)] uppercase tracking-wider mb-1">
                 Veo Members
@@ -396,6 +408,14 @@ export default function AcademyAccessPage() {
                 Players No Sub
               </p>
               <p className="text-2xl font-bold text-red-400">{noSub}</p>
+            </div>
+            <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-4">
+              <p className="text-xs text-[var(--ash-grey)] uppercase tracking-wider mb-1">
+                Paying, Not in Veo
+              </p>
+              <p className="text-2xl font-bold text-orange-400">
+                {data.stripeOnlySubscribers?.length ?? 0}
+              </p>
             </div>
             <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-4">
               <p className="text-xs text-[var(--ash-grey)] uppercase tracking-wider mb-1">
@@ -515,6 +535,76 @@ export default function AcademyAccessPage() {
             )}
           </div>
         </FadeIn>
+
+        {/* Stripe-only subscribers (paying but not in Veo) */}
+        {data.stripeOnlySubscribers &&
+          data.stripeOnlySubscribers.length > 0 && (
+            <FadeIn delay={135}>
+              <div className="rounded-xl border border-orange-500/20 bg-white/[0.015] mb-6">
+                <button
+                  onClick={() => setStripeOnlyOpen(!stripeOnlyOpen)}
+                  className="w-full flex items-center justify-between p-4 hover:bg-white/[0.03] transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-[var(--ash-grey)] text-xs w-4">
+                      {stripeOnlyOpen ? '\u25BC' : '\u25B6'}
+                    </span>
+                    <span className="font-medium text-[var(--timberwolf)]">
+                      Paying, Not in Veo
+                    </span>
+                    <span className="text-xs text-orange-400">
+                      {data.stripeOnlySubscribers.length}{' '}
+                      {data.stripeOnlySubscribers.length === 1
+                        ? 'subscriber'
+                        : 'subscribers'}{' '}
+                      not found in any Veo team
+                    </span>
+                  </div>
+                </button>
+                {stripeOnlyOpen && (
+                  <div className="border-t border-[var(--ash-grey)]/10 bg-white/[0.02]">
+                    <div className="divide-y divide-[var(--ash-grey)]/5">
+                      {data.stripeOnlySubscribers.map((sub) => (
+                        <div
+                          key={sub.email}
+                          className="flex items-center justify-between gap-2 px-4 py-2 text-sm"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-[var(--timberwolf)] truncate">
+                              {sub.name || 'Unknown'}
+                            </span>
+                            <span className="text-xs text-[var(--ash-grey)] truncate">
+                              {sub.email}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {sub.registrationTeam && (
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-white/5 text-[var(--ash-grey)]">
+                                {sub.registrationTeam}
+                              </span>
+                            )}
+                            {sub.isScholarship && (
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400">
+                                scholarship
+                              </span>
+                            )}
+                            <span
+                              className={`text-xs px-1.5 py-0.5 rounded ${stripeStatusColor(
+                                sub.status,
+                                true
+                              )}`}
+                            >
+                              {sub.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </FadeIn>
+          )}
 
         {/* Controls */}
         <FadeIn delay={150}>

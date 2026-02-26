@@ -22,7 +22,10 @@ export async function GET() {
 
   if (isAdmin) {
     // Platform admins see all clubs
-    return NextResponse.json({ clubs: getAllClubs(), role: 'platform_admin' })
+    return NextResponse.json({
+      clubs: await getAllClubs(),
+      role: 'platform_admin',
+    })
   }
 
   // Check which clubs this user is an admin for (via organization_members)
@@ -37,7 +40,8 @@ export async function GET() {
 
   const orgIds = new Set((memberships || []).map((m: any) => m.organization_id))
 
-  const accessibleClubs = getAllClubs().filter(
+  const allClubs = await getAllClubs()
+  const accessibleClubs = allClubs.filter(
     (club) => club.organizationId && orgIds.has(club.organizationId)
   )
 

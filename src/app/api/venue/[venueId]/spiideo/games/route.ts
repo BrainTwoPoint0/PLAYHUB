@@ -3,115 +3,11 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
-
-const SPIIDEO_API_BASE = 'https://api-public.spiideo.com'
-const SPIIDEO_TOKEN_URL = 'https://auth-play.spiideo.net/oauth2/token'
-
-// Shared Spiideo account credentials from environment (Kuwait)
-const SPIIDEO_CLIENT_ID = process.env.SPIIDEO_KUWAIT_CLIENT_ID!
-const SPIIDEO_CLIENT_SECRET = process.env.SPIIDEO_KUWAIT_CLIENT_SECRET!
-const SPIIDEO_ACCOUNT_ID = process.env.SPIIDEO_KUWAIT_ACCOUNT_ID!
-const SPIIDEO_USER_ID = process.env.SPIIDEO_PLAYBACK_ADMIN_USER_ID!
-
-async function getAccessToken(): Promise<string> {
-  const basicAuth = Buffer.from(
-    `${SPIIDEO_CLIENT_ID}:${SPIIDEO_CLIENT_SECRET}`
-  ).toString('base64')
-
-  const response = await fetch(SPIIDEO_TOKEN_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: `Basic ${basicAuth}`,
-    },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-    }),
-    cache: 'no-store',
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to get Spiideo token: ${response.status}`)
-  }
-
-  const data = await response.json()
-  return data.access_token
-}
-
-async function createSpiideoGame(gameData: {
-  title: string
-  description?: string
-  sceneId: string
-  scheduledStartTime: string
-  scheduledStopTime: string
-  sport?: string
-}) {
-  const token = await getAccessToken()
-
-  const body = {
-    accountId: SPIIDEO_ACCOUNT_ID,
-    title: gameData.title,
-    description: gameData.description || '',
-    sceneId: gameData.sceneId,
-    scheduledStartTime: gameData.scheduledStartTime,
-    scheduledStopTime: gameData.scheduledStopTime,
-    sport: gameData.sport || 'football',
-  }
-
-  const response = await fetch(`${SPIIDEO_API_BASE}/v1/games`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'X-Spiideo-Api-User': SPIIDEO_USER_ID,
-    },
-    body: JSON.stringify(body),
-    cache: 'no-store',
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Spiideo API error: ${response.status} - ${errorText}`)
-  }
-
-  return response.json()
-}
-
-async function createSpiideoProduction(gameId: string, recipeId?: string) {
-  const token = await getAccessToken()
-
-  const body: any = {
-    productionType: 'single_game',
-    type: 'live',
-  }
-
-  if (recipeId) {
-    body.productionRecipeId = recipeId
-  }
-
-  const response = await fetch(
-    `${SPIIDEO_API_BASE}/v1/games/${gameId}/productions`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'X-Spiideo-Api-User': SPIIDEO_USER_ID,
-      },
-      body: JSON.stringify(body),
-      cache: 'no-store',
-    }
-  )
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(
-      `Spiideo production error: ${response.status} - ${errorText}`
-    )
-  }
-
-  return response.json()
-}
+import {
+  createGame,
+  createProduction,
+  getAccountConfig,
+} from '@/lib/spiideo/client'
 
 export async function POST(
   request: NextRequest,
@@ -139,14 +35,6 @@ export async function POST(
     )
   }
 
-  // Check if Spiideo is configured
-  if (!SPIIDEO_CLIENT_ID || !SPIIDEO_CLIENT_SECRET || !SPIIDEO_ACCOUNT_ID) {
-    return NextResponse.json(
-      { error: 'Spiideo not configured' },
-      { status: 404 }
-    )
-  }
-
   const body = await request.json()
   const {
     title,
@@ -159,6 +47,8 @@ export async function POST(
     awayTeam,
     pitchName,
     accessEmails, // Array of emails to grant access
+    isBillable,
+    billableAmount,
   } = body
 
   // Validate required fields
@@ -192,19 +82,31 @@ export async function POST(
 
   try {
     // 1. Create game in Spiideo
-    const game = await createSpiideoGame({
+    const config = getAccountConfig('kuwait')
+    const game = await createGame({
+      accountId: config.accountId!,
       title,
-      description,
+      description: description || '',
       sceneId,
       scheduledStartTime,
       scheduledStopTime,
-      sport,
+      sport: sport || 'football',
     })
 
     // 2. Create live production
-    const production = await createSpiideoProduction(game.id)
+    const production = await createProduction(game.id, {
+      productionType: 'single_game',
+      type: 'live',
+    })
 
-    // 3. Create recording entry in Supabase (placeholder with status='scheduled')
+    // 3. Look up billing config for billable defaults
+    const { data: billingConfig } = await (serviceClient as any)
+      .from('playhub_venue_billing_config')
+      .select('default_billable_amount, currency')
+      .eq('organization_id', venueId)
+      .maybeSingle()
+
+    // 4. Create recording entry in Supabase (placeholder with status='scheduled')
     const { data: recording, error: recordingError } = await (
       serviceClient as any
     )
@@ -222,6 +124,11 @@ export async function POST(
         status: 'scheduled',
         access_type: 'private_link',
         created_by: user.id,
+        is_billable: isBillable ?? true,
+        billable_amount:
+          billableAmount ?? billingConfig?.default_billable_amount ?? null,
+        billable_currency: billingConfig?.currency ?? 'KWD',
+        collected_by: 'venue',
       })
       .select('id')
       .single()
@@ -231,7 +138,7 @@ export async function POST(
       // Don't fail - game is already scheduled in Spiideo
     }
 
-    // 4. Grant access to emails if provided
+    // 5. Grant access to emails if provided
     if (accessEmails && accessEmails.length > 0 && recording?.id) {
       const accessInserts = accessEmails.map((email: string) => ({
         match_recording_id: recording.id,

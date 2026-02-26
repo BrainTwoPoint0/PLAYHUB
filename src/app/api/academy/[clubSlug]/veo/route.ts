@@ -34,7 +34,7 @@ export async function GET(
   }
 
   const { clubSlug } = await params
-  const club = getClubBySlug(clubSlug)
+  const club = await getClubBySlug(clubSlug)
   if (!club) {
     return NextResponse.json({ error: 'Club not found' }, { status: 404 })
   }
@@ -57,13 +57,21 @@ export async function GET(
     const productIds = getAllProductIds(club)
     const additionalIds = productIds.slice(1) // skip primary (fetched via clubSlug)
 
-    let cachedData, primarySubs: Awaited<ReturnType<typeof getAcademySubscribers>>, additionalSubs: Awaited<ReturnType<typeof getSubscribersByProduct>>[]
+    let cachedData,
+      primarySubs: Awaited<ReturnType<typeof getAcademySubscribers>>,
+      additionalSubs: Awaited<ReturnType<typeof getSubscribersByProduct>>[]
     try {
       cachedData = await getCachedClubData(clubSlug)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       console.error(`getCachedClubData failed (${clubSlug}):`, msg)
-      return NextResponse.json({ error: 'Failed to fetch Veo data', detail: `Supabase cache read failed: ${msg}` }, { status: 500 })
+      return NextResponse.json(
+        {
+          error: 'Failed to fetch Veo data',
+          detail: `Supabase cache read failed: ${msg}`,
+        },
+        { status: 500 }
+      )
     }
 
     try {
@@ -71,15 +79,29 @@ export async function GET(
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       console.error(`getAcademySubscribers failed (${clubSlug}):`, msg)
-      return NextResponse.json({ error: 'Failed to fetch Veo data', detail: `Stripe subscribers failed: ${msg}` }, { status: 500 })
+      return NextResponse.json(
+        {
+          error: 'Failed to fetch Veo data',
+          detail: `Stripe subscribers failed: ${msg}`,
+        },
+        { status: 500 }
+      )
     }
 
     try {
-      additionalSubs = await Promise.all(additionalIds.map((pid) => getSubscribersByProduct(pid)))
+      additionalSubs = await Promise.all(
+        additionalIds.map((pid) => getSubscribersByProduct(pid))
+      )
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       console.error(`getSubscribersByProduct failed (${clubSlug}):`, msg)
-      return NextResponse.json({ error: 'Failed to fetch Veo data', detail: `Stripe additional products failed: ${msg}` }, { status: 500 })
+      return NextResponse.json(
+        {
+          error: 'Failed to fetch Veo data',
+          detail: `Stripe additional products failed: ${msg}`,
+        },
+        { status: 500 }
+      )
     }
 
     // Merge all subscribers, dedup by email (keep first/best match)
@@ -160,10 +182,64 @@ export async function GET(
       }
     })
 
+    // Inverse lookup: Stripe subscribers whose email is NOT in any Veo team
+    const veoEmails = new Set<string>()
+    for (const team of cachedData.teams) {
+      for (const m of team.members) {
+        if (m.email) veoEmails.add(m.email.toLowerCase())
+      }
+    }
+
+    const stripeOnlySubscribers: {
+      email: string
+      name: string | null
+      status: string
+      isScholarship: boolean
+      registrationTeam: string | null
+    }[] = []
+
+    // Deduplicate subscribers by email, keeping best status (same logic as subsByEmail)
+    const seenStripeOnly = new Map<
+      string,
+      {
+        name: string | null
+        status: string
+        isScholarship: boolean
+        registrationTeam: string | null
+      }
+    >()
+    for (const sub of subscribers) {
+      if (!sub.customerEmail) continue
+      const email = sub.customerEmail.toLowerCase()
+      // Skip if this email exists in Veo
+      if (veoEmails.has(email)) continue
+      // Skip canceled — they don't need Veo access
+      if (sub.status === 'canceled') continue
+
+      const existing = seenStripeOnly.get(email)
+      if (
+        !existing ||
+        (statusPriority[sub.status] ?? 9) <
+          (statusPriority[existing.status] ?? 9)
+      ) {
+        seenStripeOnly.set(email, {
+          name: sub.customerName ?? null,
+          status: sub.status,
+          isScholarship: sub.isScholarship,
+          registrationTeam: sub.registrationTeam,
+        })
+      }
+    }
+
+    for (const [email, info] of seenStripeOnly) {
+      stripeOnlySubscribers.push({ email, ...info })
+    }
+
     return NextResponse.json({
       clubName: club.name,
       veoClubSlug: club.veoClubSlug,
       teams,
+      stripeOnlySubscribers,
       lastSyncedAt: cachedData.lastSyncedAt,
     })
   } catch (error) {

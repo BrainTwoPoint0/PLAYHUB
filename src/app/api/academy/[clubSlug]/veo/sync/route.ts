@@ -27,7 +27,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   }
 
   const { clubSlug } = await params
-  const club = getClubBySlug(clubSlug)
+  const club = await getClubBySlug(clubSlug)
   if (!club) {
     return NextResponse.json({ error: 'Club not found' }, { status: 404 })
   }

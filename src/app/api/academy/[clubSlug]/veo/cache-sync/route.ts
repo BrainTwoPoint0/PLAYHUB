@@ -25,7 +25,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   }
 
   const { clubSlug } = await params
-  const club = getClubBySlug(clubSlug)
+  const club = await getClubBySlug(clubSlug)
   if (!club || !club.veoClubSlug) {
     return NextResponse.json({ error: 'Club not found' }, { status: 404 })
   }

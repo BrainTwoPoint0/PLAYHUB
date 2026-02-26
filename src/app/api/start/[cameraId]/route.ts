@@ -18,7 +18,7 @@ const CHARGE_CURRENCY = 'eur'
 let cachedRate: { rate: number; fetchedAt: number } | null = null
 const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
 
-const FALLBACK_KWD_TO_EUR_RATE = 2.95
+const FALLBACK_KWD_TO_EUR_RATE = 2.75
 
 async function getKwdToEurRate(): Promise<number> {
   if (cachedRate && Date.now() - cachedRate.fetchedAt < CACHE_TTL_MS) {

@@ -225,10 +225,7 @@ export async function listClubTeamsWithMembers(
   teams: (VeoTeam & { members: VeoMember[] })[]
 }> {
   // Fetch teams
-  const teamsRes = await session.api(
-    'GET',
-    `/api/app/clubs/${clubSlug}/teams/`
-  )
+  const teamsRes = await session.api('GET', `/api/app/clubs/${clubSlug}/teams/`)
 
   if (teamsRes.status !== 200) {
     throw new Error(`Failed to list teams: HTTP ${teamsRes.status}`)
@@ -285,7 +282,9 @@ export async function listClubRecordings(
       : parsed?.results || []
 
     allRecordings.push(...items)
-    console.log(`Page ${page}: ${items.length} recordings (total: ${allRecordings.length})`)
+    console.log(
+      `Page ${page}: ${items.length} recordings (total: ${allRecordings.length})`
+    )
 
     // Stop if fewer than page_size results (last page)
     if (items.length < 100) break

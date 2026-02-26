@@ -26,6 +26,53 @@ vi.mock('stripe', () => {
   return { default: MockStripe }
 })
 
+// Mock the config module — getClubBySlug is now async (DB-backed)
+vi.mock('../config', () => ({
+  getClubBySlug: vi.fn(async (slug: string) => {
+    const clubs: Record<string, any> = {
+      cfa: {
+        slug: 'cfa',
+        name: 'PLAYBACK Academy - CFA',
+        stripeProductId: 'prod_RWhRQ4wM3PiEBJ',
+        veoClubSlug: 'playback-15fdc44b',
+      },
+      sefa: {
+        slug: 'sefa',
+        name: 'PLAYBACK Academy - SEFA',
+        stripeProductId: 'prod_QiMBPC4wf4nff1',
+        additionalStripeProductIds: [
+          'prod_Qyv9ID1M0sCowi',
+          'prod_QuA6axz11zTGbw',
+        ],
+        veoClubSlug: 'soccer-elite-fa-0b0814d2',
+      },
+    }
+    return clubs[slug] || undefined
+  }),
+  getAllClubs: vi.fn(async () => [
+    {
+      slug: 'cfa',
+      name: 'PLAYBACK Academy - CFA',
+      stripeProductId: 'prod_RWhRQ4wM3PiEBJ',
+      veoClubSlug: 'playback-15fdc44b',
+    },
+    {
+      slug: 'sefa',
+      name: 'PLAYBACK Academy - SEFA',
+      stripeProductId: 'prod_QiMBPC4wf4nff1',
+      additionalStripeProductIds: [
+        'prod_Qyv9ID1M0sCowi',
+        'prod_QuA6axz11zTGbw',
+      ],
+      veoClubSlug: 'soccer-elite-fa-0b0814d2',
+    },
+  ]),
+  getAllProductIds: vi.fn((club: any) => [
+    club.stripeProductId,
+    ...(club.additionalStripeProductIds || []),
+  ]),
+}))
+
 // Helper to create async iterable from array (Stripe auto-pagination)
 function asyncIterable<T>(items: T[]) {
   return {

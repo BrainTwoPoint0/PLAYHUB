@@ -52,9 +52,7 @@ interface ClubResult {
 // Cache Sync — scrape Veo directly via Playwright and write to Supabase
 // ============================================================================
 
-async function runCacheSync(
-  onlyClub?: string
-): Promise<ClubResult[]> {
+async function runCacheSync(onlyClub?: string): Promise<ClubResult[]> {
   const results: ClubResult[] = []
   const slugs = onlyClub ? [onlyClub] : CLUB_SLUGS
 
@@ -206,9 +204,7 @@ async function runCleanupSync(): Promise<ClubResult[]> {
 // Privacy Sync — set all recordings to private (except excepted teams)
 // ============================================================================
 
-async function runPrivacySync(
-  onlyClub?: string
-): Promise<ClubResult[]> {
+async function runPrivacySync(onlyClub?: string): Promise<ClubResult[]> {
   const results: ClubResult[] = []
   const slugs = onlyClub ? [onlyClub] : CLUB_SLUGS
 
@@ -276,8 +272,7 @@ async function runPrivacySync(
         executedCount: totalSetPrivate,
         exceptedCount: totalSkipped,
         elapsed,
-        error:
-          totalErrors > 0 ? `${totalErrors} recordings failed` : undefined,
+        error: totalErrors > 0 ? `${totalErrors} recordings failed` : undefined,
       })
 
       console.log(
@@ -318,8 +313,7 @@ function parseEvent(raw: EventPayload | FunctionUrlEvent): EventPayload {
         : {}
 
       // Verify API key for Function URL calls
-      const apiKey =
-        body.apiKey || urlEvent.headers?.['x-api-key'] || ''
+      const apiKey = body.apiKey || urlEvent.headers?.['x-api-key'] || ''
       if (apiKey !== SYNC_API_KEY) {
         throw new Error('Unauthorized')
       }

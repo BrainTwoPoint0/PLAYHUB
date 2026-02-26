@@ -301,7 +301,7 @@ export async function getAcademySummary(
   const cached = getCached<AcademySummary>(cacheKey)
   if (cached) return cached
 
-  const club = getClubBySlug(clubSlug)
+  const club = await getClubBySlug(clubSlug)
   if (!club) throw new Error(`Unknown club: ${clubSlug}`)
 
   const [clubData, registrations] = await Promise.all([
@@ -451,7 +451,7 @@ export async function getAcademySubscribers(
   const cached = getCached<AcademySubscriber[]>(cacheKey)
   if (cached) return cached
 
-  const club = getClubBySlug(clubSlug)
+  const club = await getClubBySlug(clubSlug)
   if (!club) throw new Error(`Unknown club: ${clubSlug}`)
 
   const [clubData, registrations] = await Promise.all([
@@ -584,7 +584,7 @@ export async function getAcademyRevenue(
   const cached = getCached<AcademyRevenue>(cacheKey)
   if (cached) return cached
 
-  const club = getClubBySlug(clubSlug)
+  const club = await getClubBySlug(clubSlug)
   if (!club) throw new Error(`Unknown club: ${clubSlug}`)
 
   // Get the summary for MRR (reuses cache if available)
