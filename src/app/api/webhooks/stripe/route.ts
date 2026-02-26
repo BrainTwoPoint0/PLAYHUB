@@ -241,11 +241,12 @@ async function handleVenueBooking(
   const serviceClient = createServiceClient() as any
 
   try {
-    // Calculate start/stop times
+    // Calculate start/stop times (1-min buffer so Spiideo accepts the schedule)
     const now = new Date()
     const durationMs = parseInt(durationMinutes) * 60 * 1000
-    const startTime = now.toISOString()
-    const stopTime = new Date(now.getTime() + durationMs).toISOString()
+    const start = new Date(now.getTime() + 60_000) // +1 minute
+    const startTime = start.toISOString()
+    const stopTime = new Date(start.getTime() + durationMs).toISOString()
 
     // Create game in Spiideo
     const spiideoConfig = getAccountConfig('kuwait')
