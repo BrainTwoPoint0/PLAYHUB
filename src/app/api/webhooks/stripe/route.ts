@@ -1,12 +1,8 @@
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
-import {
-  createGame,
-  createProduction,
-  getAccountConfig,
-} from '@/lib/spiideo/client'
+import { createClient } from '@/lib/supabase/server'
+import { scheduleRecording } from '@/lib/spiideo/schedule-recording'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-02-24.acacia',
@@ -238,84 +234,25 @@ async function handleVenueBooking(
     return NextResponse.json({ error: 'Missing metadata' }, { status: 400 })
   }
 
-  const serviceClient = createServiceClient() as any
-
   try {
-    // Calculate start/stop times (1-min buffer so Spiideo accepts the schedule)
     const now = new Date()
-    const durationMs = parseInt(durationMinutes) * 60 * 1000
-    const start = new Date(now.getTime() + 60_000) // +1 minute
-    const startTime = start.toISOString()
-    const stopTime = new Date(start.getTime() + durationMs).toISOString()
-
-    // Create game in Spiideo
-    const spiideoConfig = getAccountConfig('kuwait')
-    const game = await createGame({
-      accountId: spiideoConfig.accountId!,
+    const result = await scheduleRecording({
+      venueId,
+      sceneId,
+      sceneName: sceneName || 'Pitch',
+      durationMinutes: parseInt(durationMinutes),
       title: `Self-service: ${sceneName || 'Pitch'} — ${now.toLocaleDateString('en-GB')}`,
       description: `Booked by ${email}`,
-      sceneId,
-      scheduledStartTime: startTime,
-      scheduledStopTime: stopTime,
-      sport: 'football',
+      email,
+      collectedBy: 'playhub',
+      startBufferMs: 60_000,
     })
-
-    // Create live production
-    const production = await createProduction(game.id, {
-      productionType: 'single_game',
-      type: 'live',
-    })
-
-    // Get billing config for amount
-    const { data: billingConfig } = await serviceClient
-      .from('playhub_venue_billing_config')
-      .select('default_billable_amount, currency')
-      .eq('organization_id', venueId)
-      .maybeSingle()
-
-    // Create recording in database
-    const { data: recording, error: recordingError } = await serviceClient
-      .from('playhub_match_recordings')
-      .insert({
-        organization_id: venueId,
-        spiideo_game_id: game.id,
-        spiideo_production_id: production.id,
-        title: `${sceneName || 'Pitch'} — ${now.toLocaleDateString('en-GB')}`,
-        description: `Self-service booking by ${email}`,
-        match_date: startTime,
-        home_team: 'Home',
-        away_team: 'Away',
-        pitch_name: sceneName || null,
-        status: 'scheduled',
-        access_type: 'private_link',
-        is_billable: true,
-        billable_amount: billingConfig?.default_billable_amount ?? null,
-        billable_currency: billingConfig?.currency ?? 'KWD',
-        collected_by: 'playhub',
-      })
-      .select('id')
-      .single()
-
-    if (recordingError) {
-      console.error('Failed to create recording for booking:', recordingError)
-    }
-
-    // Grant access via email
-    if (recording?.id) {
-      await serviceClient.from('playhub_access_rights').insert({
-        match_recording_id: recording.id,
-        invited_email: email.toLowerCase().trim(),
-        granted_at: new Date().toISOString(),
-        is_active: true,
-        notes: 'Self-service QR booking',
-      })
-    }
 
     console.log('Venue booking completed:', {
       venueId,
       sceneId,
-      gameId: game.id,
-      recordingId: recording?.id,
+      gameId: result.gameId,
+      recordingId: result.recordingId,
       email,
       duration: durationMinutes,
       collected_by: 'playhub',

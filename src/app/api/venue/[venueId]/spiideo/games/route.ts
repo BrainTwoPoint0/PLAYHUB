@@ -3,11 +3,7 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
-import {
-  createGame,
-  createProduction,
-  getAccountConfig,
-} from '@/lib/spiideo/client'
+import { scheduleRecording } from '@/lib/spiideo/schedule-recording'
 
 export async function POST(
   request: NextRequest,
@@ -46,7 +42,7 @@ export async function POST(
     homeTeam,
     awayTeam,
     pitchName,
-    accessEmails, // Array of emails to grant access
+    accessEmails,
     isBillable,
     billableAmount,
   } = body
@@ -80,84 +76,37 @@ export async function POST(
     }
   }
 
+  // Calculate duration from start/stop for the helper
+  const startMs = new Date(scheduledStartTime).getTime()
+  const stopMs = new Date(scheduledStopTime).getTime()
+  const durationMinutes = Math.round((stopMs - startMs) / 60_000)
+
   try {
-    // 1. Create game in Spiideo
-    const config = getAccountConfig('kuwait')
-    const game = await createGame({
-      accountId: config.accountId!,
+    const result = await scheduleRecording({
+      venueId,
+      sceneId,
+      sceneName: pitchName || 'Pitch',
+      durationMinutes,
       title,
       description: description || '',
-      sceneId,
+      createdBy: user.id,
+      collectedBy: 'venue',
+      isBillable: isBillable ?? true,
+      billableAmount,
+      accessEmails,
+      sport,
+      homeTeam,
+      awayTeam,
+      startBufferMs: 0,
       scheduledStartTime,
       scheduledStopTime,
-      sport: sport || 'football',
     })
-
-    // 2. Create live production
-    const production = await createProduction(game.id, {
-      productionType: 'single_game',
-      type: 'live',
-    })
-
-    // 3. Look up billing config for billable defaults
-    const { data: billingConfig } = await (serviceClient as any)
-      .from('playhub_venue_billing_config')
-      .select('default_billable_amount, currency')
-      .eq('organization_id', venueId)
-      .maybeSingle()
-
-    // 4. Create recording entry in Supabase (placeholder with status='scheduled')
-    const { data: recording, error: recordingError } = await (
-      serviceClient as any
-    )
-      .from('playhub_match_recordings')
-      .insert({
-        organization_id: venueId,
-        spiideo_game_id: game.id,
-        spiideo_production_id: production.id,
-        title,
-        description,
-        match_date: scheduledStartTime,
-        home_team: homeTeam || 'Home',
-        away_team: awayTeam || 'Away',
-        pitch_name: pitchName || null,
-        status: 'scheduled',
-        access_type: 'private_link',
-        created_by: user.id,
-        is_billable: isBillable ?? true,
-        billable_amount:
-          billableAmount ?? billingConfig?.default_billable_amount ?? null,
-        billable_currency: billingConfig?.currency ?? 'KWD',
-        collected_by: 'venue',
-      })
-      .select('id')
-      .single()
-
-    if (recordingError) {
-      console.error('Failed to create recording entry:', recordingError)
-      // Don't fail - game is already scheduled in Spiideo
-    }
-
-    // 5. Grant access to emails if provided
-    if (accessEmails && accessEmails.length > 0 && recording?.id) {
-      const accessInserts = accessEmails.map((email: string) => ({
-        match_recording_id: recording.id,
-        invited_email: email.toLowerCase().trim(),
-        granted_by: user.id,
-        granted_at: new Date().toISOString(),
-        is_active: true,
-      }))
-
-      await (serviceClient as any)
-        .from('playhub_access_rights')
-        .insert(accessInserts)
-    }
 
     return NextResponse.json({
       success: true,
-      gameId: game.id,
-      productionId: production.id,
-      recordingId: recording?.id,
+      gameId: result.gameId,
+      productionId: result.productionId,
+      recordingId: result.recordingId,
       message: 'Recording scheduled successfully',
     })
   } catch (error) {
