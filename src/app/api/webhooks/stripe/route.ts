@@ -1,7 +1,12 @@
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
+import {
+  createGame,
+  createProduction,
+  getAccountConfig,
+} from '@/lib/spiideo/client'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-02-24.acacia',
@@ -33,8 +38,28 @@ export async function POST(req: Request) {
       return handleStreamAccessPurchase(session, metadata)
     }
 
+    // Check if this is a venue self-service booking
+    if (metadata.type === 'venue_booking') {
+      return handleVenueBooking(session, metadata)
+    }
+
+    // camera_booking is now handled via payment_intent.succeeded (inline payment)
+
     // Otherwise, handle match recording purchase (existing flow)
     return handleMatchRecordingPurchase(session, metadata)
+  }
+
+  // Handle payment_intent.succeeded (inline Stripe Elements payments)
+  if (event.type === 'payment_intent.succeeded') {
+    const paymentIntent = event.data.object as Stripe.PaymentIntent
+    const metadata = paymentIntent.metadata || {}
+
+    if (metadata.type === 'camera_booking') {
+      return handleVenueBooking(paymentIntent, {
+        ...metadata,
+        sceneId: metadata.cameraId,
+      })
+    }
   }
 
   return NextResponse.json({ received: true })
@@ -199,4 +224,108 @@ async function handleMatchRecordingPurchase(
   })
 
   return NextResponse.json({ received: true })
+}
+
+// Handle venue self-service QR booking
+async function handleVenueBooking(
+  event: Stripe.Checkout.Session | Stripe.PaymentIntent,
+  metadata: Record<string, string>
+) {
+  const { venueId, sceneId, durationMinutes, email, sceneName } = metadata
+
+  if (!venueId || !sceneId || !durationMinutes || !email) {
+    console.error('Missing venue booking metadata:', event.id)
+    return NextResponse.json({ error: 'Missing metadata' }, { status: 400 })
+  }
+
+  const serviceClient = createServiceClient() as any
+
+  try {
+    // Calculate start/stop times
+    const now = new Date()
+    const durationMs = parseInt(durationMinutes) * 60 * 1000
+    const startTime = now.toISOString()
+    const stopTime = new Date(now.getTime() + durationMs).toISOString()
+
+    // Create game in Spiideo
+    const spiideoConfig = getAccountConfig('kuwait')
+    const game = await createGame({
+      accountId: spiideoConfig.accountId!,
+      title: `Self-service: ${sceneName || 'Pitch'} — ${now.toLocaleDateString('en-GB')}`,
+      description: `Booked by ${email}`,
+      sceneId,
+      scheduledStartTime: startTime,
+      scheduledStopTime: stopTime,
+      sport: 'football',
+    })
+
+    // Create live production
+    const production = await createProduction(game.id, {
+      productionType: 'single_game',
+      type: 'live',
+    })
+
+    // Get billing config for amount
+    const { data: billingConfig } = await serviceClient
+      .from('playhub_venue_billing_config')
+      .select('default_billable_amount, currency')
+      .eq('organization_id', venueId)
+      .maybeSingle()
+
+    // Create recording in database
+    const { data: recording, error: recordingError } = await serviceClient
+      .from('playhub_match_recordings')
+      .insert({
+        organization_id: venueId,
+        spiideo_game_id: game.id,
+        spiideo_production_id: production.id,
+        title: `${sceneName || 'Pitch'} — ${now.toLocaleDateString('en-GB')}`,
+        description: `Self-service booking by ${email}`,
+        match_date: startTime,
+        home_team: 'Home',
+        away_team: 'Away',
+        pitch_name: sceneName || null,
+        status: 'scheduled',
+        access_type: 'private_link',
+        is_billable: true,
+        billable_amount: billingConfig?.default_billable_amount ?? null,
+        billable_currency: billingConfig?.currency ?? 'KWD',
+        collected_by: 'playhub',
+      })
+      .select('id')
+      .single()
+
+    if (recordingError) {
+      console.error('Failed to create recording for booking:', recordingError)
+    }
+
+    // Grant access via email
+    if (recording?.id) {
+      await serviceClient.from('playhub_access_rights').insert({
+        match_recording_id: recording.id,
+        invited_email: email.toLowerCase().trim(),
+        granted_at: new Date().toISOString(),
+        is_active: true,
+        notes: 'Self-service QR booking',
+      })
+    }
+
+    console.log('Venue booking completed:', {
+      venueId,
+      sceneId,
+      gameId: game.id,
+      recordingId: recording?.id,
+      email,
+      duration: durationMinutes,
+      collected_by: 'playhub',
+    })
+
+    return NextResponse.json({ received: true })
+  } catch (error) {
+    console.error('Venue booking webhook error:', error)
+    return NextResponse.json(
+      { error: 'Failed to process venue booking' },
+      { status: 500 }
+    )
+  }
 }
