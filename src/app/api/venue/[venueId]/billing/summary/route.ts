@@ -5,6 +5,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
 import { isPlatformAdmin } from '@/lib/admin/auth'
+import { getKwdToEurRate } from '@/lib/fx/rates'
 
 type RouteContext = { params: Promise<{ venueId: string }> }
 
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   const { data: config } = await serviceClient
     .from('playhub_venue_billing_config')
     .select(
-      'default_billable_amount, currency, daily_recording_target, fixed_cost_per_recording, venue_profit_share_pct'
+      'default_billable_amount, currency, daily_recording_target, fixed_cost_eur, ambassador_pct, venue_profit_share_pct'
     )
     .eq('organization_id', venueId)
     .maybeSingle()
@@ -92,8 +93,13 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     .lte('created_at', todayEnd)
 
   const recordings = monthRecordings || []
-  const fixedCost = Number(config?.fixed_cost_per_recording) || 0
+  const fixedCostEur = Number(config?.fixed_cost_eur) || 0
+  const ambassadorPct = Number(config?.ambassador_pct) || 0
   const venuePct = Number(config?.venue_profit_share_pct) || 0
+
+  // Convert EUR fixed cost to KWD using live FX rate
+  const kwdToEurRate = await getKwdToEurRate()
+  const fixedCostKwd = fixedCostEur > 0 ? fixedCostEur / kwdToEurRate : 0
 
   // Revenue: use billable_amount if set, otherwise default from config (5 KWD)
   const totalRevenue = recordings.reduce(
@@ -123,22 +129,28 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   )
 
   // Profit share calculation (per agreement Section 6.3):
-  // profit = revenue - fixed_costs
+  // cost_per_recording = fixed_cost_eur (in KWD) + ambassador_pct% of price
+  // profit = revenue - total_costs
   // venue_keeps = profit * venue_pct%
 
+  // Helper: calculate cost for a set of recordings
+  function totalCost(recs: any[]) {
+    return recs.reduce((sum: number, r: any) => {
+      const price = Number(r.billable_amount) || defaultAmount
+      const ambassadorFee = price * (ambassadorPct / 100)
+      return sum + fixedCostKwd + ambassadorFee
+    }, 0)
+  }
+
   // Venue-collected: venue keeps their profit share, owes PLAYBACK the rest
-  const venueProfit = Math.max(
-    0,
-    venueCollectedRevenue - fixedCost * venueCollectedCount
-  )
+  const venueCosts = totalCost(venueRecordings)
+  const venueProfit = Math.max(0, venueCollectedRevenue - venueCosts)
   const venueKeeps = venueProfit * (venuePct / 100)
   const venueOwesPlayhub = venueCollectedRevenue - venueKeeps
 
   // PLAYHUB-collected: PLAYHUB owes venue their profit share
-  const playhubProfit = Math.max(
-    0,
-    playhubCollectedRevenue - fixedCost * playhubCollectedCount
-  )
+  const playhubCosts = totalCost(playhubRecordings)
+  const playhubProfit = Math.max(0, playhubCollectedRevenue - playhubCosts)
   const playhubOwesVenue = playhubProfit * (venuePct / 100)
 
   // Net: positive = venue owes PLAYHUB, negative = PLAYHUB owes venue
@@ -160,8 +172,10 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     playhubCollectedRevenue: Number(playhubCollectedRevenue.toFixed(3)),
     playhubOwesVenue: Number(playhubOwesVenue.toFixed(3)),
     netBalance: Number(netBalance.toFixed(3)),
-    fixedCostPerRecording: fixedCost,
+    fixedCostEur: fixedCostEur,
+    ambassadorPct: ambassadorPct,
     venueProfitSharePct: venuePct,
+    fxRate: Number(kwdToEurRate.toFixed(4)),
     dailyTarget: config?.daily_recording_target || 0,
     todayCount: todayRecordings?.length || 0,
     monthStart,
