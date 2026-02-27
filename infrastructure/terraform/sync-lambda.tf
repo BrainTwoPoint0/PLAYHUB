@@ -132,6 +132,8 @@ resource "aws_lambda_function" "sync_recordings" {
       S3_REGION             = var.aws_region
       SUPABASE_URL          = var.supabase_url
       SUPABASE_SERVICE_KEY  = var.supabase_service_key
+      RESEND_API_KEY        = var.resend_api_key
+      ALERT_EMAIL           = var.alert_email
     }
   }
 

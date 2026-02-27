@@ -19,8 +19,15 @@ const SPIIDEO_CLIENT_SECRET = process.env.SPIIDEO_CLIENT_SECRET!
 const SPIIDEO_ACCOUNT_ID = process.env.SPIIDEO_ACCOUNT_ID!
 const SPIIDEO_USER_ID = process.env.SPIIDEO_USER_ID!
 
+const RESEND_API_KEY = process.env.RESEND_API_KEY || ''
+const ALERT_EMAIL = process.env.ALERT_EMAIL || ''
+
 const SPIIDEO_API_BASE = 'https://api-public.spiideo.com'
 const SPIIDEO_TOKEN_URL = 'https://auth-play.spiideo.net/oauth2/token'
+
+// Stuck recording thresholds (at 15-min intervals)
+const RETRY_THRESHOLD = 8   // ~2 hours: delete stuck output + recreate
+const GIVE_UP_THRESHOLD = 16 // ~4 hours after retry: stop retrying
 
 // Token cache
 let tokenCache: { token: string; expiresAt: number } | null = null
@@ -141,6 +148,10 @@ async function createDownloadOutput(productionId: string): Promise<Output> {
     method: 'POST',
     body: JSON.stringify({ outputType: 'download' }),
   })
+}
+
+async function deleteOutput(outputId: string): Promise<void> {
+  await spiideoFetch(`/v1/outputs/${outputId}`, { method: 'DELETE' })
 }
 
 async function getOutputProgress(
@@ -282,6 +293,132 @@ async function saveRecording(
   }
 }
 
+// Sync attempt tracking
+async function getSyncAttempts(
+  gameId: string
+): Promise<{ attempts: number; recordingExists: boolean }> {
+  const { data } = await supabase
+    .from('playhub_match_recordings')
+    .select('sync_attempts')
+    .eq('spiideo_game_id', gameId)
+    .single()
+
+  if (!data) return { attempts: 0, recordingExists: false }
+  return { attempts: data.sync_attempts || 0, recordingExists: true }
+}
+
+async function updateSyncAttempts(
+  gameId: string,
+  attempts: number,
+  lastError: string | null
+): Promise<void> {
+  const { error } = await supabase
+    .from('playhub_match_recordings')
+    .update({ sync_attempts: attempts, last_sync_error: lastError })
+    .eq('spiideo_game_id', gameId)
+
+  if (error) {
+    console.error(`Failed to update sync_attempts for ${gameId}:`, error.message)
+  }
+}
+
+async function upsertProcessingRecording(
+  game: Game,
+  productionId: string,
+  organizationId: string | null,
+  pitchName: string | null,
+  attempts: number,
+  lastError: string
+): Promise<void> {
+  const { error } = await supabase.from('playhub_match_recordings').upsert(
+    {
+      spiideo_game_id: game.id,
+      spiideo_production_id: productionId,
+      organization_id: organizationId,
+      title: game.title || game.description || 'Untitled',
+      description: game.description,
+      match_date: game.scheduledStartTime,
+      home_team: 'Home',
+      away_team: 'Away',
+      pitch_name: pitchName,
+      status: 'processing',
+      access_type: 'private_link',
+      sync_attempts: attempts,
+      last_sync_error: lastError,
+    },
+    { onConflict: 'spiideo_game_id' }
+  )
+
+  if (error) {
+    console.error(`Failed to upsert processing recording for ${game.id}:`, error.message)
+  }
+}
+
+// Alert email via Resend
+async function sendSyncAlertEmail(
+  subject: string,
+  details: {
+    gameId: string
+    title: string
+    matchDate: string
+    pitchName: string | null
+    attempts: number
+    lastError: string
+    isRetryExhausted: boolean
+  }
+): Promise<void> {
+  if (!RESEND_API_KEY || !ALERT_EMAIL) {
+    console.warn('RESEND_API_KEY or ALERT_EMAIL not set, skipping alert email')
+    return
+  }
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: ${details.isRetryExhausted ? '#dc2626' : '#f59e0b'};">
+        ${details.isRetryExhausted ? '🚨 Recording Sync Failed' : '⚠️ Recording Stuck — Retrying'}
+      </h2>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr><td style="padding: 8px; font-weight: bold;">Title</td><td style="padding: 8px;">${details.title}</td></tr>
+        <tr><td style="padding: 8px; font-weight: bold;">Game ID</td><td style="padding: 8px; font-family: monospace;">${details.gameId}</td></tr>
+        <tr><td style="padding: 8px; font-weight: bold;">Match Date</td><td style="padding: 8px;">${details.matchDate}</td></tr>
+        <tr><td style="padding: 8px; font-weight: bold;">Pitch</td><td style="padding: 8px;">${details.pitchName || 'Unknown'}</td></tr>
+        <tr><td style="padding: 8px; font-weight: bold;">Sync Attempts</td><td style="padding: 8px;">${details.attempts}</td></tr>
+        <tr><td style="padding: 8px; font-weight: bold;">Last Status</td><td style="padding: 8px;">${details.lastError}</td></tr>
+      </table>
+      <p style="margin-top: 16px; color: #6b7280;">
+        ${details.isRetryExhausted
+          ? 'The download output was recreated after the first 8 attempts, but the retry also failed. Manual investigation required.'
+          : 'The stuck download output has been deleted and a fresh one created. The Lambda will continue retrying automatically.'}
+      </p>
+    </div>
+  `
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'PLAYHUB Alerts <alerts@playbacksports.ai>',
+        to: [ALERT_EMAIL],
+        subject,
+        html,
+      }),
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      console.error(`Resend API error: ${response.status} ${text}`)
+    } else {
+      console.log(`Alert email sent to ${ALERT_EMAIL}`)
+    }
+  } catch (error) {
+    console.error('Failed to send alert email:', error)
+  }
+}
+
 // Main sync logic for a single game
 async function syncGame(
   game: Game,
@@ -337,6 +474,19 @@ async function syncGame(
       }
     }
 
+    // Check existing sync attempts from DB
+    const { attempts: prevAttempts } = await getSyncAttempts(game.id)
+
+    // If we've given up after retry, skip this game
+    if (prevAttempts >= GIVE_UP_THRESHOLD) {
+      return {
+        gameId: game.id,
+        title,
+        status: 'error',
+        message: `Gave up after ${prevAttempts} attempts. Manual intervention required.`,
+      }
+    }
+
     // Get or create download output
     const outputs = await getOutputs(production.id)
     let downloadOutput = outputs.find((o) => o.outputType === 'download')
@@ -349,20 +499,79 @@ async function syncGame(
     const maxWaitMs = 10 * 60 * 1000
     const pollIntervalMs = 5000
     const startTime = Date.now()
+    let lastProgress = 0
 
     while (Date.now() - startTime < maxWaitMs) {
       const progress = await getOutputProgress(downloadOutput.id)
+      lastProgress = progress.progress
 
       if (progress.progress >= 100) {
         break
       }
 
       if (Date.now() - startTime + pollIntervalMs >= maxWaitMs) {
+        // Download still not ready — track the attempt
+        const newAttempts = prevAttempts + 1
+        const errorMsg = `Download stuck at ${progress.progress}% (attempt ${newAttempts})`
+        console.log(errorMsg)
+
+        // Upsert so the recording row exists to track attempts
+        await upsertProcessingRecording(
+          game,
+          production.id,
+          organizationId,
+          pitchName,
+          newAttempts,
+          errorMsg
+        )
+
+        if (newAttempts === RETRY_THRESHOLD) {
+          // ~2 hours stuck: delete output, recreate, send alert
+          console.log(`Attempt ${newAttempts}: deleting stuck output ${downloadOutput.id} and recreating...`)
+          try {
+            await deleteOutput(downloadOutput.id)
+            await createDownloadOutput(production.id)
+            // Reset counter so the retry gets a fresh 8-attempt window
+            await updateSyncAttempts(game.id, RETRY_THRESHOLD, `Recreated download output at attempt ${newAttempts}`)
+          } catch (retryError) {
+            console.error('Failed to recreate download output:', retryError)
+          }
+
+          await sendSyncAlertEmail(
+            `⚠️ Stuck recording: ${title}`,
+            {
+              gameId: game.id,
+              title,
+              matchDate: game.scheduledStartTime,
+              pitchName,
+              attempts: newAttempts,
+              lastError: errorMsg,
+              isRetryExhausted: false,
+            }
+          )
+        } else if (newAttempts >= GIVE_UP_THRESHOLD) {
+          // ~4 hours after retry: give up + send final alert
+          console.log(`Attempt ${newAttempts}: giving up on ${game.id}`)
+
+          await sendSyncAlertEmail(
+            `🚨 Recording sync failed: ${title}`,
+            {
+              gameId: game.id,
+              title,
+              matchDate: game.scheduledStartTime,
+              pitchName,
+              attempts: newAttempts,
+              lastError: `Still stuck after output recreation. ${errorMsg}`,
+              isRetryExhausted: true,
+            }
+          )
+        }
+
         return {
           gameId: game.id,
           title,
           status: 'processing',
-          message: `Download processing (${progress.progress}%). Will retry next run.`,
+          message: errorMsg,
         }
       }
 
@@ -374,7 +583,7 @@ async function syncGame(
     console.log(`Transferring ${title} to S3...`)
     const { size } = await uploadToS3(downloadUri, s3Key)
 
-    // Save to Supabase
+    // Save to Supabase (reset sync_attempts on success)
     await saveRecording(
       game,
       production.id,
@@ -383,6 +592,11 @@ async function syncGame(
       organizationId,
       pitchName
     )
+
+    // Clear sync tracking on success
+    if (prevAttempts > 0) {
+      await updateSyncAttempts(game.id, 0, null)
+    }
 
     return {
       gameId: game.id,
