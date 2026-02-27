@@ -240,8 +240,11 @@ async function handleVenueBooking(
     ('payment_intent' in event && event.payment_intent
       ? (event.payment_intent as string)
       : null) || event.id
+
+  const supabase = await createClient()
+
+  // Check 1: by stripe_payment_intent_id (works for new records that store it)
   if (paymentIntentId) {
-    const supabase = await createClient()
     const { data: existing } = await (supabase as any)
       .from('playhub_match_recordings')
       .select('id')
@@ -249,9 +252,25 @@ async function handleVenueBooking(
       .maybeSingle()
 
     if (existing) {
-      console.log('Venue booking already processed:', paymentIntentId)
+      console.log('Venue booking already processed (by payment ID):', paymentIntentId)
       return NextResponse.json({ received: true })
     }
+  }
+
+  // Check 2: by venue + scene + recent time window (catches retries for records
+  // created before the payment ID fix, or when payment_intent was null)
+  const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+  const { data: recentDup } = await (supabase as any)
+    .from('playhub_match_recordings')
+    .select('id')
+    .eq('organization_id', venueId)
+    .eq('pitch_name', sceneName || 'Pitch')
+    .gte('created_at', fiveMinAgo)
+    .maybeSingle()
+
+  if (recentDup) {
+    console.log('Venue booking already processed (by recent duplicate check):', event.id)
+    return NextResponse.json({ received: true })
   }
 
   try {
