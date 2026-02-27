@@ -57,6 +57,14 @@ export async function GET(
     }
   }
 
+  // Fetch public events for this recording
+  const { data: events } = await (serviceClient as any)
+    .from('playhub_recording_events')
+    .select('*')
+    .eq('match_recording_id', recording.id)
+    .eq('visibility', 'public')
+    .order('timestamp_seconds', { ascending: true })
+
   return NextResponse.json({
     recording: {
       id: recording.id,
@@ -69,5 +77,6 @@ export async function GET(
       pitchName: recording.pitch_name,
     },
     videoUrl,
+    events: events || [],
   })
 }

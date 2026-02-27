@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   Card,
@@ -8,9 +8,17 @@ import {
   CardHeader,
   CardTitle,
   Button,
+  Badge,
 } from '@braintwopoint0/playback-commons/ui'
 import { useAuth } from '@braintwopoint0/playback-commons/auth'
 import { Bookmark, BookmarkCheck, Loader2 } from 'lucide-react'
+import { VideoPlayer } from '@/components/video/VideoPlayer'
+import type { RecordingEvent } from '@/lib/recordings/event-types'
+import {
+  EVENT_TYPE_LABELS,
+  EVENT_TYPE_COLORS,
+  formatTimestamp,
+} from '@/lib/recordings/event-types'
 
 interface Recording {
   id: string
@@ -31,6 +39,7 @@ export default function PublicWatchPage() {
 
   const [recording, setRecording] = useState<Recording | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [events, setEvents] = useState<RecordingEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -62,6 +71,7 @@ export default function PublicWatchPage() {
 
       setRecording(data.recording)
       setVideoUrl(data.videoUrl)
+      setEvents(data.events || [])
     } catch (err) {
       setError('Failed to load recording')
     } finally {
@@ -164,16 +174,11 @@ export default function PublicWatchPage() {
           <CardContent className="space-y-4">
             {/* Video Player */}
             {videoUrl ? (
-              <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                <video
-                  src={videoUrl}
-                  controls
-                  autoPlay
-                  className="w-full h-full"
-                >
-                  Your browser does not support the video tag.
-                </video>
-              </div>
+              <VideoPlayer
+                src={videoUrl}
+                events={events}
+                className="w-full aspect-video rounded-lg"
+              />
             ) : (
               <div className="aspect-video bg-zinc-900 rounded-lg flex items-center justify-center">
                 <p className="text-muted-foreground">Video not available</p>
@@ -227,6 +232,58 @@ export default function PublicWatchPage() {
               <div className="pt-4 border-t">
                 <p className="text-sm text-muted-foreground">Description</p>
                 <p>{recording.description}</p>
+              </div>
+            )}
+
+            {/* Event Tags */}
+            {events.length > 0 && (
+              <div className="pt-4 border-t">
+                <h3 className="text-sm font-semibold text-[var(--timberwolf)] mb-3">
+                  Event Tags
+                </h3>
+                <div className="space-y-1.5">
+                  {events.map((event) => (
+                    <div
+                      key={event.id}
+                      className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/[0.03] transition-colors"
+                    >
+                      <div
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: EVENT_TYPE_COLORS[event.event_type] }}
+                      />
+                      <button
+                        onClick={() => {
+                          const video = document.querySelector('video')
+                          if (video) video.currentTime = event.timestamp_seconds
+                        }}
+                        className="text-xs font-mono text-emerald-400 hover:text-emerald-300 w-14 text-left flex-shrink-0"
+                      >
+                        {formatTimestamp(event.timestamp_seconds)}
+                      </button>
+                      <Badge
+                        variant="outline"
+                        className="text-xs flex-shrink-0"
+                        style={{
+                          backgroundColor: EVENT_TYPE_COLORS[event.event_type] + '20',
+                          color: EVENT_TYPE_COLORS[event.event_type],
+                          borderColor: EVENT_TYPE_COLORS[event.event_type] + '40',
+                        }}
+                      >
+                        {EVENT_TYPE_LABELS[event.event_type]}
+                      </Badge>
+                      {event.team && (
+                        <span className="text-xs text-[var(--ash-grey)]">
+                          {event.team === 'home' ? recording.homeTeam : recording.awayTeam}
+                        </span>
+                      )}
+                      {event.label && (
+                        <span className="text-xs text-[var(--timberwolf)] truncate">
+                          {event.label}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </CardContent>
