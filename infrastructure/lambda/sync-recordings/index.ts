@@ -26,8 +26,8 @@ const SPIIDEO_API_BASE = 'https://api-public.spiideo.com'
 const SPIIDEO_TOKEN_URL = 'https://auth-play.spiideo.net/oauth2/token'
 
 // Stuck recording thresholds (at 15-min intervals)
-const RETRY_THRESHOLD = 8   // ~2 hours: delete stuck output + recreate
-const GIVE_UP_THRESHOLD = 16 // ~4 hours after retry: stop retrying
+const RETRY_THRESHOLD = 12  // ~3 hours: delete stuck output + recreate
+const GIVE_UP_THRESHOLD = 24 // ~3 more hours after retry: stop retrying
 
 // Token cache
 let tokenCache: { token: string; expiresAt: number } | null = null
