@@ -166,9 +166,7 @@ export default function VenueManagementPage() {
   const [newEmails, setNewEmails] = useState('')
   const [grantingAccess, setGrantingAccess] = useState(false)
 
-  // Video playback
-  const [playingId, setPlayingId] = useState<string | null>(null)
-  const [playbackUrl, setPlaybackUrl] = useState<string | null>(null)
+  // Video playback (removed — redirects to /recordings/[id] now)
 
   // Public link
   const [generatingLink, setGeneratingLink] = useState<string | null>(null)
@@ -725,27 +723,6 @@ export default function VenueManagementPage() {
       )
     } finally {
       setSchedulingStream(false)
-    }
-  }
-
-  async function handlePlayRecording(recording: Recording) {
-    if (playingId === recording.id) {
-      setPlayingId(null)
-      setPlaybackUrl(null)
-      return
-    }
-
-    try {
-      const res = await fetch(
-        `/api/recordings?id=${recording.id}&action=playback`
-      )
-      const data = await res.json()
-      if (data.playbackUrl) {
-        setPlayingId(recording.id)
-        setPlaybackUrl(data.playbackUrl)
-      }
-    } catch (err) {
-      console.error('Error getting playback URL:', err)
     }
   }
 
@@ -2042,37 +2019,6 @@ export default function VenueManagementPage() {
               </p>
             </div>
             <div className="px-6 pb-6">
-              {/* Video Player */}
-              {playingId && playbackUrl && (
-                <div className="mb-6 bg-black rounded-lg overflow-hidden">
-                  <div className="p-3 border-b border-white/10 flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium truncate min-w-0 text-[var(--timberwolf)]">
-                      Now Playing:{' '}
-                      {recordings.find((r) => r.id === playingId)?.title}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-[var(--timberwolf)] hover:bg-white/10"
-                      onClick={() => {
-                        setPlayingId(null)
-                        setPlaybackUrl(null)
-                      }}
-                    >
-                      Close
-                    </Button>
-                  </div>
-                  <div className="aspect-video">
-                    <video
-                      src={playbackUrl}
-                      controls
-                      autoPlay
-                      className="w-full h-full"
-                    />
-                  </div>
-                </div>
-              )}
-
               {recordings.length === 0 ? (
                 <p className="text-[var(--ash-grey)] text-center py-8">
                   No recordings yet. Schedule a recording to get started.
@@ -2085,45 +2031,25 @@ export default function VenueManagementPage() {
                   ).map((recording) => (
                     <div
                       key={recording.id}
-                      className={`p-4 rounded-lg ${
-                        playingId === recording.id
-                          ? 'bg-[var(--timberwolf)]/10 border border-[var(--timberwolf)]/30'
-                          : 'bg-white/[0.03] border border-[var(--ash-grey)]/10'
-                      }`}
+                      className="p-4 rounded-lg bg-white/[0.03] border border-[var(--ash-grey)]/10"
                     >
                       {/* Top row: Play button + Info + Status */}
                       <div className="flex items-start gap-3">
-                        {/* Play Button */}
+                        {/* Play Button — links to recording detail page */}
                         {recording.s3_key && (
                           <Button
-                            variant={
-                              playingId === recording.id ? 'default' : 'outline'
-                            }
+                            variant="outline"
                             size="icon"
-                            onClick={() => handlePlayRecording(recording)}
-                            className={`flex-shrink-0 ${
-                              playingId === recording.id
-                                ? primaryBtnClass
-                                : outlineBtnClass
-                            }`}
+                            onClick={() => router.push(`/recordings/${recording.id}`)}
+                            className={`flex-shrink-0 ${outlineBtnClass}`}
                           >
-                            {playingId === recording.id ? (
-                              <svg
-                                className="w-4 h-4"
-                                fill="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                              </svg>
-                            ) : (
-                              <svg
-                                className="w-4 h-4 ml-0.5"
-                                fill="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path d="M8 5v14l11-7z" />
-                              </svg>
-                            )}
+                            <svg
+                              className="w-4 h-4 ml-0.5"
+                              fill="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
                           </Button>
                         )}
 

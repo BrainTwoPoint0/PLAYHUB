@@ -679,12 +679,12 @@ export default function RecordingPage() {
                           }}
                         />
 
-                        {/* Timestamp — clickable */}
+                        {/* Timestamp — clickable (5s pre-roll) */}
                         <button
                           onClick={() => {
                             const video = document.querySelector('video')
                             if (video) {
-                              video.currentTime = event.timestamp_seconds
+                              video.currentTime = Math.max(0, event.timestamp_seconds - 5)
                             }
                           }}
                           className="text-xs font-mono text-emerald-400 hover:text-emerald-300 w-14 text-left flex-shrink-0"

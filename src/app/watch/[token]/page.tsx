@@ -8,17 +8,12 @@ import {
   CardHeader,
   CardTitle,
   Button,
-  Badge,
 } from '@braintwopoint0/playback-commons/ui'
 import { useAuth } from '@braintwopoint0/playback-commons/auth'
 import { Bookmark, BookmarkCheck, Loader2 } from 'lucide-react'
 import { VideoPlayer } from '@/components/video/VideoPlayer'
+import { EventTagsList } from '@/components/EventTagsList'
 import type { RecordingEvent } from '@/lib/recordings/event-types'
-import {
-  EVENT_TYPE_LABELS,
-  EVENT_TYPE_COLORS,
-  formatTimestamp,
-} from '@/lib/recordings/event-types'
 
 interface Recording {
   id: string
@@ -241,49 +236,11 @@ export default function PublicWatchPage() {
                 <h3 className="text-sm font-semibold text-[var(--timberwolf)] mb-3">
                   Event Tags
                 </h3>
-                <div className="space-y-1.5">
-                  {events.map((event) => (
-                    <div
-                      key={event.id}
-                      className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/[0.03] transition-colors"
-                    >
-                      <div
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: EVENT_TYPE_COLORS[event.event_type] }}
-                      />
-                      <button
-                        onClick={() => {
-                          const video = document.querySelector('video')
-                          if (video) video.currentTime = event.timestamp_seconds
-                        }}
-                        className="text-xs font-mono text-emerald-400 hover:text-emerald-300 w-14 text-left flex-shrink-0"
-                      >
-                        {formatTimestamp(event.timestamp_seconds)}
-                      </button>
-                      <Badge
-                        variant="outline"
-                        className="text-xs flex-shrink-0"
-                        style={{
-                          backgroundColor: EVENT_TYPE_COLORS[event.event_type] + '20',
-                          color: EVENT_TYPE_COLORS[event.event_type],
-                          borderColor: EVENT_TYPE_COLORS[event.event_type] + '40',
-                        }}
-                      >
-                        {EVENT_TYPE_LABELS[event.event_type]}
-                      </Badge>
-                      {event.team && (
-                        <span className="text-xs text-[var(--ash-grey)]">
-                          {event.team === 'home' ? recording.homeTeam : recording.awayTeam}
-                        </span>
-                      )}
-                      {event.label && (
-                        <span className="text-xs text-[var(--timberwolf)] truncate">
-                          {event.label}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <EventTagsList
+                  events={events}
+                  homeTeam={recording.homeTeam}
+                  awayTeam={recording.awayTeam}
+                />
               </div>
             )}
           </CardContent>
