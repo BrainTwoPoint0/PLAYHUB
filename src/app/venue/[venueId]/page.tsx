@@ -1074,12 +1074,12 @@ export default function VenueManagementPage() {
                         {billingSummary.venueCollectedCount === 1 ? '' : 's'}
                       </p>
                     </div>
-                    {/* Online-collected revenue */}
+                    {/* QR Code-collected revenue */}
                     <div className="bg-[var(--night)] p-3.5">
                       <div className="flex items-center gap-1.5 mb-1.5">
                         <div className="h-1.5 w-1.5 rounded-full bg-indigo-400/60" />
                         <p className="text-[10px] text-[var(--ash-grey)]/60 uppercase tracking-widest">
-                          Online
+                          QR Code
                         </p>
                       </div>
                       <p
@@ -1384,7 +1384,7 @@ export default function VenueManagementPage() {
                               {totalRecordings === 1 ? '' : 's'}
                               {inv.venue_collected_count > 0 &&
                                 inv.playhub_collected_count > 0 &&
-                                ` (${inv.venue_collected_count} venue, ${inv.playhub_collected_count} online)`}
+                                ` (${inv.venue_collected_count} venue, ${inv.playhub_collected_count} QR code)`}
                             </p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
