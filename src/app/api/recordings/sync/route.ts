@@ -169,7 +169,7 @@ export async function POST(request: Request) {
       const existing = existingByGameId.get(game.id) as any
 
       if (existing) {
-        // Check if needs migration (wrong S3 path)
+        // Already transferred — check if needs migration (wrong S3 path)
         if (existing.s3_key && existing.spiideo_production_id) {
           const correctKey = generateRecordingKey(
             game.id,
@@ -226,11 +226,14 @@ export async function POST(request: Request) {
               s3Key: existing.s3_key,
             })
           }
+          continue
         }
-        continue
+
+        // Existing record but no s3_key yet (e.g. created by scheduleRecording)
+        // Fall through to transfer it
       }
 
-      // New game - transfer from Spiideo to S3
+      // Transfer from Spiideo to S3 (new game or existing without s3_key)
       try {
         const result = await transferGame(game, supabase)
         results.push(result)
