@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import NavBar from '@/components/NavBar'
@@ -7,6 +7,12 @@ import { AuthProvider } from '@braintwopoint0/playback-commons/auth'
 import { GotchaProvider } from '@/components/GotchaProvider'
 
 const inter = Inter({ subsets: ['latin'] })
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+}
 
 export const metadata: Metadata = {
   title: 'PLAYHUB - Match Recordings Marketplace',
