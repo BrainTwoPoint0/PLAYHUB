@@ -235,10 +235,11 @@ async function handleVenueBooking(
   }
 
   // Idempotency: check if we already processed this payment
+  // For checkout sessions, payment_intent can be null — fall back to session ID
   const paymentIntentId =
-    'payment_intent' in event
+    ('payment_intent' in event && event.payment_intent
       ? (event.payment_intent as string)
-      : event.id
+      : null) || event.id
   if (paymentIntentId) {
     const supabase = await createClient()
     const { data: existing } = await (supabase as any)
