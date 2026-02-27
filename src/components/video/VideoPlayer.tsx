@@ -8,8 +8,8 @@ import {
   Volume2,
   VolumeX,
   Maximize,
-  SkipBack,
-  SkipForward,
+  RotateCcw,
+  RotateCw,
   Tag,
 } from 'lucide-react'
 import Hls from 'hls.js'
@@ -193,10 +193,32 @@ export function VideoPlayer({
   }
 
   const toggleFullscreen = () => {
+    const video = videoRef.current
     const container = containerRef.current
-    if (!container) return
-    if (!document.fullscreenElement) container.requestFullscreen?.()
-    else document.exitFullscreen?.()
+    const doc = document as any
+
+    // Check if already fullscreen — exit if so
+    if (doc.fullscreenElement || doc.webkitFullscreenElement) {
+      ;(doc.exitFullscreen || doc.webkitExitFullscreen)?.call(doc)
+      return
+    }
+
+    // 1. Standard Fullscreen API on container (desktop + Android)
+    if (container?.requestFullscreen) {
+      container.requestFullscreen()
+      return
+    }
+
+    // 2. Webkit prefix on container (older Android Chrome)
+    if ((container as any)?.webkitRequestFullscreen) {
+      ;(container as any).webkitRequestFullscreen()
+      return
+    }
+
+    // 3. iOS Safari — only supports fullscreen on <video> element
+    if ((video as any)?.webkitEnterFullscreen) {
+      ;(video as any).webkitEnterFullscreen()
+    }
   }
 
   const handleMouseMove = () => {
@@ -211,6 +233,7 @@ export function VideoPlayer({
       ref={containerRef}
       className={`relative bg-black rounded-lg overflow-hidden group ${className}`}
       onMouseMove={handleMouseMove}
+      onTouchStart={handleMouseMove}
       onMouseLeave={() => isPlaying && setShowControls(false)}
     >
       <video
@@ -228,9 +251,9 @@ export function VideoPlayer({
         </div>
       )}
 
-      {/* Play button overlay */}
+      {/* Play button overlay — pb-14 offsets for the controls bar so the button is visually centered in the video area */}
       {!isPlaying && !isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/30 pb-14">
           <button
             onClick={togglePlayPause}
             className="w-16 h-16 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-sm flex items-center justify-center transition-colors"
@@ -242,17 +265,16 @@ export function VideoPlayer({
 
       {/* Controls overlay */}
       <div
-        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 transition-all duration-300 ${
+        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3 pb-3 pt-8 md:p-4 transition-all duration-300 ${
           showControls || !isPlaying
             ? 'opacity-100'
             : 'opacity-0 pointer-events-none'
         }`}
       >
         {/* Progress bar with event markers */}
-        <div className="mb-3 relative">
+        <div className="mb-2 md:mb-3 relative py-2 -my-2 cursor-pointer" onClick={handleProgressClick}>
           <div
-            className="relative w-full h-2 bg-white/20 rounded-full cursor-pointer group/progress"
-            onClick={handleProgressClick}
+            className="relative w-full h-1.5 md:h-2 bg-white/20 rounded-full pointer-events-none"
           >
             {/* Played portion */}
             <div
@@ -267,7 +289,7 @@ export function VideoPlayer({
                 return (
                   <div
                     key={event.id}
-                    className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border border-black/50 cursor-pointer z-10 hover:scale-150 transition-transform"
+                    className="absolute top-1/2 w-2.5 h-2.5 md:w-3 md:h-3 rounded-full border border-black/50 pointer-events-auto cursor-pointer z-10 hover:scale-150 transition-transform"
                     style={{
                       left: `${left}%`,
                       backgroundColor: EVENT_TYPE_COLORS[event.event_type],
@@ -308,13 +330,13 @@ export function VideoPlayer({
         </div>
 
         {/* Control buttons */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1">
+        <div className="flex items-center justify-between gap-1">
+          <div className="flex items-center gap-0.5 md:gap-1">
             <Button
               onClick={togglePlayPause}
               size="sm"
               variant="ghost"
-              className="text-white hover:bg-white/20 h-8 w-8 p-0"
+              className="text-white hover:bg-white/20 h-9 w-9 md:h-8 md:w-8 p-0"
             >
               {isPlaying ? (
                 <Pause className="h-4 w-4" />
@@ -324,24 +346,25 @@ export function VideoPlayer({
             </Button>
 
             <Button
-              onClick={() => skip(-10)}
+              onClick={() => skip(-5)}
               size="sm"
               variant="ghost"
-              className="text-white hover:bg-white/20 h-8 w-8 p-0"
+              className="text-white hover:bg-white/20 h-9 w-9 md:h-8 md:w-8 p-0"
             >
-              <SkipBack className="h-4 w-4" />
+              <RotateCcw className="h-4 w-4" />
             </Button>
 
             <Button
-              onClick={() => skip(10)}
+              onClick={() => skip(5)}
               size="sm"
               variant="ghost"
-              className="text-white hover:bg-white/20 h-8 w-8 p-0"
+              className="text-white hover:bg-white/20 h-9 w-9 md:h-8 md:w-8 p-0"
             >
-              <SkipForward className="h-4 w-4" />
+              <RotateCw className="h-4 w-4" />
             </Button>
 
-            <div className="flex items-center gap-1 ml-1">
+            {/* Volume — hidden on mobile (use device volume) */}
+            <div className="hidden md:flex items-center gap-1 ml-1">
               <Button
                 onClick={toggleMute}
                 size="sm"
@@ -364,22 +387,22 @@ export function VideoPlayer({
               />
             </div>
 
-            <span className="text-white text-xs ml-2">
+            <span className="text-white text-[10px] md:text-xs ml-1 md:ml-2 tabular-nums">
               {formatTimestamp(currentTime)} / {formatTimestamp(duration)}
             </span>
           </div>
 
-          <div className="flex items-center gap-1">
-            {/* Add Tag button */}
+          <div className="flex items-center gap-0.5 md:gap-1">
+            {/* Add Tag button — icon only on mobile */}
             {canEdit && onAddTag && (
               <Button
                 onClick={() => onAddTag(currentTime)}
                 size="sm"
                 variant="ghost"
-                className="text-white hover:bg-white/20 h-8 px-2 text-xs gap-1"
+                className="text-white hover:bg-white/20 h-9 w-9 md:h-8 md:w-auto md:px-2 p-0 text-xs gap-1"
               >
                 <Tag className="h-3.5 w-3.5" />
-                Tag
+                <span className="hidden md:inline">Tag</span>
               </Button>
             )}
 
@@ -387,7 +410,7 @@ export function VideoPlayer({
               onClick={toggleFullscreen}
               size="sm"
               variant="ghost"
-              className="text-white hover:bg-white/20 h-8 w-8 p-0"
+              className="text-white hover:bg-white/20 h-9 w-9 md:h-8 md:w-8 p-0"
             >
               <Maximize className="h-4 w-4" />
             </Button>

@@ -383,15 +383,15 @@ export default function RecordingPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--night)]">
-        <div className="container mx-auto px-5 py-16 max-w-4xl animate-pulse">
-          <div className="bg-[var(--ash-grey)]/10 rounded h-9 w-[170px] mb-6" />
+        <div className="container mx-auto px-4 md:px-5 py-6 md:py-16 max-w-4xl animate-pulse">
+          <div className="bg-[var(--ash-grey)]/10 rounded h-9 w-[170px] mb-4 md:mb-6" />
           <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-black/20">
-            <div className="p-6 pb-3 space-y-2">
-              <div className="bg-[var(--ash-grey)]/10 rounded h-7 w-[260px]" />
-              <div className="bg-[var(--ash-grey)]/10 rounded h-4 w-[200px]" />
+            <div className="p-4 md:p-6 pb-2 md:pb-3 space-y-2">
+              <div className="bg-[var(--ash-grey)]/10 rounded h-6 md:h-7 w-[200px] md:w-[260px]" />
+              <div className="bg-[var(--ash-grey)]/10 rounded h-3 md:h-4 w-[160px] md:w-[200px]" />
             </div>
-            <div className="px-6 pb-6 space-y-4">
-              <div className="aspect-video bg-black/30 rounded-lg" />
+            <div className="px-4 md:px-6 pb-4 md:pb-6 space-y-4">
+              <div className="aspect-video bg-black/30 md:rounded-lg -mx-4 md:mx-0" />
               <div className="grid grid-cols-2 gap-4 pt-4">
                 {[0, 1, 2, 3].map((i) => (
                   <div key={i} className="space-y-2">
@@ -451,11 +451,11 @@ export default function RecordingPage() {
 
   return (
     <div className="min-h-screen bg-[var(--night)]">
-      <div className="container mx-auto px-5 py-16 max-w-4xl">
+      <div className="container mx-auto px-4 md:px-5 py-6 md:py-16 max-w-4xl">
         <Button
           variant="ghost"
           onClick={() => router.push('/recordings')}
-          className="mb-6 text-[var(--timberwolf)] hover:bg-white/10"
+          className="mb-4 md:mb-6 text-[var(--timberwolf)] hover:bg-white/10"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Recordings
@@ -463,28 +463,28 @@ export default function RecordingPage() {
 
         <FadeIn>
           <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
-            <div className="p-6 pb-3">
-              <h1 className="text-2xl md:text-3xl font-bold text-[var(--timberwolf)]">
+            <div className="p-4 md:p-6 pb-2 md:pb-3">
+              <h1 className="text-xl md:text-3xl font-bold text-[var(--timberwolf)]">
                 {recording.title}
               </h1>
-              <p className="text-sm text-[var(--ash-grey)] mt-1">
+              <p className="text-xs md:text-sm text-[var(--ash-grey)] mt-1">
                 {formatDate(recording.matchDate)}
               </p>
             </div>
-            <div className="px-6 pb-6 space-y-4">
+            <div className="px-4 md:px-6 pb-4 md:pb-6 space-y-4">
               {/* Video Player */}
               {videoUrl ? (
-                <div className="aspect-video">
+                <div className="-mx-4 md:mx-0">
                   <VideoPlayer
                     src={videoUrl}
                     events={events}
                     canEdit={canEdit}
                     onAddTag={handleAddTag}
-                    className="w-full h-full"
+                    className="w-full aspect-video md:rounded-lg"
                   />
                 </div>
               ) : (
-                <div className="aspect-video bg-black/30 rounded-lg flex items-center justify-center border border-[var(--ash-grey)]/10">
+                <div className="aspect-video bg-black/30 md:rounded-lg flex items-center justify-center border-y md:border border-[var(--ash-grey)]/10 -mx-4 md:mx-0">
                   <p className="text-[var(--ash-grey)]">
                     {recording.status === 'scheduled'
                       ? 'Recording not yet available'
@@ -496,7 +496,7 @@ export default function RecordingPage() {
               )}
 
               {/* Match Info */}
-              <div className="grid grid-cols-2 gap-4 pt-4">
+              <div className="grid grid-cols-2 gap-3 md:gap-4 pt-4">
                 <div>
                   <p className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)] mb-1">
                     Home Team
