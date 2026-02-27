@@ -234,6 +234,25 @@ async function handleVenueBooking(
     return NextResponse.json({ error: 'Missing metadata' }, { status: 400 })
   }
 
+  // Idempotency: check if we already processed this payment
+  const paymentIntentId =
+    'payment_intent' in event
+      ? (event.payment_intent as string)
+      : event.id
+  if (paymentIntentId) {
+    const supabase = await createClient()
+    const { data: existing } = await (supabase as any)
+      .from('playhub_match_recordings')
+      .select('id')
+      .eq('stripe_payment_intent_id', paymentIntentId)
+      .maybeSingle()
+
+    if (existing) {
+      console.log('Venue booking already processed:', paymentIntentId)
+      return NextResponse.json({ received: true })
+    }
+  }
+
   try {
     const now = new Date()
     const result = await scheduleRecording({
@@ -246,6 +265,7 @@ async function handleVenueBooking(
       email,
       collectedBy: 'playhub',
       startBufferMs: 60_000,
+      stripePaymentIntentId: paymentIntentId || undefined,
     })
 
     console.log('Venue booking completed:', {

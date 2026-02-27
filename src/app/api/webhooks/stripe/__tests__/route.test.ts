@@ -51,7 +51,7 @@ function supaChain(resolvedValue: { data: any; error: any }) {
   c.update = vi.fn().mockReturnValue(c)
   c.eq = vi.fn().mockReturnValue(c)
   c.single = vi.fn().mockResolvedValue(resolvedValue)
-  c.maybeSingle = vi.fn().mockResolvedValue(resolvedValue)
+  c.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
   return c
 }
 

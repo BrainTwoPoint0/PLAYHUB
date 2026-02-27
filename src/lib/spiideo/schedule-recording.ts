@@ -31,6 +31,8 @@ export interface ScheduleRecordingInput {
   /** When provided the start/stop are used as-is (venue management). */
   scheduledStartTime?: string
   scheduledStopTime?: string
+  /** Stripe payment intent ID for idempotency on webhook retries. */
+  stripePaymentIntentId?: string
 }
 
 export interface ScheduleRecordingResult {
@@ -122,6 +124,7 @@ export async function scheduleRecording(
       status: 'scheduled',
       access_type: 'private_link',
       created_by: createdBy || null,
+      stripe_payment_intent_id: input.stripePaymentIntentId || null,
       is_billable: isBillable,
       billable_amount:
         billableAmount ?? billingConfig?.default_billable_amount ?? null,
