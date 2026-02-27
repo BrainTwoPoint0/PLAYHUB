@@ -91,13 +91,13 @@ function makeRequest(method: string, body?: any) {
 beforeEach(() => {
   vi.clearAllMocks()
 
-  // Default: FX API returns a known rate
+  // Default: FX API returns known rates
   vi.stubGlobal('fetch', mockFetch)
   mockFetch.mockResolvedValue({
     json: () =>
       Promise.resolve({
         result: 'success',
-        rates: { EUR: 3.0 },
+        rates: { GBP: 2.5, EUR: 3.0 },
       }),
   })
 
@@ -136,49 +136,48 @@ beforeEach(() => {
 // ── GET tests ───────────────────────────────────────────────────────
 
 describe('GET /api/start/[cameraId]', () => {
-  it('falls back to 2.75 when FX API is down and no cache', async () => {
+  it('falls back to 2.35 when FX API is down and no cache', async () => {
     // Run this first — before any successful FX fetch populates the cache
     mockFetch.mockRejectedValue(new Error('Network error'))
 
     const res = await GET(makeRequest('GET'), makeRouteContext())
     const json = await res.json()
 
-    // 2 KWD * 2.75 fallback = 5.5
-    expect(json.chargePrice).toBe(5.5)
-    expect(json.chargeCurrency).toBe('EUR')
+    // 2 KWD * 2.35 GBP fallback = 4.7
+    expect(json.chargePrice).toBe(4.7)
+    expect(json.chargeCurrency).toBe('GBP')
   })
 
-  it('returns chargePrice in EUR when venue currency is KWD', async () => {
+  it('returns chargePrice in GBP when venue currency is KWD', async () => {
     const res = await GET(makeRequest('GET'), makeRouteContext())
     const json = await res.json()
 
-    expect(json.chargeCurrency).toBe('EUR')
-    // 2 KWD * 3.0 rate = 6.0 EUR
-    expect(json.chargePrice).toBe(6)
+    expect(json.chargeCurrency).toBe('GBP')
+    // 2 KWD * 2.5 rate = 5.0 GBP
+    expect(json.chargePrice).toBe(5)
     expect(json.price).toBe(2)
     expect(json.currency).toBe('KWD')
   })
 
   it('uses cached rate within TTL', async () => {
-    // The previous test cached rate=3.0. Even if fetch would return something else,
+    // The previous test cached rate=2.5. Even if fetch would return something else,
     // the cached rate should be used since TTL hasn't expired.
     mockFetch.mockResolvedValue({
-      json: () => Promise.resolve({ result: 'success', rates: { EUR: 999 } }),
+      json: () => Promise.resolve({ result: 'success', rates: { GBP: 999, EUR: 999 } }),
     })
 
     const res = await GET(makeRequest('GET'), makeRouteContext())
     const json = await res.json()
 
-    // Still uses cached 3.0, not 999
-    expect(json.chargePrice).toBe(6) // 2 * 3.0
-    // fetch should not have been called again (or if called, result is ignored due to cache)
+    // Still uses cached 2.5, not 999
+    expect(json.chargePrice).toBe(5) // 2 * 2.5
   })
 
-  it('returns same currency when venue is EUR', async () => {
+  it('returns same currency when venue is GBP', async () => {
     billingChain.maybeSingle.mockResolvedValue({
       data: {
         default_billable_amount: 10,
-        currency: 'EUR',
+        currency: 'GBP',
         booking_durations: [60],
         booking_enabled: true,
       },
@@ -189,7 +188,7 @@ describe('GET /api/start/[cameraId]', () => {
     const json = await res.json()
 
     expect(json.chargePrice).toBe(10)
-    expect(json.chargeCurrency).toBe('EUR')
+    expect(json.chargeCurrency).toBe('GBP')
   })
 
   it('returns 404 when camera not found', async () => {
@@ -218,7 +217,7 @@ describe('GET /api/start/[cameraId]', () => {
 // ── POST tests ──────────────────────────────────────────────────────
 
 describe('POST /api/start/[cameraId]', () => {
-  it('creates PaymentIntent in EUR with correct converted amount', async () => {
+  it('creates PaymentIntent in GBP with correct converted amount', async () => {
     const res = await POST(
       makeRequest('POST', { durationMinutes: 60, email: 'test@example.com' }),
       makeRouteContext()
@@ -229,9 +228,9 @@ describe('POST /api/start/[cameraId]', () => {
     expect(mockPaymentIntentsCreate).toHaveBeenCalledOnce()
 
     const args = mockPaymentIntentsCreate.mock.calls[0][0]
-    // 2 KWD * 3.0 rate * 100 = 600 cents
-    expect(args.amount).toBe(600)
-    expect(args.currency).toBe('eur')
+    // 2 KWD * 2.5 rate * 100 = 500 pence
+    expect(args.amount).toBe(500)
+    expect(args.currency).toBe('gbp')
     expect(args.metadata.type).toBe('camera_booking')
   })
 

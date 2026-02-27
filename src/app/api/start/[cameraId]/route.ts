@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
-import { getKwdToEurRate } from '@/lib/fx/rates'
+import { getKwdToGbpRate } from '@/lib/fx/rates'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-02-24.acacia',
@@ -12,8 +12,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 type RouteContext = { params: Promise<{ cameraId: string }> }
 
-// Stripe UK doesn't support KWD — charge in EUR instead
-const CHARGE_CURRENCY = 'eur'
+// Stripe UK settles in GBP — charge in GBP to avoid conversion fees
+const CHARGE_CURRENCY = 'gbp'
 
 // Resolve camera (scene_id) → venue info + billing config
 async function resolveCamera(cameraId: string) {
@@ -71,13 +71,13 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
   const price = Number(config.default_billable_amount) || 5
   const currency = config.currency || 'KWD'
 
-  // If venue currency isn't supported by Stripe UK, provide EUR equivalent
+  // If venue currency isn't supported by Stripe UK, convert to GBP
   let chargePrice = price
   let chargeCurrency = currency
   if (currency.toUpperCase() === 'KWD') {
-    const rate = await getKwdToEurRate()
+    const rate = await getKwdToGbpRate()
     chargePrice = Math.round(price * rate * 100) / 100 // round to 2 decimals
-    chargeCurrency = 'EUR'
+    chargeCurrency = 'GBP'
   }
 
   return NextResponse.json({
@@ -150,13 +150,13 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   const price = Number(config.default_billable_amount) || 5
   const venueCurrency = (config.currency || 'KWD').toUpperCase()
 
-  // Convert to EUR if venue currency not supported by Stripe UK
+  // Convert to GBP if venue currency not supported by Stripe UK
   let chargeAmount: number
   let chargeCurrency: string
   if (venueCurrency === 'KWD') {
-    const rate = await getKwdToEurRate()
-    const eurPrice = price * rate
-    chargeAmount = Math.round(eurPrice * 100) // EUR uses 2 decimal places
+    const rate = await getKwdToGbpRate()
+    const gbpPrice = price * rate
+    chargeAmount = Math.round(gbpPrice * 100) // GBP uses 2 decimal places
     chargeCurrency = CHARGE_CURRENCY
   } else {
     chargeAmount = Math.round(price * 100)
