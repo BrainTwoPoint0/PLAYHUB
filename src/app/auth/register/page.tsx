@@ -150,7 +150,7 @@ export default function RegisterPage() {
             'An account with this email already exists. Please sign in instead.'
           )
         } else {
-          router.push('/auth/verify-email')
+          router.push('/')
         }
       } else {
         setError('Failed to create account. Please try again.')
