@@ -18,6 +18,7 @@ import { FadeIn } from '@/components/FadeIn'
 import { VideoPlayer } from '@/components/video/VideoPlayer'
 import { ArrowLeft, Lock, Globe, Pencil, Trash2, Plus, Share2, Download } from 'lucide-react'
 import { ShareRecordingModal } from '@/components/ShareRecordingModal'
+import { MatchDetails } from '@/components/MatchDetails'
 import type {
   RecordingEvent,
   EventType,
@@ -538,56 +539,13 @@ export default function RecordingPage() {
                 </div>
               )}
 
-              {/* Match Info */}
-              <div className="grid grid-cols-2 gap-3 md:gap-4 pt-4">
-                <div>
-                  <p className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)] mb-1">
-                    Home Team
-                  </p>
-                  <p className="font-medium text-[var(--timberwolf)]">
-                    {recording.homeTeam}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)] mb-1">
-                    Away Team
-                  </p>
-                  <p className="font-medium text-[var(--timberwolf)]">
-                    {recording.awayTeam}
-                  </p>
-                </div>
-                {recording.venue && (
-                  <div>
-                    <p className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)] mb-1">
-                      Venue
-                    </p>
-                    <p className="font-medium text-[var(--timberwolf)]">
-                      {recording.venue}
-                    </p>
-                  </div>
-                )}
-                {recording.pitchName && (
-                  <div>
-                    <p className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)] mb-1">
-                      Pitch
-                    </p>
-                    <p className="font-medium text-[var(--timberwolf)]">
-                      {recording.pitchName}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {recording.description && (
-                <div className="pt-4 border-t border-[var(--ash-grey)]/10">
-                  <p className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)] mb-1">
-                    Description
-                  </p>
-                  <p className="text-[var(--timberwolf)]">
-                    {recording.description}
-                  </p>
-                </div>
-              )}
+              <MatchDetails
+                homeTeam={recording.homeTeam}
+                awayTeam={recording.awayTeam}
+                venue={recording.venue}
+                pitchName={recording.pitchName}
+                description={recording.description}
+              />
             </div>
           </div>
         </FadeIn>

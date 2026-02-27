@@ -13,6 +13,7 @@ import { useAuth } from '@braintwopoint0/playback-commons/auth'
 import { Bookmark, BookmarkCheck, Loader2 } from 'lucide-react'
 import { VideoPlayer } from '@/components/video/VideoPlayer'
 import { EventTagsList } from '@/components/EventTagsList'
+import { MatchDetails } from '@/components/MatchDetails'
 import type { RecordingEvent } from '@/lib/recordings/event-types'
 
 interface Recording {
@@ -205,30 +206,12 @@ export default function PublicWatchPage() {
               </div>
             )}
 
-            {/* Match Info */}
-            <div className="grid grid-cols-2 gap-4 pt-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Home Team</p>
-                <p className="font-medium">{recording.homeTeam}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Away Team</p>
-                <p className="font-medium">{recording.awayTeam}</p>
-              </div>
-              {recording.pitchName && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Pitch</p>
-                  <p className="font-medium">{recording.pitchName}</p>
-                </div>
-              )}
-            </div>
-
-            {recording.description && (
-              <div className="pt-4 border-t">
-                <p className="text-sm text-muted-foreground">Description</p>
-                <p>{recording.description}</p>
-              </div>
-            )}
+            <MatchDetails
+              homeTeam={recording.homeTeam}
+              awayTeam={recording.awayTeam}
+              pitchName={recording.pitchName}
+              description={recording.description}
+            />
 
             {/* Event Tags */}
             {events.length > 0 && (
