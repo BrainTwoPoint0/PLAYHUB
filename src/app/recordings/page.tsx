@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatDateTime } from '@braintwopoint0/playback-commons/utils'
 import { FadeIn } from '@/components/FadeIn'
+import { ShareRecordingModal } from '@/components/ShareRecordingModal'
 
 interface Recording {
   id: string
@@ -24,8 +25,8 @@ export default function RecordingsPage() {
   const router = useRouter()
   const [recordings, setRecordings] = useState<Recording[]>([])
   const [loading, setLoading] = useState(true)
-  const [copiedId, setCopiedId] = useState<string | null>(null)
   const [loginRequired, setLoginRequired] = useState(false)
+  const [shareRecording, setShareRecording] = useState<Recording | null>(null)
   const [showAll, setShowAll] = useState(false)
 
   const [dateFrom, setDateFrom] = useState('')
@@ -101,21 +102,15 @@ export default function RecordingsPage() {
       )
       const data = await res.json()
       if (data.downloadUrl) {
-        window.open(data.downloadUrl, '_blank')
+        const a = document.createElement('a')
+        a.href = data.downloadUrl
+        a.download = `${recording.title}.mp4`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
       }
     } catch (error) {
       console.error('Error getting download URL:', error)
-    }
-  }
-
-  const handleShare = async (recording: Recording) => {
-    const shareUrl = `${window.location.origin}/api/recordings/share/${recording.id}`
-    try {
-      await navigator.clipboard.writeText(shareUrl)
-      setCopiedId(recording.id)
-      setTimeout(() => setCopiedId(null), 2000)
-    } catch (error) {
-      console.error('Error copying to clipboard:', error)
     }
   }
 
@@ -293,48 +288,23 @@ export default function RecordingsPage() {
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
-                      onClick={() => handleShare(recording)}
-                      className={`flex-1 md:flex-none px-4 py-2 border rounded-lg text-sm transition-colors flex items-center justify-center gap-2 ${
-                        copiedId === recording.id
-                          ? 'bg-green-500/20 border-green-500/50 text-green-400'
-                          : 'bg-white/5 hover:bg-white/10 border-[var(--ash-grey)]/20 text-[var(--timberwolf)]'
-                      }`}
+                      onClick={() => setShareRecording(recording)}
+                      className="flex-1 md:flex-none px-4 py-2 border rounded-lg text-sm transition-colors flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 border-[var(--ash-grey)]/20 text-[var(--timberwolf)]"
                     >
-                      {copiedId === recording.id ? (
-                        <>
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
-                            />
-                          </svg>
-                          Share
-                        </>
-                      )}
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                        />
+                      </svg>
+                      Share
                     </button>
                     <button
                       onClick={() => handleDownload(recording)}
@@ -387,6 +357,16 @@ export default function RecordingsPage() {
           </motion.div>
         )}
       </div>
+      {shareRecording && (
+        <ShareRecordingModal
+          open={!!shareRecording}
+          onOpenChange={(open) => {
+            if (!open) setShareRecording(null)
+          }}
+          recordingId={shareRecording.id}
+          recordingTitle={shareRecording.title}
+        />
+      )}
     </div>
   )
 }

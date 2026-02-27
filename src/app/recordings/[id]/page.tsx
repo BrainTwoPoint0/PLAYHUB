@@ -16,7 +16,8 @@ import {
 import { createClient } from '@braintwopoint0/playback-commons/supabase'
 import { FadeIn } from '@/components/FadeIn'
 import { VideoPlayer } from '@/components/video/VideoPlayer'
-import { ArrowLeft, Lock, Globe, Pencil, Trash2, Plus } from 'lucide-react'
+import { ArrowLeft, Lock, Globe, Pencil, Trash2, Plus, Share2, Download } from 'lucide-react'
+import { ShareRecordingModal } from '@/components/ShareRecordingModal'
 import type {
   RecordingEvent,
   EventType,
@@ -230,6 +231,9 @@ export default function RecordingPage() {
   const [events, setEvents] = useState<RecordingEvent[]>([])
   const [userId, setUserId] = useState<string | null>(null)
 
+  // Share modal state
+  const [showShareModal, setShowShareModal] = useState(false)
+
   // Tag form state
   const [showAddForm, setShowAddForm] = useState(false)
   const [addFormTimestamp, setAddFormTimestamp] = useState(0)
@@ -292,6 +296,25 @@ export default function RecordingPage() {
     setShowAddForm(true)
     setEditingEventId(null)
   }, [])
+
+  async function handleDownload() {
+    try {
+      const res = await fetch(
+        `/api/recordings?id=${recordingId}&action=download`
+      )
+      const data = await res.json()
+      if (data.downloadUrl) {
+        const a = document.createElement('a')
+        a.href = data.downloadUrl
+        a.download = `${recording?.title || 'recording'}.mp4`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+      }
+    } catch (error) {
+      console.error('Error getting download URL:', error)
+    }
+  }
 
   async function handleCreateEvent(data: TagFormData) {
     try {
@@ -470,6 +493,26 @@ export default function RecordingPage() {
               <p className="text-xs md:text-sm text-[var(--ash-grey)] mt-1">
                 {formatDate(recording.matchDate)}
               </p>
+              <div className="flex gap-2 mt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowShareModal(true)}
+                  className="border-[var(--ash-grey)]/20 text-[var(--timberwolf)] hover:bg-white/10 gap-1.5"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  Share
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownload}
+                  className="border-[var(--ash-grey)]/20 text-[var(--timberwolf)] hover:bg-white/10 gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download
+                </Button>
+              </div>
             </div>
             <div className="px-4 md:px-6 pb-4 md:pb-6 space-y-4">
               {/* Video Player */}
@@ -714,6 +757,15 @@ export default function RecordingPage() {
             </div>
           </div>
         </FadeIn>
+
+        {recording && (
+          <ShareRecordingModal
+            open={showShareModal}
+            onOpenChange={setShowShareModal}
+            recordingId={recording.id}
+            recordingTitle={recording.title}
+          />
+        )}
       </div>
     </div>
   )

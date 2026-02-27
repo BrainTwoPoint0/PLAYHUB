@@ -164,8 +164,9 @@ export async function sendRecordingAssignedEmail(params: {
   matchDate?: string
   venueName?: string
   assignedBy?: string
+  isReady?: boolean
 }): Promise<SendEmailResult> {
-  const { toEmail, recordingTitle, matchDate, venueName, assignedBy } = params
+  const { toEmail, recordingTitle, matchDate, venueName, assignedBy, isReady } = params
 
   try {
     const { error } = await resend.emails.send({
@@ -184,7 +185,7 @@ export async function sendRecordingAssignedEmail(params: {
             <h1 style="color: #d6d5c9; font-size: 24px; margin-bottom: 24px;">PLAYHUB</h1>
 
             <p style="font-size: 16px; line-height: 1.6; margin-bottom: 16px;">
-              ${assignedBy ? `${assignedBy} has added` : 'A new recording has been added to'} your library:
+              ${assignedBy ? `${assignedBy} has shared a recording with you:` : 'A new recording has been added to your library:'}
             </p>
 
             <div style="background-color: #1a1f1c; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
@@ -193,6 +194,18 @@ export async function sendRecordingAssignedEmail(params: {
               ${matchDate ? `<p style="font-size: 14px; color: #b9baa3; margin: 4px 0 0 0;">${matchDate}</p>` : ''}
             </div>
 
+            ${
+              isReady
+                ? `
+            <p style="font-size: 16px; line-height: 1.6; margin-bottom: 24px;">
+              The recording is ready to watch now.
+            </p>
+
+            <a href="${APP_URL}/recordings"
+               style="display: inline-block; background-color: #d6d5c9; color: #0a100d; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">
+              Watch now
+            </a>`
+                : `
             <p style="font-size: 16px; line-height: 1.6; margin-bottom: 24px;">
               You'll receive another email when the recording is ready to watch.
             </p>
@@ -200,7 +213,8 @@ export async function sendRecordingAssignedEmail(params: {
             <a href="${APP_URL}/recordings"
                style="display: inline-block; background-color: #d6d5c9; color: #0a100d; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">
               View your library
-            </a>
+            </a>`
+            }
 
             <hr style="border: none; border-top: 1px solid #333; margin: 32px 0;">
 

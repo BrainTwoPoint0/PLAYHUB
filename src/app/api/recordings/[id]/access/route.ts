@@ -4,6 +4,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   isVenueAdmin,
+  checkRecordingAccess,
   listRecordingAccess,
   grantRecordingAccess,
   grantRecordingAccessBulk,
@@ -41,15 +42,20 @@ export async function GET(
     return NextResponse.json({ error: 'Recording not found' }, { status: 404 })
   }
 
-  // Check if user is admin for this venue
+  // Check if user is admin for this venue, or has access to the recording
+  let authorized = false
   if (recording.organization_id) {
-    const isAdmin = await isVenueAdmin(user.id, recording.organization_id)
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Not authorized to view access for this recording' },
-        { status: 403 }
-      )
-    }
+    authorized = await isVenueAdmin(user.id, recording.organization_id)
+  }
+  if (!authorized) {
+    const access = await checkRecordingAccess(recordingId, user.id)
+    authorized = access.hasAccess
+  }
+  if (!authorized) {
+    return NextResponse.json(
+      { error: 'Not authorized to view access for this recording' },
+      { status: 403 }
+    )
   }
 
   // Get access list
@@ -88,7 +94,7 @@ export async function POST(
     serviceClient as any
   )
     .from('playhub_match_recordings')
-    .select('id, organization_id, title')
+    .select('id, organization_id, title, s3_key')
     .eq('id', recordingId)
     .single()
 
@@ -96,15 +102,22 @@ export async function POST(
     return NextResponse.json({ error: 'Recording not found' }, { status: 404 })
   }
 
-  // Check if user is admin for this venue
+  const isReady = !!recording.s3_key
+
+  // Check if user is admin for this venue, or has access to the recording
+  let authorized = false
   if (recording.organization_id) {
-    const isAdmin = await isVenueAdmin(user.id, recording.organization_id)
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Not authorized to grant access for this recording' },
-        { status: 403 }
-      )
-    }
+    authorized = await isVenueAdmin(user.id, recording.organization_id)
+  }
+  if (!authorized) {
+    const access = await checkRecordingAccess(recordingId, user.id)
+    authorized = access.hasAccess
+  }
+  if (!authorized) {
+    return NextResponse.json(
+      { error: 'Not authorized to grant access for this recording' },
+      { status: 403 }
+    )
   }
 
   // Get venue name for email
@@ -167,6 +180,7 @@ export async function POST(
         recordingTitle: recording.title,
         venueName,
         assignedBy: inviterProfile?.full_name || undefined,
+        isReady,
       })
     } else {
       await sendRecordingAccessEmail({
@@ -204,6 +218,7 @@ export async function POST(
             recordingTitle: recording.title,
             venueName,
             assignedBy: inviterProfile?.full_name || undefined,
+            isReady,
           })
         : sendRecordingAccessEmail({
             toEmail: r.email,
