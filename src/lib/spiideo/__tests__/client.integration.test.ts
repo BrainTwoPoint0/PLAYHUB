@@ -6,36 +6,20 @@ import {
 } from '@/lib/spiideo/client'
 
 const hasCredentials =
-  !!process.env.SPIIDEO_KUWAIT_CLIENT_ID &&
-  !!process.env.SPIIDEO_KUWAIT_CLIENT_SECRET &&
+  !!process.env.SPIIDEO_CLIENT_ID &&
+  !!process.env.SPIIDEO_CLIENT_SECRET &&
   !!process.env.SPIIDEO_PLAYBACK_ADMIN_USER_ID
 
 describe.skipIf(!hasCredentials)('Spiideo Integration', () => {
-  it('connects to Kuwait account', async () => {
-    const result = await testConnection('kuwait')
+  it('connects to Spiideo account', async () => {
+    const result = await testConnection()
     expect(result.success).toBe(true)
-    expect(result.account).toBe('kuwait')
   })
 
-  it('connects to Dubai account', async () => {
-    const hasDubai =
-      !!process.env.SPIIDEO_PERFORM_DUBAI_CLIENT_ID &&
-      !!process.env.SPIIDEO_PERFORM_DUBAI_CLIENT_SECRET
-
-    if (!hasDubai) {
-      console.log('Skipping Dubai test — credentials not set')
-      return
-    }
-
-    const result = await testConnection('dubai')
-    expect(result.success).toBe(true)
-    expect(result.account).toBe('dubai')
-  })
-
-  it('fetches games from Kuwait account', async () => {
-    const config = getAccountConfig('kuwait')
+  it('fetches games from account', async () => {
+    const config = getAccountConfig()
     if (!config.accountId) {
-      console.log('Skipping — SPIIDEO_KUWAIT_ACCOUNT_ID not set')
+      console.log('Skipping — SPIIDEO_ACCOUNT_ID not set')
       return
     }
 

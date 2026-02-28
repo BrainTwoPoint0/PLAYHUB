@@ -6,8 +6,8 @@ vi.hoisted(() => {
   process.env.PLAYHUB_AWS_ACCESS_KEY_ID = 'fake'
   process.env.PLAYHUB_AWS_SECRET_ACCESS_KEY = 'fake'
   process.env.S3_RECORDINGS_BUCKET = 'test-bucket'
-  process.env.SPIIDEO_KUWAIT_CLIENT_ID = 'kw-id'
-  process.env.SPIIDEO_KUWAIT_CLIENT_SECRET = 'kw-secret'
+  process.env.SPIIDEO_CLIENT_ID = 'test-id'
+  process.env.SPIIDEO_CLIENT_SECRET = 'test-secret'
   process.env.SPIIDEO_PLAYBACK_ADMIN_USER_ID = 'admin'
   process.env.STRIPE_SECRET_KEY = 'sk_test_fake'
   process.env.RESEND_API_KEY = 'rk_test_fake'
@@ -48,8 +48,6 @@ function mockAllHealthy() {
   vi.mocked(testConnection).mockResolvedValue({
     success: true,
     message: 'OK',
-    account: 'kuwait',
-    accountType: 'play',
   })
 
   // S3: 404 NotFound = healthy (bucket accessible, key just doesn't exist)
@@ -94,8 +92,6 @@ describe('GET /api/health', () => {
     vi.mocked(testConnection).mockResolvedValue({
       success: false,
       message: 'Failed',
-      account: 'kuwait',
-      accountType: 'play',
       error: 'Auth failed',
     })
 

@@ -1,6 +1,6 @@
 // Spiideo API Client for PLAYHUB
 // Handles OAuth2 authentication and API calls to Spiideo
-// Supports multiple Spiideo accounts (Play and Perform)
+// Single "Spiideo Play" account covering all venues
 // Documentation: https://docs-public.spiideo.com
 
 const SPIIDEO_API_BASE = 'https://api-public.spiideo.com'
@@ -9,9 +9,6 @@ const SPIIDEO_TOKEN_URL = 'https://auth-play.spiideo.net/oauth2/token'
 // ============================================================================
 // Types
 // ============================================================================
-
-// Supported Spiideo account configurations
-export type SpiideoAccountKey = 'kuwait' | 'dubai'
 
 interface TokenResponse {
   access_token: string
@@ -29,7 +26,6 @@ interface SpiideoConfig {
   accountId?: string
   sceneId?: string
   recipeId?: string
-  type: 'play' | 'perform'
 }
 
 // Spiideo Sport Types
@@ -106,7 +102,7 @@ export type OutputType = 'download' | 'push_stream' | 'external_hls'
 export interface SpiideoAccount {
   id: string
   name: string
-  type: 'play' | 'perform' | 'league'
+  type: string
 }
 
 // Game/Match
@@ -251,117 +247,63 @@ export interface PagedResponse<T> {
 }
 
 // ============================================================================
-// Token Cache (per account)
+// Token Cache
 // ============================================================================
 
-const tokenCache: Record<string, { token: string; expiresAt: number }> = {}
-
-// Current active account (default to Kuwait for backwards compatibility)
-let activeAccount: SpiideoAccountKey = 'kuwait'
+let tokenCache: { token: string; expiresAt: number } | null = null
 
 // ============================================================================
 // Configuration
 // ============================================================================
 
-const ACCOUNT_CONFIGS: Record<SpiideoAccountKey, () => SpiideoConfig> = {
-  kuwait: () => {
-    const clientId = process.env.SPIIDEO_KUWAIT_CLIENT_ID
-    const clientSecret = process.env.SPIIDEO_KUWAIT_CLIENT_SECRET
-    const clientName = process.env.SPIIDEO_KUWAIT_CLIENT_NAME
-    const userId = process.env.SPIIDEO_PLAYBACK_ADMIN_USER_ID
+function getConfig(): SpiideoConfig {
+  const clientId = process.env.SPIIDEO_CLIENT_ID
+  const clientSecret = process.env.SPIIDEO_CLIENT_SECRET
+  const clientName = process.env.SPIIDEO_CLIENT_NAME
+  const userId = process.env.SPIIDEO_PLAYBACK_ADMIN_USER_ID
 
-    if (!clientId || !clientSecret) {
-      throw new Error('Spiideo Kuwait client credentials not configured')
-    }
-    if (!userId) {
-      throw new Error(
-        'Spiideo user ID not configured (SPIIDEO_PLAYBACK_ADMIN_USER_ID)'
-      )
-    }
+  if (!clientId || !clientSecret) {
+    throw new Error('Spiideo client credentials not configured')
+  }
+  if (!userId) {
+    throw new Error(
+      'Spiideo user ID not configured (SPIIDEO_PLAYBACK_ADMIN_USER_ID)'
+    )
+  }
 
-    return {
-      clientId,
-      clientSecret,
-      clientName: clientName || 'playhub',
-      userId,
-      accountId: process.env.SPIIDEO_KUWAIT_ACCOUNT_ID,
-      sceneId: process.env.SPIIDEO_KUWAIT_SCENE_ID,
-      recipeId: process.env.SPIIDEO_KUWAIT_RECIPE_ID,
-      type: 'play' as const,
-    }
-  },
-  dubai: () => {
-    const clientId = process.env.SPIIDEO_PERFORM_DUBAI_CLIENT_ID
-    const clientSecret = process.env.SPIIDEO_PERFORM_DUBAI_CLIENT_SECRET
-    const clientName = process.env.SPIIDEO_PERFORM_DUBAI_CLIENT_NAME
-    const userId = process.env.SPIIDEO_PLAYBACK_ADMIN_USER_ID
-
-    if (!clientId || !clientSecret) {
-      throw new Error('Spiideo Dubai Perform client credentials not configured')
-    }
-    if (!userId) {
-      throw new Error(
-        'Spiideo user ID not configured (SPIIDEO_PLAYBACK_ADMIN_USER_ID)'
-      )
-    }
-
-    return {
-      clientId,
-      clientSecret,
-      clientName: clientName || 'playhub',
-      userId,
-      accountId: process.env.SPIIDEO_PERFORM_DUBAI_ACCOUNT_ID,
-      sceneId: process.env.SPIIDEO_PERFORM_DUBAI_SCENE_ID,
-      recipeId: process.env.SPIIDEO_PERFORM_DUBAI_RECIPE_ID,
-      type: 'perform' as const,
-    }
-  },
-}
-
-function getConfig(account?: SpiideoAccountKey): SpiideoConfig {
-  const key = account || activeAccount
-  return ACCOUNT_CONFIGS[key]()
+  return {
+    clientId,
+    clientSecret,
+    clientName: clientName || 'playhub',
+    userId,
+    accountId: process.env.SPIIDEO_ACCOUNT_ID,
+    sceneId: process.env.SPIIDEO_SCENE_ID,
+    recipeId: process.env.SPIIDEO_RECIPE_ID,
+  }
 }
 
 /**
- * Set the active Spiideo account for subsequent API calls
+ * Get the Spiideo account configuration
  */
-export function setActiveAccount(account: SpiideoAccountKey): void {
-  activeAccount = account
+export function getAccountConfig(): SpiideoConfig {
+  return getConfig()
 }
 
-/**
- * Get the current active Spiideo account
- */
-export function getActiveAccount(): SpiideoAccountKey {
-  return activeAccount
-}
-
-/**
- * Get configuration for a specific account
- */
-export function getAccountConfig(account?: SpiideoAccountKey): SpiideoConfig {
-  return getConfig(account)
-}
-
-export function getSpiideoUserId(account?: SpiideoAccountKey): string {
-  return getConfig(account).userId
+export function getSpiideoUserId(): string {
+  return getConfig().userId
 }
 
 // ============================================================================
 // Authentication
 // ============================================================================
 
-async function getAccessToken(account?: SpiideoAccountKey): Promise<string> {
-  const key = account || activeAccount
-  const cached = tokenCache[key]
-
+async function getAccessToken(): Promise<string> {
   // Check cache first - 5 min buffer before expiry
-  if (cached && Date.now() < cached.expiresAt - 300000) {
-    return cached.token
+  if (tokenCache && Date.now() < tokenCache.expiresAt - 300000) {
+    return tokenCache.token
   }
 
-  const config = getConfig(key)
+  const config = getConfig()
   const basicAuth = Buffer.from(
     `${config.clientId}:${config.clientSecret}`
   ).toString('base64')
@@ -381,13 +323,13 @@ async function getAccessToken(account?: SpiideoAccountKey): Promise<string> {
   if (!response.ok) {
     const errorText = await response.text()
     throw new Error(
-      `Failed to get Spiideo access token for ${key}: ${response.status} - ${errorText}`
+      `Failed to get Spiideo access token: ${response.status} - ${errorText}`
     )
   }
 
   const data: TokenResponse = await response.json()
 
-  tokenCache[key] = {
+  tokenCache = {
     token: data.access_token,
     expiresAt: Date.now() + data.expires_in * 1000,
   }
@@ -404,12 +346,10 @@ async function spiideoRequest<T>(
   options: {
     method?: string
     body?: unknown
-    account?: SpiideoAccountKey
   } = {}
 ): Promise<T> {
-  const account = options.account || activeAccount
-  const token = await getAccessToken(account)
-  const config = getConfig(account)
+  const token = await getAccessToken()
+  const config = getConfig()
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
@@ -428,7 +368,7 @@ async function spiideoRequest<T>(
   if (!response.ok) {
     const errorText = await response.text()
     throw new Error(
-      `Spiideo API error (${account}): ${response.status} - ${errorText}`
+      `Spiideo API error: ${response.status} - ${errorText}`
     )
   }
 
@@ -444,51 +384,28 @@ async function spiideoRequest<T>(
 // Connection Test
 // ============================================================================
 
-export async function testConnection(account?: SpiideoAccountKey): Promise<{
+export async function testConnection(): Promise<{
   success: boolean
   message: string
-  account: SpiideoAccountKey
-  accountType: 'play' | 'perform'
   tokenUrl?: string
   error?: string
 }> {
-  const key = account || activeAccount
   try {
-    await getAccessToken(key)
-    const config = getConfig(key)
+    await getAccessToken()
     return {
       success: true,
-      message: `Successfully connected to Spiideo API (${key})`,
-      account: key,
-      accountType: config.type,
+      message: 'Successfully connected to Spiideo API',
       tokenUrl: SPIIDEO_TOKEN_URL,
     }
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error'
-    const config = getConfig(key)
     return {
       success: false,
-      message: `Failed to connect to Spiideo API (${key})`,
-      account: key,
-      accountType: config.type,
+      message: 'Failed to connect to Spiideo API',
       tokenUrl: SPIIDEO_TOKEN_URL,
       error: message,
     }
   }
-}
-
-/**
- * Test connections to all configured Spiideo accounts
- */
-export async function testAllConnections(): Promise<{
-  kuwait: Awaited<ReturnType<typeof testConnection>>
-  dubai: Awaited<ReturnType<typeof testConnection>>
-}> {
-  const [kuwait, dubai] = await Promise.all([
-    testConnection('kuwait'),
-    testConnection('dubai'),
-  ])
-  return { kuwait, dubai }
 }
 
 // ============================================================================
@@ -897,11 +814,8 @@ export async function waitForDownloadReady(
 // ============================================================================
 
 export const spiideoClient = {
-  // Multi-account management
-  setActiveAccount,
-  getActiveAccount,
+  // Configuration
   getAccountConfig,
-  testAllConnections,
 
   // Connection
   testConnection,

@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
 import {
-  setActiveAccount,
   getGame,
   createGame,
   setupLiveBroadcast,
@@ -41,9 +40,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Use Kuwait account (Spiideo Play - has RTMP access)
-    setActiveAccount('kuwait')
-    const config = getAccountConfig('kuwait')
+    const config = getAccountConfig()
 
     let gameId: string
     let gameTitle: string

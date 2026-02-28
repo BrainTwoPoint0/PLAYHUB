@@ -2,22 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Stub env vars before the module loads (hoisted alongside vi.mock)
 vi.hoisted(() => {
-  process.env.SPIIDEO_KUWAIT_CLIENT_ID = 'kw-id'
-  process.env.SPIIDEO_KUWAIT_CLIENT_SECRET = 'kw-secret'
-  process.env.SPIIDEO_KUWAIT_CLIENT_NAME = 'playhub'
+  process.env.SPIIDEO_CLIENT_ID = 'test-id'
+  process.env.SPIIDEO_CLIENT_SECRET = 'test-secret'
+  process.env.SPIIDEO_CLIENT_NAME = 'playhub'
   process.env.SPIIDEO_PLAYBACK_ADMIN_USER_ID = 'admin-user'
-  process.env.SPIIDEO_KUWAIT_ACCOUNT_ID = 'kw-acct'
-  process.env.SPIIDEO_KUWAIT_SCENE_ID = 'kw-scene'
-  process.env.SPIIDEO_PERFORM_DUBAI_CLIENT_ID = 'dxb-id'
-  process.env.SPIIDEO_PERFORM_DUBAI_CLIENT_SECRET = 'dxb-secret'
-  process.env.SPIIDEO_PERFORM_DUBAI_CLIENT_NAME = 'playhub'
-  process.env.SPIIDEO_PERFORM_DUBAI_ACCOUNT_ID = 'dxb-acct'
+  process.env.SPIIDEO_ACCOUNT_ID = 'test-acct'
+  process.env.SPIIDEO_SCENE_ID = 'test-scene'
 })
 
 import {
   buildRtmpUrl,
-  setActiveAccount,
-  getActiveAccount,
   getAccountConfig,
   testConnection,
 } from '@/lib/spiideo/client'
@@ -42,42 +36,17 @@ describe('buildRtmpUrl', () => {
   })
 })
 
-// ─── setActiveAccount / getActiveAccount ────────────────────────
-
-describe('account switching', () => {
-  beforeEach(() => {
-    setActiveAccount('kuwait') // reset to default
-  })
-
-  it('defaults to kuwait', () => {
-    expect(getActiveAccount()).toBe('kuwait')
-  })
-
-  it('switches to dubai', () => {
-    setActiveAccount('dubai')
-    expect(getActiveAccount()).toBe('dubai')
-  })
-
-  it('switches back to kuwait', () => {
-    setActiveAccount('dubai')
-    setActiveAccount('kuwait')
-    expect(getActiveAccount()).toBe('kuwait')
-  })
-})
-
 // ─── getAccountConfig ───────────────────────────────────────────
 
 describe('getAccountConfig', () => {
-  it('returns kuwait config with correct type', () => {
-    const config = getAccountConfig('kuwait')
-    expect(config.type).toBe('play')
-    expect(config.clientId).toBe('kw-id')
+  it('returns config with correct clientId', () => {
+    const config = getAccountConfig()
+    expect(config.clientId).toBe('test-id')
   })
 
-  it('returns dubai config with correct type', () => {
-    const config = getAccountConfig('dubai')
-    expect(config.type).toBe('perform')
-    expect(config.clientId).toBe('dxb-id')
+  it('returns config with accountId from env', () => {
+    const config = getAccountConfig()
+    expect(config.accountId).toBe('test-acct')
   })
 })
 
@@ -86,6 +55,16 @@ describe('getAccountConfig', () => {
 describe('testConnection', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('returns failure when token fetch fails', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('Unauthorized', { status: 401 })
+    )
+
+    const result = await testConnection()
+    expect(result.success).toBe(false)
+    expect(result.error).toBeDefined()
   })
 
   it('returns success when token fetch succeeds', async () => {
@@ -100,19 +79,7 @@ describe('testConnection', () => {
       )
     )
 
-    const result = await testConnection('kuwait')
+    const result = await testConnection()
     expect(result.success).toBe(true)
-    expect(result.account).toBe('kuwait')
-  })
-
-  it('returns failure when token fetch fails', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response('Unauthorized', { status: 401 })
-    )
-
-    // Use 'dubai' to avoid hitting the cached token from the success test
-    const result = await testConnection('dubai')
-    expect(result.success).toBe(false)
-    expect(result.error).toBeDefined()
   })
 })

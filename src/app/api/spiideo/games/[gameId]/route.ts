@@ -8,8 +8,6 @@ import {
   createDownloadOutput,
   getOutputProgress,
   getDownloadUri,
-  setActiveAccount,
-  type SpiideoAccountKey,
 } from '@/lib/spiideo/client'
 
 // GET - Get game details with productions and outputs
@@ -18,13 +16,8 @@ export async function GET(
   { params }: { params: Promise<{ gameId: string }> }
 ) {
   const { gameId } = await params
-  const { searchParams } = new URL(request.url)
-  const accountKey =
-    (searchParams.get('account') as SpiideoAccountKey) || 'kuwait'
 
   try {
-    setActiveAccount(accountKey)
-
     // Get game details
     const game = await getGame(gameId)
 
@@ -82,13 +75,8 @@ export async function POST(
   { params }: { params: Promise<{ gameId: string }> }
 ) {
   const { gameId } = await params
-  const { searchParams } = new URL(request.url)
-  const accountKey =
-    (searchParams.get('account') as SpiideoAccountKey) || 'kuwait'
 
   try {
-    setActiveAccount(accountKey)
-
     // Get game details first
     const game = await getGame(gameId)
 

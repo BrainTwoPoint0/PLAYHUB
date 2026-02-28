@@ -3,14 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ── Stubs ───────────────────────────────────────────────────────────
 
 vi.hoisted(() => {
-  process.env.SPIIDEO_KUWAIT_CLIENT_ID = 'kw-id'
-  process.env.SPIIDEO_KUWAIT_CLIENT_SECRET = 'kw-secret'
-  process.env.SPIIDEO_KUWAIT_CLIENT_NAME = 'playhub'
+  process.env.SPIIDEO_CLIENT_ID = 'test-id'
+  process.env.SPIIDEO_CLIENT_SECRET = 'test-secret'
+  process.env.SPIIDEO_CLIENT_NAME = 'playhub'
   process.env.SPIIDEO_PLAYBACK_ADMIN_USER_ID = 'admin-user'
-  process.env.SPIIDEO_KUWAIT_ACCOUNT_ID = 'kw-acct'
-  process.env.SPIIDEO_KUWAIT_SCENE_ID = 'kw-scene'
-  process.env.SPIIDEO_PERFORM_DUBAI_CLIENT_ID = 'dxb-id'
-  process.env.SPIIDEO_PERFORM_DUBAI_CLIENT_SECRET = 'dxb-secret'
+  process.env.SPIIDEO_ACCOUNT_ID = 'test-acct'
+  process.env.SPIIDEO_SCENE_ID = 'test-scene'
 })
 
 const mockCreateGame = vi.fn()
@@ -80,7 +78,7 @@ describe('scheduleRecording', () => {
   beforeEach(() => {
     vi.clearAllMocks()
 
-    mockGetAccountConfig.mockReturnValue({ accountId: 'kw-acct' })
+    mockGetAccountConfig.mockReturnValue({ accountId: 'test-acct' })
     mockCreateGame.mockResolvedValue({ id: 'game-1' })
     mockCreateProduction.mockResolvedValue({ id: 'prod-1' })
 

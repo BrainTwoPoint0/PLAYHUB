@@ -32,7 +32,7 @@ async function checkSpiideo(): Promise<ServiceStatus> {
   const start = Date.now()
   try {
     const { testConnection } = await import('@/lib/spiideo/client')
-    const result = await withTimeout(testConnection('kuwait'), CHECK_TIMEOUT)
+    const result = await withTimeout(testConnection(), CHECK_TIMEOUT)
     if (!result.success) throw new Error(result.error || 'Connection failed')
     return {
       name: 'spiideo',

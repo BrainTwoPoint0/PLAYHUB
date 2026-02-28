@@ -21,7 +21,7 @@ import {
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendRecordingReadyEmail } from '@/lib/email'
 
-const ACCOUNT_ID = process.env.SPIIDEO_KUWAIT_ACCOUNT_ID!
+const ACCOUNT_ID = process.env.SPIIDEO_ACCOUNT_ID!
 const SYNC_API_KEY = process.env.SYNC_API_KEY
 
 // Verify API key for protected endpoints

@@ -83,7 +83,7 @@ export async function scheduleRecording(
   }
 
   // 2. Create Spiideo game + production
-  const spiideoConfig = getAccountConfig('kuwait')
+  const spiideoConfig = getAccountConfig()
   const game = await createGame({
     accountId: spiideoConfig.accountId!,
     title,
