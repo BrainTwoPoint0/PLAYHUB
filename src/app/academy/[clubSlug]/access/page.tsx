@@ -56,8 +56,8 @@ interface VeoException {
 // Helpers
 // ============================================================================
 
-function stripeStatusColor(status: string | null, hasSub: boolean): string {
-  if (!hasSub) return 'bg-red-500/20 text-red-400'
+function stripeStatusColor(status: string | null, hasSub: boolean, isExempt = false): string {
+  if (!hasSub) return isExempt ? 'bg-blue-500/20 text-blue-400' : 'bg-red-500/20 text-red-400'
   switch (status) {
     case 'active':
       return 'bg-green-500/20 text-green-500'
@@ -72,8 +72,8 @@ function stripeStatusColor(status: string | null, hasSub: boolean): string {
   }
 }
 
-function stripeStatusLabel(status: string | null, hasSub: boolean): string {
-  if (!hasSub) return 'No subscription'
+function stripeStatusLabel(status: string | null, hasSub: boolean, isExempt = false): string {
+  if (!hasSub) return isExempt ? 'exempt' : 'No subscription'
   return status || 'unknown'
 }
 
@@ -327,6 +327,9 @@ export default function AcademyAccessPage() {
 
   if (!data) return null
 
+  // Set of exempt emails for quick lookup
+  const exemptEmails = new Set(exceptions.map((e) => e.email.toLowerCase()))
+
   // Stats — deduplicate by email so users in multiple teams are counted once.
   // If someone is a viewer in one team and coach in another, treat them as staff (not flagged).
   const allMembers = data.teams.flatMap((t) => t.members)
@@ -343,7 +346,7 @@ export default function AcademyAccessPage() {
   const totalMembers = uniqueMembers.length
   const players = uniqueMembers.filter((m) => m.isPlayer)
   const staff = uniqueMembers.filter((m) => !m.isPlayer)
-  const noSub = players.filter((m) => !m.hasSubscription).length
+  const noSub = players.filter((m) => !m.hasSubscription && !exemptEmails.has(m.email?.toLowerCase())).length
   const scholarships = uniqueMembers.filter((m) => m.isScholarship).length
 
   return (
@@ -651,11 +654,11 @@ export default function AcademyAccessPage() {
               {data.teams.map((team) => {
                 const isExpanded = expandedTeams.has(team.slug)
                 const teamNoSub = team.members.filter(
-                  (m) => m.isPlayer && !m.hasSubscription
+                  (m) => m.isPlayer && !m.hasSubscription && !exemptEmails.has(m.email?.toLowerCase())
                 ).length
                 const teamStaff = team.members.filter((m) => !m.isPlayer).length
                 const displayMembers = filterNoSub
-                  ? team.members.filter((m) => m.isPlayer && !m.hasSubscription)
+                  ? team.members.filter((m) => m.isPlayer && !m.hasSubscription && !exemptEmails.has(m.email?.toLowerCase()))
                   : team.members
 
                 // When filtering, skip teams with no matching members
@@ -735,12 +738,14 @@ export default function AcademyAccessPage() {
                                     <span
                                       className={`text-xs px-1.5 py-0.5 rounded ${stripeStatusColor(
                                         member.stripeStatus,
-                                        member.hasSubscription
+                                        member.hasSubscription,
+                                        exemptEmails.has(member.email?.toLowerCase())
                                       )}`}
                                     >
                                       {stripeStatusLabel(
                                         member.stripeStatus,
-                                        member.hasSubscription
+                                        member.hasSubscription,
+                                        exemptEmails.has(member.email?.toLowerCase())
                                       )}
                                     </span>
                                   ) : (
