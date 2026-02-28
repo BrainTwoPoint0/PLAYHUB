@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { scheduleRecording } from '@/lib/spiideo/schedule-recording'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -56,6 +56,15 @@ export async function POST(req: Request) {
         sceneId: metadata.cameraId,
       })
     }
+  }
+
+  // Handle invoice payment events (venue billing)
+  if (event.type === 'invoice.paid') {
+    return handleInvoicePaid(event.data.object as Stripe.Invoice)
+  }
+
+  if (event.type === 'invoice.payment_failed') {
+    return handleInvoicePaymentFailed(event.data.object as Stripe.Invoice)
   }
 
   return NextResponse.json({ received: true })
@@ -306,4 +315,48 @@ async function handleVenueBooking(
       { status: 500 }
     )
   }
+}
+
+// Handle invoice.paid — update venue invoice status to 'paid'
+async function handleInvoicePaid(invoice: Stripe.Invoice) {
+  const stripeInvoiceId = invoice.id
+  const serviceClient = createServiceClient() as any
+
+  const { error } = await serviceClient
+    .from('playhub_venue_invoices')
+    .update({ status: 'paid' })
+    .eq('stripe_invoice_id', stripeInvoiceId)
+
+  if (error) {
+    console.error('Failed to mark invoice as paid:', error)
+    return NextResponse.json(
+      { error: 'Failed to update invoice status' },
+      { status: 500 }
+    )
+  }
+
+  console.log('Invoice marked as paid:', stripeInvoiceId)
+  return NextResponse.json({ received: true })
+}
+
+// Handle invoice.payment_failed — update venue invoice status to 'overdue'
+async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
+  const stripeInvoiceId = invoice.id
+  const serviceClient = createServiceClient() as any
+
+  const { error } = await serviceClient
+    .from('playhub_venue_invoices')
+    .update({ status: 'overdue' })
+    .eq('stripe_invoice_id', stripeInvoiceId)
+
+  if (error) {
+    console.error('Failed to mark invoice as overdue:', error)
+    return NextResponse.json(
+      { error: 'Failed to update invoice status' },
+      { status: 500 }
+    )
+  }
+
+  console.log('Invoice marked as overdue:', stripeInvoiceId)
+  return NextResponse.json({ received: true })
 }

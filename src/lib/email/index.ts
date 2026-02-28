@@ -239,6 +239,223 @@ export async function sendRecordingAssignedEmail(params: {
   }
 }
 
+export interface InvoiceEmailParams {
+  venueName: string
+  periodLabel: string
+  currency: string
+  stripeInvoiceUrl?: string
+  // Costs
+  fixedCostPerRecording: number
+  ambassadorPct: number
+  // Breakdown
+  venueCollectedCount: number
+  venueCollectedRevenue: number
+  venueOwesPlayhub: number
+  playhubCollectedCount: number
+  playhubCollectedRevenue: number
+  playhubOwesVenue: number
+  venueProfitSharePct: number
+  netAmount: number
+}
+
+/**
+ * Generate invoice email HTML (exported for preview)
+ */
+export function renderInvoiceEmailHtml(params: InvoiceEmailParams): string {
+  const {
+    venueName,
+    periodLabel,
+    currency,
+    stripeInvoiceUrl,
+    fixedCostPerRecording,
+    ambassadorPct,
+    venueCollectedCount,
+    venueCollectedRevenue,
+    venueOwesPlayhub,
+    playhubCollectedCount,
+    playhubCollectedRevenue,
+    playhubOwesVenue,
+    venueProfitSharePct,
+    netAmount,
+  } = params
+
+  const fmt = (n: number) =>
+    new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(n)
+
+  const totalCount = venueCollectedCount + playhubCollectedCount
+  const totalRevenue = venueCollectedRevenue + playhubCollectedRevenue
+  const totalFixedCosts = fixedCostPerRecording * totalCount
+  const totalAmbassadorCost = totalRevenue * (ambassadorPct / 100)
+  const totalProfit = Math.max(0, totalRevenue - totalFixedCosts - totalAmbassadorCost)
+
+  // Build collector-specific breakdown rows
+  let venueSection = ''
+  if (venueCollectedCount > 0) {
+    venueSection = `
+            <tr>
+              <td colspan="2" style="padding: 12px 0 4px 0; font-weight: 600; font-size: 13px; color: #d6d5c9;">Venue-collected</td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0 4px 12px; color: #b9baa3;">Recordings</td>
+              <td style="padding: 4px 0; text-align: right;">${venueCollectedCount}</td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0 4px 12px; color: #b9baa3;">Revenue</td>
+              <td style="padding: 4px 0; text-align: right;">${fmt(venueCollectedRevenue)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0 4px 12px; color: #b9baa3;">Venue owes PLAYHUB</td>
+              <td style="padding: 4px 0; text-align: right; font-weight: 500;">${fmt(venueOwesPlayhub)}</td>
+            </tr>`
+  }
+  let playhubSection = ''
+  if (playhubCollectedCount > 0) {
+    playhubSection = `
+            <tr>
+              <td colspan="2" style="padding: 12px 0 4px 0; font-weight: 600; font-size: 13px; color: #d6d5c9;">PLAYHUB-collected</td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0 4px 12px; color: #b9baa3;">Recordings</td>
+              <td style="padding: 4px 0; text-align: right;">${playhubCollectedCount}</td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0 4px 12px; color: #b9baa3;">Revenue</td>
+              <td style="padding: 4px 0; text-align: right;">${fmt(playhubCollectedRevenue)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0 4px 12px; color: #b9baa3;">PLAYHUB owes venue</td>
+              <td style="padding: 4px 0; text-align: right; font-weight: 500;">-${fmt(playhubOwesVenue)}</td>
+            </tr>`
+  }
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0a100d; color: #d6d5c9; padding: 40px 20px; margin: 0;">
+      <div style="max-width: 500px; margin: 0 auto;">
+        <h1 style="color: #d6d5c9; font-size: 24px; margin-bottom: 24px;">PLAYHUB</h1>
+
+        <p style="font-size: 16px; line-height: 1.6; margin-bottom: 16px;">
+          Your monthly invoice for <strong>${venueName}</strong> is ready.
+        </p>
+
+        <!-- Summary -->
+        <div style="background-color: #1a1f1c; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+          <p style="font-size: 14px; color: #b9baa3; margin: 0 0 12px 0;">${periodLabel}</p>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="padding: 6px 0; color: #b9baa3;">Total recordings</td>
+              <td style="padding: 6px 0; text-align: right; font-weight: 500;">${totalCount}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #b9baa3;">Total revenue</td>
+              <td style="padding: 6px 0; text-align: right; font-weight: 500;">${fmt(totalRevenue)}</td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Costs -->
+        <div style="background-color: #1a1f1c; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+          <p style="font-size: 13px; font-weight: 600; color: #b9baa3; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 0.5px;">Costs</p>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="padding: 4px 0; color: #b9baa3;">Fixed cost (${totalCount} × ${fmt(fixedCostPerRecording)})</td>
+              <td style="padding: 4px 0; text-align: right;">-${fmt(totalFixedCosts)}</td>
+            </tr>
+            ${ambassadorPct > 0 ? `
+            <tr>
+              <td style="padding: 4px 0; color: #b9baa3;">Ambassador (${ambassadorPct}%)</td>
+              <td style="padding: 4px 0; text-align: right;">-${fmt(totalAmbassadorCost)}</td>
+            </tr>` : ''}
+            <tr>
+              <td style="padding: 8px 0 4px 0; color: #d6d5c9; font-weight: 500;">Profit</td>
+              <td style="padding: 8px 0 4px 0; text-align: right; font-weight: 500;">${fmt(totalProfit)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0; color: #b9baa3;">Venue share (${venueProfitSharePct}%)</td>
+              <td style="padding: 4px 0; text-align: right;">${fmt(totalProfit * (venueProfitSharePct / 100))}</td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Collector breakdown -->
+        ${venueCollectedCount > 0 || playhubCollectedCount > 0 ? `
+        <div style="background-color: #1a1f1c; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+          <p style="font-size: 13px; font-weight: 600; color: #b9baa3; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 0.5px;">Collection breakdown</p>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            ${venueSection}
+            ${playhubSection}
+          </table>
+        </div>` : ''}
+
+        <!-- Net settlement -->
+        <div style="background-color: #1a1f1c; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="font-size: 14px; color: #b9baa3; padding: 0;">Net settlement</td>
+              <td style="font-size: 20px; font-weight: 600; text-align: right; padding: 0;">${fmt(netAmount)}</td>
+            </tr>
+          </table>
+        </div>
+
+        ${
+          stripeInvoiceUrl
+            ? `
+        <a href="${stripeInvoiceUrl}"
+           style="display: inline-block; background-color: #d6d5c9; color: #0a100d; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">
+          View &amp; pay invoice
+        </a>`
+            : ''
+        }
+
+        <p style="font-size: 14px; color: #b9baa3; margin-top: 24px;">
+          Payment is due within 30 days. If you have any questions, reply to this email.
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #333; margin: 32px 0;">
+
+        <p style="font-size: 12px; color: #b9baa3;">
+          This email was sent by PLAYHUB. If you believe this was sent in error, please contact us.
+        </p>
+      </div>
+    </body>
+    </html>
+  `
+}
+
+/**
+ * Send monthly invoice email to venue admins
+ */
+export async function sendInvoiceEmail(
+  params: InvoiceEmailParams & { toEmail: string }
+): Promise<SendEmailResult> {
+  const { toEmail, periodLabel, ...rest } = params
+  const html = renderInvoiceEmailHtml({ periodLabel, ...rest })
+
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: toEmail,
+      subject: `Your PLAYHUB invoice for ${periodLabel}`,
+      html,
+    })
+
+    if (error) {
+      console.error('Failed to send invoice email:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (err) {
+    console.error('Email send error:', err)
+    return { success: false, error: 'Failed to send email' }
+  }
+}
+
 /**
  * Send email when a recording is uploaded and ready to watch
  */

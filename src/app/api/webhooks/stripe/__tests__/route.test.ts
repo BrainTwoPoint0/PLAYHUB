@@ -221,4 +221,32 @@ describe('POST /api/webhooks/stripe', () => {
     expect(json.received).toBe(true)
     expect(mockScheduleRecording).not.toHaveBeenCalled()
   })
+
+  it('handles invoice.paid by updating status to paid', async () => {
+    mockConstructEvent.mockReturnValue(
+      stripeEvent('invoice.paid', {
+        id: 'inv_paid_123',
+      })
+    )
+
+    const res = await POST(makeRequest())
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.received).toBe(true)
+    expect(mockScheduleRecording).not.toHaveBeenCalled()
+  })
+
+  it('handles invoice.payment_failed by updating status to overdue', async () => {
+    mockConstructEvent.mockReturnValue(
+      stripeEvent('invoice.payment_failed', {
+        id: 'inv_failed_456',
+      })
+    )
+
+    const res = await POST(makeRequest())
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.received).toBe(true)
+    expect(mockScheduleRecording).not.toHaveBeenCalled()
+  })
 })
