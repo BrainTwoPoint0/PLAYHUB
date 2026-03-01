@@ -166,7 +166,8 @@ export async function sendRecordingAssignedEmail(params: {
   assignedBy?: string
   isReady?: boolean
 }): Promise<SendEmailResult> {
-  const { toEmail, recordingTitle, matchDate, venueName, assignedBy, isReady } = params
+  const { toEmail, recordingTitle, matchDate, venueName, assignedBy, isReady } =
+    params
 
   try {
     const { error } = await resend.emails.send({
@@ -351,7 +352,10 @@ export function renderInvoiceEmailHtml(params: InvoiceEmailParams): string {
   const totalRevenue = venueCollectedRevenue + playhubCollectedRevenue
   const totalFixedCosts = fixedCostPerRecording * totalCount
   const totalAmbassadorCost = totalRevenue * (ambassadorPct / 100)
-  const totalProfit = Math.max(0, totalRevenue - totalFixedCosts - totalAmbassadorCost)
+  const totalProfit = Math.max(
+    0,
+    totalRevenue - totalFixedCosts - totalAmbassadorCost
+  )
 
   // Build collector-specific breakdown rows
   let venueSection = ''
@@ -431,11 +435,15 @@ export function renderInvoiceEmailHtml(params: InvoiceEmailParams): string {
               <td style="padding: 4px 0; color: #b9baa3;">Fixed cost (${totalCount} × ${fmt(fixedCostPerRecording)})</td>
               <td style="padding: 4px 0; text-align: right;">-${fmt(totalFixedCosts)}</td>
             </tr>
-            ${ambassadorPct > 0 ? `
+            ${
+              ambassadorPct > 0
+                ? `
             <tr>
               <td style="padding: 4px 0; color: #b9baa3;">Ambassador (${ambassadorPct}%)</td>
               <td style="padding: 4px 0; text-align: right;">-${fmt(totalAmbassadorCost)}</td>
-            </tr>` : ''}
+            </tr>`
+                : ''
+            }
             <tr>
               <td style="padding: 8px 0 4px 0; color: #d6d5c9; font-weight: 500;">Profit</td>
               <td style="padding: 8px 0 4px 0; text-align: right; font-weight: 500;">${fmt(totalProfit)}</td>
@@ -448,14 +456,18 @@ export function renderInvoiceEmailHtml(params: InvoiceEmailParams): string {
         </div>
 
         <!-- Collector breakdown -->
-        ${venueCollectedCount > 0 || playhubCollectedCount > 0 ? `
+        ${
+          venueCollectedCount > 0 || playhubCollectedCount > 0
+            ? `
         <div style="background-color: #1a1f1c; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
           <p style="font-size: 13px; font-weight: 600; color: #b9baa3; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 0.5px;">Collection breakdown</p>
           <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
             ${venueSection}
             ${playhubSection}
           </table>
-        </div>` : ''}
+        </div>`
+            : ''
+        }
 
         <!-- Net settlement -->
         <div style="background-color: #1a1f1c; padding: 16px; border-radius: 8px; margin-bottom: 24px;">

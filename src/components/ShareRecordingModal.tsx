@@ -117,13 +117,9 @@ export function ShareRecordingModal({
             </p>
           </div>
 
-          {error && (
-            <p className="text-sm text-red-400">{error}</p>
-          )}
+          {error && <p className="text-sm text-red-400">{error}</p>}
 
-          {success && (
-            <p className="text-sm text-emerald-400">{success}</p>
-          )}
+          {success && <p className="text-sm text-emerald-400">{success}</p>}
 
           <button
             onClick={handleShare}

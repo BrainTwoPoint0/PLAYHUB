@@ -74,7 +74,9 @@ const todayRecordingsChain = supaChain({ data: null, error: null })
 // ── Helpers ─────────────────────────────────────────────────────────
 
 function makeRequest() {
-  return new NextRequest('http://localhost:3001/api/venue/venue-1/billing/summary')
+  return new NextRequest(
+    'http://localhost:3001/api/venue/venue-1/billing/summary'
+  )
 }
 
 function makeRouteContext(venueId = 'venue-1') {
@@ -113,7 +115,9 @@ beforeEach(() => {
     if (table === 'playhub_match_recordings') {
       recordingsCallCount++
       // First call = month recordings, second = today recordings
-      return recordingsCallCount === 1 ? monthRecordingsChain : todayRecordingsChain
+      return recordingsCallCount === 1
+        ? monthRecordingsChain
+        : todayRecordingsChain
     }
     return supaChain({ data: null, error: null })
   })
@@ -140,7 +144,10 @@ beforeEach(() => {
 
 describe('GET /api/venue/[venueId]/billing/summary', () => {
   it('returns 401 for unauthenticated user', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: null }, error: { message: 'No session' } })
+    mockGetUser.mockResolvedValue({
+      data: { user: null },
+      error: { message: 'No session' },
+    })
 
     const res = await GET(makeRequest(), makeRouteContext())
     expect(res.status).toBe(401)
@@ -201,7 +208,9 @@ describe('GET /api/venue/[venueId]/billing/summary', () => {
     expect(json.venueCollectedCount).toBe(2)
     expect(json.venueCollectedRevenue).toBe(10)
     expect(json.venueKeeps).toBe(expectedVenueKeeps)
-    expect(json.venueOwesPlayhub).toBe(Number((10 - expectedVenueKeeps).toFixed(3)))
+    expect(json.venueOwesPlayhub).toBe(
+      Number((10 - expectedVenueKeeps).toFixed(3))
+    )
   })
 
   it('calculates playhub-collected profit share correctly', async () => {
@@ -249,7 +258,9 @@ describe('GET /api/venue/[venueId]/billing/summary', () => {
     expect(json.totalRevenue).toBe(20)
     expect(json.venueCollectedCount).toBe(3)
     expect(json.playhubCollectedCount).toBe(1)
-    expect(json.venueTotalProfit).toBe(Number((venueKeeps + playhubOwesVenue).toFixed(3)))
+    expect(json.venueTotalProfit).toBe(
+      Number((venueKeeps + playhubOwesVenue).toFixed(3))
+    )
   })
 
   it('uses FX rate to convert EUR fixed cost to KWD', async () => {
@@ -342,7 +353,13 @@ describe('GET /api/venue/[venueId]/billing/summary', () => {
 
   it('uses default billable amount when recording has none', async () => {
     monthRecordingsChain.lte.mockResolvedValueOnce({
-      data: [makeRecording({ id: 'r1', billable_amount: null, collected_by: 'venue' })],
+      data: [
+        makeRecording({
+          id: 'r1',
+          billable_amount: null,
+          collected_by: 'venue',
+        }),
+      ],
       error: null,
     })
 

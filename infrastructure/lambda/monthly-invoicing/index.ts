@@ -49,7 +49,9 @@ export async function handler() {
   const year = prevMonth.getFullYear()
   const month = prevMonth.getMonth() + 1 // 1-indexed
 
-  console.log(`Generating invoices for ${year}-${String(month).padStart(2, '0')}`)
+  console.log(
+    `Generating invoices for ${year}-${String(month).padStart(2, '0')}`
+  )
 
   // Get all active venues with billing config and Stripe customer
   const { data: configs, error: configError } = await supabase
@@ -119,7 +121,11 @@ async function generateInvoiceForVenue(
   year: number,
   month: number,
   config: any
-): Promise<{ netAmount: number; recordingCount: number; stripeInvoiceUrl: string | null } | null> {
+): Promise<{
+  netAmount: number
+  recordingCount: number
+  stripeInvoiceUrl: string | null
+} | null> {
   // Period boundaries
   const periodStart = `${year}-${String(month).padStart(2, '0')}-01`
   const lastDay = new Date(year, month, 0).getDate()
@@ -322,10 +328,14 @@ async function notifyAdmins(
     new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(n)
 
   const totalCount = result.venueCollectedCount + result.playhubCollectedCount
-  const totalRevenue = result.venueCollectedRevenue + result.playhubCollectedRevenue
+  const totalRevenue =
+    result.venueCollectedRevenue + result.playhubCollectedRevenue
   const totalFixedCosts = result.fixedCostPerRecording * totalCount
   const totalAmbassadorCost = totalRevenue * (result.ambassadorPct / 100)
-  const totalProfit = Math.max(0, totalRevenue - totalFixedCosts - totalAmbassadorCost)
+  const totalProfit = Math.max(
+    0,
+    totalRevenue - totalFixedCosts - totalAmbassadorCost
+  )
 
   // Build collector breakdown rows
   let venueSection = ''
@@ -385,14 +395,18 @@ async function notifyAdmins(
                   </table>
                 </div>
 
-                ${venueSection || playhubSection ? `
+                ${
+                  venueSection || playhubSection
+                    ? `
                 <div style="background-color:#1a1f1c;padding:16px;border-radius:8px;margin-bottom:16px;">
                   <p style="font-size:13px;font-weight:600;color:#b9baa3;margin:0 0 10px 0;text-transform:uppercase;letter-spacing:0.5px;">Collection breakdown</p>
                   <table style="width:100%;border-collapse:collapse;font-size:14px;">
                     ${venueSection}
                     ${playhubSection}
                   </table>
-                </div>` : ''}
+                </div>`
+                    : ''
+                }
 
                 <div style="background-color:#1a1f1c;padding:16px;border-radius:8px;margin-bottom:24px;">
                   <table style="width:100%;border-collapse:collapse;">

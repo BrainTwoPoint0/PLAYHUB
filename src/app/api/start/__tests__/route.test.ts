@@ -163,7 +163,8 @@ describe('GET /api/start/[cameraId]', () => {
     // The previous test cached rate=2.5. Even if fetch would return something else,
     // the cached rate should be used since TTL hasn't expired.
     mockFetch.mockResolvedValue({
-      json: () => Promise.resolve({ result: 'success', rates: { GBP: 999, EUR: 999 } }),
+      json: () =>
+        Promise.resolve({ result: 'success', rates: { GBP: 999, EUR: 999 } }),
     })
 
     const res = await GET(makeRequest('GET'), makeRouteContext())
@@ -236,7 +237,10 @@ describe('POST /api/start/[cameraId]', () => {
 
   it('normalizes email (trim + lowercase)', async () => {
     const res = await POST(
-      makeRequest('POST', { durationMinutes: 60, email: '  Test@EXAMPLE.com  ' }),
+      makeRequest('POST', {
+        durationMinutes: 60,
+        email: '  Test@EXAMPLE.com  ',
+      }),
       makeRouteContext()
     )
 

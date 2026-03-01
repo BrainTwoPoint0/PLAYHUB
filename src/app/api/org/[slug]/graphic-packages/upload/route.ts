@@ -16,7 +16,9 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -30,7 +32,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     .maybeSingle()
 
   if (!org) {
-    return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
+    return NextResponse.json(
+      { error: 'Organization not found' },
+      { status: 404 }
+    )
   }
 
   const isAdmin = await isVenueAdmin(user.id, org.id)
@@ -47,11 +52,17 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   }
 
   if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-    return NextResponse.json({ error: 'File must be PNG, JPEG, or WebP' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'File must be PNG, JPEG, or WebP' },
+      { status: 400 }
+    )
   }
 
   if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: 'File must be under 5MB' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'File must be under 5MB' },
+      { status: 400 }
+    )
   }
 
   // Validate type param against allowlist
@@ -73,7 +84,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
   if (uploadError) {
     console.error('Failed to upload graphic:', uploadError)
-    return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to upload file' },
+      { status: 500 }
+    )
   }
 
   const { data: urlData } = serviceClient.storage

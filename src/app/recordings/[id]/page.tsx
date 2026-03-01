@@ -15,8 +15,21 @@ import {
 } from '@braintwopoint0/playback-commons/ui'
 import { createClient } from '@braintwopoint0/playback-commons/supabase'
 import { FadeIn } from '@/components/FadeIn'
-import { VideoPlayer, type MediaPack, type GraphicPackageOverlay } from '@/components/video/VideoPlayer'
-import { ArrowLeft, Lock, Globe, Pencil, Trash2, Plus, Share2, Download } from 'lucide-react'
+import {
+  VideoPlayer,
+  type MediaPack,
+  type GraphicPackageOverlay,
+} from '@/components/video/VideoPlayer'
+import {
+  ArrowLeft,
+  Lock,
+  Globe,
+  Pencil,
+  Trash2,
+  Plus,
+  Share2,
+  Download,
+} from 'lucide-react'
 import { ShareRecordingModal } from '@/components/ShareRecordingModal'
 import { MatchDetails } from '@/components/MatchDetails'
 import type {
@@ -226,7 +239,9 @@ export default function RecordingPage() {
   const [recording, setRecording] = useState<Recording | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [mediaPack, setMediaPack] = useState<MediaPack | undefined>(undefined)
-  const [graphicPackage, setGraphicPackage] = useState<GraphicPackageOverlay | undefined>(undefined)
+  const [graphicPackage, setGraphicPackage] = useState<
+    GraphicPackageOverlay | undefined
+  >(undefined)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -648,7 +663,10 @@ export default function RecordingPage() {
                           onClick={() => {
                             const video = document.querySelector('video')
                             if (video) {
-                              video.currentTime = Math.max(0, event.timestamp_seconds - 5)
+                              video.currentTime = Math.max(
+                                0,
+                                event.timestamp_seconds - 5
+                              )
                             }
                           }}
                           className="text-xs font-mono text-emerald-400 hover:text-emerald-300 w-14 text-left flex-shrink-0"

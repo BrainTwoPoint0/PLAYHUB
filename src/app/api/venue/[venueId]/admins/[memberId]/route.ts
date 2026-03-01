@@ -72,7 +72,10 @@ export async function DELETE(
   const memberIsPlatformAdmin = (membership.profiles as any)?.is_platform_admin
   if (memberIsPlatformAdmin) {
     return NextResponse.json(
-      { error: 'Cannot remove a platform admin. Remove their platform admin status first.' },
+      {
+        error:
+          'Cannot remove a platform admin. Remove their platform admin status first.',
+      },
       { status: 400 }
     )
   }

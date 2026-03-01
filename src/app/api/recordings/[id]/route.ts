@@ -1,8 +1,15 @@
 // GET/PATCH/DELETE /api/recordings/[id]
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { checkRecordingAccess, isVenueAdmin } from '@/lib/recordings/access-control'
-import { S3Client, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import {
+  checkRecordingAccess,
+  isVenueAdmin,
+} from '@/lib/recordings/access-control'
+import {
+  S3Client,
+  GetObjectCommand,
+  DeleteObjectCommand,
+} from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 const s3Client = new S3Client({
@@ -88,7 +95,10 @@ export async function GET(
       .select('media_pack')
       .eq('organization_id', recording.organization_id)
       .maybeSingle()
-    if (billingCfg?.media_pack && Object.keys(billingCfg.media_pack).length > 0) {
+    if (
+      billingCfg?.media_pack &&
+      Object.keys(billingCfg.media_pack).length > 0
+    ) {
       mediaPack = billingCfg.media_pack
     }
   }
@@ -146,7 +156,13 @@ export async function PATCH(
   }
 
   const body = await request.json()
-  const allowedFields = ['title', 'home_team', 'away_team', 'is_billable', 'billable_amount']
+  const allowedFields = [
+    'title',
+    'home_team',
+    'away_team',
+    'is_billable',
+    'billable_amount',
+  ]
   const updates: Record<string, any> = {}
 
   for (const field of allowedFields) {
@@ -156,13 +172,21 @@ export async function PATCH(
   }
 
   if (Object.keys(updates).length === 0) {
-    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'No valid fields to update' },
+      { status: 400 }
+    )
   }
 
   // Prevent editing billable_amount on playhub-collected recordings (verified Stripe transactions)
-  if (updates.billable_amount !== undefined && recording.collected_by === 'playhub') {
+  if (
+    updates.billable_amount !== undefined &&
+    recording.collected_by === 'playhub'
+  ) {
     return NextResponse.json(
-      { error: 'Cannot edit amount for recordings with a verified transaction' },
+      {
+        error: 'Cannot edit amount for recordings with a verified transaction',
+      },
       { status: 403 }
     )
   }
@@ -178,7 +202,10 @@ export async function PATCH(
 
   if (error) {
     console.error('Failed to update recording:', error)
-    return NextResponse.json({ error: 'Failed to update recording' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to update recording' },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json({ recording: updated })
@@ -225,7 +252,10 @@ export async function DELETE(
         })
       )
     } catch (s3Err) {
-      console.error('Failed to delete S3 object (continuing with DB delete):', s3Err)
+      console.error(
+        'Failed to delete S3 object (continuing with DB delete):',
+        s3Err
+      )
     }
   }
 
@@ -236,7 +266,10 @@ export async function DELETE(
 
   if (error) {
     console.error('Failed to delete recording:', error)
-    return NextResponse.json({ error: 'Failed to delete recording' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to delete recording' },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json({ success: true })

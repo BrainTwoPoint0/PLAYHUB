@@ -367,9 +367,7 @@ async function spiideoRequest<T>(
 
   if (!response.ok) {
     const errorText = await response.text()
-    throw new Error(
-      `Spiideo API error: ${response.status} - ${errorText}`
-    )
+    throw new Error(`Spiideo API error: ${response.status} - ${errorText}`)
   }
 
   // Handle 204 No Content
@@ -444,14 +442,12 @@ export interface SpiideoGraphicPackage {
   type: 'html' | 'svg'
 }
 
-export async function getGraphicPackages(
-  options?: {
-    accountId?: string
-    nameSearch?: string
-    sport?: SpiideoSport[]
-    includePublic?: boolean
-  }
-): Promise<PagedResponse<SpiideoGraphicPackage>> {
+export async function getGraphicPackages(options?: {
+  accountId?: string
+  nameSearch?: string
+  sport?: SpiideoSport[]
+  includePublic?: boolean
+}): Promise<PagedResponse<SpiideoGraphicPackage>> {
   const params = new URLSearchParams()
   if (options?.accountId) params.set('accountId', options.accountId)
   if (options?.nameSearch) params.set('nameSearch', options.nameSearch)

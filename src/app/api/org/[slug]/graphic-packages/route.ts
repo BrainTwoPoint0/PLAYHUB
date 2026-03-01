@@ -34,14 +34,19 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const orgId = await resolveOrg(slug)
   if (!orgId) {
-    return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
+    return NextResponse.json(
+      { error: 'Organization not found' },
+      { status: 404 }
+    )
   }
 
   const isAdmin = await isVenueAdmin(user.id, orgId)
@@ -59,7 +64,10 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 
   if (error) {
     console.error('Failed to fetch graphic packages:', error)
-    return NextResponse.json({ error: 'Failed to fetch graphic packages' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to fetch graphic packages' },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json({ packages: data || [] })
@@ -70,14 +78,19 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const orgId = await resolveOrg(slug)
   if (!orgId) {
-    return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
+    return NextResponse.json(
+      { error: 'Organization not found' },
+      { status: 404 }
+    )
   }
 
   const isAdmin = await isVenueAdmin(user.id, orgId)
@@ -92,22 +105,47 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { name, logo_url, logo_position, sponsor_logo_url, sponsor_position, is_default, spiideo_graphic_package_id } = body
+  const {
+    name,
+    logo_url,
+    logo_position,
+    sponsor_logo_url,
+    sponsor_position,
+    is_default,
+    spiideo_graphic_package_id,
+  } = body
 
-  if (!name || typeof name !== 'string' || name.trim().length === 0 || name.length > 200) {
-    return NextResponse.json({ error: 'Name is required and must be under 200 characters' }, { status: 400 })
+  if (
+    !name ||
+    typeof name !== 'string' ||
+    name.trim().length === 0 ||
+    name.length > 200
+  ) {
+    return NextResponse.json(
+      { error: 'Name is required and must be under 200 characters' },
+      { status: 400 }
+    )
   }
   if (logo_url && !isValidHttpUrl(logo_url)) {
     return NextResponse.json({ error: 'Invalid logo URL' }, { status: 400 })
   }
   if (sponsor_logo_url && !isValidHttpUrl(sponsor_logo_url)) {
-    return NextResponse.json({ error: 'Invalid sponsor logo URL' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Invalid sponsor logo URL' },
+      { status: 400 }
+    )
   }
   if (logo_position && !VALID_POSITIONS.includes(logo_position)) {
-    return NextResponse.json({ error: 'Invalid logo position' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Invalid logo position' },
+      { status: 400 }
+    )
   }
   if (sponsor_position && !VALID_POSITIONS.includes(sponsor_position)) {
-    return NextResponse.json({ error: 'Invalid sponsor position' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Invalid sponsor position' },
+      { status: 400 }
+    )
   }
 
   const serviceClient = createServiceClient() as any
@@ -138,7 +176,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
   if (error) {
     console.error('Failed to create graphic package:', error)
-    return NextResponse.json({ error: 'Failed to create graphic package' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to create graphic package' },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json({ package: data }, { status: 201 })
@@ -149,14 +190,19 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const orgId = await resolveOrg(slug)
   if (!orgId) {
-    return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
+    return NextResponse.json(
+      { error: 'Organization not found' },
+      { status: 404 }
+    )
   }
 
   const isAdmin = await isVenueAdmin(user.id, orgId)
@@ -174,27 +220,57 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const { id, ...fields } = body
 
   if (!id) {
-    return NextResponse.json({ error: 'Package id is required' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Package id is required' },
+      { status: 400 }
+    )
   }
 
   // Validate individual fields
-  if (fields.name !== undefined && (typeof fields.name !== 'string' || fields.name.trim().length === 0 || fields.name.length > 200)) {
-    return NextResponse.json({ error: 'Name must be under 200 characters' }, { status: 400 })
+  if (
+    fields.name !== undefined &&
+    (typeof fields.name !== 'string' ||
+      fields.name.trim().length === 0 ||
+      fields.name.length > 200)
+  ) {
+    return NextResponse.json(
+      { error: 'Name must be under 200 characters' },
+      { status: 400 }
+    )
   }
   if (fields.logo_url && !isValidHttpUrl(fields.logo_url)) {
     return NextResponse.json({ error: 'Invalid logo URL' }, { status: 400 })
   }
   if (fields.sponsor_logo_url && !isValidHttpUrl(fields.sponsor_logo_url)) {
-    return NextResponse.json({ error: 'Invalid sponsor logo URL' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Invalid sponsor logo URL' },
+      { status: 400 }
+    )
   }
   if (fields.logo_position && !VALID_POSITIONS.includes(fields.logo_position)) {
-    return NextResponse.json({ error: 'Invalid logo position' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Invalid logo position' },
+      { status: 400 }
+    )
   }
-  if (fields.sponsor_position && !VALID_POSITIONS.includes(fields.sponsor_position)) {
-    return NextResponse.json({ error: 'Invalid sponsor position' }, { status: 400 })
+  if (
+    fields.sponsor_position &&
+    !VALID_POSITIONS.includes(fields.sponsor_position)
+  ) {
+    return NextResponse.json(
+      { error: 'Invalid sponsor position' },
+      { status: 400 }
+    )
   }
 
-  const allowedFields = ['name', 'logo_url', 'logo_position', 'sponsor_logo_url', 'sponsor_position', 'is_default']
+  const allowedFields = [
+    'name',
+    'logo_url',
+    'logo_position',
+    'sponsor_logo_url',
+    'sponsor_position',
+    'is_default',
+  ]
   const updates: Record<string, any> = {}
   for (const field of allowedFields) {
     if (fields[field] !== undefined) {
@@ -203,7 +279,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
 
   if (Object.keys(updates).length === 0) {
-    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'No valid fields to update' },
+      { status: 400 }
+    )
   }
 
   const serviceClient = createServiceClient() as any
@@ -229,7 +308,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
   if (error) {
     console.error('Failed to update graphic package:', error)
-    return NextResponse.json({ error: 'Failed to update graphic package' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to update graphic package' },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json({ package: data })
@@ -240,14 +322,19 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const orgId = await resolveOrg(slug)
   if (!orgId) {
-    return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
+    return NextResponse.json(
+      { error: 'Organization not found' },
+      { status: 404 }
+    )
   }
 
   const isAdmin = await isVenueAdmin(user.id, orgId)
@@ -258,7 +345,10 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
   if (!id) {
-    return NextResponse.json({ error: 'Package id is required' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Package id is required' },
+      { status: 400 }
+    )
   }
 
   const serviceClient = createServiceClient() as any
@@ -270,7 +360,10 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
 
   if (error) {
     console.error('Failed to delete graphic package:', error)
-    return NextResponse.json({ error: 'Failed to delete graphic package' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to delete graphic package' },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json({ success: true })

@@ -23,22 +23,26 @@ An org like DAFL is a league that books recordings across multiple venues. They 
 ## Planned Features
 
 ### Graphics Packages (→ see [graphic-packages.md](graphic-packages.md))
+
 - [x] Account-level graphics (logos, sponsors, overlays)
 - [x] Import from Spiideo or create custom
 - [x] Applied when org starts a recording at any venue
 - [x] File upload to Supabase Storage
 
 ### Recordings View
+
 - [ ] All recordings across all venues, filtered by org
 - [ ] Search, filter by date/venue/status
 - [ ] Bulk actions (publish, set pricing, etc.)
 
 ### Team & Access Management
+
 - [ ] Invite employees by email
 - [ ] Role-based access (admin, manager, viewer)
 - [ ] Uses existing `organization_members` table
 
 ### Marketplace / Storefront
+
 - [x] Marketplace settings moved from venue to org level (`organizations` table)
 - [x] Enable/disable marketplace per org + default pricing/currency
 - [x] API: `GET/PUT /api/org/[slug]/marketplace`
@@ -47,6 +51,7 @@ An org like DAFL is a league that books recordings across multiple venues. They 
 - [ ] Stripe Connect for payouts (future)
 
 ### Live View Preview
+
 - [ ] Show Spiideo camera live feed before recording starts
 - [ ] Overlay org's graphics package on the preview
 - [ ] **Blocker:** Spiideo public API does NOT expose a live view endpoint
@@ -55,10 +60,12 @@ An org like DAFL is a league that books recordings across multiple venues. They 
 ## Spiideo Live View — Research Notes
 
 The "Live View" shown in Spiideo's web dashboard (`app.spiideo.net`) is a feature of their UI, not exposed via the public API (`docs-public.spiideo.com`). The API covers:
+
 - Game scheduling, productions, outputs, downloads, shareable links
 - But NO camera preview/live feed endpoints
 
 Possible approaches:
+
 1. **Ask Spiideo** if there's a private/beta endpoint for scene live view
 2. **Playwright scrape** the dashboard (fragile, like Veo auth)
 3. **Use our own pipeline** — start a brief push_stream production → MediaLive → HLS preview, then tear it down

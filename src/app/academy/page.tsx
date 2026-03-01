@@ -168,7 +168,9 @@ export default function AcademySelectorPage() {
                         <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
                           {club.name}
                         </h2>
-                        <span className={`text-xs px-1.5 py-0.5 rounded ${role === 'platform_admin' ? 'bg-amber-500/15 text-amber-400' : 'bg-white/5 text-[var(--ash-grey)]'}`}>
+                        <span
+                          className={`text-xs px-1.5 py-0.5 rounded ${role === 'platform_admin' ? 'bg-amber-500/15 text-amber-400' : 'bg-white/5 text-[var(--ash-grey)]'}`}
+                        >
                           {role === 'platform_admin' ? 'Admin' : 'Viewer'}
                         </span>
                       </div>

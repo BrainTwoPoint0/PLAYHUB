@@ -265,14 +265,24 @@ export function VideoPlayer({
       {/* Graphics overlay — prefer graphicPackage over legacy mediaPack */}
       {(() => {
         const logoUrl = graphicPackage?.logo_url || mediaPack?.logo_url
-        const logoPos = graphicPackage?.logo_position || mediaPack?.logo_position || 'top-right'
-        const sponsorUrl = graphicPackage?.sponsor_logo_url || mediaPack?.sponsor_logo_url
-        const sponsorPos = graphicPackage?.sponsor_position || mediaPack?.sponsor_position || 'bottom-left'
+        const logoPos =
+          graphicPackage?.logo_position ||
+          mediaPack?.logo_position ||
+          'top-right'
+        const sponsorUrl =
+          graphicPackage?.sponsor_logo_url || mediaPack?.sponsor_logo_url
+        const sponsorPos =
+          graphicPackage?.sponsor_position ||
+          mediaPack?.sponsor_position ||
+          'bottom-left'
         const posClass = (pos: string) =>
-          pos === 'top-left' ? 'top-3 left-3' :
-          pos === 'top-right' ? 'top-3 right-3' :
-          pos === 'bottom-left' ? 'bottom-16 left-3' :
-          'bottom-16 right-3'
+          pos === 'top-left'
+            ? 'top-3 left-3'
+            : pos === 'top-right'
+              ? 'top-3 right-3'
+              : pos === 'bottom-left'
+                ? 'bottom-16 left-3'
+                : 'bottom-16 right-3'
         return (
           <>
             {logoUrl && (
@@ -321,10 +331,11 @@ export function VideoPlayer({
         }`}
       >
         {/* Progress bar with event markers */}
-        <div className="mb-2 md:mb-3 relative py-2 -my-2 cursor-pointer" onClick={handleProgressClick}>
-          <div
-            className="relative w-full h-1.5 md:h-2 bg-white/20 rounded-full pointer-events-none"
-          >
+        <div
+          className="mb-2 md:mb-3 relative py-2 -my-2 cursor-pointer"
+          onClick={handleProgressClick}
+        >
+          <div className="relative w-full h-1.5 md:h-2 bg-white/20 rounded-full pointer-events-none">
             {/* Played portion */}
             <div
               className="absolute top-0 left-0 h-full bg-emerald-500 rounded-full pointer-events-none"

@@ -23,14 +23,19 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const orgId = await resolveOrg(slug)
   if (!orgId) {
-    return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
+    return NextResponse.json(
+      { error: 'Organization not found' },
+      { status: 404 }
+    )
   }
 
   const isAdmin = await isVenueAdmin(user.id, orgId)
@@ -53,7 +58,9 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       .eq('organization_id', orgId)
       .not('spiideo_graphic_package_id', 'is', null)
 
-    const importedIds = new Set((existing || []).map((e: any) => e.spiideo_graphic_package_id))
+    const importedIds = new Set(
+      (existing || []).map((e: any) => e.spiideo_graphic_package_id)
+    )
 
     const available = (spiideoPackages.content || []).map((pkg) => ({
       ...pkg,
@@ -63,7 +70,10 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ packages: available })
   } catch (err) {
     console.error('Failed to fetch Spiideo graphic packages:', err)
-    return NextResponse.json({ error: 'Failed to fetch from Spiideo' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to fetch from Spiideo' },
+      { status: 500 }
+    )
   }
 }
 
@@ -72,14 +82,19 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const orgId = await resolveOrg(slug)
   if (!orgId) {
-    return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
+    return NextResponse.json(
+      { error: 'Organization not found' },
+      { status: 404 }
+    )
   }
 
   const isAdmin = await isVenueAdmin(user.id, orgId)
@@ -97,7 +112,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   const { spiideoId, name } = body
 
   if (!spiideoId || !name) {
-    return NextResponse.json({ error: 'spiideoId and name are required' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'spiideoId and name are required' },
+      { status: 400 }
+    )
   }
 
   const serviceClient = createServiceClient() as any
@@ -111,7 +129,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     .maybeSingle()
 
   if (existing) {
-    return NextResponse.json({ error: 'This package has already been imported' }, { status: 409 })
+    return NextResponse.json(
+      { error: 'This package has already been imported' },
+      { status: 409 }
+    )
   }
 
   const { data, error } = await serviceClient
@@ -127,7 +148,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
   if (error) {
     console.error('Failed to import graphic package:', error)
-    return NextResponse.json({ error: 'Failed to import package' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to import package' },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json({ package: data }, { status: 201 })

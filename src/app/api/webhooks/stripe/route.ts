@@ -273,7 +273,10 @@ async function handleVenueBooking(
       .maybeSingle()
 
     if (existing) {
-      console.log('Venue booking already processed (by payment ID):', paymentIntentId)
+      console.log(
+        'Venue booking already processed (by payment ID):',
+        paymentIntentId
+      )
       return NextResponse.json({ received: true })
     }
   }
@@ -290,7 +293,10 @@ async function handleVenueBooking(
     .maybeSingle()
 
   if (recentDup) {
-    console.log('Venue booking already processed (by recent duplicate check):', event.id)
+    console.log(
+      'Venue booking already processed (by recent duplicate check):',
+      event.id
+    )
     return NextResponse.json({ received: true })
   }
 

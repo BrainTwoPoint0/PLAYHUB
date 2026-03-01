@@ -26,7 +26,7 @@ const SPIIDEO_API_BASE = 'https://api-public.spiideo.com'
 const SPIIDEO_TOKEN_URL = 'https://auth-play.spiideo.net/oauth2/token'
 
 // Stuck recording thresholds (at 15-min intervals)
-const RETRY_THRESHOLD = 12  // ~3 hours: delete stuck output + recreate
+const RETRY_THRESHOLD = 12 // ~3 hours: delete stuck output + recreate
 const GIVE_UP_THRESHOLD = 24 // ~3 more hours after retry: stop retrying
 
 // Token cache
@@ -325,7 +325,10 @@ async function updateSyncAttempts(
     .eq('spiideo_game_id', gameId)
 
   if (error) {
-    console.error(`Failed to update sync_attempts for ${gameId}:`, error.message)
+    console.error(
+      `Failed to update sync_attempts for ${gameId}:`,
+      error.message
+    )
   }
 }
 
@@ -357,7 +360,10 @@ async function upsertProcessingRecording(
   )
 
   if (error) {
-    console.error(`Failed to upsert processing recording for ${game.id}:`, error.message)
+    console.error(
+      `Failed to upsert processing recording for ${game.id}:`,
+      error.message
+    )
   }
 }
 
@@ -393,9 +399,11 @@ async function sendSyncAlertEmail(
         <tr><td style="padding: 8px; font-weight: bold;">Last Status</td><td style="padding: 8px;">${details.lastError}</td></tr>
       </table>
       <p style="margin-top: 16px; color: #6b7280;">
-        ${details.isRetryExhausted
-          ? 'The download output was recreated after the first 8 attempts, but the retry also failed. Manual investigation required.'
-          : 'The stuck download output has been deleted and a fresh one created. The Lambda will continue retrying automatically.'}
+        ${
+          details.isRetryExhausted
+            ? 'The download output was recreated after the first 8 attempts, but the retry also failed. Manual investigation required.'
+            : 'The stuck download output has been deleted and a fresh one created. The Lambda will continue retrying automatically.'
+        }
       </p>
     </div>
   `
@@ -534,44 +542,44 @@ async function syncGame(
 
         if (newAttempts === RETRY_THRESHOLD) {
           // ~2 hours stuck: delete output, recreate, send alert
-          console.log(`Attempt ${newAttempts}: deleting stuck output ${downloadOutput.id} and recreating...`)
+          console.log(
+            `Attempt ${newAttempts}: deleting stuck output ${downloadOutput.id} and recreating...`
+          )
           try {
             await deleteOutput(downloadOutput.id)
             await createDownloadOutput(production.id)
             // Reset counter so the retry gets a fresh 8-attempt window
-            await updateSyncAttempts(game.id, RETRY_THRESHOLD, `Recreated download output at attempt ${newAttempts}`)
+            await updateSyncAttempts(
+              game.id,
+              RETRY_THRESHOLD,
+              `Recreated download output at attempt ${newAttempts}`
+            )
           } catch (retryError) {
             console.error('Failed to recreate download output:', retryError)
           }
 
-          await sendSyncAlertEmail(
-            `⚠️ Stuck recording: ${title}`,
-            {
-              gameId: game.id,
-              title,
-              matchDate: game.scheduledStartTime,
-              pitchName,
-              attempts: newAttempts,
-              lastError: errorMsg,
-              isRetryExhausted: false,
-            }
-          )
+          await sendSyncAlertEmail(`⚠️ Stuck recording: ${title}`, {
+            gameId: game.id,
+            title,
+            matchDate: game.scheduledStartTime,
+            pitchName,
+            attempts: newAttempts,
+            lastError: errorMsg,
+            isRetryExhausted: false,
+          })
         } else if (newAttempts >= GIVE_UP_THRESHOLD) {
           // ~4 hours after retry: give up + send final alert
           console.log(`Attempt ${newAttempts}: giving up on ${game.id}`)
 
-          await sendSyncAlertEmail(
-            `🚨 Recording sync failed: ${title}`,
-            {
-              gameId: game.id,
-              title,
-              matchDate: game.scheduledStartTime,
-              pitchName,
-              attempts: newAttempts,
-              lastError: `Still stuck after output recreation. ${errorMsg}`,
-              isRetryExhausted: true,
-            }
-          )
+          await sendSyncAlertEmail(`🚨 Recording sync failed: ${title}`, {
+            gameId: game.id,
+            title,
+            matchDate: game.scheduledStartTime,
+            pitchName,
+            attempts: newAttempts,
+            lastError: `Still stuck after output recreation. ${errorMsg}`,
+            isRetryExhausted: true,
+          })
         }
 
         return {

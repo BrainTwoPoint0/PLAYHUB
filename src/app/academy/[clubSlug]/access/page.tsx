@@ -58,8 +58,15 @@ interface VeoException {
 // Helpers
 // ============================================================================
 
-function stripeStatusColor(status: string | null, hasSub: boolean, isExempt = false): string {
-  if (!hasSub) return isExempt ? 'bg-blue-500/20 text-blue-400' : 'bg-red-500/20 text-red-400'
+function stripeStatusColor(
+  status: string | null,
+  hasSub: boolean,
+  isExempt = false
+): string {
+  if (!hasSub)
+    return isExempt
+      ? 'bg-blue-500/20 text-blue-400'
+      : 'bg-red-500/20 text-red-400'
   switch (status) {
     case 'active':
       return 'bg-green-500/20 text-green-500'
@@ -74,7 +81,11 @@ function stripeStatusColor(status: string | null, hasSub: boolean, isExempt = fa
   }
 }
 
-function stripeStatusLabel(status: string | null, hasSub: boolean, isExempt = false): string {
+function stripeStatusLabel(
+  status: string | null,
+  hasSub: boolean,
+  isExempt = false
+): string {
   if (!hasSub) return isExempt ? 'exempt' : 'No subscription'
   return status || 'unknown'
 }
@@ -135,7 +146,15 @@ export default function AcademyAccessPage() {
 
   // Admin management state
   const [adminsOpen, setAdminsOpen] = useState(false)
-  const [admins, setAdmins] = useState<{ id: string; role: string; fullName: string; email: string; createdAt: string }[]>([])
+  const [admins, setAdmins] = useState<
+    {
+      id: string
+      role: string
+      fullName: string
+      email: string
+      createdAt: string
+    }[]
+  >([])
   const [newAdminEmail, setNewAdminEmail] = useState('')
   const [adminsLoading, setAdminsLoading] = useState(false)
   const [adminMessage, setAdminMessage] = useState<string | null>(null)
@@ -300,7 +319,9 @@ export default function AcademyAccessPage() {
       const json = await res.json()
       if (res.ok) {
         setNewAdminEmail('')
-        setAdminMessage(json.invited ? json.message : 'Admin added successfully')
+        setAdminMessage(
+          json.invited ? json.message : 'Admin added successfully'
+        )
         await fetchAdmins()
       } else {
         setAdminMessage(json.error || 'Failed to invite admin')
@@ -423,8 +444,14 @@ export default function AcademyAccessPage() {
   const totalMembers = uniqueMembers.length
   const players = uniqueMembers.filter((m) => m.isPlayer)
   const staff = uniqueMembers.filter((m) => !m.isPlayer)
-  const noSub = players.filter((m) => (!m.hasSubscription || m.stripeStatus === 'canceled') && !exemptEmails.has(m.email?.toLowerCase())).length
-  const scholarships = data.hasScholarships ? uniqueMembers.filter((m) => m.isScholarship).length : 0
+  const noSub = players.filter(
+    (m) =>
+      (!m.hasSubscription || m.stripeStatus === 'canceled') &&
+      !exemptEmails.has(m.email?.toLowerCase())
+  ).length
+  const scholarships = data.hasScholarships
+    ? uniqueMembers.filter((m) => m.isScholarship).length
+    : 0
 
   // Total active academy subscribers (in Veo + not in Veo)
   const activeSubEmails = new Set<string>()
@@ -433,7 +460,8 @@ export default function AcademyAccessPage() {
       activeSubEmails.add(m.email.toLowerCase())
     }
   }
-  const academySubs = activeSubEmails.size + (data.stripeOnlySubscribers?.length ?? 0)
+  const academySubs =
+    activeSubEmails.size + (data.stripeOnlySubscribers?.length ?? 0)
 
   return (
     <div className="min-h-screen bg-[var(--night)]">
@@ -527,209 +555,213 @@ export default function AcademyAccessPage() {
               </p>
             </div>
             {data.hasScholarships && scholarships > 0 && (
-            <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-4">
-              <p className="text-xs text-[var(--ash-grey)] uppercase tracking-wider mb-1">
-                Scholarships
-              </p>
-              <p className="text-2xl font-bold text-purple-400">
-                {scholarships}
-              </p>
-            </div>
+              <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-4">
+                <p className="text-xs text-[var(--ash-grey)] uppercase tracking-wider mb-1">
+                  Scholarships
+                </p>
+                <p className="text-2xl font-bold text-purple-400">
+                  {scholarships}
+                </p>
+              </div>
             )}
           </div>
         </FadeIn>
 
         {/* Exceptions — platform admin only */}
         {isPlatAdmin && (
-        <FadeIn delay={125}>
-          <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] mb-6">
-            <button
-              onClick={() => setExceptionsOpen(!exceptionsOpen)}
-              className="w-full flex items-center justify-between p-4 hover:bg-white/[0.03] transition-colors text-left"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-[var(--ash-grey)] text-xs w-4">
-                  {exceptionsOpen ? '\u25BC' : '\u25B6'}
-                </span>
-                <span className="font-medium text-[var(--timberwolf)]">
-                  Sync Exceptions
-                </span>
-                <span className="text-xs text-[var(--ash-grey)]">
-                  {exceptions.length}{' '}
-                  {exceptions.length === 1 ? 'user' : 'users'} exempt from
-                  auto-removal
-                </span>
-              </div>
-            </button>
-            {exceptionsOpen && (
-              <div className="border-t border-[var(--ash-grey)]/10 p-4 space-y-3">
-                {/* Add exception form */}
-                <div className="flex items-end gap-2">
-                  <div className="flex-1">
-                    <label className="text-xs text-[var(--ash-grey)] mb-1 block">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={newExceptionEmail}
-                      onChange={(e) => setNewExceptionEmail(e.target.value)}
-                      placeholder="user@example.com"
-                      className="w-full text-sm px-3 py-1.5 rounded-lg bg-white/5 border border-[var(--ash-grey)]/20 text-[var(--timberwolf)] placeholder-[var(--ash-grey)]/50 outline-none focus:border-[var(--ash-grey)]/40"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-xs text-[var(--ash-grey)] mb-1 block">
-                      Reason (optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={newExceptionReason}
-                      onChange={(e) => setNewExceptionReason(e.target.value)}
-                      placeholder="e.g. Staff member"
-                      className="w-full text-sm px-3 py-1.5 rounded-lg bg-white/5 border border-[var(--ash-grey)]/20 text-[var(--timberwolf)] placeholder-[var(--ash-grey)]/50 outline-none focus:border-[var(--ash-grey)]/40"
-                    />
-                  </div>
-                  <Button
-                    variant="outline"
-                    className={`${outlineBtnClass} text-xs`}
-                    onClick={addException}
-                    disabled={exceptionsLoading || !newExceptionEmail.trim()}
-                  >
-                    Add
-                  </Button>
+          <FadeIn delay={125}>
+            <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] mb-6">
+              <button
+                onClick={() => setExceptionsOpen(!exceptionsOpen)}
+                className="w-full flex items-center justify-between p-4 hover:bg-white/[0.03] transition-colors text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-[var(--ash-grey)] text-xs w-4">
+                    {exceptionsOpen ? '\u25BC' : '\u25B6'}
+                  </span>
+                  <span className="font-medium text-[var(--timberwolf)]">
+                    Sync Exceptions
+                  </span>
+                  <span className="text-xs text-[var(--ash-grey)]">
+                    {exceptions.length}{' '}
+                    {exceptions.length === 1 ? 'user' : 'users'} exempt from
+                    auto-removal
+                  </span>
                 </div>
+              </button>
+              {exceptionsOpen && (
+                <div className="border-t border-[var(--ash-grey)]/10 p-4 space-y-3">
+                  {/* Add exception form */}
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <label className="text-xs text-[var(--ash-grey)] mb-1 block">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        value={newExceptionEmail}
+                        onChange={(e) => setNewExceptionEmail(e.target.value)}
+                        placeholder="user@example.com"
+                        className="w-full text-sm px-3 py-1.5 rounded-lg bg-white/5 border border-[var(--ash-grey)]/20 text-[var(--timberwolf)] placeholder-[var(--ash-grey)]/50 outline-none focus:border-[var(--ash-grey)]/40"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-xs text-[var(--ash-grey)] mb-1 block">
+                        Reason (optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={newExceptionReason}
+                        onChange={(e) => setNewExceptionReason(e.target.value)}
+                        placeholder="e.g. Staff member"
+                        className="w-full text-sm px-3 py-1.5 rounded-lg bg-white/5 border border-[var(--ash-grey)]/20 text-[var(--timberwolf)] placeholder-[var(--ash-grey)]/50 outline-none focus:border-[var(--ash-grey)]/40"
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      className={`${outlineBtnClass} text-xs`}
+                      onClick={addException}
+                      disabled={exceptionsLoading || !newExceptionEmail.trim()}
+                    >
+                      Add
+                    </Button>
+                  </div>
 
-                {/* Exception list */}
-                {exceptions.length === 0 ? (
-                  <p className="text-xs text-[var(--ash-grey)]">
-                    No exceptions configured.
-                  </p>
-                ) : (
-                  <div className="divide-y divide-[var(--ash-grey)]/5">
-                    {exceptions.map((exc) => (
-                      <div
-                        key={exc.id}
-                        className="flex items-center justify-between py-2 text-sm"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className="text-[var(--timberwolf)] truncate">
-                            {exc.email}
-                          </span>
-                          {exc.reason && (
-                            <span className="text-xs text-[var(--ash-grey)] truncate">
-                              {exc.reason}
-                            </span>
-                          )}
-                          <span className="text-xs text-[var(--ash-grey)]/50">
-                            {new Date(exc.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => removeException(exc.email)}
-                          disabled={exceptionsLoading}
-                          className="text-xs px-2 py-1 rounded text-red-400 hover:bg-red-500/10 transition-colors"
+                  {/* Exception list */}
+                  {exceptions.length === 0 ? (
+                    <p className="text-xs text-[var(--ash-grey)]">
+                      No exceptions configured.
+                    </p>
+                  ) : (
+                    <div className="divide-y divide-[var(--ash-grey)]/5">
+                      {exceptions.map((exc) => (
+                        <div
+                          key={exc.id}
+                          className="flex items-center justify-between py-2 text-sm"
                         >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </FadeIn>
-        )}
-
-        {/* Manage Admins — platform admin only */}
-        {isPlatAdmin && (
-        <FadeIn delay={130}>
-          <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] mb-6">
-            <button
-              onClick={() => setAdminsOpen(!adminsOpen)}
-              className="w-full flex items-center justify-between p-4 hover:bg-white/[0.03] transition-colors text-left"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-[var(--ash-grey)] text-xs w-4">
-                  {adminsOpen ? '\u25BC' : '\u25B6'}
-                </span>
-                <span className="font-medium text-[var(--timberwolf)]">
-                  Manage Admins
-                </span>
-                <span className="text-xs text-[var(--ash-grey)]">
-                  {admins.length} {admins.length === 1 ? 'admin' : 'admins'}
-                </span>
-              </div>
-            </button>
-            {adminsOpen && (
-              <div className="border-t border-[var(--ash-grey)]/10 p-4 space-y-3">
-                {/* Invite form */}
-                <div className="flex items-end gap-2">
-                  <div className="flex-1">
-                    <label className="text-xs text-[var(--ash-grey)] mb-1 block">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={newAdminEmail}
-                      onChange={(e) => setNewAdminEmail(e.target.value)}
-                      placeholder="admin@example.com"
-                      className="w-full text-sm px-3 py-1.5 rounded-lg bg-white/5 border border-[var(--ash-grey)]/20 text-[var(--timberwolf)] placeholder-[var(--ash-grey)]/50 outline-none focus:border-[var(--ash-grey)]/40"
-                    />
-                  </div>
-                  <Button
-                    variant="outline"
-                    className={`${outlineBtnClass} text-xs`}
-                    onClick={inviteAdmin}
-                    disabled={adminsLoading || !newAdminEmail.trim()}
-                  >
-                    Invite
-                  </Button>
-                </div>
-                {adminMessage && (
-                  <p className="text-xs text-[var(--ash-grey)]">{adminMessage}</p>
-                )}
-
-                {/* Admin list */}
-                {admins.length === 0 ? (
-                  <p className="text-xs text-[var(--ash-grey)]">
-                    No admins configured.
-                  </p>
-                ) : (
-                  <div className="divide-y divide-[var(--ash-grey)]/5">
-                    {admins.map((admin) => (
-                      <div
-                        key={admin.id}
-                        className="flex items-center justify-between py-2 text-sm"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className="text-[var(--timberwolf)] truncate">
-                            {admin.fullName || 'Unknown'}
-                          </span>
-                          <span className="text-xs text-[var(--ash-grey)] truncate">
-                            {admin.email}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-xs px-1.5 py-0.5 rounded bg-white/5 text-[var(--ash-grey)]">
-                            {admin.role === 'league_admin' ? 'League Admin' : 'Club Admin'}
-                          </span>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-[var(--timberwolf)] truncate">
+                              {exc.email}
+                            </span>
+                            {exc.reason && (
+                              <span className="text-xs text-[var(--ash-grey)] truncate">
+                                {exc.reason}
+                              </span>
+                            )}
+                            <span className="text-xs text-[var(--ash-grey)]/50">
+                              {new Date(exc.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
                           <button
-                            onClick={() => removeAdmin(admin.id)}
-                            disabled={adminsLoading}
+                            onClick={() => removeException(exc.email)}
+                            disabled={exceptionsLoading}
                             className="text-xs px-2 py-1 rounded text-red-400 hover:bg-red-500/10 transition-colors"
                           >
                             Remove
                           </button>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </FadeIn>
+        )}
+
+        {/* Manage Admins — platform admin only */}
+        {isPlatAdmin && (
+          <FadeIn delay={130}>
+            <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] mb-6">
+              <button
+                onClick={() => setAdminsOpen(!adminsOpen)}
+                className="w-full flex items-center justify-between p-4 hover:bg-white/[0.03] transition-colors text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-[var(--ash-grey)] text-xs w-4">
+                    {adminsOpen ? '\u25BC' : '\u25B6'}
+                  </span>
+                  <span className="font-medium text-[var(--timberwolf)]">
+                    Manage Admins
+                  </span>
+                  <span className="text-xs text-[var(--ash-grey)]">
+                    {admins.length} {admins.length === 1 ? 'admin' : 'admins'}
+                  </span>
+                </div>
+              </button>
+              {adminsOpen && (
+                <div className="border-t border-[var(--ash-grey)]/10 p-4 space-y-3">
+                  {/* Invite form */}
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <label className="text-xs text-[var(--ash-grey)] mb-1 block">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        value={newAdminEmail}
+                        onChange={(e) => setNewAdminEmail(e.target.value)}
+                        placeholder="admin@example.com"
+                        className="w-full text-sm px-3 py-1.5 rounded-lg bg-white/5 border border-[var(--ash-grey)]/20 text-[var(--timberwolf)] placeholder-[var(--ash-grey)]/50 outline-none focus:border-[var(--ash-grey)]/40"
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      className={`${outlineBtnClass} text-xs`}
+                      onClick={inviteAdmin}
+                      disabled={adminsLoading || !newAdminEmail.trim()}
+                    >
+                      Invite
+                    </Button>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-        </FadeIn>
+                  {adminMessage && (
+                    <p className="text-xs text-[var(--ash-grey)]">
+                      {adminMessage}
+                    </p>
+                  )}
+
+                  {/* Admin list */}
+                  {admins.length === 0 ? (
+                    <p className="text-xs text-[var(--ash-grey)]">
+                      No admins configured.
+                    </p>
+                  ) : (
+                    <div className="divide-y divide-[var(--ash-grey)]/5">
+                      {admins.map((admin) => (
+                        <div
+                          key={admin.id}
+                          className="flex items-center justify-between py-2 text-sm"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-[var(--timberwolf)] truncate">
+                              {admin.fullName || 'Unknown'}
+                            </span>
+                            <span className="text-xs text-[var(--ash-grey)] truncate">
+                              {admin.email}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-white/5 text-[var(--ash-grey)]">
+                              {admin.role === 'league_admin'
+                                ? 'League Admin'
+                                : 'Club Admin'}
+                            </span>
+                            <button
+                              onClick={() => removeAdmin(admin.id)}
+                              disabled={adminsLoading}
+                              className="text-xs px-2 py-1 rounded text-red-400 hover:bg-red-500/10 transition-colors"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </FadeIn>
         )}
 
         {/* Stripe-only subscribers (paying but not in Veo) */}
@@ -855,11 +887,19 @@ export default function AcademyAccessPage() {
                 const query = searchQuery.toLowerCase().trim()
                 const isExpanded = expandedTeams.has(team.slug) || !!query
                 const teamNoSub = team.members.filter(
-                  (m) => m.isPlayer && (!m.hasSubscription || m.stripeStatus === 'canceled') && !exemptEmails.has(m.email?.toLowerCase())
+                  (m) =>
+                    m.isPlayer &&
+                    (!m.hasSubscription || m.stripeStatus === 'canceled') &&
+                    !exemptEmails.has(m.email?.toLowerCase())
                 ).length
                 const teamStaff = team.members.filter((m) => !m.isPlayer).length
                 let displayMembers = filterNoSub
-                  ? team.members.filter((m) => m.isPlayer && (!m.hasSubscription || m.stripeStatus === 'canceled') && !exemptEmails.has(m.email?.toLowerCase()))
+                  ? team.members.filter(
+                      (m) =>
+                        m.isPlayer &&
+                        (!m.hasSubscription || m.stripeStatus === 'canceled') &&
+                        !exemptEmails.has(m.email?.toLowerCase())
+                    )
                   : team.members
                 if (query) {
                   displayMembers = displayMembers.filter(
@@ -870,7 +910,8 @@ export default function AcademyAccessPage() {
                 }
 
                 // When filtering or searching, skip teams with no matching members
-                if ((filterNoSub || query) && displayMembers.length === 0) return null
+                if ((filterNoSub || query) && displayMembers.length === 0)
+                  return null
 
                 return (
                   <div
@@ -937,23 +978,28 @@ export default function AcademyAccessPage() {
                                       {member.registrationTeam}
                                     </span>
                                   )}
-                                  {data.hasScholarships && member.isScholarship && (
-                                    <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400">
-                                      scholarship
-                                    </span>
-                                  )}
+                                  {data.hasScholarships &&
+                                    member.isScholarship && (
+                                      <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400">
+                                        scholarship
+                                      </span>
+                                    )}
                                   {member.isPlayer ? (
                                     <span
                                       className={`text-xs px-1.5 py-0.5 rounded ${stripeStatusColor(
                                         member.stripeStatus,
                                         member.hasSubscription,
-                                        exemptEmails.has(member.email?.toLowerCase())
+                                        exemptEmails.has(
+                                          member.email?.toLowerCase()
+                                        )
                                       )}`}
                                     >
                                       {stripeStatusLabel(
                                         member.stripeStatus,
                                         member.hasSubscription,
-                                        exemptEmails.has(member.email?.toLowerCase())
+                                        exemptEmails.has(
+                                          member.email?.toLowerCase()
+                                        )
                                       )}
                                     </span>
                                   ) : (

@@ -10,7 +10,9 @@ async function resolveOrg(slug: string) {
   const serviceClient = createServiceClient() as any
   const { data } = await serviceClient
     .from('organizations')
-    .select('id, marketplace_enabled, default_price_amount, default_price_currency')
+    .select(
+      'id, marketplace_enabled, default_price_amount, default_price_currency'
+    )
     .eq('slug', slug)
     .maybeSingle()
   return data
@@ -21,14 +23,19 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const org = await resolveOrg(slug)
   if (!org) {
-    return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
+    return NextResponse.json(
+      { error: 'Organization not found' },
+      { status: 404 }
+    )
   }
 
   const isAdmin = await isVenueAdmin(user.id, org.id)
@@ -48,14 +55,19 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const org = await resolveOrg(slug)
   if (!org) {
-    return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
+    return NextResponse.json(
+      { error: 'Organization not found' },
+      { status: 404 }
+    )
   }
 
   const isAdmin = await isVenueAdmin(user.id, org.id)
@@ -75,16 +87,26 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 
   if (body.marketplace_enabled !== undefined) {
     if (typeof body.marketplace_enabled !== 'boolean') {
-      return NextResponse.json({ error: 'marketplace_enabled must be a boolean' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'marketplace_enabled must be a boolean' },
+        { status: 400 }
+      )
     }
     updates.marketplace_enabled = body.marketplace_enabled
   }
   if (body.default_price_amount !== undefined) {
     const amount = Number(body.default_price_amount)
-    if (body.default_price_amount !== null && (isNaN(amount) || amount < 0 || amount > 100000)) {
-      return NextResponse.json({ error: 'Invalid price amount' }, { status: 400 })
+    if (
+      body.default_price_amount !== null &&
+      (isNaN(amount) || amount < 0 || amount > 100000)
+    ) {
+      return NextResponse.json(
+        { error: 'Invalid price amount' },
+        { status: 400 }
+      )
     }
-    updates.default_price_amount = body.default_price_amount === null ? null : amount
+    updates.default_price_amount =
+      body.default_price_amount === null ? null : amount
   }
   if (body.default_price_currency !== undefined) {
     if (!VALID_CURRENCIES.includes(body.default_price_currency)) {

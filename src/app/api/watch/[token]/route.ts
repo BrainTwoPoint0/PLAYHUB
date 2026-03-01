@@ -94,7 +94,10 @@ export async function GET(
       .select('media_pack')
       .eq('organization_id', recording.organization_id)
       .maybeSingle()
-    if (billingCfg?.media_pack && Object.keys(billingCfg.media_pack).length > 0) {
+    if (
+      billingCfg?.media_pack &&
+      Object.keys(billingCfg.media_pack).length > 0
+    ) {
       mediaPack = billingCfg.media_pack
     }
   }

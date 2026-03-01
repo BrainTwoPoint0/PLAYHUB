@@ -38,7 +38,10 @@ export async function GET(
   let role: 'platform_admin' | 'org_admin' | null = null
   if (await isPlatformAdmin(user.id)) {
     role = 'platform_admin'
-  } else if (club.organizationId && (await isVenueAdmin(user.id, club.organizationId))) {
+  } else if (
+    club.organizationId &&
+    (await isVenueAdmin(user.id, club.organizationId))
+  ) {
     role = 'org_admin'
   }
   if (!role) {

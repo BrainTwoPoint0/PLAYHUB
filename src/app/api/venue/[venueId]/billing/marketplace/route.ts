@@ -60,10 +60,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 
   if (purchaseError) {
     console.error('Failed to fetch marketplace purchases:', purchaseError)
-    return NextResponse.json(
-      { error: 'Failed to fetch data' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 })
   }
 
   const allPurchases = purchases || []

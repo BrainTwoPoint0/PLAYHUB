@@ -2,7 +2,16 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, DateTimePicker } from '@braintwopoint0/playback-commons/ui'
+import {
+  Button,
+  Input,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+  DateTimePicker,
+} from '@braintwopoint0/playback-commons/ui'
 import {
   ChartContainer,
   ChartTooltip,
@@ -221,7 +230,9 @@ function MarketplaceRevenue({
           {loading ? (
             <LoadingSpinner size="sm" className="text-[var(--ash-grey)]" />
           ) : !data || data.totalSales === 0 ? (
-            <p className="text-sm text-[var(--ash-grey)]">No marketplace sales yet.</p>
+            <p className="text-sm text-[var(--ash-grey)]">
+              No marketplace sales yet.
+            </p>
           ) : (
             <div className="space-y-4">
               {/* Summary cards */}
@@ -310,8 +321,12 @@ function VenueSettings({
   const [savedMsg, setSavedMsg] = useState<string | null>(null)
 
   // Local form state
-  const [youtubeRtmpUrl, setYoutubeRtmpUrl] = useState(billingConfig?.youtube_rtmp_url || '')
-  const [youtubeStreamKey, setYoutubeStreamKey] = useState(billingConfig?.youtube_stream_key || '')
+  const [youtubeRtmpUrl, setYoutubeRtmpUrl] = useState(
+    billingConfig?.youtube_rtmp_url || ''
+  )
+  const [youtubeStreamKey, setYoutubeStreamKey] = useState(
+    billingConfig?.youtube_stream_key || ''
+  )
 
   // Sync when billingConfig loads/changes
   useEffect(() => {
@@ -374,7 +389,9 @@ function VenueSettings({
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs text-[var(--ash-grey)]">RTMP URL</label>
+                <label className="text-xs text-[var(--ash-grey)]">
+                  RTMP URL
+                </label>
                 <Input
                   value={youtubeRtmpUrl}
                   onChange={(e) => setYoutubeRtmpUrl(e.target.value)}
@@ -383,7 +400,9 @@ function VenueSettings({
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-[var(--ash-grey)]">Stream Key</label>
+                <label className="text-xs text-[var(--ash-grey)]">
+                  Stream Key
+                </label>
                 <Input
                   type="password"
                   value={youtubeStreamKey}
@@ -459,7 +478,10 @@ function GraphicPackagesSection({
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [uploadingSponsor, setUploadingSponsor] = useState(false)
 
-  async function uploadFile(file: File, type: 'logo' | 'sponsor'): Promise<string | null> {
+  async function uploadFile(
+    file: File,
+    type: 'logo' | 'sponsor'
+  ): Promise<string | null> {
     if (!venueSlug) return null
     const formData = new FormData()
     formData.append('file', file)
@@ -584,7 +606,10 @@ function GraphicPackagesSection({
   async function handleDelete(pkg: GraphicPackage) {
     if (!venueSlug || !confirm(`Delete "${pkg.name}"?`)) return
     try {
-      const res = await fetch(`/api/org/${venueSlug}/graphic-packages?id=${pkg.id}`, { method: 'DELETE' })
+      const res = await fetch(
+        `/api/org/${venueSlug}/graphic-packages?id=${pkg.id}`,
+        { method: 'DELETE' }
+      )
       if (res.ok) {
         setPackages((prev) => prev.filter((p) => p.id !== pkg.id))
         setSuccessMsg('Package deleted')
@@ -611,7 +636,9 @@ function GraphicPackagesSection({
 
   // Spiideo import state
   const [showImport, setShowImport] = useState(false)
-  const [spiideoPackages, setSpiideoPackages] = useState<Array<{ id: string; name: string; type: string; alreadyImported: boolean }>>([])
+  const [spiideoPackages, setSpiideoPackages] = useState<
+    Array<{ id: string; name: string; type: string; alreadyImported: boolean }>
+  >([])
   const [loadingImport, setLoadingImport] = useState(false)
   const [importingId, setImportingId] = useState<string | null>(null)
 
@@ -648,7 +675,11 @@ function GraphicPackagesSection({
       if (res.ok) {
         setSuccessMsg(`Imported "${pkg.name}"`)
         setTimeout(() => setSuccessMsg(null), 3000)
-        setSpiideoPackages((prev) => prev.map((p) => p.id === pkg.id ? { ...p, alreadyImported: true } : p))
+        setSpiideoPackages((prev) =>
+          prev.map((p) =>
+            p.id === pkg.id ? { ...p, alreadyImported: true } : p
+          )
+        )
         fetchPackages()
       } else {
         const data = await res.json()
@@ -680,7 +711,8 @@ function GraphicPackagesSection({
               Graphic Packages
             </h2>
             <p className="text-xs text-[var(--ash-grey)] mt-1">
-              Logo overlays shown on recordings — applies to all venues for this account
+              Logo overlays shown on recordings — applies to all venues for this
+              account
             </p>
           </div>
           <Button
@@ -697,9 +729,7 @@ function GraphicPackagesSection({
       </div>
       {expanded && (
         <div className="px-6 pb-6 space-y-4">
-          {error && (
-            <p className="text-sm text-red-400">{error}</p>
-          )}
+          {error && <p className="text-sm text-red-400">{error}</p>}
           {successMsg && (
             <p className="text-sm text-emerald-400">{successMsg}</p>
           )}
@@ -708,7 +738,8 @@ function GraphicPackagesSection({
             <LoadingSpinner size="sm" className="text-[var(--ash-grey)]" />
           ) : packages.length === 0 && !showForm ? (
             <p className="text-sm text-[var(--ash-grey)]">
-              No graphic packages yet. Create one to add logo overlays to your recordings.
+              No graphic packages yet. Create one to add logo overlays to your
+              recordings.
             </p>
           ) : (
             <div className="space-y-3">
@@ -727,7 +758,9 @@ function GraphicPackagesSection({
                       />
                     ) : (
                       <div className="w-10 h-10 rounded bg-white/5 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs text-[var(--ash-grey)]">No logo</span>
+                        <span className="text-xs text-[var(--ash-grey)]">
+                          No logo
+                        </span>
                       </div>
                     )}
                     <div className="min-w-0">
@@ -744,7 +777,9 @@ function GraphicPackagesSection({
                       <div className="flex items-center gap-3 text-xs text-[var(--ash-grey)]">
                         <span>Logo: {positionLabel(pkg.logo_position)}</span>
                         {pkg.sponsor_logo_url && (
-                          <span>Sponsor: {positionLabel(pkg.sponsor_position)}</span>
+                          <span>
+                            Sponsor: {positionLabel(pkg.sponsor_position)}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -783,7 +818,9 @@ function GraphicPackagesSection({
                 {editingPkg ? 'Edit Package' : 'New Package'}
               </h3>
               <div className="space-y-1">
-                <label className="text-xs text-[var(--ash-grey)]">Package Name</label>
+                <label className="text-xs text-[var(--ash-grey)]">
+                  Package Name
+                </label>
                 <Input
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
@@ -801,7 +838,9 @@ function GraphicPackagesSection({
                       placeholder="https://... or upload"
                       className={`flex-1 ${inputClass}`}
                     />
-                    <label className={`inline-flex items-center px-3 text-xs rounded cursor-pointer whitespace-nowrap ${outlineBtnClass} border`}>
+                    <label
+                      className={`inline-flex items-center px-3 text-xs rounded cursor-pointer whitespace-nowrap ${outlineBtnClass} border`}
+                    >
                       {uploadingLogo ? '...' : 'Upload'}
                       <input
                         type="file"
@@ -814,8 +853,13 @@ function GraphicPackagesSection({
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs text-[var(--ash-grey)]">Logo Position</label>
-                  <Select value={formLogoPosition} onValueChange={setFormLogoPosition}>
+                  <label className="text-xs text-[var(--ash-grey)]">
+                    Logo Position
+                  </label>
+                  <Select
+                    value={formLogoPosition}
+                    onValueChange={setFormLogoPosition}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -828,7 +872,9 @@ function GraphicPackagesSection({
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs text-[var(--ash-grey)]">Sponsor Logo</label>
+                  <label className="text-xs text-[var(--ash-grey)]">
+                    Sponsor Logo
+                  </label>
                   <div className="flex gap-2">
                     <Input
                       value={formSponsorUrl}
@@ -836,7 +882,9 @@ function GraphicPackagesSection({
                       placeholder="https://... or upload"
                       className={`flex-1 ${inputClass}`}
                     />
-                    <label className={`inline-flex items-center px-3 text-xs rounded cursor-pointer whitespace-nowrap ${outlineBtnClass} border`}>
+                    <label
+                      className={`inline-flex items-center px-3 text-xs rounded cursor-pointer whitespace-nowrap ${outlineBtnClass} border`}
+                    >
                       {uploadingSponsor ? '...' : 'Upload'}
                       <input
                         type="file"
@@ -849,8 +897,13 @@ function GraphicPackagesSection({
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs text-[var(--ash-grey)]">Sponsor Position</label>
-                  <Select value={formSponsorPosition} onValueChange={setFormSponsorPosition}>
+                  <label className="text-xs text-[var(--ash-grey)]">
+                    Sponsor Position
+                  </label>
+                  <Select
+                    value={formSponsorPosition}
+                    onValueChange={setFormSponsorPosition}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -886,10 +939,13 @@ function GraphicPackagesSection({
                       src={formLogoUrl}
                       alt="Logo"
                       className={`absolute w-12 h-12 object-contain opacity-70 ${
-                        formLogoPosition === 'top-left' ? 'top-2 left-2' :
-                        formLogoPosition === 'top-right' ? 'top-2 right-2' :
-                        formLogoPosition === 'bottom-left' ? 'bottom-2 left-2' :
-                        'bottom-2 right-2'
+                        formLogoPosition === 'top-left'
+                          ? 'top-2 left-2'
+                          : formLogoPosition === 'top-right'
+                            ? 'top-2 right-2'
+                            : formLogoPosition === 'bottom-left'
+                              ? 'bottom-2 left-2'
+                              : 'bottom-2 right-2'
                       }`}
                     />
                   )}
@@ -898,10 +954,13 @@ function GraphicPackagesSection({
                       src={formSponsorUrl}
                       alt="Sponsor"
                       className={`absolute w-16 h-8 object-contain opacity-70 ${
-                        formSponsorPosition === 'top-left' ? 'top-2 left-2' :
-                        formSponsorPosition === 'top-right' ? 'top-2 right-2' :
-                        formSponsorPosition === 'bottom-left' ? 'bottom-2 left-2' :
-                        'bottom-2 right-2'
+                        formSponsorPosition === 'top-left'
+                          ? 'top-2 left-2'
+                          : formSponsorPosition === 'top-right'
+                            ? 'top-2 right-2'
+                            : formSponsorPosition === 'bottom-left'
+                              ? 'bottom-2 left-2'
+                              : 'bottom-2 right-2'
                       }`}
                     />
                   )}
@@ -909,7 +968,11 @@ function GraphicPackagesSection({
               )}
 
               <div className="flex items-center gap-2">
-                <Button onClick={handleSave} disabled={saving || !formName.trim()} className={primaryBtnClass}>
+                <Button
+                  onClick={handleSave}
+                  disabled={saving || !formName.trim()}
+                  className={primaryBtnClass}
+                >
                   {saving ? 'Saving...' : editingPkg ? 'Update' : 'Create'}
                 </Button>
                 <Button
@@ -952,7 +1015,9 @@ function GraphicPackagesSection({
               {loadingImport ? (
                 <LoadingSpinner size="sm" className="text-[var(--ash-grey)]" />
               ) : spiideoPackages.length === 0 ? (
-                <p className="text-xs text-[var(--ash-grey)]">No Spiideo packages found</p>
+                <p className="text-xs text-[var(--ash-grey)]">
+                  No Spiideo packages found
+                </p>
               ) : (
                 <div className="space-y-1">
                   {spiideoPackages.map((pkg) => (
@@ -961,11 +1026,17 @@ function GraphicPackagesSection({
                       className="flex items-center justify-between py-2 px-3 rounded bg-white/[0.02]"
                     >
                       <div>
-                        <span className="text-sm text-[var(--timberwolf)]">{pkg.name}</span>
-                        <span className="text-xs text-[var(--ash-grey)] ml-2">({pkg.type})</span>
+                        <span className="text-sm text-[var(--timberwolf)]">
+                          {pkg.name}
+                        </span>
+                        <span className="text-xs text-[var(--ash-grey)] ml-2">
+                          ({pkg.type})
+                        </span>
                       </div>
                       {pkg.alreadyImported ? (
-                        <span className="text-xs text-[var(--ash-grey)]">Imported</span>
+                        <span className="text-xs text-[var(--ash-grey)]">
+                          Imported
+                        </span>
                       ) : (
                         <Button
                           variant="outline"
@@ -1001,7 +1072,11 @@ function MarketplaceSettingsSection({
   inputClass: string
   outlineBtnClass: string
   primaryBtnClass: string
-  onUpdate: (settings: { marketplace_enabled: boolean; default_price_amount: number | null; default_price_currency: string }) => void
+  onUpdate: (settings: {
+    marketplace_enabled: boolean
+    default_price_amount: number | null
+    default_price_currency: string
+  }) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -1020,7 +1095,9 @@ function MarketplaceSettingsSection({
       if (res.ok) {
         const data = await res.json()
         setEnabled(data.marketplace_enabled || false)
-        setPrice(data.default_price_amount ? String(data.default_price_amount) : '')
+        setPrice(
+          data.default_price_amount ? String(data.default_price_amount) : ''
+        )
         setCurrency(data.default_price_currency || 'AED')
       }
     } catch {
@@ -1101,7 +1178,9 @@ function MarketplaceSettingsSection({
               {enabled && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-xs text-[var(--ash-grey)]">Default Price</label>
+                    <label className="text-xs text-[var(--ash-grey)]">
+                      Default Price
+                    </label>
                     <Input
                       type="number"
                       step="0.01"
@@ -1113,7 +1192,9 @@ function MarketplaceSettingsSection({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs text-[var(--ash-grey)]">Currency</label>
+                    <label className="text-xs text-[var(--ash-grey)]">
+                      Currency
+                    </label>
                     <Select value={currency} onValueChange={setCurrency}>
                       <SelectTrigger>
                         <SelectValue />
@@ -1130,7 +1211,11 @@ function MarketplaceSettingsSection({
                 </div>
               )}
               <div className="flex items-center gap-3">
-                <Button onClick={handleSave} disabled={saving} className={primaryBtnClass}>
+                <Button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className={primaryBtnClass}
+                >
                   {saving ? 'Saving...' : 'Save'}
                 </Button>
                 {savedMsg && (
@@ -1180,7 +1265,9 @@ export default function VenueManagementPage() {
   const [grantingAccess, setGrantingAccess] = useState(false)
 
   // Edit recording modal state
-  const [editingRecording, setEditingRecording] = useState<Recording | null>(null)
+  const [editingRecording, setEditingRecording] = useState<Recording | null>(
+    null
+  )
   const [editTitle, setEditTitle] = useState('')
   const [editHomeTeam, setEditHomeTeam] = useState('')
   const [editAwayTeam, setEditAwayTeam] = useState('')
@@ -1188,7 +1275,9 @@ export default function VenueManagementPage() {
   const [togglingBillable, setTogglingBillable] = useState<string | null>(null)
   const [editingAmountId, setEditingAmountId] = useState<string | null>(null)
   const [editingAmountValue, setEditingAmountValue] = useState('')
-  const [deletingRecording, setDeletingRecording] = useState<string | null>(null)
+  const [deletingRecording, setDeletingRecording] = useState<string | null>(
+    null
+  )
 
   // Delete confirmation modal state
   const [deleteConfirmRecording, setDeleteConfirmRecording] =
@@ -1271,8 +1360,11 @@ export default function VenueManagementPage() {
   } | null>(null)
 
   // Graphic package state (for schedule form)
-  const [scheduleGraphicPackages, setScheduleGraphicPackages] = useState<GraphicPackage[]>([])
-  const [selectedGraphicPackageId, setSelectedGraphicPackageId] = useState<string>('default')
+  const [scheduleGraphicPackages, setScheduleGraphicPackages] = useState<
+    GraphicPackage[]
+  >([])
+  const [selectedGraphicPackageId, setSelectedGraphicPackageId] =
+    useState<string>('default')
 
   // Fetch graphic packages when schedule form opens
   useEffect(() => {
@@ -1375,7 +1467,12 @@ export default function VenueManagementPage() {
   }, [searchInput])
 
   // Separate recordings fetch with pagination + filters
-  async function fetchRecordings(page?: number, search?: string, status?: string, billable?: string) {
+  async function fetchRecordings(
+    page?: number,
+    search?: string,
+    status?: string,
+    billable?: string
+  ) {
     const p = page ?? currentPage
     const s = search ?? debouncedSearch
     const st = status ?? statusFilter
@@ -1406,7 +1503,12 @@ export default function VenueManagementPage() {
   // Fetch recordings when filters/page change or venue loads
   useEffect(() => {
     if (venue) {
-      fetchRecordings(currentPage, debouncedSearch, statusFilter, billableFilter)
+      fetchRecordings(
+        currentPage,
+        debouncedSearch,
+        statusFilter,
+        billableFilter
+      )
     }
   }, [currentPage, debouncedSearch, statusFilter, billableFilter, venue])
 
@@ -1632,7 +1734,12 @@ export default function VenueManagementPage() {
         setRecordings((prev) =>
           prev.map((r) =>
             r.id === editingRecording.id
-              ? { ...r, title: editTitle, home_team: editHomeTeam, away_team: editAwayTeam }
+              ? {
+                  ...r,
+                  title: editTitle,
+                  home_team: editHomeTeam,
+                  away_team: editAwayTeam,
+                }
               : r
           )
         )
@@ -2004,9 +2111,17 @@ export default function VenueManagementPage() {
             isBillable && billableAmount ? Number(billableAmount) : undefined,
           broadcastToYoutube,
           marketplaceEnabled,
-          priceAmount: marketplaceEnabled && marketplacePrice ? Number(marketplacePrice) : undefined,
+          priceAmount:
+            marketplaceEnabled && marketplacePrice
+              ? Number(marketplacePrice)
+              : undefined,
           priceCurrency: orgMarketplace?.default_price_currency || 'AED',
-          graphicPackageId: selectedGraphicPackageId === 'default' ? undefined : selectedGraphicPackageId === 'none' ? null : selectedGraphicPackageId,
+          graphicPackageId:
+            selectedGraphicPackageId === 'default'
+              ? undefined
+              : selectedGraphicPackageId === 'none'
+                ? null
+                : selectedGraphicPackageId,
         }),
       })
 
@@ -2231,9 +2346,10 @@ export default function VenueManagementPage() {
                   <div className="flex items-center gap-3 order-last sm:order-none ml-auto sm:ml-0 sm:absolute sm:left-1/2 sm:-translate-x-1/2">
                     <button
                       onClick={() => {
-                        const prev = billingMonth === 1
-                          ? { m: 12, y: billingYear - 1 }
-                          : { m: billingMonth - 1, y: billingYear }
+                        const prev =
+                          billingMonth === 1
+                            ? { m: 12, y: billingYear - 1 }
+                            : { m: billingMonth - 1, y: billingYear }
                         setBillingMonth(prev.m)
                         setBillingYear(prev.y)
                         fetchBillingData(prev.m, prev.y)
@@ -2243,7 +2359,10 @@ export default function VenueManagementPage() {
                       ‹
                     </button>
                     <p className="text-sm text-[var(--ash-grey)] font-medium min-w-[120px] text-center">
-                      {new Date(billingYear, billingMonth - 1).toLocaleDateString('en-GB', {
+                      {new Date(
+                        billingYear,
+                        billingMonth - 1
+                      ).toLocaleDateString('en-GB', {
                         month: 'long',
                         year: 'numeric',
                       })}
@@ -2251,9 +2370,10 @@ export default function VenueManagementPage() {
                     <button
                       onClick={() => {
                         if (isCurrentBillingMonth) return
-                        const next = billingMonth === 12
-                          ? { m: 1, y: billingYear + 1 }
-                          : { m: billingMonth + 1, y: billingYear }
+                        const next =
+                          billingMonth === 12
+                            ? { m: 1, y: billingYear + 1 }
+                            : { m: billingMonth + 1, y: billingYear }
                         setBillingMonth(next.m)
                         setBillingYear(next.y)
                         fetchBillingData(next.m, next.y)
@@ -2288,19 +2408,20 @@ export default function VenueManagementPage() {
                           recordings
                         </span>
                       </div>
-                      {billingSummary.dailyTarget > 0 && isCurrentBillingMonth && (
-                        <div className="border-l border-[var(--ash-grey)]/10 pl-3 sm:pl-4">
-                          <span
-                            className="text-[var(--timberwolf)] font-medium"
-                            style={{ fontVariantNumeric: 'tabular-nums' }}
-                          >
-                            {billingSummary.todayCount}
-                          </span>
-                          <span className="text-[var(--ash-grey)]/60 text-xs">
-                            /{billingSummary.dailyTarget} today
-                          </span>
-                        </div>
-                      )}
+                      {billingSummary.dailyTarget > 0 &&
+                        isCurrentBillingMonth && (
+                          <div className="border-l border-[var(--ash-grey)]/10 pl-3 sm:pl-4">
+                            <span
+                              className="text-[var(--timberwolf)] font-medium"
+                              style={{ fontVariantNumeric: 'tabular-nums' }}
+                            >
+                              {billingSummary.todayCount}
+                            </span>
+                            <span className="text-[var(--ash-grey)]/60 text-xs">
+                              /{billingSummary.dailyTarget} today
+                            </span>
+                          </div>
+                        )}
                     </div>
                   )}
                 </div>
@@ -2371,7 +2492,11 @@ export default function VenueManagementPage() {
                       </p>
                       <p className="text-[10px] text-[var(--ash-grey)]/40 mt-1">
                         {billingSummary.count} recording
-                        {billingSummary.count === 1 ? '' : 's'} in {new Date(billingYear, billingMonth - 1).toLocaleDateString('en-GB', { month: 'long' })}
+                        {billingSummary.count === 1 ? '' : 's'} in{' '}
+                        {new Date(
+                          billingYear,
+                          billingMonth - 1
+                        ).toLocaleDateString('en-GB', { month: 'long' })}
                       </p>
                     </div>
                     {/* Net settlement */}
@@ -2717,7 +2842,11 @@ export default function VenueManagementPage() {
                         <label className="text-sm font-medium text-[var(--timberwolf)]">
                           Pitch/Camera *
                         </label>
-                        <Select value={sceneId} onValueChange={setSceneId} disabled={scenes.length <= 1}>
+                        <Select
+                          value={sceneId}
+                          onValueChange={setSceneId}
+                          disabled={scenes.length <= 1}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Select pitch..." />
                           </SelectTrigger>
@@ -2890,24 +3019,28 @@ export default function VenueManagementPage() {
                     )}
 
                     {/* Broadcast to YouTube */}
-                    {billingConfig?.youtube_rtmp_url && billingConfig?.youtube_stream_key && (
-                      <div className="space-y-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={broadcastToYoutube}
-                            onChange={(e) => setBroadcastToYoutube(e.target.checked)}
-                            className="w-4 h-4 rounded border-[var(--ash-grey)]/20 bg-white/5 accent-[var(--timberwolf)]"
-                          />
-                          <span className="text-sm font-medium text-[var(--timberwolf)]">
-                            Broadcast to YouTube
-                          </span>
-                        </label>
-                        <p className="text-xs text-[var(--ash-grey)]">
-                          Stream will be pushed to the configured YouTube channel via RTMP
-                        </p>
-                      </div>
-                    )}
+                    {billingConfig?.youtube_rtmp_url &&
+                      billingConfig?.youtube_stream_key && (
+                        <div className="space-y-2">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={broadcastToYoutube}
+                              onChange={(e) =>
+                                setBroadcastToYoutube(e.target.checked)
+                              }
+                              className="w-4 h-4 rounded border-[var(--ash-grey)]/20 bg-white/5 accent-[var(--timberwolf)]"
+                            />
+                            <span className="text-sm font-medium text-[var(--timberwolf)]">
+                              Broadcast to YouTube
+                            </span>
+                          </label>
+                          <p className="text-xs text-[var(--ash-grey)]">
+                            Stream will be pushed to the configured YouTube
+                            channel via RTMP
+                          </p>
+                        </div>
+                      )}
 
                     {/* List on marketplace */}
                     {orgMarketplace?.marketplace_enabled && (
@@ -2916,7 +3049,9 @@ export default function VenueManagementPage() {
                           <input
                             type="checkbox"
                             checked={marketplaceEnabled}
-                            onChange={(e) => setMarketplaceEnabled(e.target.checked)}
+                            onChange={(e) =>
+                              setMarketplaceEnabled(e.target.checked)
+                            }
                             className="w-4 h-4 rounded border-[var(--ash-grey)]/20 bg-white/5 accent-[var(--timberwolf)]"
                           />
                           <span className="text-sm font-medium text-[var(--timberwolf)]">
@@ -2930,8 +3065,12 @@ export default function VenueManagementPage() {
                               step="0.01"
                               min="0"
                               value={marketplacePrice}
-                              onChange={(e) => setMarketplacePrice(e.target.value)}
-                              placeholder={String(orgMarketplace.default_price_amount || '25.00')}
+                              onChange={(e) =>
+                                setMarketplacePrice(e.target.value)
+                              }
+                              placeholder={String(
+                                orgMarketplace.default_price_amount || '25.00'
+                              )}
                               className={`w-32 ${inputClass}`}
                             />
                             <span className="text-sm text-[var(--ash-grey)]">
@@ -2948,7 +3087,10 @@ export default function VenueManagementPage() {
                         <label className="text-sm font-medium text-[var(--timberwolf)]">
                           Graphic Package
                         </label>
-                        <Select value={selectedGraphicPackageId} onValueChange={setSelectedGraphicPackageId}>
+                        <Select
+                          value={selectedGraphicPackageId}
+                          onValueChange={setSelectedGraphicPackageId}
+                        >
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -2957,7 +3099,8 @@ export default function VenueManagementPage() {
                             <SelectItem value="none">None</SelectItem>
                             {scheduleGraphicPackages.map((pkg) => (
                               <SelectItem key={pkg.id} value={pkg.id}>
-                                {pkg.name}{pkg.is_default ? ' (default)' : ''}
+                                {pkg.name}
+                                {pkg.is_default ? ' (default)' : ''}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -3104,7 +3247,10 @@ export default function VenueManagementPage() {
                           <label className="text-sm text-[var(--ash-grey)]">
                             Camera/Pitch *
                           </label>
-                          <Select value={streamSceneId} onValueChange={setStreamSceneId}>
+                          <Select
+                            value={streamSceneId}
+                            onValueChange={setStreamSceneId}
+                          >
                             <SelectTrigger>
                               <SelectValue placeholder="Select pitch..." />
                             </SelectTrigger>
@@ -3393,7 +3539,13 @@ export default function VenueManagementPage() {
                   onChange={(e) => setSearchInput(e.target.value)}
                   className={`sm:max-w-xs ${inputClass}`}
                 />
-                <Select value={statusFilter || 'all'} onValueChange={(v) => { setStatusFilter(v === 'all' ? '' : v); setCurrentPage(1) }}>
+                <Select
+                  value={statusFilter || 'all'}
+                  onValueChange={(v) => {
+                    setStatusFilter(v === 'all' ? '' : v)
+                    setCurrentPage(1)
+                  }}
+                >
                   <SelectTrigger className="sm:w-40">
                     <SelectValue />
                   </SelectTrigger>
@@ -3404,7 +3556,13 @@ export default function VenueManagementPage() {
                     <SelectItem value="scheduled">Scheduled</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={billableFilter || 'all'} onValueChange={(v) => { setBillableFilter(v === 'all' ? '' : v); setCurrentPage(1) }}>
+                <Select
+                  value={billableFilter || 'all'}
+                  onValueChange={(v) => {
+                    setBillableFilter(v === 'all' ? '' : v)
+                    setCurrentPage(1)
+                  }}
+                >
                   <SelectTrigger className="sm:w-40">
                     <SelectValue />
                   </SelectTrigger>
@@ -3437,7 +3595,9 @@ export default function VenueManagementPage() {
                           <Button
                             variant="outline"
                             size="icon"
-                            onClick={() => router.push(`/recordings/${recording.id}`)}
+                            onClick={() =>
+                              router.push(`/recordings/${recording.id}`)
+                            }
                             className={`flex-shrink-0 ${outlineBtnClass}`}
                           >
                             <svg
@@ -3498,8 +3658,8 @@ export default function VenueManagementPage() {
                                 ? 'Billable'
                                 : 'Not Billable'}
                           </button>
-                          {recording.is_billable !== false && (
-                            editingAmountId === recording.id ? (
+                          {recording.is_billable !== false &&
+                            (editingAmountId === recording.id ? (
                               <input
                                 type="number"
                                 step="0.001"
@@ -3507,11 +3667,15 @@ export default function VenueManagementPage() {
                                 autoFocus
                                 className="w-24 text-xs px-2 py-0.5 rounded bg-zinc-800 text-[var(--timberwolf)] border border-[var(--ash-grey)]/30 outline-none"
                                 value={editingAmountValue}
-                                onChange={(e) => setEditingAmountValue(e.target.value)}
+                                onChange={(e) =>
+                                  setEditingAmountValue(e.target.value)
+                                }
                                 onBlur={() => saveBillableAmount(recording)}
                                 onKeyDown={(e) => {
-                                  if (e.key === 'Enter') saveBillableAmount(recording)
-                                  if (e.key === 'Escape') setEditingAmountId(null)
+                                  if (e.key === 'Enter')
+                                    saveBillableAmount(recording)
+                                  if (e.key === 'Escape')
+                                    setEditingAmountId(null)
                                 }}
                               />
                             ) : (
@@ -3521,23 +3685,37 @@ export default function VenueManagementPage() {
                                     ? 'cursor-pointer hover:bg-zinc-700/50'
                                     : ''
                                 } text-[var(--ash-grey)]`}
-                                title={recording.collected_by === 'playhub' ? 'Amount locked (verified transaction)' : 'Click to edit amount'}
+                                title={
+                                  recording.collected_by === 'playhub'
+                                    ? 'Amount locked (verified transaction)'
+                                    : 'Click to edit amount'
+                                }
                                 onClick={() => {
                                   if (recording.collected_by !== 'playhub') {
                                     setEditingAmountId(recording.id)
                                     setEditingAmountValue(
-                                      String(recording.billable_amount ?? billingConfig?.default_billable_amount ?? '')
+                                      String(
+                                        recording.billable_amount ??
+                                          billingConfig?.default_billable_amount ??
+                                          ''
+                                      )
                                     )
                                   }
                                 }}
                               >
-                                {(recording.billable_amount ?? billingConfig?.default_billable_amount ?? 0).toFixed(3)}{' '}
+                                {(
+                                  recording.billable_amount ??
+                                  billingConfig?.default_billable_amount ??
+                                  0
+                                ).toFixed(3)}{' '}
                                 {billingConfig?.currency || 'KWD'}
                               </span>
-                            )
-                          )}
+                            ))}
                           {recording.graphicPackageName && (
-                            <span className="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-400" title="Graphic Package">
+                            <span
+                              className="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-400"
+                              title="Graphic Package"
+                            >
                               {recording.graphicPackageName}
                             </span>
                           )}
@@ -3580,7 +3758,9 @@ export default function VenueManagementPage() {
                             onClick={() => promptDeleteRecording(recording)}
                             disabled={deletingRecording === recording.id}
                           >
-                            {deletingRecording === recording.id ? '...' : 'Delete'}
+                            {deletingRecording === recording.id
+                              ? '...'
+                              : 'Delete'}
                           </Button>
                         </div>
                       </div>
@@ -3591,7 +3771,9 @@ export default function VenueManagementPage() {
                   {totalRecordings > pageSize && (
                     <div className="flex items-center justify-between mt-4 pt-4 border-t border-[var(--ash-grey)]/10">
                       <p className="text-sm text-[var(--ash-grey)]">
-                        {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, totalRecordings)} of {totalRecordings}
+                        {(currentPage - 1) * pageSize + 1}–
+                        {Math.min(currentPage * pageSize, totalRecordings)} of{' '}
+                        {totalRecordings}
                       </p>
                       <div className="flex items-center gap-2">
                         <Button
@@ -3604,13 +3786,16 @@ export default function VenueManagementPage() {
                           Previous
                         </Button>
                         <span className="text-sm text-[var(--ash-grey)] px-2">
-                          Page {currentPage} of {Math.ceil(totalRecordings / pageSize)}
+                          Page {currentPage} of{' '}
+                          {Math.ceil(totalRecordings / pageSize)}
                         </span>
                         <Button
                           variant="outline"
                           size="sm"
                           className={outlineBtnClass}
-                          disabled={currentPage >= Math.ceil(totalRecordings / pageSize)}
+                          disabled={
+                            currentPage >= Math.ceil(totalRecordings / pageSize)
+                          }
                           onClick={() => setCurrentPage((p) => p + 1)}
                         >
                           Next

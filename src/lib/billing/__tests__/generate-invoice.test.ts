@@ -21,7 +21,9 @@ function createSupabaseMock(overrides: Record<string, any> = {}) {
   chain.not = vi.fn().mockReturnValue(chain)
   chain.single = vi.fn().mockResolvedValue({ data: null, error: null })
   chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
-  chain.auth = { admin: { listUsers: vi.fn().mockResolvedValue({ data: { users: [] } }) } }
+  chain.auth = {
+    admin: { listUsers: vi.fn().mockResolvedValue({ data: { users: [] } }) },
+  }
 
   // Apply overrides
   Object.assign(chain, overrides)
@@ -107,8 +109,18 @@ describe('generateMonthlyInvoice', () => {
       },
       playhub_venue_invoices_check: null, // no duplicate
       playhub_match_recordings: [
-        { id: 'r1', title: 'Match 1', billable_amount: 10, collected_by: 'venue' },
-        { id: 'r2', title: 'Match 2', billable_amount: 20, collected_by: 'venue' },
+        {
+          id: 'r1',
+          title: 'Match 1',
+          billable_amount: 10,
+          collected_by: 'venue',
+        },
+        {
+          id: 'r2',
+          title: 'Match 2',
+          billable_amount: 20,
+          collected_by: 'venue',
+        },
       ],
       playhub_venue_invoices_insert: {
         id: 'new-invoice',
@@ -133,10 +145,16 @@ describe('generateMonthlyInvoice', () => {
     supabase.single.mockImplementation(() => {
       singleCallCount++
       if (singleCallCount === 1) {
-        return Promise.resolve({ data: mockData.playhub_venue_billing_config, error: null })
+        return Promise.resolve({
+          data: mockData.playhub_venue_billing_config,
+          error: null,
+        })
       }
       // insert().select().single()
-      return Promise.resolve({ data: mockData.playhub_venue_invoices_insert, error: null })
+      return Promise.resolve({
+        data: mockData.playhub_venue_invoices_insert,
+        error: null,
+      })
     })
 
     // maybeSingle = duplicate check (no match)
@@ -151,7 +169,10 @@ describe('generateMonthlyInvoice', () => {
       lteCallCount++
       if (lteCallCount === 1) {
         // This is the recordings query — return data directly
-        return Promise.resolve({ data: mockData.playhub_match_recordings, error: null })
+        return Promise.resolve({
+          data: mockData.playhub_match_recordings,
+          error: null,
+        })
       }
       return supabase
     })

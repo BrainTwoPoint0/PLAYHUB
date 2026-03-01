@@ -9,14 +9,17 @@ Graphics (logos, sponsors) are currently stored as `media_pack` JSONB on `playhu
 ## Current State
 
 **In the DB:**
+
 - `playhub_venue_billing_config.media_pack` — JSONB with `logo_url`, `logo_position`, `sponsor_logo_url`, `sponsor_position`
 - Set per venue via the billing settings UI
 
 **In the UI:**
+
 - Venue page has a "Media Pack" section in billing settings
 - `media_pack` is fetched in `/api/recordings/[id]` and `/api/watch/[token]` and passed to the video player
 
 **Spiideo API:**
+
 - `GET /v1/graphic-packages` — lists packages with `id`, `accountId`, `name`, `sports[]`, `type` (html/svg)
 - Packages are NOT linked to productions/games in the public API
 - Graphics are NOT baked into Spiideo Play downloads
@@ -25,25 +28,29 @@ Graphics (logos, sponsors) are currently stored as `media_pack` JSONB on `playhu
 ## Design Decisions (Resolved)
 
 ### 1. Logo File Storage
+
 - **PLAYHUB-managed packages** → Supabase Storage bucket `graphic-packages/`
 - **Spiideo-linked packages** → URL reference to Spiideo (metadata only, assets uploaded to Supabase separately)
 
 ### 2. Position System (Learned from LIGR)
+
 **Predefined position slots, not custom coordinates.** LIGR proves users don't want x/y control. Use percentage-based CSS positioning for responsiveness across player sizes.
 
-| Position | CSS | Typical Use |
-|----------|-----|-------------|
-| `top-left` | `top: 2%; left: 2%` | Competition/league logo |
-| `top-right` | `top: 2%; right: 2%` | Club/org logo |
-| `bottom-left` | `bottom: 2%; left: 2%` | Sponsor logo |
-| `bottom-right` | `bottom: 2%; right: 2%` | Secondary sponsor |
+| Position       | CSS                     | Typical Use             |
+| -------------- | ----------------------- | ----------------------- |
+| `top-left`     | `top: 2%; left: 2%`     | Competition/league logo |
+| `top-right`    | `top: 2%; right: 2%`    | Club/org logo           |
+| `bottom-left`  | `bottom: 2%; left: 2%`  | Sponsor logo            |
+| `bottom-right` | `bottom: 2%; right: 2%` | Secondary sponsor       |
 
 Logo spec: **300x300 PNG with transparent background** (LIGR standard). Sponsor banners: **510x150 PNG transparent**.
 
 ### 3. Spiideo Import
+
 Link by Spiideo package ID for reference. Actual assets (logos, sponsors) must be uploaded to Supabase — Spiideo's API only returns metadata (name, type, sports), not the graphic files.
 
 ### 4. Overlay Rendering
+
 **CSS overlay on the video player** — absolutely-positioned elements over `<video>`. This is how LIGR works (transparent HTML layer over video). Graphics exist in the viewing experience, not baked into the file. Simple, no server-side processing needed.
 
 ## Database Schema
@@ -176,15 +183,15 @@ recording.graphic_package_id (explicit)
 
 ## Files That Will Change
 
-| File | Change |
-|------|--------|
-| `src/app/api/recordings/[id]/route.ts` | Fetch graphic package, fallback chain |
-| `src/app/api/watch/[token]/route.ts` | Same fallback logic |
-| `src/app/venue/[venueId]/page.tsx` | Scheduling form: pick graphic package |
-| `src/lib/spiideo/client.ts` | Add `getGraphicPackages()` method |
-| New: `src/app/api/org/[orgId]/graphic-packages/route.ts` | CRUD |
-| New: `src/components/streaming/GraphicsOverlay.tsx` | CSS overlay component |
-| New: migration SQL | Table + column + RLS |
+| File                                                     | Change                                |
+| -------------------------------------------------------- | ------------------------------------- |
+| `src/app/api/recordings/[id]/route.ts`                   | Fetch graphic package, fallback chain |
+| `src/app/api/watch/[token]/route.ts`                     | Same fallback logic                   |
+| `src/app/venue/[venueId]/page.tsx`                       | Scheduling form: pick graphic package |
+| `src/lib/spiideo/client.ts`                              | Add `getGraphicPackages()` method     |
+| New: `src/app/api/org/[orgId]/graphic-packages/route.ts` | CRUD                                  |
+| New: `src/components/streaming/GraphicsOverlay.tsx`      | CSS overlay component                 |
+| New: migration SQL                                       | Table + column + RLS                  |
 
 ## Spiideo Graphic Packages — API Reference
 

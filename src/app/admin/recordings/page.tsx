@@ -1,7 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Card, CardContent, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@braintwopoint0/playback-commons/ui'
+import {
+  Card,
+  CardContent,
+  Input,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@braintwopoint0/playback-commons/ui'
 
 interface Recording {
   id: string

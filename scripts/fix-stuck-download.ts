@@ -42,11 +42,15 @@ async function main() {
     process.exit(1)
   }
 
-  console.log(`Production: ${liveProduction.id} | State: ${liveProduction.processingState}`)
+  console.log(
+    `Production: ${liveProduction.id} | State: ${liveProduction.processingState}`
+  )
 
   console.log('\nFetching outputs...')
   const outputs = await getOutputs(liveProduction.id)
-  const downloadOutputs = outputs.content.filter((o) => o.outputType === 'download')
+  const downloadOutputs = outputs.content.filter(
+    (o) => o.outputType === 'download'
+  )
 
   console.log(`Found ${downloadOutputs.length} download output(s)`)
 
@@ -69,9 +73,13 @@ async function main() {
   const initialProgress = await getOutputProgress(newOutput.id)
   console.log(`Initial progress: ${initialProgress.progress}%`)
 
-  console.log('\nDone! The sync Lambda will pick this up on the next run (every 15 min).')
+  console.log(
+    '\nDone! The sync Lambda will pick this up on the next run (every 15 min).'
+  )
   console.log('Or monitor progress manually with:')
-  console.log(`  npx tsx -e "import 'dotenv/config'; import {getOutputProgress} from './src/lib/spiideo/client'; getOutputProgress('${newOutput.id}').then(p => console.log(p.progress + '%'))"`)
+  console.log(
+    `  npx tsx -e "import 'dotenv/config'; import {getOutputProgress} from './src/lib/spiideo/client'; getOutputProgress('${newOutput.id}').then(p => console.log(p.progress + '%'))"`
+  )
 }
 
 main().catch((err) => {

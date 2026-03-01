@@ -40,7 +40,10 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 
   if (error) {
     console.error('Failed to fetch billing config:', error)
-    return NextResponse.json({ error: 'Failed to fetch billing config' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to fetch billing config' },
+      { status: 500 }
+    )
   }
 
   // Return config or defaults
@@ -116,9 +119,12 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   }
 
   // Only include new fields if they were sent (avoids overwriting on older PUT calls)
-  if (youtube_rtmp_url !== undefined) upsertData.youtube_rtmp_url = youtube_rtmp_url || null
-  if (youtube_stream_key !== undefined) upsertData.youtube_stream_key = youtube_stream_key || null
-  if (marketplace_revenue_split_pct !== undefined) upsertData.marketplace_revenue_split_pct = marketplace_revenue_split_pct
+  if (youtube_rtmp_url !== undefined)
+    upsertData.youtube_rtmp_url = youtube_rtmp_url || null
+  if (youtube_stream_key !== undefined)
+    upsertData.youtube_stream_key = youtube_stream_key || null
+  if (marketplace_revenue_split_pct !== undefined)
+    upsertData.marketplace_revenue_split_pct = marketplace_revenue_split_pct
 
   const { data, error } = await serviceClient
     .from('playhub_venue_billing_config')
@@ -128,7 +134,10 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 
   if (error) {
     console.error('Failed to update billing config:', error)
-    return NextResponse.json({ error: 'Failed to update billing config' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to update billing config' },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json({ config: data })

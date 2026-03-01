@@ -4,7 +4,14 @@ import { motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatDateTime } from '@braintwopoint0/playback-commons/utils'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, DatePicker } from '@braintwopoint0/playback-commons/ui'
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+  DatePicker,
+} from '@braintwopoint0/playback-commons/ui'
 import { FadeIn } from '@/components/FadeIn'
 import { ShareRecordingModal } from '@/components/ShareRecordingModal'
 

@@ -33,13 +33,22 @@ export async function GET(
   // Parse query params
   const searchParams = request.nextUrl.searchParams
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
-  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)))
+  const limit = Math.min(
+    100,
+    Math.max(1, parseInt(searchParams.get('limit') || '20', 10))
+  )
   // Sanitize search: escape PostgREST filter special chars to prevent filter injection
   const rawSearch = searchParams.get('search')?.trim() || ''
   const search = rawSearch.replace(/[%_,().\\*]/g, (c) => `\\${c}`)
   const status = searchParams.get('status') || ''
   const billable = searchParams.get('billable') || ''
-  const VALID_STATUSES = ['draft', 'published', 'archived', 'processing', 'ready']
+  const VALID_STATUSES = [
+    'draft',
+    'published',
+    'archived',
+    'processing',
+    'ready',
+  ]
 
   // Use service client for data queries to bypass RLS
   const serviceClient = createServiceClient()
@@ -153,7 +162,11 @@ export async function GET(
   }
 
   // Get graphic package names for recordings that have one
-  const gpIds = [...new Set((recordings || []).map((r: any) => r.graphic_package_id).filter(Boolean))]
+  const gpIds = [
+    ...new Set(
+      (recordings || []).map((r: any) => r.graphic_package_id).filter(Boolean)
+    ),
+  ]
   let gpNames: Record<string, string> = {}
 
   if (gpIds.length > 0) {

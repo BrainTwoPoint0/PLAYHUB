@@ -440,30 +440,51 @@ export async function listClubTeamsWithMembers(
 export async function removeMembersInBulk(
   clubSlug: string,
   targets: { email: string; teamSlug: string }[]
-): Promise<{ email: string; teamSlug: string; success: boolean; message: string }[]> {
+): Promise<
+  { email: string; teamSlug: string; success: boolean; message: string }[]
+> {
   if (targets.length === 0) return []
 
   return withSession(async (session) => {
-    const results: { email: string; teamSlug: string; success: boolean; message: string }[] = []
+    const results: {
+      email: string
+      teamSlug: string
+      success: boolean
+      message: string
+    }[] = []
 
     for (const target of targets) {
       const basePath = `/api/app/clubs/${clubSlug}/teams/${target.teamSlug}`
       let removed = false
 
       // Step 1: Check active members
-      const membersRes = await session.api('GET', `${basePath}/members/?status=active`)
+      const membersRes = await session.api(
+        'GET',
+        `${basePath}/members/?status=active`
+      )
       if (membersRes.status === 200) {
         const members: VeoMember[] = parseBody(membersRes.body) || []
         const member = members.find(
           (m) => m.email?.toLowerCase() === target.email.toLowerCase()
         )
         if (member) {
-          const deleteRes = await session.api('DELETE', `${basePath}/members/${member.id}/`)
+          const deleteRes = await session.api(
+            'DELETE',
+            `${basePath}/members/${member.id}/`
+          )
           if (deleteRes.status === 204 || deleteRes.status === 200) {
-            results.push({ ...target, success: true, message: `Removed ${target.email} from team` })
+            results.push({
+              ...target,
+              success: true,
+              message: `Removed ${target.email} from team`,
+            })
             removed = true
           } else {
-            results.push({ ...target, success: false, message: `Failed to delete member ${member.id}: ${deleteRes.status}` })
+            results.push({
+              ...target,
+              success: false,
+              message: `Failed to delete member ${member.id}: ${deleteRes.status}`,
+            })
             removed = true // attempted
           }
         }
@@ -479,11 +500,22 @@ export async function removeMembersInBulk(
           (m) => m.email?.toLowerCase() === target.email.toLowerCase()
         )
         if (member) {
-          const deleteRes = await session.api('DELETE', `${basePath}/members/${member.id}/`)
+          const deleteRes = await session.api(
+            'DELETE',
+            `${basePath}/members/${member.id}/`
+          )
           if (deleteRes.status === 204 || deleteRes.status === 200) {
-            results.push({ ...target, success: true, message: `Removed ${target.email} from team (status: ${member.status})` })
+            results.push({
+              ...target,
+              success: true,
+              message: `Removed ${target.email} from team (status: ${member.status})`,
+            })
           } else {
-            results.push({ ...target, success: false, message: `Failed to delete member ${member.id}: ${deleteRes.status}` })
+            results.push({
+              ...target,
+              success: false,
+              message: `Failed to delete member ${member.id}: ${deleteRes.status}`,
+            })
           }
           continue
         }
@@ -498,18 +530,32 @@ export async function removeMembersInBulk(
         )
         if (invitation) {
           const invId = invitation.public_identifier || invitation.id
-          const deleteRes = await session.api('DELETE', `${basePath}/invitations/${invId}/`)
+          const deleteRes = await session.api(
+            'DELETE',
+            `${basePath}/invitations/${invId}/`
+          )
           if (deleteRes.status === 204 || deleteRes.status === 200) {
-            results.push({ ...target, success: true, message: `Revoked invitation for ${target.email}` })
+            results.push({
+              ...target,
+              success: true,
+              message: `Revoked invitation for ${target.email}`,
+            })
           } else {
-            results.push({ ...target, success: false, message: `Failed to revoke invitation ${invId}: ${deleteRes.status}` })
+            results.push({
+              ...target,
+              success: false,
+              message: `Failed to revoke invitation ${invId}: ${deleteRes.status}`,
+            })
           }
           continue
         }
       }
 
       // Step 4: Check addressed invitations
-      const addrInvRes = await session.api('GET', `${basePath}/addressed-invitations/`)
+      const addrInvRes = await session.api(
+        'GET',
+        `${basePath}/addressed-invitations/`
+      )
       if (addrInvRes.status === 200) {
         const invitations: VeoInvitation[] = parseBody(addrInvRes.body) || []
         const invitation = invitations.find((i) =>
@@ -517,17 +563,32 @@ export async function removeMembersInBulk(
         )
         if (invitation) {
           const invId = invitation.public_identifier || invitation.id
-          const deleteRes = await session.api('DELETE', `${basePath}/addressed-invitations/${invId}/`)
+          const deleteRes = await session.api(
+            'DELETE',
+            `${basePath}/addressed-invitations/${invId}/`
+          )
           if (deleteRes.status === 204 || deleteRes.status === 200) {
-            results.push({ ...target, success: true, message: `Revoked addressed invitation for ${target.email}` })
+            results.push({
+              ...target,
+              success: true,
+              message: `Revoked addressed invitation for ${target.email}`,
+            })
           } else {
-            results.push({ ...target, success: false, message: `Failed to revoke addressed invitation ${invId}: ${deleteRes.status}` })
+            results.push({
+              ...target,
+              success: false,
+              message: `Failed to revoke addressed invitation ${invId}: ${deleteRes.status}`,
+            })
           }
           continue
         }
       }
 
-      results.push({ ...target, success: false, message: `${target.email} not found in team members or invitations` })
+      results.push({
+        ...target,
+        success: false,
+        message: `${target.email} not found in team members or invitations`,
+      })
     }
 
     return results

@@ -12,7 +12,11 @@ import {
 import { useAuth } from '@braintwopoint0/playback-commons/auth'
 import { Bookmark, BookmarkCheck, Loader2 } from 'lucide-react'
 import { LoadingSpinner } from '@/components/ui/loading'
-import { VideoPlayer, type MediaPack, type GraphicPackageOverlay } from '@/components/video/VideoPlayer'
+import {
+  VideoPlayer,
+  type MediaPack,
+  type GraphicPackageOverlay,
+} from '@/components/video/VideoPlayer'
 import { EventTagsList } from '@/components/EventTagsList'
 import { MatchDetails } from '@/components/MatchDetails'
 import type { RecordingEvent } from '@/lib/recordings/event-types'
@@ -38,7 +42,9 @@ export default function PublicWatchPage() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [events, setEvents] = useState<RecordingEvent[]>([])
   const [mediaPack, setMediaPack] = useState<MediaPack | undefined>(undefined)
-  const [graphicPackage, setGraphicPackage] = useState<GraphicPackageOverlay | undefined>(undefined)
+  const [graphicPackage, setGraphicPackage] = useState<
+    GraphicPackageOverlay | undefined
+  >(undefined)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 

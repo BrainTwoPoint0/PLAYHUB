@@ -15,4 +15,6 @@ for (const line of envContent.split('\n')) {
 import { getOutputProgress } from '../src/lib/spiideo/client'
 
 const outputId = 'b95d55fd-6765-4be0-beb2-0ec6a7affcb8'
-getOutputProgress(outputId).then(p => console.log(`Download progress: ${p.progress}%`))
+getOutputProgress(outputId).then((p) =>
+  console.log(`Download progress: ${p.progress}%`)
+)

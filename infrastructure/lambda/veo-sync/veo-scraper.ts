@@ -338,20 +338,27 @@ export async function removeMembersFromClub(
     let handled = false
 
     // Step 1: Check active members
-    const membersRes = await session.api('GET', `${basePath}/members/?status=active`)
+    const membersRes = await session.api(
+      'GET',
+      `${basePath}/members/?status=active`
+    )
     if (membersRes.status === 200) {
       const members: VeoMember[] = parseBody(membersRes.body) || []
       const member = members.find(
         (m) => m.email?.toLowerCase() === target.email.toLowerCase()
       )
       if (member) {
-        const deleteRes = await session.api('DELETE', `${basePath}/members/${member.id}/`)
+        const deleteRes = await session.api(
+          'DELETE',
+          `${basePath}/members/${member.id}/`
+        )
         results.push({
           ...target,
           success: deleteRes.status === 204 || deleteRes.status === 200,
-          message: deleteRes.status === 204 || deleteRes.status === 200
-            ? `Removed ${target.email} from team`
-            : `Failed to delete member ${member.id}: ${deleteRes.status}`,
+          message:
+            deleteRes.status === 204 || deleteRes.status === 200
+              ? `Removed ${target.email} from team`
+              : `Failed to delete member ${member.id}: ${deleteRes.status}`,
         })
         handled = true
       }
@@ -367,13 +374,17 @@ export async function removeMembersFromClub(
         (m) => m.email?.toLowerCase() === target.email.toLowerCase()
       )
       if (member) {
-        const deleteRes = await session.api('DELETE', `${basePath}/members/${member.id}/`)
+        const deleteRes = await session.api(
+          'DELETE',
+          `${basePath}/members/${member.id}/`
+        )
         results.push({
           ...target,
           success: deleteRes.status === 204 || deleteRes.status === 200,
-          message: deleteRes.status === 204 || deleteRes.status === 200
-            ? `Removed ${target.email} (status: ${member.status})`
-            : `Failed to delete member ${member.id}: ${deleteRes.status}`,
+          message:
+            deleteRes.status === 204 || deleteRes.status === 200
+              ? `Removed ${target.email} (status: ${member.status})`
+              : `Failed to delete member ${member.id}: ${deleteRes.status}`,
         })
         continue
       }
@@ -382,40 +393,57 @@ export async function removeMembersFromClub(
     // Step 3: Check pending invitations
     const invRes = await session.api('GET', `${basePath}/invitations/`)
     if (invRes.status === 200) {
-      const invitations = (parseBody(invRes.body) || []) as { id?: string; public_identifier?: string }[]
+      const invitations = (parseBody(invRes.body) || []) as {
+        id?: string
+        public_identifier?: string
+      }[]
       const invitation = invitations.find((i) =>
         JSON.stringify(i).toLowerCase().includes(target.email.toLowerCase())
       )
       if (invitation) {
         const invId = invitation.public_identifier || invitation.id
-        const deleteRes = await session.api('DELETE', `${basePath}/invitations/${invId}/`)
+        const deleteRes = await session.api(
+          'DELETE',
+          `${basePath}/invitations/${invId}/`
+        )
         results.push({
           ...target,
           success: deleteRes.status === 204 || deleteRes.status === 200,
-          message: deleteRes.status === 204 || deleteRes.status === 200
-            ? `Revoked invitation for ${target.email}`
-            : `Failed to revoke invitation ${invId}: ${deleteRes.status}`,
+          message:
+            deleteRes.status === 204 || deleteRes.status === 200
+              ? `Revoked invitation for ${target.email}`
+              : `Failed to revoke invitation ${invId}: ${deleteRes.status}`,
         })
         continue
       }
     }
 
     // Step 4: Check addressed invitations
-    const addrInvRes = await session.api('GET', `${basePath}/addressed-invitations/`)
+    const addrInvRes = await session.api(
+      'GET',
+      `${basePath}/addressed-invitations/`
+    )
     if (addrInvRes.status === 200) {
-      const invitations = (parseBody(addrInvRes.body) || []) as { id?: string; public_identifier?: string }[]
+      const invitations = (parseBody(addrInvRes.body) || []) as {
+        id?: string
+        public_identifier?: string
+      }[]
       const invitation = invitations.find((i) =>
         JSON.stringify(i).toLowerCase().includes(target.email.toLowerCase())
       )
       if (invitation) {
         const invId = invitation.public_identifier || invitation.id
-        const deleteRes = await session.api('DELETE', `${basePath}/addressed-invitations/${invId}/`)
+        const deleteRes = await session.api(
+          'DELETE',
+          `${basePath}/addressed-invitations/${invId}/`
+        )
         results.push({
           ...target,
           success: deleteRes.status === 204 || deleteRes.status === 200,
-          message: deleteRes.status === 204 || deleteRes.status === 200
-            ? `Revoked addressed invitation for ${target.email}`
-            : `Failed to revoke addressed invitation ${invId}: ${deleteRes.status}`,
+          message:
+            deleteRes.status === 204 || deleteRes.status === 200
+              ? `Revoked addressed invitation for ${target.email}`
+              : `Failed to revoke addressed invitation ${invId}: ${deleteRes.status}`,
         })
         continue
       }

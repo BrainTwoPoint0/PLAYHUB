@@ -19,7 +19,8 @@ const mockGetAccountConfig = vi.fn()
 vi.mock('@/lib/spiideo/client', () => ({
   createGame: (...args: any[]) => mockCreateGame(...args),
   createProduction: (...args: any[]) => mockCreateProduction(...args),
-  createPushStreamOutput: (...args: any[]) => mockCreatePushStreamOutput(...args),
+  createPushStreamOutput: (...args: any[]) =>
+    mockCreatePushStreamOutput(...args),
   getAccountConfig: (...args: any[]) => mockGetAccountConfig(...args),
 }))
 
@@ -257,7 +258,9 @@ describe('scheduleRecording', () => {
     expect(insertCall.match_recording_id).toBe('rec-123')
 
     // Also flags the recording
-    expect(mockRecordingChain.update).toHaveBeenCalledWith({ marketplace_enabled: true })
+    expect(mockRecordingChain.update).toHaveBeenCalledWith({
+      marketplace_enabled: true,
+    })
   })
 
   it('does not create marketplace product when not enabled', async () => {
