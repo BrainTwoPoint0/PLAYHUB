@@ -11,6 +11,7 @@ export interface AcademyClub {
   veoClubSlug?: string
   organizationId?: string
   logoUrl?: string | null
+  hasScholarships?: boolean
 }
 
 // ============================================================================
@@ -45,6 +46,7 @@ async function loadClubs(): Promise<AcademyClub[]> {
     veoClubSlug: row.veo_club_slug || undefined,
     organizationId: row.organization_id || undefined,
     logoUrl: row.logo_url || null,
+    hasScholarships: row.has_scholarships ?? false,
   }))
   cacheExpiresAt = Date.now() + CACHE_TTL_MS
 
