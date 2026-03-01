@@ -7,10 +7,8 @@ import { isPlatformAdmin } from '@/lib/admin/auth'
 import { getClubBySlug } from '@/lib/academy/config'
 
 export async function DELETE(
-  request: NextRequest,
-  {
-    params,
-  }: { params: Promise<{ clubSlug: string; memberId: string }> }
+  _request: NextRequest,
+  { params }: { params: Promise<{ clubSlug: string; memberId: string }> }
 ) {
   const { clubSlug, memberId } = await params
   const supabase = await createClient()
@@ -76,7 +74,10 @@ export async function DELETE(
   const memberIsPlatformAdmin = (membership.profiles as any)?.is_platform_admin
   if (memberIsPlatformAdmin) {
     return NextResponse.json(
-      { error: 'Cannot remove a platform admin. Remove their platform admin status first.' },
+      {
+        error:
+          'Cannot remove a platform admin. Remove their platform admin status first.',
+      },
       { status: 400 }
     )
   }

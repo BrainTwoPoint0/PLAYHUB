@@ -207,7 +207,7 @@ export async function POST(
     await sendAdminAddedEmail({
       toEmail: email.toLowerCase(),
       entityName: club.name,
-      dashboardUrl: `/academy/${clubSlug}`,
+      dashboardUrl: `/academy/${clubSlug}/access`,
       inviterName: inviterProfile?.full_name || undefined,
     })
 
@@ -242,7 +242,7 @@ export async function POST(
   await sendAdminAddedEmail({
     toEmail: email.toLowerCase(),
     entityName: club.name,
-    dashboardUrl: `/academy/${clubSlug}`,
+    dashboardUrl: `/academy/${clubSlug}/access`,
     inviterName: inviterProfile?.full_name || undefined,
   })
 
