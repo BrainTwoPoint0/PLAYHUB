@@ -39,6 +39,8 @@ interface StripeOnlySubscriber {
 interface VeoData {
   clubName: string
   veoClubSlug: string
+  hasScholarships: boolean
+  role: 'platform_admin' | 'org_admin'
   teams: VeoTeam[]
   stripeOnlySubscribers: StripeOnlySubscriber[]
   lastSyncedAt: string | null
@@ -131,10 +133,27 @@ export default function AcademyAccessPage() {
   // Stripe-only subscribers state
   const [stripeOnlyOpen, setStripeOnlyOpen] = useState(false)
 
+  // Admin management state
+  const [adminsOpen, setAdminsOpen] = useState(false)
+  const [admins, setAdmins] = useState<{ id: string; role: string; fullName: string; email: string; createdAt: string }[]>([])
+  const [newAdminEmail, setNewAdminEmail] = useState('')
+  const [adminsLoading, setAdminsLoading] = useState(false)
+  const [adminMessage, setAdminMessage] = useState<string | null>(null)
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('')
+
   useEffect(() => {
     fetchVeoData()
     fetchExceptions()
   }, [clubSlug])
+
+  // Fetch admins once we know the user is a platform admin
+  useEffect(() => {
+    if (data?.role === 'platform_admin') {
+      fetchAdmins()
+    }
+  }, [data?.role, clubSlug])
 
   async function fetchVeoData(refresh = false) {
     try {
@@ -237,6 +256,41 @@ export default function AcademyAccessPage() {
     }
   }
 
+  async function fetchAdmins() {
+    try {
+      const res = await fetch(`/api/academy/${clubSlug}/admins`)
+      const json = await res.json()
+      if (json.admins) setAdmins(json.admins)
+    } catch {
+      // Silently fail — admins section is supplementary
+    }
+  }
+
+  async function inviteAdmin() {
+    if (!newAdminEmail.trim()) return
+    setAdminsLoading(true)
+    setAdminMessage(null)
+    try {
+      const res = await fetch(`/api/academy/${clubSlug}/admins`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: newAdminEmail.trim() }),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        setNewAdminEmail('')
+        setAdminMessage(json.invited ? json.message : 'Admin added successfully')
+        await fetchAdmins()
+      } else {
+        setAdminMessage(json.error || 'Failed to invite admin')
+      }
+    } catch {
+      setAdminMessage('Failed to invite admin')
+    } finally {
+      setAdminsLoading(false)
+    }
+  }
+
   function toggleTeam(slug: string) {
     setExpandedTeams((prev) => {
       const next = new Set(prev)
@@ -327,6 +381,8 @@ export default function AcademyAccessPage() {
 
   if (!data) return null
 
+  const isPlatAdmin = data.role === 'platform_admin'
+
   // Set of exempt emails for quick lookup
   const exemptEmails = new Set(exceptions.map((e) => e.email.toLowerCase()))
 
@@ -346,8 +402,17 @@ export default function AcademyAccessPage() {
   const totalMembers = uniqueMembers.length
   const players = uniqueMembers.filter((m) => m.isPlayer)
   const staff = uniqueMembers.filter((m) => !m.isPlayer)
-  const noSub = players.filter((m) => !m.hasSubscription && !exemptEmails.has(m.email?.toLowerCase())).length
-  const scholarships = uniqueMembers.filter((m) => m.isScholarship).length
+  const noSub = players.filter((m) => (!m.hasSubscription || m.stripeStatus === 'canceled') && !exemptEmails.has(m.email?.toLowerCase())).length
+  const scholarships = data.hasScholarships ? uniqueMembers.filter((m) => m.isScholarship).length : 0
+
+  // Total active academy subscribers (in Veo + not in Veo)
+  const activeSubEmails = new Set<string>()
+  for (const m of uniqueMembers) {
+    if (m.hasSubscription && m.stripeStatus !== 'canceled' && m.email) {
+      activeSubEmails.add(m.email.toLowerCase())
+    }
+  }
+  const academySubs = activeSubEmails.size + (data.stripeOnlySubscribers?.length ?? 0)
 
   return (
     <div className="min-h-screen bg-[var(--night)]">
@@ -369,21 +434,25 @@ export default function AcademyAccessPage() {
               )}
             </div>
             <div className="flex items-center gap-2 self-start sm:self-auto">
-              <Button
-                variant="outline"
-                className={outlineBtnClass}
-                onClick={triggerCacheSync}
-                disabled={syncing}
-              >
-                {syncing ? 'Syncing...' : 'Sync Now'}
-              </Button>
-              <Button
-                variant="outline"
-                className={outlineBtnClass}
-                onClick={() => fetchVeoData(true)}
-              >
-                Refresh Stripe
-              </Button>
+              {isPlatAdmin && (
+                <>
+                  <Button
+                    variant="outline"
+                    className={outlineBtnClass}
+                    onClick={triggerCacheSync}
+                    disabled={syncing}
+                  >
+                    {syncing ? 'Syncing...' : 'Sync Now'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className={outlineBtnClass}
+                    onClick={() => fetchVeoData(true)}
+                  >
+                    Refresh Stripe
+                  </Button>
+                </>
+              )}
               <Button
                 variant="outline"
                 className={outlineBtnClass}
@@ -397,7 +466,15 @@ export default function AcademyAccessPage() {
 
         {/* Summary */}
         <FadeIn delay={100}>
-          <div className="grid gap-4 grid-cols-5 mb-6">
+          <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 mb-6 text-center">
+            <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-4">
+              <p className="text-xs text-[var(--ash-grey)] uppercase tracking-wider mb-1">
+                Academy Subs
+              </p>
+              <p className="text-2xl font-bold text-[var(--timberwolf)]">
+                {academySubs}
+              </p>
+            </div>
             <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-4">
               <p className="text-xs text-[var(--ash-grey)] uppercase tracking-wider mb-1">
                 Veo Members
@@ -414,7 +491,7 @@ export default function AcademyAccessPage() {
             </div>
             <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-4">
               <p className="text-xs text-[var(--ash-grey)] uppercase tracking-wider mb-1">
-                Paying, Not in Veo
+                Not in Veo
               </p>
               <p className="text-2xl font-bold text-orange-400">
                 {data.stripeOnlySubscribers?.length ?? 0}
@@ -428,6 +505,7 @@ export default function AcademyAccessPage() {
                 {staff.length}
               </p>
             </div>
+            {data.hasScholarships && scholarships > 0 && (
             <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-4">
               <p className="text-xs text-[var(--ash-grey)] uppercase tracking-wider mb-1">
                 Scholarships
@@ -436,10 +514,12 @@ export default function AcademyAccessPage() {
                 {scholarships}
               </p>
             </div>
+            )}
           </div>
         </FadeIn>
 
-        {/* Exceptions */}
+        {/* Exceptions — platform admin only */}
+        {isPlatAdmin && (
         <FadeIn delay={125}>
           <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] mb-6">
             <button
@@ -538,6 +618,89 @@ export default function AcademyAccessPage() {
             )}
           </div>
         </FadeIn>
+        )}
+
+        {/* Manage Admins — platform admin only */}
+        {isPlatAdmin && (
+        <FadeIn delay={130}>
+          <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] mb-6">
+            <button
+              onClick={() => setAdminsOpen(!adminsOpen)}
+              className="w-full flex items-center justify-between p-4 hover:bg-white/[0.03] transition-colors text-left"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-[var(--ash-grey)] text-xs w-4">
+                  {adminsOpen ? '\u25BC' : '\u25B6'}
+                </span>
+                <span className="font-medium text-[var(--timberwolf)]">
+                  Manage Admins
+                </span>
+                <span className="text-xs text-[var(--ash-grey)]">
+                  {admins.length} {admins.length === 1 ? 'admin' : 'admins'}
+                </span>
+              </div>
+            </button>
+            {adminsOpen && (
+              <div className="border-t border-[var(--ash-grey)]/10 p-4 space-y-3">
+                {/* Invite form */}
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <label className="text-xs text-[var(--ash-grey)] mb-1 block">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={newAdminEmail}
+                      onChange={(e) => setNewAdminEmail(e.target.value)}
+                      placeholder="admin@example.com"
+                      className="w-full text-sm px-3 py-1.5 rounded-lg bg-white/5 border border-[var(--ash-grey)]/20 text-[var(--timberwolf)] placeholder-[var(--ash-grey)]/50 outline-none focus:border-[var(--ash-grey)]/40"
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    className={`${outlineBtnClass} text-xs`}
+                    onClick={inviteAdmin}
+                    disabled={adminsLoading || !newAdminEmail.trim()}
+                  >
+                    Invite
+                  </Button>
+                </div>
+                {adminMessage && (
+                  <p className="text-xs text-[var(--ash-grey)]">{adminMessage}</p>
+                )}
+
+                {/* Admin list */}
+                {admins.length === 0 ? (
+                  <p className="text-xs text-[var(--ash-grey)]">
+                    No admins configured.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-[var(--ash-grey)]/5">
+                    {admins.map((admin) => (
+                      <div
+                        key={admin.id}
+                        className="flex items-center justify-between py-2 text-sm"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-[var(--timberwolf)] truncate">
+                            {admin.fullName || 'Unknown'}
+                          </span>
+                          <span className="text-xs text-[var(--ash-grey)] truncate">
+                            {admin.email}
+                          </span>
+                        </div>
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-white/5 text-[var(--ash-grey)]">
+                          {admin.role === 'league_admin' ? 'League Admin' : 'Club Admin'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </FadeIn>
+        )}
 
         {/* Stripe-only subscribers (paying but not in Veo) */}
         {data.stripeOnlySubscribers &&
@@ -553,7 +716,7 @@ export default function AcademyAccessPage() {
                       {stripeOnlyOpen ? '\u25BC' : '\u25B6'}
                     </span>
                     <span className="font-medium text-[var(--timberwolf)]">
-                      Paying, Not in Veo
+                      Not in Veo
                     </span>
                     <span className="text-xs text-orange-400">
                       {data.stripeOnlySubscribers.length}{' '}
@@ -586,7 +749,7 @@ export default function AcademyAccessPage() {
                                 {sub.registrationTeam}
                               </span>
                             )}
-                            {sub.isScholarship && (
+                            {data.hasScholarships && sub.isScholarship && (
                               <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400">
                                 scholarship
                               </span>
@@ -612,6 +775,13 @@ export default function AcademyAccessPage() {
         {/* Controls */}
         <FadeIn delay={150}>
           <div className="flex items-center gap-3 mb-4">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name or email..."
+              className="text-sm px-3 py-1.5 rounded-lg bg-white/5 border border-[var(--ash-grey)]/20 text-[var(--timberwolf)] placeholder-[var(--ash-grey)]/50 outline-none focus:border-[var(--ash-grey)]/40 w-64"
+            />
             <button
               onClick={() => setFilterNoSub(!filterNoSub)}
               className={`text-xs px-3 py-1.5 rounded-lg transition-colors border ${
@@ -652,17 +822,25 @@ export default function AcademyAccessPage() {
             </div>
             <div className="px-6 pb-6 space-y-1">
               {data.teams.map((team) => {
-                const isExpanded = expandedTeams.has(team.slug)
+                const query = searchQuery.toLowerCase().trim()
+                const isExpanded = expandedTeams.has(team.slug) || !!query
                 const teamNoSub = team.members.filter(
-                  (m) => m.isPlayer && !m.hasSubscription && !exemptEmails.has(m.email?.toLowerCase())
+                  (m) => m.isPlayer && (!m.hasSubscription || m.stripeStatus === 'canceled') && !exemptEmails.has(m.email?.toLowerCase())
                 ).length
                 const teamStaff = team.members.filter((m) => !m.isPlayer).length
-                const displayMembers = filterNoSub
-                  ? team.members.filter((m) => m.isPlayer && !m.hasSubscription && !exemptEmails.has(m.email?.toLowerCase()))
+                let displayMembers = filterNoSub
+                  ? team.members.filter((m) => m.isPlayer && (!m.hasSubscription || m.stripeStatus === 'canceled') && !exemptEmails.has(m.email?.toLowerCase()))
                   : team.members
+                if (query) {
+                  displayMembers = displayMembers.filter(
+                    (m) =>
+                      m.name?.toLowerCase().includes(query) ||
+                      m.email?.toLowerCase().includes(query)
+                  )
+                }
 
-                // When filtering, skip teams with no matching members
-                if (filterNoSub && displayMembers.length === 0) return null
+                // When filtering or searching, skip teams with no matching members
+                if ((filterNoSub || query) && displayMembers.length === 0) return null
 
                 return (
                   <div
@@ -729,7 +907,7 @@ export default function AcademyAccessPage() {
                                       {member.registrationTeam}
                                     </span>
                                   )}
-                                  {member.isScholarship && (
+                                  {data.hasScholarships && member.isScholarship && (
                                     <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400">
                                       scholarship
                                     </span>

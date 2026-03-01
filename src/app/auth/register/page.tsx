@@ -198,7 +198,7 @@ export default function RegisterPage() {
                   placeholder="Your name"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="h-11 pl-10 bg-zinc-800/50 border-[var(--ash-grey)]/30 text-[var(--timberwolf)] placeholder:text-[var(--ash-grey)]/50"
+                  className="h-11 pl-10"
                   disabled={loading}
                   autoComplete="name"
                 />
@@ -217,12 +217,12 @@ export default function RegisterPage() {
                   placeholder="Choose a username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className={`h-11 pl-10 pr-10 bg-zinc-800/50 text-[var(--timberwolf)] placeholder:text-[var(--ash-grey)]/50 ${
+                  className={`h-11 pl-10 pr-10 ${
                     usernameStatus === 'taken' || usernameStatus === 'invalid'
-                      ? 'border-red-500'
+                      ? 'ring-2 ring-red-500'
                       : usernameStatus === 'available'
-                        ? 'border-green-500'
-                        : 'border-[var(--ash-grey)]/30'
+                        ? 'ring-2 ring-green-500'
+                        : ''
                   }`}
                   disabled={loading}
                   autoComplete="username"
@@ -265,7 +265,7 @@ export default function RegisterPage() {
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="h-11 pl-10 bg-zinc-800/50 border-[var(--ash-grey)]/30 text-[var(--timberwolf)] placeholder:text-[var(--ash-grey)]/50"
+                  className="h-11 pl-10"
                   disabled={loading}
                   autoComplete="email"
                 />
@@ -284,7 +284,7 @@ export default function RegisterPage() {
                   placeholder="Create a password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-11 pl-10 bg-zinc-800/50 border-[var(--ash-grey)]/30 text-[var(--timberwolf)] placeholder:text-[var(--ash-grey)]/50"
+                  className="h-11 pl-10"
                   disabled={loading}
                   autoComplete="new-password"
                 />
@@ -309,7 +309,7 @@ export default function RegisterPage() {
                   placeholder="Re-enter password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="h-11 pl-10 bg-zinc-800/50 border-[var(--ash-grey)]/30 text-[var(--timberwolf)] placeholder:text-[var(--ash-grey)]/50"
+                  className="h-11 pl-10"
                   disabled={loading}
                   autoComplete="new-password"
                 />

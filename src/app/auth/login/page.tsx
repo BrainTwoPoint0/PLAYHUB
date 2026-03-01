@@ -105,7 +105,7 @@ function LoginForm() {
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="h-11 pl-10 bg-zinc-800/50 border-[var(--ash-grey)]/30 text-[var(--timberwolf)] placeholder:text-[var(--ash-grey)]/50"
+                  className="h-11 pl-10"
                   disabled={loading}
                   autoComplete="email"
                 />
@@ -124,7 +124,7 @@ function LoginForm() {
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-11 pl-10 pr-10 bg-zinc-800/50 border-[var(--ash-grey)]/30 text-[var(--timberwolf)] placeholder:text-[var(--ash-grey)]/50"
+                  className="h-11 pl-10 pr-10"
                   disabled={loading}
                   autoComplete="current-password"
                 />

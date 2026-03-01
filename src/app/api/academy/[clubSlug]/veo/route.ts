@@ -4,6 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
+import { isVenueAdmin } from '@/lib/recordings/access-control'
 import { getClubBySlug, getAllProductIds } from '@/lib/academy/config'
 import { getCachedClubData } from '@/lib/veo/cache'
 import {
@@ -27,16 +28,21 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Platform admin only (Veo access is sensitive)
-  const isAdmin = await isPlatformAdmin(user.id)
-  if (!isAdmin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
   const { clubSlug } = await params
   const club = await getClubBySlug(clubSlug)
   if (!club) {
     return NextResponse.json({ error: 'Club not found' }, { status: 404 })
+  }
+
+  // Two-tier auth: platform admin (full) or org admin (read-only)
+  let role: 'platform_admin' | 'org_admin' | null = null
+  if (await isPlatformAdmin(user.id)) {
+    role = 'platform_admin'
+  } else if (club.organizationId && (await isVenueAdmin(user.id, club.organizationId))) {
+    role = 'org_admin'
+  }
+  if (!role) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   if (!club.veoClubSlug) {
@@ -238,6 +244,8 @@ export async function GET(
     return NextResponse.json({
       clubName: club.name,
       veoClubSlug: club.veoClubSlug,
+      hasScholarships: club.hasScholarships ?? false,
+      role,
       teams,
       stripeOnlySubscribers,
       lastSyncedAt: cachedData.lastSyncedAt,

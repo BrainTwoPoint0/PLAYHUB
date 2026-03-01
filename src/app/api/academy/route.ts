@@ -31,10 +31,24 @@ export async function GET() {
   // Check which clubs this user is an admin for (via organization_members)
   const serviceClient = createServiceClient() as any
 
+  // Look up profile first — organization_members uses profile_id, not user_id
+  const { data: profile } = await serviceClient
+    .from('profiles')
+    .select('id')
+    .eq('user_id', user.id)
+    .single()
+
+  if (!profile) {
+    return NextResponse.json(
+      { error: 'You do not have access to any academy clubs' },
+      { status: 403 }
+    )
+  }
+
   const { data: memberships } = await serviceClient
     .from('organization_members')
     .select('organization_id')
-    .eq('user_id', user.id)
+    .eq('profile_id', profile.id)
     .in('role', ['club_admin', 'league_admin'])
     .eq('is_active', true)
 
@@ -52,5 +66,5 @@ export async function GET() {
     )
   }
 
-  return NextResponse.json({ clubs: accessibleClubs, role: 'club_admin' })
+  return NextResponse.json({ clubs: accessibleClubs, role: 'org_admin' })
 }

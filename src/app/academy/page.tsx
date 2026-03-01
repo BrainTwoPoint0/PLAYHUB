@@ -14,6 +14,7 @@ interface Club {
 export default function AcademySelectorPage() {
   const router = useRouter()
   const [clubs, setClubs] = useState<Club[]>([])
+  const [role, setRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -34,6 +35,7 @@ export default function AcademySelectorPage() {
 
       const clubList = data.clubs || []
       setClubs(clubList)
+      setRole(data.role || null)
 
       // If only one club, redirect directly
       if (clubList.length === 1) {
@@ -162,9 +164,14 @@ export default function AcademySelectorPage() {
                       </div>
                     )}
                     <div>
-                      <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-                        {club.name}
-                      </h2>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
+                          {club.name}
+                        </h2>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${role === 'platform_admin' ? 'bg-amber-500/15 text-amber-400' : 'bg-white/5 text-[var(--ash-grey)]'}`}>
+                          {role === 'platform_admin' ? 'Admin' : 'Viewer'}
+                        </span>
+                      </div>
                       <p className="text-sm text-[var(--ash-grey)]">
                         {club.slug}
                       </p>
