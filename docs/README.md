@@ -6,8 +6,7 @@ Index of all plans, designs, and feature trackers.
 
 | Doc | Status | Summary |
 |-----|--------|---------|
-| [graphic-packages.md](graphic-packages.md) | Planning | Account-based graphics packages (logos, sponsors, overlays) |
-| [org-dashboard.md](org-dashboard.md) | Roadmap | Organization dashboard — recordings, branding, team, marketplace |
+| [org-dashboard.md](org-dashboard.md) | Partial | Organization dashboard — recordings view, team management, revenue still pending |
 
 ## Design Documents
 
@@ -20,5 +19,6 @@ Index of all plans, designs, and feature trackers.
 
 | Doc | Status | Summary |
 |-----|--------|---------|
+| [graphic-packages.md](graphic-packages.md) | Complete | Account-based graphics packages (logos, sponsors, overlays) — all 4 phases done |
 | [projectplan.md](projectplan.md) | Done | Spiideo+MediaLive integration, Gotcha feedback, Veo Lambda, Veo privacy sync |
 | [video-tagging-plan.md](video-tagging-plan.md) | Done | Recording event tagging system |

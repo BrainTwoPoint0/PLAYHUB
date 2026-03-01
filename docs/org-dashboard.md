@@ -1,6 +1,6 @@
 # Organization Dashboard — Roadmap
 
-**Status:** Roadmap (not yet in development)
+**Status:** Partially Complete (graphics packages + marketplace settings done, recordings view + team management pending)
 
 ## Context
 
