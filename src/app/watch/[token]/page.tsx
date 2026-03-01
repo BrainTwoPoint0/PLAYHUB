@@ -11,6 +11,7 @@ import {
 } from '@braintwopoint0/playback-commons/ui'
 import { useAuth } from '@braintwopoint0/playback-commons/auth'
 import { Bookmark, BookmarkCheck, Loader2 } from 'lucide-react'
+import { LoadingSpinner } from '@/components/ui/loading'
 import { VideoPlayer, type MediaPack, type GraphicPackageOverlay } from '@/components/video/VideoPlayer'
 import { EventTagsList } from '@/components/EventTagsList'
 import { MatchDetails } from '@/components/MatchDetails'
@@ -133,7 +134,7 @@ export default function PublicWatchPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
+        <LoadingSpinner size="lg" className="text-muted-foreground" />
       </div>
     )
   }

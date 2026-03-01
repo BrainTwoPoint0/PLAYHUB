@@ -6,7 +6,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { getClubBySlug } from '@/lib/academy/config'
-import { sendAdminInviteEmail } from '@/lib/email'
+import { sendAdminInviteEmail, sendAdminAddedEmail } from '@/lib/email'
 
 export async function GET(
   request: NextRequest,
@@ -204,6 +204,13 @@ export async function POST(
       )
     }
 
+    await sendAdminAddedEmail({
+      toEmail: email.toLowerCase(),
+      entityName: club.name,
+      dashboardUrl: `/academy/${clubSlug}`,
+      inviterName: inviterProfile?.full_name || undefined,
+    })
+
     return NextResponse.json({
       success: true,
       admin: {
@@ -231,6 +238,13 @@ export async function POST(
     console.error('Failed to add admin:', insertError)
     return NextResponse.json({ error: 'Failed to add admin' }, { status: 500 })
   }
+
+  await sendAdminAddedEmail({
+    toEmail: email.toLowerCase(),
+    entityName: club.name,
+    dashboardUrl: `/academy/${clubSlug}`,
+    inviterName: inviterProfile?.full_name || undefined,
+  })
 
   return NextResponse.json({
     success: true,

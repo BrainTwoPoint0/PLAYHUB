@@ -4,7 +4,7 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
-import { sendAdminInviteEmail } from '@/lib/email'
+import { sendAdminInviteEmail, sendAdminAddedEmail } from '@/lib/email'
 
 export async function GET(
   request: NextRequest,
@@ -207,6 +207,13 @@ export async function POST(
       )
     }
 
+    await sendAdminAddedEmail({
+      toEmail: email.toLowerCase(),
+      entityName: venue?.name || 'a venue',
+      dashboardUrl: `/venue/${venueId}`,
+      inviterName: inviterProfile?.full_name || undefined,
+    })
+
     return NextResponse.json({
       success: true,
       admin: {
@@ -234,6 +241,13 @@ export async function POST(
     console.error('Failed to add admin:', insertError)
     return NextResponse.json({ error: 'Failed to add admin' }, { status: 500 })
   }
+
+  await sendAdminAddedEmail({
+    toEmail: email.toLowerCase(),
+    entityName: venue?.name || 'a venue',
+    dashboardUrl: `/venue/${venueId}`,
+    inviterName: inviterProfile?.full_name || undefined,
+  })
 
   return NextResponse.json({
     success: true,

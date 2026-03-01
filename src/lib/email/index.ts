@@ -239,6 +239,71 @@ export async function sendRecordingAssignedEmail(params: {
   }
 }
 
+/**
+ * Send email when an existing user is added as admin
+ */
+export async function sendAdminAddedEmail(params: {
+  toEmail: string
+  entityName: string
+  dashboardUrl: string
+  inviterName?: string
+}): Promise<SendEmailResult> {
+  const { toEmail, entityName, dashboardUrl, inviterName } = params
+
+  const fullDashboardUrl = `${APP_URL}${dashboardUrl}`
+
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: toEmail,
+      subject: `You've been added as an admin on PLAYHUB`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0a100d; color: #d6d5c9; padding: 40px 20px; margin: 0;">
+          <div style="max-width: 500px; margin: 0 auto;">
+            <h1 style="color: #d6d5c9; font-size: 24px; margin-bottom: 24px;">PLAYHUB</h1>
+
+            <p style="font-size: 16px; line-height: 1.6; margin-bottom: 16px;">
+              ${inviterName ? `${inviterName} has added you` : "You've been added"} as an admin for <strong>${entityName}</strong> on PLAYHUB.
+            </p>
+
+            <p style="font-size: 16px; line-height: 1.6; margin-bottom: 24px;">
+              You can now manage recordings, invite other admins, and configure settings.
+            </p>
+
+            <a href="${fullDashboardUrl}"
+               style="display: inline-block; background-color: #d6d5c9; color: #0a100d; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">
+              Go to Dashboard
+            </a>
+
+            <hr style="border: none; border-top: 1px solid #333; margin: 32px 0;">
+
+            <p style="font-size: 12px; color: #b9baa3;">
+              This email was sent by PLAYHUB. If you didn't expect this, you can ignore this email.
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
+    })
+
+    if (error) {
+      console.error('Failed to send admin added email:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (err) {
+    console.error('Email send error:', err)
+    return { success: false, error: 'Failed to send email' }
+  }
+}
+
 export interface InvoiceEmailParams {
   venueName: string
   periodLabel: string

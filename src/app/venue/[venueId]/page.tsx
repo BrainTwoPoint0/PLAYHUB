@@ -18,6 +18,7 @@ import {
   ReferenceLine,
 } from 'recharts'
 import { FadeIn } from '@/components/FadeIn'
+import { LoadingSpinner } from '@/components/ui/loading'
 import { HlsPlayer } from '@/components/streaming/HlsPlayer'
 
 interface Recording {
@@ -218,7 +219,7 @@ function MarketplaceRevenue({
       {expanded && (
         <div className="px-6 pb-6">
           {loading ? (
-            <p className="text-sm text-[var(--ash-grey)]">Loading...</p>
+            <LoadingSpinner size="sm" className="text-[var(--ash-grey)]" />
           ) : !data || data.totalSales === 0 ? (
             <p className="text-sm text-[var(--ash-grey)]">No marketplace sales yet.</p>
           ) : (
@@ -704,7 +705,7 @@ function GraphicPackagesSection({
           )}
 
           {loading ? (
-            <p className="text-sm text-[var(--ash-grey)]">Loading...</p>
+            <LoadingSpinner size="sm" className="text-[var(--ash-grey)]" />
           ) : packages.length === 0 && !showForm ? (
             <p className="text-sm text-[var(--ash-grey)]">
               No graphic packages yet. Create one to add logo overlays to your recordings.
@@ -949,7 +950,7 @@ function GraphicPackagesSection({
                 Import from Spiideo
               </h3>
               {loadingImport ? (
-                <p className="text-xs text-[var(--ash-grey)]">Loading...</p>
+                <LoadingSpinner size="sm" className="text-[var(--ash-grey)]" />
               ) : spiideoPackages.length === 0 ? (
                 <p className="text-xs text-[var(--ash-grey)]">No Spiideo packages found</p>
               ) : (
@@ -1083,7 +1084,7 @@ function MarketplaceSettingsSection({
       {expanded && (
         <div className="px-6 pb-6 space-y-4">
           {loading ? (
-            <p className="text-xs text-[var(--ash-grey)]">Loading...</p>
+            <LoadingSpinner size="sm" className="text-[var(--ash-grey)]" />
           ) : (
             <>
               <label className="flex items-center gap-2 cursor-pointer">

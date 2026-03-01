@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@braintwopoint0/playback-commons/auth'
+import { LoadingSpinner } from '@/components/ui/loading'
 
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: '📊' },
@@ -55,7 +56,7 @@ export default function AdminLayout({
   if (loading || checkingAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
+        <LoadingSpinner size="lg" className="text-muted-foreground" />
       </div>
     )
   }
