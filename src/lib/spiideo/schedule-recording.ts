@@ -4,6 +4,7 @@
 import {
   createGame,
   createProduction,
+  createPushStreamOutput,
   getAccountConfig,
 } from '@/lib/spiideo/client'
 import { createServiceClient } from '@/lib/supabase/server'
@@ -33,6 +34,14 @@ export interface ScheduleRecordingInput {
   scheduledStopTime?: string
   /** Stripe payment intent ID for idempotency on webhook retries. */
   stripePaymentIntentId?: string
+  /** Full RTMP URL (with stream key) — when provided, creates a push stream output for YouTube broadcasting. */
+  youtubeRtmpUrl?: string
+  /** When true, the recording will be listed on the org's marketplace page. */
+  marketplaceEnabled?: boolean
+  /** Price for marketplace purchase (requires marketplaceEnabled). */
+  priceAmount?: number
+  /** Currency for marketplace price. */
+  priceCurrency?: string
 }
 
 export interface ScheduleRecordingResult {
@@ -99,6 +108,15 @@ export async function scheduleRecording(
     type: 'live',
   })
 
+  // 2b. If YouTube RTMP URL is provided, add a push stream output
+  if (input.youtubeRtmpUrl) {
+    await createPushStreamOutput(
+      production.id,
+      input.youtubeRtmpUrl,
+      'YouTube Live'
+    )
+  }
+
   // 3. Fetch billing config from DB
   const serviceClient = createServiceClient() as any
 
@@ -125,7 +143,7 @@ export async function scheduleRecording(
       access_type: 'private_link',
       created_by: createdBy || null,
       stripe_payment_intent_id: input.stripePaymentIntentId || null,
-      is_billable: isBillable,
+      is_billable: false,
       billable_amount:
         billableAmount ?? billingConfig?.default_billable_amount ?? null,
       billable_currency: billingConfig?.currency ?? 'KWD',
@@ -136,6 +154,30 @@ export async function scheduleRecording(
 
   if (recordingError) {
     console.error('Failed to create recording for booking:', recordingError)
+  }
+
+  // 4b. If marketplace-enabled, create a product row for purchasing
+  if (input.marketplaceEnabled && recording?.id && input.priceAmount) {
+    const { error: productError } = await serviceClient
+      .from('playhub_products')
+      .insert({
+        match_recording_id: recording.id,
+        name: title,
+        description: description || null,
+        price_amount: input.priceAmount,
+        currency: input.priceCurrency || 'AED',
+        is_available: true,
+      })
+
+    if (productError) {
+      console.error('Failed to create marketplace product:', productError)
+    }
+
+    // Also flag the recording as marketplace-enabled
+    await serviceClient
+      .from('playhub_match_recordings')
+      .update({ marketplace_enabled: true })
+      .eq('id', recording.id)
   }
 
   // 5. Grant access via email(s)

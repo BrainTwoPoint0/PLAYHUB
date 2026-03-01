@@ -51,6 +51,13 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       currency: 'KWD',
       daily_recording_target: 0,
       is_active: false,
+      youtube_rtmp_url: null,
+      youtube_stream_key: null,
+      marketplace_enabled: false,
+      default_price_amount: null,
+      default_price_currency: 'AED',
+      marketplace_revenue_split_pct: 20.0,
+      media_pack: {},
     },
     exists: !!data,
   })
@@ -85,27 +92,42 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     stripe_customer_id,
     daily_recording_target,
     is_active,
+    youtube_rtmp_url,
+    youtube_stream_key,
+    marketplace_enabled,
+    default_price_amount,
+    default_price_currency,
+    marketplace_revenue_split_pct,
+    media_pack,
   } = body
 
   const serviceClient = createServiceClient() as any
 
+  const upsertData: Record<string, unknown> = {
+    organization_id: venueId,
+    billing_model: billing_model || 'per_recording',
+    default_billable_amount: default_billable_amount ?? 5.0,
+    currency: currency || 'KWD',
+    fixed_cost_per_recording: fixed_cost_per_recording ?? 0.0,
+    venue_profit_share_pct: venue_profit_share_pct ?? 30.0,
+    stripe_customer_id: stripe_customer_id || null,
+    daily_recording_target: daily_recording_target ?? 0,
+    is_active: is_active ?? true,
+    updated_at: new Date().toISOString(),
+  }
+
+  // Only include new fields if they were sent (avoids overwriting on older PUT calls)
+  if (youtube_rtmp_url !== undefined) upsertData.youtube_rtmp_url = youtube_rtmp_url || null
+  if (youtube_stream_key !== undefined) upsertData.youtube_stream_key = youtube_stream_key || null
+  if (marketplace_enabled !== undefined) upsertData.marketplace_enabled = marketplace_enabled
+  if (default_price_amount !== undefined) upsertData.default_price_amount = default_price_amount
+  if (default_price_currency !== undefined) upsertData.default_price_currency = default_price_currency || 'AED'
+  if (marketplace_revenue_split_pct !== undefined) upsertData.marketplace_revenue_split_pct = marketplace_revenue_split_pct
+  if (media_pack !== undefined) upsertData.media_pack = media_pack
+
   const { data, error } = await serviceClient
     .from('playhub_venue_billing_config')
-    .upsert(
-      {
-        organization_id: venueId,
-        billing_model: billing_model || 'per_recording',
-        default_billable_amount: default_billable_amount ?? 5.0,
-        currency: currency || 'KWD',
-        fixed_cost_per_recording: fixed_cost_per_recording ?? 0.0,
-        venue_profit_share_pct: venue_profit_share_pct ?? 30.0,
-        stripe_customer_id: stripe_customer_id || null,
-        daily_recording_target: daily_recording_target ?? 0,
-        is_active: is_active ?? true,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'organization_id' }
-    )
+    .upsert(upsertData, { onConflict: 'organization_id' })
     .select()
     .single()
 

@@ -291,6 +291,13 @@ async function saveRecording(
   if (error) {
     throw new Error(`Database error: ${error.message}`)
   }
+
+  // Mark as billable now that video exists (only for pre-booked recordings with billing config)
+  await supabase
+    .from('playhub_match_recordings')
+    .update({ is_billable: true })
+    .eq('spiideo_game_id', game.id)
+    .not('billable_amount', 'is', null)
 }
 
 // Sync attempt tracking

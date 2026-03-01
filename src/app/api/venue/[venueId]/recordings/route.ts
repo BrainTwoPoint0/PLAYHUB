@@ -1,4 +1,4 @@
-// GET /api/venue/[venueId]/recordings - List recordings for a venue
+// GET /api/venue/[venueId]/recordings - List recordings for a venue (paginated)
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
@@ -30,11 +30,53 @@ export async function GET(
     )
   }
 
+  // Parse query params
+  const searchParams = request.nextUrl.searchParams
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
+  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)))
+  const search = searchParams.get('search')?.trim() || ''
+  const status = searchParams.get('status') || ''
+  const billable = searchParams.get('billable') || ''
+
   // Use service client for data queries to bypass RLS
   const serviceClient = createServiceClient()
 
-  // Get recordings for this venue
-  const { data: recordings, error } = await (serviceClient as any)
+  // Build count query (same filters, head-only for count)
+  let countQuery = (serviceClient as any)
+    .from('playhub_match_recordings')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', venueId)
+
+  if (search) {
+    countQuery = countQuery.or(
+      `title.ilike.%${search}%,home_team.ilike.%${search}%,away_team.ilike.%${search}%`
+    )
+  }
+  if (status) {
+    countQuery = countQuery.eq('status', status)
+  }
+  if (billable === 'true') {
+    countQuery = countQuery.eq('is_billable', true)
+  } else if (billable === 'false') {
+    countQuery = countQuery.eq('is_billable', false)
+  }
+
+  const { count, error: countError } = await countQuery
+
+  if (countError) {
+    console.error('Failed to count recordings:', countError)
+    return NextResponse.json(
+      { error: 'Failed to fetch recordings' },
+      { status: 500 }
+    )
+  }
+
+  const total = count || 0
+  const from = (page - 1) * limit
+  const to = from + limit - 1
+
+  // Build data query with same filters + pagination
+  let dataQuery = (serviceClient as any)
     .from('playhub_match_recordings')
     .select(
       `
@@ -51,11 +93,31 @@ export async function GET(
       file_size_bytes,
       transferred_at,
       spiideo_game_id,
+      is_billable,
       created_at
     `
     )
     .eq('organization_id', venueId)
+
+  if (search) {
+    dataQuery = dataQuery.or(
+      `title.ilike.%${search}%,home_team.ilike.%${search}%,away_team.ilike.%${search}%`
+    )
+  }
+  if (status) {
+    dataQuery = dataQuery.eq('status', status)
+  }
+  if (billable === 'true') {
+    dataQuery = dataQuery.eq('is_billable', true)
+  } else if (billable === 'false') {
+    dataQuery = dataQuery.eq('is_billable', false)
+  }
+
+  dataQuery = dataQuery
     .order('match_date', { ascending: false })
+    .range(from, to)
+
+  const { data: recordings, error } = await dataQuery
 
   if (error) {
     console.error('Failed to fetch recordings:', error)
@@ -65,7 +127,7 @@ export async function GET(
     )
   }
 
-  // Get access counts for each recording
+  // Get access counts for each recording on this page
   const recordingIds = recordings?.map((r: any) => r.id) || []
   let accessCounts: Record<string, number> = {}
 
@@ -90,5 +152,10 @@ export async function GET(
     accessCount: accessCounts[r.id] || 0,
   }))
 
-  return NextResponse.json({ recordings: enrichedRecordings })
+  return NextResponse.json({
+    recordings: enrichedRecordings,
+    total,
+    page,
+    pageSize: limit,
+  })
 }

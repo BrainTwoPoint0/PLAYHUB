@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Card, CardContent, Input } from '@braintwopoint0/playback-commons/ui'
+import { Card, CardContent, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@braintwopoint0/playback-commons/ui'
 
 interface Recording {
   id: string
@@ -86,17 +86,18 @@ export default function AdminRecordingsPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-md"
         />
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 rounded-md border bg-background"
-        >
-          {statuses.map((status) => (
-            <option key={status} value={status}>
-              {status === 'all' ? 'All statuses' : status}
-            </option>
-          ))}
-        </select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {statuses.map((status) => (
+              <SelectItem key={status} value={status}>
+                {status === 'all' ? 'All statuses' : status}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {filteredRecordings.length === 0 ? (

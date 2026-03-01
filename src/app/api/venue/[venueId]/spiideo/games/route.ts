@@ -45,6 +45,10 @@ export async function POST(
     accessEmails,
     isBillable,
     billableAmount,
+    broadcastToYoutube,
+    marketplaceEnabled,
+    priceAmount,
+    priceCurrency,
   } = body
 
   // Validate required fields
@@ -81,6 +85,21 @@ export async function POST(
   const stopMs = new Date(scheduledStopTime).getTime()
   const durationMinutes = Math.round((stopMs - startMs) / 60_000)
 
+  // Look up YouTube RTMP URL if broadcasting requested
+  let youtubeRtmpUrl: string | undefined
+  if (broadcastToYoutube) {
+    const { data: billingCfg } = await (serviceClient as any)
+      .from('playhub_venue_billing_config')
+      .select('youtube_rtmp_url, youtube_stream_key')
+      .eq('organization_id', venueId)
+      .maybeSingle()
+
+    if (billingCfg?.youtube_rtmp_url && billingCfg?.youtube_stream_key) {
+      const base = billingCfg.youtube_rtmp_url.replace(/\/$/, '')
+      youtubeRtmpUrl = `${base}/${billingCfg.youtube_stream_key}`
+    }
+  }
+
   try {
     const result = await scheduleRecording({
       venueId,
@@ -100,6 +119,10 @@ export async function POST(
       startBufferMs: 0,
       scheduledStartTime,
       scheduledStopTime,
+      youtubeRtmpUrl,
+      marketplaceEnabled,
+      priceAmount: priceAmount ? Number(priceAmount) : undefined,
+      priceCurrency,
     })
 
     return NextResponse.json({

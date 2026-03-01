@@ -57,6 +57,7 @@ export async function generateMonthlyInvoice(
     .select('id, title, billable_amount, collected_by')
     .eq('organization_id', venueId)
     .eq('is_billable', true)
+    .eq('status', 'published')
     .gte('created_at', periodStartTs)
     .lte('created_at', periodEndTs)
 

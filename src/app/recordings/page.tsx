@@ -4,6 +4,7 @@ import { motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatDateTime } from '@braintwopoint0/playback-commons/utils'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, DatePicker } from '@braintwopoint0/playback-commons/ui'
 import { FadeIn } from '@/components/FadeIn'
 import { ShareRecordingModal } from '@/components/ShareRecordingModal'
 
@@ -136,27 +137,29 @@ export default function RecordingsPage() {
               <div className="flex items-end gap-3">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm text-[var(--ash-grey)]">From</label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={dateFrom}
-                    onChange={(e) => {
-                      setDateFrom(e.target.value)
+                    onChange={(v) => {
+                      setDateFrom(v)
                       setShowAll(false)
                     }}
-                    className="h-9 min-w-[130px] px-3 rounded-md border border-[var(--ash-grey)]/20 bg-white/5 text-sm text-[var(--timberwolf)] outline-none [&::-webkit-calendar-picker-indicator]:invert"
+                    max={dateTo || undefined}
+                    placeholder="From date"
+                    className="h-9 min-w-[130px]"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm text-[var(--ash-grey)]">To</label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={dateTo}
-                    onChange={(e) => {
-                      setDateTo(e.target.value)
+                    onChange={(v) => {
+                      setDateTo(v)
                       setShowAll(false)
                     }}
-                    className="h-9 min-w-[130px] px-3 rounded-md border border-[var(--ash-grey)]/20 bg-white/5 text-sm text-[var(--timberwolf)] outline-none [&::-webkit-calendar-picker-indicator]:invert"
+                    min={dateFrom || undefined}
+                    placeholder="To date"
+                    className="h-9 min-w-[130px]"
                   />
                 </div>
 
@@ -189,16 +192,17 @@ export default function RecordingsPage() {
               </div>
 
               {!loading && !loginRequired && recordings.length > 0 && (
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="px-3 pr-8 rounded-xl border border-[var(--ash-grey)]/20 bg-black/30 text-sm text-[var(--timberwolf)] appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%23888%22%20d%3D%22M6%208L1%203h10z%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat outline-none"
-                >
-                  <option value="date_desc">Newest first</option>
-                  <option value="date_asc">Oldest first</option>
-                  <option value="title_asc">Title A-Z</option>
-                  <option value="title_desc">Title Z-A</option>
-                </select>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="date_desc">Newest first</SelectItem>
+                    <SelectItem value="date_asc">Oldest first</SelectItem>
+                    <SelectItem value="title_asc">Title A-Z</SelectItem>
+                    <SelectItem value="title_desc">Title Z-A</SelectItem>
+                  </SelectContent>
+                </Select>
               )}
             </div>
           </div>

@@ -15,7 +15,7 @@ import {
 } from '@braintwopoint0/playback-commons/ui'
 import { createClient } from '@braintwopoint0/playback-commons/supabase'
 import { FadeIn } from '@/components/FadeIn'
-import { VideoPlayer } from '@/components/video/VideoPlayer'
+import { VideoPlayer, type MediaPack } from '@/components/video/VideoPlayer'
 import { ArrowLeft, Lock, Globe, Pencil, Trash2, Plus, Share2, Download } from 'lucide-react'
 import { ShareRecordingModal } from '@/components/ShareRecordingModal'
 import { MatchDetails } from '@/components/MatchDetails'
@@ -225,6 +225,7 @@ export default function RecordingPage() {
 
   const [recording, setRecording] = useState<Recording | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [mediaPack, setMediaPack] = useState<MediaPack | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -270,6 +271,7 @@ export default function RecordingPage() {
 
       setRecording(data.recording)
       setVideoUrl(data.videoUrl)
+      if (data.mediaPack) setMediaPack(data.mediaPack)
 
       // Fetch events after recording loads successfully
       fetchEvents()
@@ -524,6 +526,7 @@ export default function RecordingPage() {
                     events={events}
                     canEdit={canEdit}
                     onAddTag={handleAddTag}
+                    mediaPack={mediaPack}
                     className="w-full aspect-video md:rounded-lg"
                   />
                 </div>

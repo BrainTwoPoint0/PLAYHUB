@@ -13,11 +13,13 @@ vi.hoisted(() => {
 
 const mockCreateGame = vi.fn()
 const mockCreateProduction = vi.fn()
+const mockCreatePushStreamOutput = vi.fn()
 const mockGetAccountConfig = vi.fn()
 
 vi.mock('@/lib/spiideo/client', () => ({
   createGame: (...args: any[]) => mockCreateGame(...args),
   createProduction: (...args: any[]) => mockCreateProduction(...args),
+  createPushStreamOutput: (...args: any[]) => mockCreatePushStreamOutput(...args),
   getAccountConfig: (...args: any[]) => mockGetAccountConfig(...args),
 }))
 
@@ -29,6 +31,7 @@ function chainable(resolvedValue: { data: any; error: any }) {
   chain.maybeSingle = vi.fn().mockResolvedValue(resolvedValue)
   chain.single = vi.fn().mockResolvedValue(resolvedValue)
   chain.insert = vi.fn().mockReturnValue(chain)
+  chain.update = vi.fn().mockReturnValue(chain)
   return chain
 }
 
@@ -43,12 +46,14 @@ const mockRecordingChain = chainable({
 })
 
 const mockAccessChain = chainable({ data: null, error: null })
+const mockProductChain = chainable({ data: null, error: null })
 
 const mockServiceClient = {
   from: vi.fn((table: string) => {
     if (table === 'playhub_venue_billing_config') return mockBillingChain
     if (table === 'playhub_match_recordings') return mockRecordingChain
     if (table === 'playhub_access_rights') return mockAccessChain
+    if (table === 'playhub_products') return mockProductChain
     return chainable({ data: null, error: null })
   }),
 }
@@ -144,7 +149,7 @@ describe('scheduleRecording', () => {
     expect(insertCall.spiideo_production_id).toBe('prod-1')
     expect(insertCall.collected_by).toBe('venue')
     expect(insertCall.created_by).toBe('user-42')
-    expect(insertCall.is_billable).toBe(true)
+    expect(insertCall.is_billable).toBe(false)
     expect(insertCall.status).toBe('scheduled')
   })
 
@@ -212,5 +217,56 @@ describe('scheduleRecording', () => {
 
     const insertCall = mockRecordingChain.insert.mock.calls[0][0]
     expect(insertCall.billable_amount).toBe(10)
+  })
+
+  it('creates push stream output when youtubeRtmpUrl provided', async () => {
+    mockCreatePushStreamOutput.mockResolvedValue({ id: 'output-1' })
+
+    await scheduleRecording({
+      ...baseInput,
+      youtubeRtmpUrl: 'rtmp://a.rtmp.youtube.com/live2/xxxx-xxxx',
+    })
+
+    expect(mockCreatePushStreamOutput).toHaveBeenCalledWith(
+      'prod-1',
+      'rtmp://a.rtmp.youtube.com/live2/xxxx-xxxx',
+      'YouTube Live'
+    )
+  })
+
+  it('does not create push stream output when youtubeRtmpUrl is absent', async () => {
+    await scheduleRecording(baseInput)
+
+    expect(mockCreatePushStreamOutput).not.toHaveBeenCalled()
+  })
+
+  it('creates marketplace product when marketplaceEnabled', async () => {
+    mockProductChain.insert.mockReturnValue(mockProductChain)
+
+    await scheduleRecording({
+      ...baseInput,
+      marketplaceEnabled: true,
+      priceAmount: 25,
+      priceCurrency: 'AED',
+    })
+
+    expect(mockServiceClient.from).toHaveBeenCalledWith('playhub_products')
+    const insertCall = mockProductChain.insert.mock.calls[0][0]
+    expect(insertCall.price_amount).toBe(25)
+    expect(insertCall.currency).toBe('AED')
+    expect(insertCall.match_recording_id).toBe('rec-123')
+
+    // Also flags the recording
+    expect(mockRecordingChain.update).toHaveBeenCalledWith({ marketplace_enabled: true })
+  })
+
+  it('does not create marketplace product when not enabled', async () => {
+    await scheduleRecording(baseInput)
+
+    // playhub_products should not have been called
+    const productCalls = mockServiceClient.from.mock.calls.filter(
+      (c: any) => c[0] === 'playhub_products'
+    )
+    expect(productCalls.length).toBe(0)
   })
 })

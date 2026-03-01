@@ -1,8 +1,8 @@
-// GET /api/recordings/[id] - Get recording details with signed video URL
+// GET/PATCH/DELETE /api/recordings/[id]
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { checkRecordingAccess } from '@/lib/recordings/access-control'
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'
+import { checkRecordingAccess, isVenueAdmin } from '@/lib/recordings/access-control'
+import { S3Client, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 const s3Client = new S3Client({
@@ -57,6 +57,19 @@ export async function GET(
     }
   }
 
+  // Fetch media pack from org's billing config
+  let mediaPack = null
+  if (recording.organization_id) {
+    const { data: billingCfg } = await (serviceClient as any)
+      .from('playhub_venue_billing_config')
+      .select('media_pack')
+      .eq('organization_id', recording.organization_id)
+      .maybeSingle()
+    if (billingCfg?.media_pack && Object.keys(billingCfg.media_pack).length > 0) {
+      mediaPack = billingCfg.media_pack
+    }
+  }
+
   return NextResponse.json({
     recording: {
       id: recording.id,
@@ -72,5 +85,127 @@ export async function GET(
     },
     videoUrl,
     access: accessResult,
+    mediaPack,
   })
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Get the recording to find its organization_id
+  const serviceClient = createServiceClient()
+  const { data: recording } = await (serviceClient as any)
+    .from('playhub_match_recordings')
+    .select('organization_id')
+    .eq('id', id)
+    .single()
+
+  if (!recording) {
+    return NextResponse.json({ error: 'Recording not found' }, { status: 404 })
+  }
+
+  const isAdmin = await isVenueAdmin(user.id, recording.organization_id)
+  if (!isAdmin) {
+    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+  }
+
+  const body = await request.json()
+  const allowedFields = ['title', 'home_team', 'away_team', 'is_billable']
+  const updates: Record<string, any> = {}
+
+  for (const field of allowedFields) {
+    if (body[field] !== undefined) {
+      updates[field] = body[field]
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+  }
+
+  updates.updated_at = new Date().toISOString()
+
+  const { data: updated, error } = await (serviceClient as any)
+    .from('playhub_match_recordings')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Failed to update recording:', error)
+    return NextResponse.json({ error: 'Failed to update recording' }, { status: 500 })
+  }
+
+  return NextResponse.json({ recording: updated })
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const serviceClient = createServiceClient()
+  const { data: recording } = await (serviceClient as any)
+    .from('playhub_match_recordings')
+    .select('organization_id, s3_key, s3_bucket')
+    .eq('id', id)
+    .single()
+
+  if (!recording) {
+    return NextResponse.json({ error: 'Recording not found' }, { status: 404 })
+  }
+
+  const isAdmin = await isVenueAdmin(user.id, recording.organization_id)
+  if (!isAdmin) {
+    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+  }
+
+  // Delete S3 object if it exists
+  if (recording.s3_key && recording.s3_bucket) {
+    try {
+      await s3Client.send(
+        new DeleteObjectCommand({
+          Bucket: recording.s3_bucket,
+          Key: recording.s3_key,
+        })
+      )
+    } catch (s3Err) {
+      console.error('Failed to delete S3 object (continuing with DB delete):', s3Err)
+    }
+  }
+
+  const { error } = await (serviceClient as any)
+    .from('playhub_match_recordings')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    console.error('Failed to delete recording:', error)
+    return NextResponse.json({ error: 'Failed to delete recording' }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true })
 }

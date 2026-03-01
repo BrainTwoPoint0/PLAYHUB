@@ -41,23 +41,27 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     .eq('organization_id', venueId)
     .maybeSingle()
 
-  // Current month boundaries
+  // Month boundaries — use query params if provided, otherwise current month
   const now = new Date()
-  const monthStart = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    1
-  ).toISOString()
+  const searchParams = request.nextUrl.searchParams
+  const paramMonth = searchParams.get('month')
+  const paramYear = searchParams.get('year')
+  const targetMonth = paramMonth ? parseInt(paramMonth, 10) - 1 : now.getMonth()
+  const targetYear = paramYear ? parseInt(paramYear, 10) : now.getFullYear()
+  const isCurrentMonth =
+    targetMonth === now.getMonth() && targetYear === now.getFullYear()
+
+  const monthStart = new Date(targetYear, targetMonth, 1).toISOString()
   const monthEnd = new Date(
-    now.getFullYear(),
-    now.getMonth() + 1,
+    targetYear,
+    targetMonth + 1,
     0,
     23,
     59,
     59
   ).toISOString()
 
-  // Today boundaries
+  // Today boundaries (only relevant for current month)
   const todayStart = new Date(
     now.getFullYear(),
     now.getMonth(),
@@ -80,17 +84,23 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     .select('id, billable_amount, collected_by, created_at')
     .eq('organization_id', venueId)
     .eq('is_billable', true)
+    .eq('status', 'published')
     .gte('created_at', monthStart)
     .lte('created_at', monthEnd)
 
-  // Query today's recordings (for daily target)
-  const { data: todayRecordings } = await serviceClient
-    .from('playhub_match_recordings')
-    .select('id')
-    .eq('organization_id', venueId)
-    .eq('is_billable', true)
-    .gte('created_at', todayStart)
-    .lte('created_at', todayEnd)
+  // Query today's recordings (only for current month)
+  let todayRecordings: any[] | null = null
+  if (isCurrentMonth) {
+    const { data } = await serviceClient
+      .from('playhub_match_recordings')
+      .select('id')
+      .eq('organization_id', venueId)
+      .eq('is_billable', true)
+      .eq('status', 'published')
+      .gte('created_at', todayStart)
+      .lte('created_at', todayEnd)
+    todayRecordings = data
+  }
 
   const recordings = monthRecordings || []
   const fixedCostEur = Number(config?.fixed_cost_eur) || 0

@@ -642,7 +642,7 @@ export default function AcademyAccessPage() {
         {/* Teams */}
         <FadeIn delay={200}>
           <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
-            <div className="p-6 pb-3">
+            <div className="p-6">
               <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
                 Veo Teams
               </h2>

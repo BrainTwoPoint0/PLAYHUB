@@ -20,6 +20,13 @@ import {
   formatTimestamp,
 } from '@/lib/recordings/event-types'
 
+export interface MediaPack {
+  logo_url?: string
+  logo_position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+  sponsor_logo_url?: string
+  sponsor_position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+}
+
 interface VideoPlayerProps {
   src: string
   events?: RecordingEvent[]
@@ -27,6 +34,7 @@ interface VideoPlayerProps {
   onAddTag?: (timestampSeconds: number) => void
   onSeek?: (timestampSeconds: number) => void
   className?: string
+  mediaPack?: MediaPack
 }
 
 export function VideoPlayer({
@@ -36,6 +44,7 @@ export function VideoPlayer({
   onAddTag,
   onSeek,
   className = '',
+  mediaPack,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const hlsRef = useRef<Hls | null>(null)
@@ -243,6 +252,32 @@ export function VideoPlayer({
         preload="metadata"
         onClick={togglePlayPause}
       />
+
+      {/* Media pack overlays */}
+      {mediaPack?.logo_url && (
+        <img
+          src={mediaPack.logo_url}
+          alt=""
+          className={`absolute pointer-events-none w-12 h-12 md:w-16 md:h-16 object-contain opacity-70 ${
+            mediaPack.logo_position === 'top-left' ? 'top-3 left-3' :
+            mediaPack.logo_position === 'bottom-left' ? 'bottom-16 left-3' :
+            mediaPack.logo_position === 'bottom-right' ? 'bottom-16 right-3' :
+            'top-3 right-3'
+          }`}
+        />
+      )}
+      {mediaPack?.sponsor_logo_url && (
+        <img
+          src={mediaPack.sponsor_logo_url}
+          alt=""
+          className={`absolute pointer-events-none w-12 h-12 md:w-16 md:h-16 object-contain opacity-70 ${
+            mediaPack.sponsor_position === 'top-left' ? 'top-3 left-3' :
+            mediaPack.sponsor_position === 'top-right' ? 'top-3 right-3' :
+            mediaPack.sponsor_position === 'bottom-right' ? 'bottom-16 right-3' :
+            'bottom-16 left-3'
+          }`}
+        />
+      )}
 
       {/* Loading spinner */}
       {isLoading && (

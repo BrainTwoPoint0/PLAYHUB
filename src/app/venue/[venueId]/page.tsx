@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { Button, Input } from '@braintwopoint0/playback-commons/ui'
+import { Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, DateTimePicker } from '@braintwopoint0/playback-commons/ui'
 import {
   ChartContainer,
   ChartTooltip,
@@ -33,6 +33,7 @@ interface Recording {
   s3_key?: string
   file_size_bytes?: number
   spiideo_game_id?: string
+  is_billable?: boolean
   accessCount?: number
 }
 
@@ -116,6 +117,13 @@ interface BillingConfig {
   currency: string
   daily_recording_target: number
   is_active: boolean
+  youtube_rtmp_url?: string | null
+  youtube_stream_key?: string | null
+  marketplace_enabled?: boolean
+  default_price_amount?: number | null
+  default_price_currency?: string
+  marketplace_revenue_split_pct?: number
+  media_pack?: Record<string, string>
 }
 
 interface Invoice {
@@ -130,6 +138,409 @@ interface Invoice {
   currency: string
   stripe_invoice_id: string | null
   status: string
+}
+
+// ── Marketplace Revenue ───────────────────────────────────────────
+function MarketplaceRevenue({
+  venueId,
+  outlineBtnClass,
+}: {
+  venueId: string
+  outlineBtnClass: string
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [data, setData] = useState<{
+    totalSales: number
+    totalRevenue: number
+    orgShare: number
+    playhubShare: number
+    splitPct: number
+    currency: string
+    perRecording: Array<{
+      recordingId: string
+      title: string
+      matchDate: string
+      sales: number
+      revenue: number
+      orgShare: number
+    }>
+  } | null>(null)
+
+  async function fetchRevenue() {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/venue/${venueId}/billing/marketplace`)
+      const json = await res.json()
+      if (!json.error) setData(json)
+    } catch {
+      // Non-critical
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function handleToggle() {
+    if (!expanded && !data) fetchRevenue()
+    setExpanded(!expanded)
+  }
+
+  function formatPrice(amount: number, currency: string) {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(amount)
+  }
+
+  return (
+    <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
+      <div className="p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
+              Marketplace Revenue
+            </h2>
+            <p className="text-sm text-[var(--ash-grey)]">
+              Sales from recordings listed on the marketplace
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            className={`w-full md:w-auto ${outlineBtnClass}`}
+            onClick={handleToggle}
+          >
+            {expanded ? 'Hide' : 'View Revenue'}
+          </Button>
+        </div>
+      </div>
+      {expanded && (
+        <div className="px-6 pb-6">
+          {loading ? (
+            <p className="text-sm text-[var(--ash-grey)]">Loading...</p>
+          ) : !data || data.totalSales === 0 ? (
+            <p className="text-sm text-[var(--ash-grey)]">No marketplace sales yet.</p>
+          ) : (
+            <div className="space-y-4">
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-[var(--ash-grey)]/[0.06]">
+                {[
+                  { label: 'Total Sales', value: String(data.totalSales) },
+                  {
+                    label: 'Total Revenue',
+                    value: formatPrice(data.totalRevenue, data.currency),
+                  },
+                  {
+                    label: `Your Share (${100 - data.splitPct}%)`,
+                    value: formatPrice(data.orgShare, data.currency),
+                  },
+                  {
+                    label: `PLAYHUB (${data.splitPct}%)`,
+                    value: formatPrice(data.playhubShare, data.currency),
+                  },
+                ].map((card) => (
+                  <div key={card.label} className="bg-[var(--night)] p-3.5">
+                    <p className="text-xs text-[var(--ash-grey)] mb-1">
+                      {card.label}
+                    </p>
+                    <p className="text-lg font-semibold text-[var(--timberwolf)]">
+                      {card.value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Per-recording breakdown */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-[var(--timberwolf)]">
+                  Per Recording
+                </h3>
+                {data.perRecording.map((rec) => (
+                  <div
+                    key={rec.recordingId}
+                    className="flex items-center justify-between p-3 rounded-lg bg-white/[0.03] border border-[var(--ash-grey)]/10"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm text-[var(--timberwolf)] truncate">
+                        {rec.title}
+                      </p>
+                      <p className="text-xs text-[var(--ash-grey)]">
+                        {rec.sales} sale{rec.sales !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0 ml-4">
+                      <p className="text-sm font-semibold text-[var(--timberwolf)]">
+                        {formatPrice(rec.orgShare, data.currency)}
+                      </p>
+                      <p className="text-xs text-[var(--ash-grey)]">
+                        of {formatPrice(rec.revenue, data.currency)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Venue Settings (YouTube, Marketplace, Media Pack) ─────────────
+function VenueSettings({
+  venueId,
+  billingConfig,
+  onSaved,
+  inputClass,
+  outlineBtnClass,
+  primaryBtnClass,
+}: {
+  venueId: string
+  billingConfig: BillingConfig | null
+  onSaved: (config: BillingConfig) => void
+  inputClass: string
+  outlineBtnClass: string
+  primaryBtnClass: string
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [savedMsg, setSavedMsg] = useState<string | null>(null)
+
+  // Local form state
+  const [youtubeRtmpUrl, setYoutubeRtmpUrl] = useState(billingConfig?.youtube_rtmp_url || '')
+  const [youtubeStreamKey, setYoutubeStreamKey] = useState(billingConfig?.youtube_stream_key || '')
+  const [mpEnabled, setMpEnabled] = useState(billingConfig?.marketplace_enabled || false)
+  const [mpPrice, setMpPrice] = useState(String(billingConfig?.default_price_amount || ''))
+  const [mpCurrency, setMpCurrency] = useState(billingConfig?.default_price_currency || 'AED')
+  const [mediaLogoUrl, setMediaLogoUrl] = useState(billingConfig?.media_pack?.logo_url || '')
+  const [mediaLogoPosition, setMediaLogoPosition] = useState(billingConfig?.media_pack?.logo_position || 'top-right')
+  const [mediaSponsorUrl, setMediaSponsorUrl] = useState(billingConfig?.media_pack?.sponsor_logo_url || '')
+  const [mediaSponsorPosition, setMediaSponsorPosition] = useState(billingConfig?.media_pack?.sponsor_position || 'bottom-left')
+
+  // Sync when billingConfig loads/changes
+  useEffect(() => {
+    if (!billingConfig) return
+    setYoutubeRtmpUrl(billingConfig.youtube_rtmp_url || '')
+    setYoutubeStreamKey(billingConfig.youtube_stream_key || '')
+    setMpEnabled(billingConfig.marketplace_enabled || false)
+    setMpPrice(String(billingConfig.default_price_amount || ''))
+    setMpCurrency(billingConfig.default_price_currency || 'AED')
+    setMediaLogoUrl(billingConfig.media_pack?.logo_url || '')
+    setMediaLogoPosition(billingConfig.media_pack?.logo_position || 'top-right')
+    setMediaSponsorUrl(billingConfig.media_pack?.sponsor_logo_url || '')
+    setMediaSponsorPosition(billingConfig.media_pack?.sponsor_position || 'bottom-left')
+  }, [billingConfig])
+
+  async function handleSave() {
+    setSaving(true)
+    setSavedMsg(null)
+    try {
+      const res = await fetch(`/api/venue/${venueId}/billing`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...billingConfig,
+          youtube_rtmp_url: youtubeRtmpUrl || null,
+          youtube_stream_key: youtubeStreamKey || null,
+          marketplace_enabled: mpEnabled,
+          default_price_amount: mpPrice ? Number(mpPrice) : null,
+          default_price_currency: mpCurrency,
+          media_pack: {
+            logo_url: mediaLogoUrl || undefined,
+            logo_position: mediaLogoPosition,
+            sponsor_logo_url: mediaSponsorUrl || undefined,
+            sponsor_position: mediaSponsorPosition,
+          },
+        }),
+      })
+      const data = await res.json()
+      if (data.config) {
+        onSaved(data.config)
+        setSavedMsg('Settings saved')
+        setTimeout(() => setSavedMsg(null), 3000)
+      }
+    } catch {
+      setSavedMsg('Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="mt-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
+      <div className="p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
+            Venue Settings
+          </h2>
+          <Button
+            variant="outline"
+            className={`w-full md:w-auto ${outlineBtnClass}`}
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? 'Hide' : 'Configure'}
+          </Button>
+        </div>
+      </div>
+      {expanded && (
+        <div className="px-6 pb-6 space-y-6">
+          {/* YouTube Settings */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-[var(--timberwolf)] uppercase tracking-wider">
+              YouTube Broadcasting
+            </h3>
+            <p className="text-xs text-[var(--ash-grey)]">
+              Configure RTMP to broadcast recordings live to YouTube
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs text-[var(--ash-grey)]">RTMP URL</label>
+                <Input
+                  value={youtubeRtmpUrl}
+                  onChange={(e) => setYoutubeRtmpUrl(e.target.value)}
+                  placeholder="rtmp://a.rtmp.youtube.com/live2"
+                  className={inputClass}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-[var(--ash-grey)]">Stream Key</label>
+                <Input
+                  type="password"
+                  value={youtubeStreamKey}
+                  onChange={(e) => setYoutubeStreamKey(e.target.value)}
+                  placeholder="xxxx-xxxx-xxxx-xxxx"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Marketplace Settings */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-[var(--timberwolf)] uppercase tracking-wider">
+              Marketplace
+            </h3>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={mpEnabled}
+                onChange={(e) => setMpEnabled(e.target.checked)}
+                className="w-4 h-4 rounded border-[var(--ash-grey)]/20 bg-white/5 accent-[var(--timberwolf)]"
+              />
+              <span className="text-sm text-[var(--timberwolf)]">
+                Enable marketplace for this venue
+              </span>
+            </label>
+            {mpEnabled && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-[var(--ash-grey)]">Default Price</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={mpPrice}
+                    onChange={(e) => setMpPrice(e.target.value)}
+                    placeholder="25.00"
+                    className={inputClass}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-[var(--ash-grey)]">Currency</label>
+                  <Select value={mpCurrency} onValueChange={setMpCurrency}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AED">AED</SelectItem>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="GBP">GBP</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                      <SelectItem value="KWD">KWD</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Media Pack Settings */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-[var(--timberwolf)] uppercase tracking-wider">
+              Media Pack
+            </h3>
+            <p className="text-xs text-[var(--ash-grey)]">
+              Logo overlays shown on the video player
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs text-[var(--ash-grey)]">Logo URL</label>
+                <Input
+                  value={mediaLogoUrl}
+                  onChange={(e) => setMediaLogoUrl(e.target.value)}
+                  placeholder="https://..."
+                  className={inputClass}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-[var(--ash-grey)]">Logo Position</label>
+                <Select value={mediaLogoPosition} onValueChange={setMediaLogoPosition}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="top-left">Top Left</SelectItem>
+                    <SelectItem value="top-right">Top Right</SelectItem>
+                    <SelectItem value="bottom-left">Bottom Left</SelectItem>
+                    <SelectItem value="bottom-right">Bottom Right</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-[var(--ash-grey)]">Sponsor Logo URL</label>
+                <Input
+                  value={mediaSponsorUrl}
+                  onChange={(e) => setMediaSponsorUrl(e.target.value)}
+                  placeholder="https://..."
+                  className={inputClass}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-[var(--ash-grey)]">Sponsor Position</label>
+                <Select value={mediaSponsorPosition} onValueChange={setMediaSponsorPosition}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="top-left">Top Left</SelectItem>
+                    <SelectItem value="top-right">Top Right</SelectItem>
+                    <SelectItem value="bottom-left">Bottom Left</SelectItem>
+                    <SelectItem value="bottom-right">Bottom Right</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Save button */}
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              className={primaryBtnClass}
+            >
+              {saving ? 'Saving...' : 'Save Settings'}
+            </Button>
+            {savedMsg && (
+              <span className="text-sm text-emerald-400">{savedMsg}</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function VenueManagementPage() {
@@ -166,14 +577,34 @@ export default function VenueManagementPage() {
   const [newEmails, setNewEmails] = useState('')
   const [grantingAccess, setGrantingAccess] = useState(false)
 
+  // Edit recording modal state
+  const [editingRecording, setEditingRecording] = useState<Recording | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editHomeTeam, setEditHomeTeam] = useState('')
+  const [editAwayTeam, setEditAwayTeam] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [togglingBillable, setTogglingBillable] = useState<string | null>(null)
+  const [deletingRecording, setDeletingRecording] = useState<string | null>(null)
+
+  // Delete confirmation modal state
+  const [deleteConfirmRecording, setDeleteConfirmRecording] =
+    useState<Recording | null>(null)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+
   // Video playback (removed — redirects to /recordings/[id] now)
 
   // Public link
   const [generatingLink, setGeneratingLink] = useState<string | null>(null)
 
-  // Recordings section state
-  const [showAllRecordings, setShowAllRecordings] = useState(false)
-  const RECORDINGS_PREVIEW_COUNT = 10
+  // Recordings pagination + filter state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalRecordings, setTotalRecordings] = useState(0)
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [billableFilter, setBillableFilter] = useState('')
+  const [loadingRecordings, setLoadingRecordings] = useState(false)
+  const pageSize = 20
 
   // Admin management state
   const [admins, setAdmins] = useState<Admin[]>([])
@@ -209,6 +640,11 @@ export default function VenueManagementPage() {
   const [showBillingSection, setShowBillingSection] = useState(false)
   const [isBillable, setIsBillable] = useState(true)
   const [billableAmount, setBillableAmount] = useState('')
+  const [billingMonth, setBillingMonth] = useState(new Date().getMonth() + 1) // 1-indexed
+  const [billingYear, setBillingYear] = useState(new Date().getFullYear())
+  const isCurrentBillingMonth =
+    billingMonth === new Date().getMonth() + 1 &&
+    billingYear === new Date().getFullYear()
 
   // Live stream scheduling state
   const [showStreamScheduleForm, setShowStreamScheduleForm] = useState(false)
@@ -217,6 +653,11 @@ export default function VenueManagementPage() {
   const [streamStartTime, setStreamStartTime] = useState('')
   const [streamEndTime, setStreamEndTime] = useState('')
   const [schedulingStream, setSchedulingStream] = useState(false)
+
+  // YouTube + Marketplace state (for schedule form)
+  const [broadcastToYoutube, setBroadcastToYoutube] = useState(false)
+  const [marketplaceEnabled, setMarketplaceEnabled] = useState(false)
+  const [marketplacePrice, setMarketplacePrice] = useState('')
 
   useEffect(() => {
     fetchVenueData()
@@ -259,11 +700,6 @@ export default function VenueManagementPage() {
       }
       setVenue(currentVenue)
 
-      // Fetch recordings
-      const recordingsRes = await fetch(`/api/venue/${venueId}/recordings`)
-      const recordingsData = await recordingsRes.json()
-      setRecordings(recordingsData.recordings || [])
-
       // Fetch scenes for scheduling
       try {
         const scenesRes = await fetch(`/api/venue/${venueId}/spiideo/scenes`)
@@ -291,11 +727,57 @@ export default function VenueManagementPage() {
     }
   }
 
-  async function fetchBillingData() {
+  // Debounce search input
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearch(searchInput)
+      setCurrentPage(1)
+    }, 300)
+    return () => clearTimeout(timeout)
+  }, [searchInput])
+
+  // Separate recordings fetch with pagination + filters
+  async function fetchRecordings(page?: number, search?: string, status?: string, billable?: string) {
+    const p = page ?? currentPage
+    const s = search ?? debouncedSearch
+    const st = status ?? statusFilter
+    const b = billable ?? billableFilter
+
+    setLoadingRecordings(true)
+    try {
+      const params = new URLSearchParams({
+        page: String(p),
+        limit: String(pageSize),
+      })
+      if (s) params.set('search', s)
+      if (st) params.set('status', st)
+      if (b) params.set('billable', b)
+
+      const res = await fetch(`/api/venue/${venueId}/recordings?${params}`)
+      const data = await res.json()
+      setRecordings(data.recordings || [])
+      setTotalRecordings(data.total || 0)
+      setCurrentPage(data.page || 1)
+    } catch {
+      // Non-critical — recordings list just won't update
+    } finally {
+      setLoadingRecordings(false)
+    }
+  }
+
+  // Fetch recordings when filters/page change or venue loads
+  useEffect(() => {
+    if (venue) {
+      fetchRecordings(currentPage, debouncedSearch, statusFilter, billableFilter)
+    }
+  }, [currentPage, debouncedSearch, statusFilter, billableFilter, venue])
+
+  async function fetchBillingData(month = billingMonth, year = billingYear) {
+    const monthParams = `?month=${month}&year=${year}`
     try {
       const [configRes, summaryRes, invoicesRes] = await Promise.all([
         fetch(`/api/venue/${venueId}/billing`),
-        fetch(`/api/venue/${venueId}/billing/summary`),
+        fetch(`/api/venue/${venueId}/billing/summary${monthParams}`),
         fetch(`/api/venue/${venueId}/billing/invoices`),
       ])
       const [configData, summaryData, invoicesData] = await Promise.all([
@@ -317,7 +799,9 @@ export default function VenueManagementPage() {
 
     // Fetch daily stats separately so it can't break billing
     try {
-      const res = await fetch(`/api/venue/${venueId}/billing/daily-stats`)
+      const res = await fetch(
+        `/api/venue/${venueId}/billing/daily-stats${monthParams}`
+      )
       const data = await res.json()
       if (!data.error) setDailyStats(data)
     } catch {
@@ -367,7 +851,7 @@ export default function VenueManagementPage() {
         // Refresh access list
         openAccessModal(selectedRecording)
         // Refresh recordings to update access count
-        fetchVenueData()
+        fetchRecordings()
       }
     } catch (err) {
       setError('Failed to grant access')
@@ -391,7 +875,7 @@ export default function VenueManagementPage() {
       // Refresh access list
       openAccessModal(selectedRecording)
       // Refresh recordings to update access count
-      fetchVenueData()
+      fetchRecordings()
     } catch (err) {
       console.error('Failed to revoke access:', err)
     }
@@ -427,6 +911,99 @@ export default function VenueManagementPage() {
       setError('Failed to generate public link')
     } finally {
       setGeneratingLink(null)
+    }
+  }
+
+  async function toggleBillable(recording: Recording) {
+    setTogglingBillable(recording.id)
+    try {
+      const res = await fetch(`/api/recordings/${recording.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_billable: !recording.is_billable }),
+      })
+      if (res.ok) {
+        setRecordings((prev) =>
+          prev.map((r) =>
+            r.id === recording.id
+              ? { ...r, is_billable: !recording.is_billable }
+              : r
+          )
+        )
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Failed to update')
+      }
+    } catch {
+      setError('Failed to update billable status')
+    } finally {
+      setTogglingBillable(null)
+    }
+  }
+
+  function openEditModal(recording: Recording) {
+    setEditingRecording(recording)
+    setEditTitle(recording.title)
+    setEditHomeTeam(recording.home_team)
+    setEditAwayTeam(recording.away_team)
+  }
+
+  async function handleSaveEdit() {
+    if (!editingRecording) return
+    setSavingEdit(true)
+    try {
+      const res = await fetch(`/api/recordings/${editingRecording.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editTitle,
+          home_team: editHomeTeam,
+          away_team: editAwayTeam,
+        }),
+      })
+      if (res.ok) {
+        setRecordings((prev) =>
+          prev.map((r) =>
+            r.id === editingRecording.id
+              ? { ...r, title: editTitle, home_team: editHomeTeam, away_team: editAwayTeam }
+              : r
+          )
+        )
+        setEditingRecording(null)
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Failed to save')
+      }
+    } catch {
+      setError('Failed to save changes')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  function promptDeleteRecording(recording: Recording) {
+    setDeleteConfirmRecording(recording)
+    setDeleteConfirmText('')
+  }
+
+  async function confirmDeleteRecording() {
+    if (!deleteConfirmRecording) return
+    setDeletingRecording(deleteConfirmRecording.id)
+    try {
+      const res = await fetch(`/api/recordings/${deleteConfirmRecording.id}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        setDeleteConfirmRecording(null)
+        fetchRecordings()
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Failed to delete')
+      }
+    } catch {
+      setError('Failed to delete recording')
+    } finally {
+      setDeletingRecording(null)
     }
   }
 
@@ -758,6 +1335,10 @@ export default function VenueManagementPage() {
           isBillable,
           billableAmount:
             isBillable && billableAmount ? Number(billableAmount) : undefined,
+          broadcastToYoutube,
+          marketplaceEnabled,
+          priceAmount: marketplaceEnabled && marketplacePrice ? Number(marketplacePrice) : undefined,
+          priceCurrency: billingConfig?.default_price_currency || 'AED',
         }),
       })
 
@@ -774,8 +1355,11 @@ export default function VenueManagementPage() {
         setHomeTeam('Home')
         setAwayTeam('Away')
         setAccessEmails('')
+        setBroadcastToYoutube(false)
+        setMarketplaceEnabled(false)
+        setMarketplacePrice('')
         setShowScheduleForm(false)
-        fetchVenueData()
+        fetchRecordings()
       }
     } catch (err) {
       setError('Failed to schedule recording')
@@ -806,9 +1390,7 @@ export default function VenueManagementPage() {
 
   // Shared input styling
   const inputClass =
-    'bg-white/5 border-[var(--ash-grey)]/20 text-[var(--timberwolf)] placeholder:text-[var(--ash-grey)]/40'
-  const selectClass =
-    "w-full p-2 pr-8 rounded-md border border-[var(--ash-grey)]/20 bg-white/5 text-[var(--timberwolf)] appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%23888%22%20d%3D%22M6%208L1%203h10z%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat disabled:opacity-60 disabled:cursor-not-allowed"
+    'bg-zinc-800 border-[var(--ash-grey)]/20 text-[var(--timberwolf)] placeholder:text-[var(--ash-grey)]/40'
   const outlineBtnClass =
     'border-[var(--ash-grey)]/20 text-[var(--timberwolf)] hover:bg-white/10'
   const primaryBtnClass =
@@ -878,7 +1460,7 @@ export default function VenueManagementPage() {
 
           {/* Recordings skeleton */}
           <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
-            <div className="p-6 pb-3 space-y-1">
+            <div className="p-6 space-y-1">
               <div className="bg-[var(--ash-grey)]/10 rounded h-5 w-[100px]" />
               <div className="bg-[var(--ash-grey)]/10 rounded h-3 w-[120px]" />
             </div>
@@ -973,17 +1555,45 @@ export default function VenueManagementPage() {
             <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/8 bg-white/[0.02]">
               <div className="p-5">
                 {/* Header row */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                  <div>
-                    <h2 className="text-base font-semibold text-[var(--timberwolf)]">
-                      Billing
-                    </h2>
-                    <p className="text-[11px] text-[var(--ash-grey)]/70 mt-0.5">
-                      {new Date().toLocaleDateString('en-GB', {
+                <div className="relative flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 mb-4">
+                  <h2 className="text-base font-semibold text-[var(--timberwolf)]">
+                    Billing
+                  </h2>
+                  <div className="flex items-center gap-3 order-last sm:order-none ml-auto sm:ml-0 sm:absolute sm:left-1/2 sm:-translate-x-1/2">
+                    <button
+                      onClick={() => {
+                        const prev = billingMonth === 1
+                          ? { m: 12, y: billingYear - 1 }
+                          : { m: billingMonth - 1, y: billingYear }
+                        setBillingMonth(prev.m)
+                        setBillingYear(prev.y)
+                        fetchBillingData(prev.m, prev.y)
+                      }}
+                      className="text-[var(--ash-grey)]/70 hover:text-[var(--timberwolf)] text-base px-1.5 py-0.5"
+                    >
+                      ‹
+                    </button>
+                    <p className="text-sm text-[var(--ash-grey)] font-medium min-w-[120px] text-center">
+                      {new Date(billingYear, billingMonth - 1).toLocaleDateString('en-GB', {
                         month: 'long',
                         year: 'numeric',
                       })}
                     </p>
+                    <button
+                      onClick={() => {
+                        if (isCurrentBillingMonth) return
+                        const next = billingMonth === 12
+                          ? { m: 1, y: billingYear + 1 }
+                          : { m: billingMonth + 1, y: billingYear }
+                        setBillingMonth(next.m)
+                        setBillingYear(next.y)
+                        fetchBillingData(next.m, next.y)
+                      }}
+                      disabled={isCurrentBillingMonth}
+                      className={`text-base px-1.5 py-0.5 ${isCurrentBillingMonth ? 'text-[var(--ash-grey)]/20 cursor-not-allowed' : 'text-[var(--ash-grey)]/70 hover:text-[var(--timberwolf)]'}`}
+                    >
+                      ›
+                    </button>
                   </div>
                   {billingSummary && (
                     <div className="flex items-center gap-3 sm:gap-4 text-sm">
@@ -1009,7 +1619,7 @@ export default function VenueManagementPage() {
                           recordings
                         </span>
                       </div>
-                      {billingSummary.dailyTarget > 0 && (
+                      {billingSummary.dailyTarget > 0 && isCurrentBillingMonth && (
                         <div className="border-l border-[var(--ash-grey)]/10 pl-3 sm:pl-4">
                           <span
                             className="text-[var(--timberwolf)] font-medium"
@@ -1092,7 +1702,7 @@ export default function VenueManagementPage() {
                       </p>
                       <p className="text-[10px] text-[var(--ash-grey)]/40 mt-1">
                         {billingSummary.count} recording
-                        {billingSummary.count === 1 ? '' : 's'} this month
+                        {billingSummary.count === 1 ? '' : 's'} in {new Date(billingYear, billingMonth - 1).toLocaleDateString('en-GB', { month: 'long' })}
                       </p>
                     </div>
                     {/* Net settlement */}
@@ -1403,8 +2013,8 @@ export default function VenueManagementPage() {
         {scenes.length > 0 && (
           <FadeIn delay={100}>
             <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
-              <div className="p-6 pb-3">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+              <div className="p-6">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-2">
                   <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
                     Schedule Recording
                   </h2>
@@ -1438,19 +2048,18 @@ export default function VenueManagementPage() {
                         <label className="text-sm font-medium text-[var(--timberwolf)]">
                           Pitch/Camera *
                         </label>
-                        <select
-                          className={selectClass}
-                          value={sceneId}
-                          onChange={(e) => setSceneId(e.target.value)}
-                          disabled={scenes.length <= 1}
-                          required
-                        >
-                          {scenes.map((scene) => (
-                            <option key={scene.id} value={scene.id}>
-                              {scene.name}
-                            </option>
-                          ))}
-                        </select>
+                        <Select value={sceneId} onValueChange={setSceneId} disabled={scenes.length <= 1}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select pitch..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {scenes.map((scene) => (
+                              <SelectItem key={scene.id} value={scene.id}>
+                                {scene.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
 
@@ -1496,12 +2105,12 @@ export default function VenueManagementPage() {
                         <label className="text-sm font-medium text-[var(--timberwolf)]">
                           Start Time *
                         </label>
-                        <Input
-                          type="datetime-local"
+                        <DateTimePicker
                           value={startTime}
-                          onChange={(e) => setStartTime(e.target.value)}
+                          onChange={setStartTime}
                           required
                           className={inputClass}
+                          placeholder="Select start time"
                         />
                         <Button
                           type="button"
@@ -1517,12 +2126,12 @@ export default function VenueManagementPage() {
                         <label className="text-sm font-medium text-[var(--timberwolf)]">
                           End Time *
                         </label>
-                        <Input
-                          type="datetime-local"
+                        <DateTimePicker
                           value={endTime}
-                          onChange={(e) => setEndTime(e.target.value)}
+                          onChange={setEndTime}
                           required
                           className={inputClass}
+                          placeholder="Select end time"
                         />
                         {startTime && (
                           <div className="flex gap-2">
@@ -1611,6 +2220,59 @@ export default function VenueManagementPage() {
                       </div>
                     )}
 
+                    {/* Broadcast to YouTube */}
+                    {billingConfig?.youtube_rtmp_url && billingConfig?.youtube_stream_key && (
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={broadcastToYoutube}
+                            onChange={(e) => setBroadcastToYoutube(e.target.checked)}
+                            className="w-4 h-4 rounded border-[var(--ash-grey)]/20 bg-white/5 accent-[var(--timberwolf)]"
+                          />
+                          <span className="text-sm font-medium text-[var(--timberwolf)]">
+                            Broadcast to YouTube
+                          </span>
+                        </label>
+                        <p className="text-xs text-[var(--ash-grey)]">
+                          Stream will be pushed to the configured YouTube channel via RTMP
+                        </p>
+                      </div>
+                    )}
+
+                    {/* List on marketplace */}
+                    {billingConfig?.marketplace_enabled && (
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={marketplaceEnabled}
+                            onChange={(e) => setMarketplaceEnabled(e.target.checked)}
+                            className="w-4 h-4 rounded border-[var(--ash-grey)]/20 bg-white/5 accent-[var(--timberwolf)]"
+                          />
+                          <span className="text-sm font-medium text-[var(--timberwolf)]">
+                            List on marketplace
+                          </span>
+                        </label>
+                        {marketplaceEnabled && (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={marketplacePrice}
+                              onChange={(e) => setMarketplacePrice(e.target.value)}
+                              placeholder={String(billingConfig.default_price_amount || '25.00')}
+                              className={`w-32 ${inputClass}`}
+                            />
+                            <span className="text-sm text-[var(--ash-grey)]">
+                              {billingConfig.default_price_currency || 'AED'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {error && (
                       <div className="bg-red-500/10 text-red-400 p-3 rounded-lg">
                         {error}
@@ -1650,7 +2312,7 @@ export default function VenueManagementPage() {
         {/* Live Streaming Section */}
         <FadeIn delay={200}>
           <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
-            <div className="p-6 pb-3">
+            <div className="p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                 <div>
                   <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
@@ -1747,41 +2409,41 @@ export default function VenueManagementPage() {
                           <label className="text-sm text-[var(--ash-grey)]">
                             Camera/Pitch *
                           </label>
-                          <select
-                            value={streamSceneId}
-                            onChange={(e) => setStreamSceneId(e.target.value)}
-                            className={selectClass}
-                            required
-                          >
-                            {scenes.map((scene) => (
-                              <option key={scene.id} value={scene.id}>
-                                {scene.name}
-                              </option>
-                            ))}
-                          </select>
+                          <Select value={streamSceneId} onValueChange={setStreamSceneId}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select pitch..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {scenes.map((scene) => (
+                                <SelectItem key={scene.id} value={scene.id}>
+                                  {scene.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div>
                           <label className="text-sm text-[var(--ash-grey)]">
                             Start Time *
                           </label>
-                          <Input
-                            type="datetime-local"
+                          <DateTimePicker
                             value={streamStartTime}
-                            onChange={(e) => setStreamStartTime(e.target.value)}
+                            onChange={setStreamStartTime}
                             required
                             className={inputClass}
+                            placeholder="Select start time"
                           />
                         </div>
                         <div>
                           <label className="text-sm text-[var(--ash-grey)]">
                             End Time *
                           </label>
-                          <Input
-                            type="datetime-local"
+                          <DateTimePicker
                             value={streamEndTime}
-                            onChange={(e) => setStreamEndTime(e.target.value)}
+                            onChange={setStreamEndTime}
                             required
                             className={inputClass}
+                            placeholder="Select end time"
                           />
                         </div>
                       </div>
@@ -2006,29 +2668,69 @@ export default function VenueManagementPage() {
           </div>
         </FadeIn>
 
+        {/* Marketplace Revenue */}
+        {billingConfig?.marketplace_enabled && (
+          <FadeIn delay={250}>
+            <MarketplaceRevenue
+              venueId={venueId}
+              outlineBtnClass={outlineBtnClass}
+            />
+          </FadeIn>
+        )}
+
         {/* Recordings List */}
         <FadeIn delay={300}>
           <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
-            <div className="p-6 pb-3">
+            <div className="p-6">
               <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
                 Recordings
               </h2>
               <p className="text-sm text-[var(--ash-grey)]">
-                {recordings.length} recording
-                {recordings.length === 1 ? '' : 's'}
+                {totalRecordings} recording
+                {totalRecordings === 1 ? '' : 's'}
               </p>
+
+              {/* Search + Filters */}
+              <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                <Input
+                  placeholder="Search title or team..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className={`sm:max-w-xs ${inputClass}`}
+                />
+                <Select value={statusFilter || 'all'} onValueChange={(v) => { setStatusFilter(v === 'all' ? '' : v); setCurrentPage(1) }}>
+                  <SelectTrigger className="sm:w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="published">Published</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="scheduled">Scheduled</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={billableFilter || 'all'} onValueChange={(v) => { setBillableFilter(v === 'all' ? '' : v); setCurrentPage(1) }}>
+                  <SelectTrigger className="sm:w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="true">Billable</SelectItem>
+                    <SelectItem value="false">Not Billable</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="px-6 pb-6">
               {recordings.length === 0 ? (
                 <p className="text-[var(--ash-grey)] text-center py-8">
-                  No recordings yet. Schedule a recording to get started.
+                  {debouncedSearch || statusFilter || billableFilter
+                    ? 'No recordings match your filters.'
+                    : 'No recordings yet. Schedule a recording to get started.'}
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {(showAllRecordings
-                    ? recordings
-                    : recordings.slice(0, RECORDINGS_PREVIEW_COUNT)
-                  ).map((recording) => (
+                  {recordings.map((recording) => (
                     <div
                       key={recording.id}
                       className="p-4 rounded-lg bg-white/[0.03] border border-[var(--ash-grey)]/10"
@@ -2081,10 +2783,27 @@ export default function VenueManagementPage() {
 
                       {/* Bottom row: Access count & Actions */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-3 pt-3 border-t border-[var(--ash-grey)]/10 gap-2">
-                        <span className="text-sm text-[var(--ash-grey)]">
-                          {recording.accessCount || 0} user
-                          {(recording.accessCount || 0) === 1 ? '' : 's'}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-[var(--ash-grey)]">
+                            {recording.accessCount || 0} user
+                            {(recording.accessCount || 0) === 1 ? '' : 's'}
+                          </span>
+                          <button
+                            onClick={() => toggleBillable(recording)}
+                            disabled={togglingBillable === recording.id}
+                            className={`text-xs px-2 py-0.5 rounded cursor-pointer transition-colors ${
+                              recording.is_billable !== false
+                                ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                                : 'bg-gray-500/20 text-gray-400 hover:bg-gray-500/30'
+                            }`}
+                          >
+                            {togglingBillable === recording.id
+                              ? '...'
+                              : recording.is_billable !== false
+                                ? 'Billable'
+                                : 'Not Billable'}
+                          </button>
+                        </div>
                         <div className="flex items-center gap-2">
                           <Button
                             variant="outline"
@@ -2108,22 +2827,58 @@ export default function VenueManagementPage() {
                           >
                             Manage Access
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={`flex-shrink-0 ${outlineBtnClass}`}
+                            onClick={() => openEditModal(recording)}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-shrink-0 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                            onClick={() => promptDeleteRecording(recording)}
+                            disabled={deletingRecording === recording.id}
+                          >
+                            {deletingRecording === recording.id ? '...' : 'Delete'}
+                          </Button>
                         </div>
                       </div>
                     </div>
                   ))}
 
-                  {/* Show more/less button */}
-                  {recordings.length > RECORDINGS_PREVIEW_COUNT && (
-                    <Button
-                      variant="ghost"
-                      className="w-full mt-2 text-[var(--timberwolf)] hover:bg-white/10"
-                      onClick={() => setShowAllRecordings(!showAllRecordings)}
-                    >
-                      {showAllRecordings
-                        ? 'Show less'
-                        : `Show all ${recordings.length} recordings`}
-                    </Button>
+                  {/* Pagination controls */}
+                  {totalRecordings > pageSize && (
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-[var(--ash-grey)]/10">
+                      <p className="text-sm text-[var(--ash-grey)]">
+                        {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, totalRecordings)} of {totalRecordings}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={outlineBtnClass}
+                          disabled={currentPage <= 1}
+                          onClick={() => setCurrentPage((p) => p - 1)}
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm text-[var(--ash-grey)] px-2">
+                          Page {currentPage} of {Math.ceil(totalRecordings / pageSize)}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={outlineBtnClass}
+                          disabled={currentPage >= Math.ceil(totalRecordings / pageSize)}
+                          onClick={() => setCurrentPage((p) => p + 1)}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
@@ -2131,10 +2886,22 @@ export default function VenueManagementPage() {
           </div>
         </FadeIn>
 
+        {/* Venue Settings (YouTube, Marketplace, Media Pack) */}
+        <FadeIn delay={350}>
+          <VenueSettings
+            venueId={venueId}
+            billingConfig={billingConfig}
+            onSaved={(updated) => setBillingConfig(updated)}
+            inputClass={inputClass}
+            outlineBtnClass={outlineBtnClass}
+            primaryBtnClass={primaryBtnClass}
+          />
+        </FadeIn>
+
         {/* Venue Admins Section */}
         <FadeIn delay={400}>
           <div className="mt-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
-            <div className="p-6 pb-3">
+            <div className="p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                 <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
                   Venue Admins
@@ -2247,7 +3014,7 @@ export default function VenueManagementPage() {
         {showAccessModal && selectedRecording && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
             <div className="w-full max-w-lg m-4 rounded-xl border border-[var(--ash-grey)]/10 bg-[var(--night)]">
-              <div className="p-6 pb-3">
+              <div className="p-6">
                 <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
                   Manage Access
                 </h2>
@@ -2338,6 +3105,121 @@ export default function VenueManagementPage() {
                 >
                   Close
                 </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Recording Modal */}
+        {editingRecording && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+            <div className="w-full max-w-lg m-4 rounded-xl border border-[var(--ash-grey)]/10 bg-[var(--night)]">
+              <div className="p-6">
+                <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
+                  Edit Recording
+                </h2>
+              </div>
+              <div className="px-6 pb-6 space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-[var(--timberwolf)]">
+                    Title
+                  </label>
+                  <Input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-[var(--timberwolf)]">
+                    Home Team
+                  </label>
+                  <Input
+                    value={editHomeTeam}
+                    onChange={(e) => setEditHomeTeam(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-[var(--timberwolf)]">
+                    Away Team
+                  </label>
+                  <Input
+                    value={editAwayTeam}
+                    onChange={(e) => setEditAwayTeam(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    className={`flex-1 ${primaryBtnClass}`}
+                    onClick={handleSaveEdit}
+                    disabled={savingEdit}
+                  >
+                    {savingEdit ? 'Saving...' : 'Save'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className={`flex-1 ${outlineBtnClass}`}
+                    onClick={() => setEditingRecording(null)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {deleteConfirmRecording && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+            <div className="w-full max-w-md m-4 rounded-xl border border-red-500/30 bg-[var(--night)]">
+              <div className="p-6">
+                <h2 className="text-lg font-semibold text-red-400">
+                  Delete Recording
+                </h2>
+                <p className="text-sm text-[var(--ash-grey)] mt-2">
+                  This will permanently delete{' '}
+                  <span className="text-[var(--timberwolf)] font-medium">
+                    {deleteConfirmRecording.title}
+                  </span>{' '}
+                  including the video file from storage. This cannot be undone.
+                </p>
+              </div>
+              <div className="px-6 pb-6 space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-[var(--timberwolf)]">
+                    Type DELETE to confirm
+                  </label>
+                  <Input
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="DELETE"
+                    className={inputClass}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white border-0"
+                    onClick={confirmDeleteRecording}
+                    disabled={
+                      deleteConfirmText !== 'DELETE' ||
+                      deletingRecording === deleteConfirmRecording.id
+                    }
+                  >
+                    {deletingRecording === deleteConfirmRecording.id
+                      ? 'Deleting...'
+                      : 'Delete Forever'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className={`flex-1 ${outlineBtnClass}`}
+                    onClick={() => setDeleteConfirmRecording(null)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

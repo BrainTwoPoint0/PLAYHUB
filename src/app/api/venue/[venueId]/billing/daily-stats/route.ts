@@ -38,16 +38,20 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     .eq('organization_id', venueId)
     .maybeSingle()
 
-  // Current month boundaries
+  // Month boundaries — use query params if provided, otherwise current month
   const now = new Date()
-  const monthStart = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    1
-  ).toISOString()
+  const searchParams = request.nextUrl.searchParams
+  const paramMonth = searchParams.get('month')
+  const paramYear = searchParams.get('year')
+  const targetMonth = paramMonth ? parseInt(paramMonth, 10) - 1 : now.getMonth()
+  const targetYear = paramYear ? parseInt(paramYear, 10) : now.getFullYear()
+  const isCurrentMonth =
+    targetMonth === now.getMonth() && targetYear === now.getFullYear()
+
+  const monthStart = new Date(targetYear, targetMonth, 1).toISOString()
   const monthEnd = new Date(
-    now.getFullYear(),
-    now.getMonth() + 1,
+    targetYear,
+    targetMonth + 1,
     0,
     23,
     59,
@@ -60,6 +64,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     .select('id, created_at, pitch_name, billable_amount')
     .eq('organization_id', venueId)
     .eq('is_billable', true)
+    .eq('status', 'published')
     .gte('created_at', monthStart)
     .lte('created_at', monthEnd)
     .order('created_at', { ascending: true })
@@ -81,13 +86,9 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   >()
 
   // Pre-fill all days of the month
-  const daysInMonth = new Date(
-    now.getFullYear(),
-    now.getMonth() + 1,
-    0
-  ).getDate()
+  const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate()
   for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    const dateStr = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
     dayMap.set(dateStr, { total: 0, byScene: {}, revenue: 0 })
   }
 
@@ -122,9 +123,10 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       revenue: Number(data.revenue.toFixed(3)),
     }))
 
-  // Calculate average per day (only up to today)
-  const todayDate = now.getDate()
-  const daysElapsed = Math.min(todayDate, daysInMonth)
+  // Calculate average per day (up to today for current month, full month for past)
+  const daysElapsed = isCurrentMonth
+    ? Math.min(now.getDate(), daysInMonth)
+    : daysInMonth
   const totalRecordings = recs.length
   const averagePerDay =
     daysElapsed > 0 ? Number((totalRecordings / daysElapsed).toFixed(1)) : 0

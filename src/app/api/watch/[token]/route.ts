@@ -65,6 +65,19 @@ export async function GET(
     .eq('visibility', 'public')
     .order('timestamp_seconds', { ascending: true })
 
+  // Fetch media pack from org's billing config
+  let mediaPack = null
+  if (recording.organization_id) {
+    const { data: billingCfg } = await (serviceClient as any)
+      .from('playhub_venue_billing_config')
+      .select('media_pack')
+      .eq('organization_id', recording.organization_id)
+      .maybeSingle()
+    if (billingCfg?.media_pack && Object.keys(billingCfg.media_pack).length > 0) {
+      mediaPack = billingCfg.media_pack
+    }
+  }
+
   return NextResponse.json({
     recording: {
       id: recording.id,
@@ -78,5 +91,6 @@ export async function GET(
     },
     videoUrl,
     events: events || [],
+    mediaPack,
   })
 }

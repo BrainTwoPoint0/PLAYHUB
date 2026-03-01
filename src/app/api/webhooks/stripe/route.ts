@@ -177,6 +177,17 @@ async function handleMatchRecordingPurchase(
 
   const supabase = await createClient()
 
+  // Look up organization_id from the match recording for revenue attribution
+  let organizationId: string | null = null
+  if (match_recording_id) {
+    const { data: recData } = await (supabase as any)
+      .from('playhub_match_recordings')
+      .select('organization_id')
+      .eq('id', match_recording_id)
+      .maybeSingle()
+    organizationId = recData?.organization_id || null
+  }
+
   // Create purchase record (type assertion for PLAYHUB tables)
   // Store customer info directly on purchase for audit trail (persists even if user deletes account)
   const { data: purchase, error: purchaseError } = await (supabase as any)
@@ -191,6 +202,7 @@ async function handleMatchRecordingPurchase(
       stripe_payment_intent_id: session.payment_intent as string,
       customer_email: session.customer_details?.email || null,
       customer_name: session.customer_details?.name || null,
+      organization_id: organizationId,
     })
     .select()
     .single()

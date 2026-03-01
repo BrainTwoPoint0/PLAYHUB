@@ -101,7 +101,7 @@ export default function AcademySelectorPage() {
       <div className="min-h-screen bg-[var(--night)]">
         <div className="container mx-auto px-5 py-16 max-w-4xl">
           <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
-            <div className="p-6 pb-3">
+            <div className="p-6">
               <h1 className="text-2xl font-bold text-[var(--timberwolf)]">
                 No Clubs
               </h1>
