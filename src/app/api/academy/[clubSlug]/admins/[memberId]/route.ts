@@ -1,14 +1,18 @@
-// DELETE /api/venue/[venueId]/admins/[memberId] - Remove admin from venue
+// DELETE /api/academy/[clubSlug]/admins/[memberId] - Remove admin from academy
+// Platform admin only
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { isVenueAdmin } from '@/lib/recordings/access-control'
+import { isPlatformAdmin } from '@/lib/admin/auth'
+import { getClubBySlug } from '@/lib/academy/config'
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ venueId: string; memberId: string }> }
+  {
+    params,
+  }: { params: Promise<{ clubSlug: string; memberId: string }> }
 ) {
-  const { venueId, memberId } = await params
+  const { clubSlug, memberId } = await params
   const supabase = await createClient()
 
   const {
@@ -20,18 +24,18 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Check if user is admin for this venue
-  const isAdmin = await isVenueAdmin(user.id, venueId)
-  if (!isAdmin) {
-    return NextResponse.json(
-      { error: 'Not authorized for this venue' },
-      { status: 403 }
-    )
+  if (!(await isPlatformAdmin(user.id))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const club = await getClubBySlug(clubSlug)
+  if (!club?.organizationId) {
+    return NextResponse.json({ error: 'Club not found' }, { status: 404 })
   }
 
   const serviceClient = createServiceClient()
 
-  // Get the membership to verify it belongs to this venue
+  // Get the membership to verify it belongs to this academy
   const { data: membership } = await serviceClient
     .from('organization_members')
     .select(
@@ -52,9 +56,9 @@ export async function DELETE(
     return NextResponse.json({ error: 'Admin not found' }, { status: 404 })
   }
 
-  if (membership.organization_id !== venueId) {
+  if (membership.organization_id !== club.organizationId) {
     return NextResponse.json(
-      { error: 'Admin does not belong to this venue' },
+      { error: 'Admin does not belong to this academy' },
       { status: 403 }
     )
   }

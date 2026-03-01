@@ -266,6 +266,27 @@ export default function AcademyAccessPage() {
     }
   }
 
+  async function removeAdmin(memberId: string) {
+    setAdminsLoading(true)
+    setAdminMessage(null)
+    try {
+      const res = await fetch(`/api/academy/${clubSlug}/admins/${memberId}`, {
+        method: 'DELETE',
+      })
+      const json = await res.json()
+      if (res.ok) {
+        setAdminMessage('Admin removed')
+        await fetchAdmins()
+      } else {
+        setAdminMessage(json.error || 'Failed to remove admin')
+      }
+    } catch {
+      setAdminMessage('Failed to remove admin')
+    } finally {
+      setAdminsLoading(false)
+    }
+  }
+
   async function inviteAdmin() {
     if (!newAdminEmail.trim()) return
     setAdminsLoading(true)
@@ -689,9 +710,18 @@ export default function AcademyAccessPage() {
                             {admin.email}
                           </span>
                         </div>
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-white/5 text-[var(--ash-grey)]">
-                          {admin.role === 'league_admin' ? 'League Admin' : 'Club Admin'}
-                        </span>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-white/5 text-[var(--ash-grey)]">
+                            {admin.role === 'league_admin' ? 'League Admin' : 'Club Admin'}
+                          </span>
+                          <button
+                            onClick={() => removeAdmin(admin.id)}
+                            disabled={adminsLoading}
+                            className="text-xs px-2 py-1 rounded text-red-400 hover:bg-red-500/10 transition-colors"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
