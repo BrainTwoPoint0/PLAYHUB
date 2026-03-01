@@ -27,6 +27,13 @@ export interface MediaPack {
   sponsor_position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 }
 
+export interface GraphicPackageOverlay {
+  logo_url: string | null
+  logo_position: string
+  sponsor_logo_url: string | null
+  sponsor_position: string
+}
+
 interface VideoPlayerProps {
   src: string
   events?: RecordingEvent[]
@@ -35,6 +42,7 @@ interface VideoPlayerProps {
   onSeek?: (timestampSeconds: number) => void
   className?: string
   mediaPack?: MediaPack
+  graphicPackage?: GraphicPackageOverlay
 }
 
 export function VideoPlayer({
@@ -45,6 +53,7 @@ export function VideoPlayer({
   onSeek,
   className = '',
   mediaPack,
+  graphicPackage,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const hlsRef = useRef<Hls | null>(null)
@@ -253,31 +262,36 @@ export function VideoPlayer({
         onClick={togglePlayPause}
       />
 
-      {/* Media pack overlays */}
-      {mediaPack?.logo_url && (
-        <img
-          src={mediaPack.logo_url}
-          alt=""
-          className={`absolute pointer-events-none w-12 h-12 md:w-16 md:h-16 object-contain opacity-70 ${
-            mediaPack.logo_position === 'top-left' ? 'top-3 left-3' :
-            mediaPack.logo_position === 'bottom-left' ? 'bottom-16 left-3' :
-            mediaPack.logo_position === 'bottom-right' ? 'bottom-16 right-3' :
-            'top-3 right-3'
-          }`}
-        />
-      )}
-      {mediaPack?.sponsor_logo_url && (
-        <img
-          src={mediaPack.sponsor_logo_url}
-          alt=""
-          className={`absolute pointer-events-none w-12 h-12 md:w-16 md:h-16 object-contain opacity-70 ${
-            mediaPack.sponsor_position === 'top-left' ? 'top-3 left-3' :
-            mediaPack.sponsor_position === 'top-right' ? 'top-3 right-3' :
-            mediaPack.sponsor_position === 'bottom-right' ? 'bottom-16 right-3' :
-            'bottom-16 left-3'
-          }`}
-        />
-      )}
+      {/* Graphics overlay — prefer graphicPackage over legacy mediaPack */}
+      {(() => {
+        const logoUrl = graphicPackage?.logo_url || mediaPack?.logo_url
+        const logoPos = graphicPackage?.logo_position || mediaPack?.logo_position || 'top-right'
+        const sponsorUrl = graphicPackage?.sponsor_logo_url || mediaPack?.sponsor_logo_url
+        const sponsorPos = graphicPackage?.sponsor_position || mediaPack?.sponsor_position || 'bottom-left'
+        const posClass = (pos: string) =>
+          pos === 'top-left' ? 'top-3 left-3' :
+          pos === 'top-right' ? 'top-3 right-3' :
+          pos === 'bottom-left' ? 'bottom-16 left-3' :
+          'bottom-16 right-3'
+        return (
+          <>
+            {logoUrl && (
+              <img
+                src={logoUrl}
+                alt=""
+                className={`absolute pointer-events-none w-12 h-12 md:w-16 md:h-16 object-contain opacity-70 ${posClass(logoPos)}`}
+              />
+            )}
+            {sponsorUrl && (
+              <img
+                src={sponsorUrl}
+                alt=""
+                className={`absolute pointer-events-none w-12 h-12 md:w-16 md:h-16 object-contain opacity-70 ${posClass(sponsorPos)}`}
+              />
+            )}
+          </>
+        )
+      })()}
 
       {/* Loading spinner */}
       {isLoading && (

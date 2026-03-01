@@ -65,9 +65,30 @@ export async function GET(
     .eq('visibility', 'public')
     .order('timestamp_seconds', { ascending: true })
 
-  // Fetch media pack from org's billing config
+  // Fetch graphic package: recording's package → org default → venue media_pack
+  let graphicPackage = null
   let mediaPack = null
-  if (recording.organization_id) {
+
+  if (recording.graphic_package_id) {
+    const { data: gp } = await (serviceClient as any)
+      .from('playhub_graphic_packages')
+      .select('*')
+      .eq('id', recording.graphic_package_id)
+      .maybeSingle()
+    if (gp) graphicPackage = gp
+  }
+
+  if (!graphicPackage && recording.organization_id) {
+    const { data: gp } = await (serviceClient as any)
+      .from('playhub_graphic_packages')
+      .select('*')
+      .eq('organization_id', recording.organization_id)
+      .eq('is_default', true)
+      .maybeSingle()
+    if (gp) graphicPackage = gp
+  }
+
+  if (!graphicPackage && recording.organization_id) {
     const { data: billingCfg } = await (serviceClient as any)
       .from('playhub_venue_billing_config')
       .select('media_pack')
@@ -91,6 +112,7 @@ export async function GET(
     },
     videoUrl,
     events: events || [],
+    graphicPackage,
     mediaPack,
   })
 }

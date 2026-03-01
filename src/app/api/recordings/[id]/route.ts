@@ -57,9 +57,32 @@ export async function GET(
     }
   }
 
-  // Fetch media pack from org's billing config
+  // Fetch graphic package: recording's package → org default → venue media_pack
+  let graphicPackage = null
   let mediaPack = null
-  if (recording.organization_id) {
+
+  if (recording.graphic_package_id) {
+    const { data: gp } = await (serviceClient as any)
+      .from('playhub_graphic_packages')
+      .select('*')
+      .eq('id', recording.graphic_package_id)
+      .maybeSingle()
+    if (gp) graphicPackage = gp
+  }
+
+  if (!graphicPackage && recording.organization_id) {
+    // Try org's default graphic package
+    const { data: gp } = await (serviceClient as any)
+      .from('playhub_graphic_packages')
+      .select('*')
+      .eq('organization_id', recording.organization_id)
+      .eq('is_default', true)
+      .maybeSingle()
+    if (gp) graphicPackage = gp
+  }
+
+  if (!graphicPackage && recording.organization_id) {
+    // Final fallback: venue media_pack
     const { data: billingCfg } = await (serviceClient as any)
       .from('playhub_venue_billing_config')
       .select('media_pack')
@@ -85,6 +108,7 @@ export async function GET(
     },
     videoUrl,
     access: accessResult,
+    graphicPackage,
     mediaPack,
   })
 }
@@ -108,7 +132,7 @@ export async function PATCH(
   const serviceClient = createServiceClient()
   const { data: recording } = await (serviceClient as any)
     .from('playhub_match_recordings')
-    .select('organization_id')
+    .select('organization_id, collected_by')
     .eq('id', id)
     .single()
 
@@ -122,7 +146,7 @@ export async function PATCH(
   }
 
   const body = await request.json()
-  const allowedFields = ['title', 'home_team', 'away_team', 'is_billable']
+  const allowedFields = ['title', 'home_team', 'away_team', 'is_billable', 'billable_amount']
   const updates: Record<string, any> = {}
 
   for (const field of allowedFields) {
@@ -133,6 +157,14 @@ export async function PATCH(
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+  }
+
+  // Prevent editing billable_amount on playhub-collected recordings (verified Stripe transactions)
+  if (updates.billable_amount !== undefined && recording.collected_by === 'playhub') {
+    return NextResponse.json(
+      { error: 'Cannot edit amount for recordings with a verified transaction' },
+      { status: 403 }
+    )
   }
 
   updates.updated_at = new Date().toISOString()

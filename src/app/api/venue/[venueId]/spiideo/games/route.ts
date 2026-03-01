@@ -49,6 +49,7 @@ export async function POST(
     marketplaceEnabled,
     priceAmount,
     priceCurrency,
+    graphicPackageId,
   } = body
 
   // Validate required fields
@@ -100,6 +101,18 @@ export async function POST(
     }
   }
 
+  // Auto-resolve org's default graphic package if none provided
+  let resolvedGraphicPackageId = graphicPackageId
+  if (!resolvedGraphicPackageId) {
+    const { data: defaultPkg } = await (serviceClient as any)
+      .from('playhub_graphic_packages')
+      .select('id')
+      .eq('organization_id', venueId)
+      .eq('is_default', true)
+      .maybeSingle()
+    if (defaultPkg) resolvedGraphicPackageId = defaultPkg.id
+  }
+
   try {
     const result = await scheduleRecording({
       venueId,
@@ -123,6 +136,7 @@ export async function POST(
       marketplaceEnabled,
       priceAmount: priceAmount ? Number(priceAmount) : undefined,
       priceCurrency,
+      graphicPackageId: resolvedGraphicPackageId,
     })
 
     return NextResponse.json({

@@ -39,7 +39,8 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     .maybeSingle()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('Failed to fetch billing config:', error)
+    return NextResponse.json({ error: 'Failed to fetch billing config' }, { status: 500 })
   }
 
   // Return config or defaults
@@ -53,11 +54,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       is_active: false,
       youtube_rtmp_url: null,
       youtube_stream_key: null,
-      marketplace_enabled: false,
-      default_price_amount: null,
-      default_price_currency: 'AED',
       marketplace_revenue_split_pct: 20.0,
-      media_pack: {},
     },
     exists: !!data,
   })
@@ -82,7 +79,13 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const body = await request.json()
+  let body: any
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
   const {
     billing_model,
     default_billable_amount,
@@ -94,11 +97,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     is_active,
     youtube_rtmp_url,
     youtube_stream_key,
-    marketplace_enabled,
-    default_price_amount,
-    default_price_currency,
     marketplace_revenue_split_pct,
-    media_pack,
   } = body
 
   const serviceClient = createServiceClient() as any
@@ -119,11 +118,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   // Only include new fields if they were sent (avoids overwriting on older PUT calls)
   if (youtube_rtmp_url !== undefined) upsertData.youtube_rtmp_url = youtube_rtmp_url || null
   if (youtube_stream_key !== undefined) upsertData.youtube_stream_key = youtube_stream_key || null
-  if (marketplace_enabled !== undefined) upsertData.marketplace_enabled = marketplace_enabled
-  if (default_price_amount !== undefined) upsertData.default_price_amount = default_price_amount
-  if (default_price_currency !== undefined) upsertData.default_price_currency = default_price_currency || 'AED'
   if (marketplace_revenue_split_pct !== undefined) upsertData.marketplace_revenue_split_pct = marketplace_revenue_split_pct
-  if (media_pack !== undefined) upsertData.media_pack = media_pack
 
   const { data, error } = await serviceClient
     .from('playhub_venue_billing_config')
@@ -132,7 +127,8 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('Failed to update billing config:', error)
+    return NextResponse.json({ error: 'Failed to update billing config' }, { status: 500 })
   }
 
   return NextResponse.json({ config: data })

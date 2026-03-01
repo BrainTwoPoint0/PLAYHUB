@@ -433,6 +433,107 @@ export async function listClubTeamsWithMembers(
   })
 }
 
+/**
+ * Remove multiple members from Veo teams using a SINGLE browser session.
+ * This is much faster than calling removeMember() N times (which creates N sessions).
+ */
+export async function removeMembersInBulk(
+  clubSlug: string,
+  targets: { email: string; teamSlug: string }[]
+): Promise<{ email: string; teamSlug: string; success: boolean; message: string }[]> {
+  if (targets.length === 0) return []
+
+  return withSession(async (session) => {
+    const results: { email: string; teamSlug: string; success: boolean; message: string }[] = []
+
+    for (const target of targets) {
+      const basePath = `/api/app/clubs/${clubSlug}/teams/${target.teamSlug}`
+      let removed = false
+
+      // Step 1: Check active members
+      const membersRes = await session.api('GET', `${basePath}/members/?status=active`)
+      if (membersRes.status === 200) {
+        const members: VeoMember[] = parseBody(membersRes.body) || []
+        const member = members.find(
+          (m) => m.email?.toLowerCase() === target.email.toLowerCase()
+        )
+        if (member) {
+          const deleteRes = await session.api('DELETE', `${basePath}/members/${member.id}/`)
+          if (deleteRes.status === 204 || deleteRes.status === 200) {
+            results.push({ ...target, success: true, message: `Removed ${target.email} from team` })
+            removed = true
+          } else {
+            results.push({ ...target, success: false, message: `Failed to delete member ${member.id}: ${deleteRes.status}` })
+            removed = true // attempted
+          }
+        }
+      }
+
+      if (removed) continue
+
+      // Step 2: Check all members (may include non-active)
+      const allMembersRes = await session.api('GET', `${basePath}/members/`)
+      if (allMembersRes.status === 200) {
+        const allMembers: VeoMember[] = parseBody(allMembersRes.body) || []
+        const member = allMembers.find(
+          (m) => m.email?.toLowerCase() === target.email.toLowerCase()
+        )
+        if (member) {
+          const deleteRes = await session.api('DELETE', `${basePath}/members/${member.id}/`)
+          if (deleteRes.status === 204 || deleteRes.status === 200) {
+            results.push({ ...target, success: true, message: `Removed ${target.email} from team (status: ${member.status})` })
+          } else {
+            results.push({ ...target, success: false, message: `Failed to delete member ${member.id}: ${deleteRes.status}` })
+          }
+          continue
+        }
+      }
+
+      // Step 3: Check pending invitations
+      const invRes = await session.api('GET', `${basePath}/invitations/`)
+      if (invRes.status === 200) {
+        const invitations: VeoInvitation[] = parseBody(invRes.body) || []
+        const invitation = invitations.find((i) =>
+          JSON.stringify(i).toLowerCase().includes(target.email.toLowerCase())
+        )
+        if (invitation) {
+          const invId = invitation.public_identifier || invitation.id
+          const deleteRes = await session.api('DELETE', `${basePath}/invitations/${invId}/`)
+          if (deleteRes.status === 204 || deleteRes.status === 200) {
+            results.push({ ...target, success: true, message: `Revoked invitation for ${target.email}` })
+          } else {
+            results.push({ ...target, success: false, message: `Failed to revoke invitation ${invId}: ${deleteRes.status}` })
+          }
+          continue
+        }
+      }
+
+      // Step 4: Check addressed invitations
+      const addrInvRes = await session.api('GET', `${basePath}/addressed-invitations/`)
+      if (addrInvRes.status === 200) {
+        const invitations: VeoInvitation[] = parseBody(addrInvRes.body) || []
+        const invitation = invitations.find((i) =>
+          JSON.stringify(i).toLowerCase().includes(target.email.toLowerCase())
+        )
+        if (invitation) {
+          const invId = invitation.public_identifier || invitation.id
+          const deleteRes = await session.api('DELETE', `${basePath}/addressed-invitations/${invId}/`)
+          if (deleteRes.status === 204 || deleteRes.status === 200) {
+            results.push({ ...target, success: true, message: `Revoked addressed invitation for ${target.email}` })
+          } else {
+            results.push({ ...target, success: false, message: `Failed to revoke addressed invitation ${invId}: ${deleteRes.status}` })
+          }
+          continue
+        }
+      }
+
+      results.push({ ...target, success: false, message: `${target.email} not found in team members or invitations` })
+    }
+
+    return results
+  })
+}
+
 // ============================================================================
 // Export Client Object
 // ============================================================================
@@ -440,6 +541,7 @@ export async function listClubTeamsWithMembers(
 export const veoClient = {
   invitePlayer,
   removeMember,
+  removeMembersInBulk,
   setMatchPrivacy,
   listClubsAndTeams,
   listRecordings,

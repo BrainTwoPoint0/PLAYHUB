@@ -1,16 +1,17 @@
 // POST /api/academy/[clubSlug]/veo/sync
-// Automated Veo Clubhouse cleanup — removes canceled subscribers
+// Returns list of canceled subscribers that should be removed from Veo ClubHouse.
+// The Lambda handles actual removal via Playwright (Lambda has the chromium layer).
 // Auth: x-api-key header (same SYNC_API_KEY as /api/veo/remove)
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getClubBySlug, getAllProductIds } from '@/lib/academy/config'
-import { listClubTeamsWithMembers, removeMember } from '@/lib/veo/client'
 import {
   getAcademySubscribers,
   getSubscribersByProduct,
 } from '@/lib/academy/stripe'
 import { createServiceClient } from '@/lib/supabase/server'
 import { findRemovableMembers } from '@/lib/veo/sync'
+import { getCachedClubData } from '@/lib/veo/cache'
 
 const SYNC_API_KEY = process.env.SYNC_API_KEY
 
@@ -39,17 +40,13 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     )
   }
 
-  const body = await request.json().catch(() => ({}))
-  const mode: 'dry-run' | 'execute' =
-    body.mode === 'execute' ? 'execute' : 'dry-run'
-
   try {
-    // 1. Fetch Veo teams+members
-    const veoResult = await listClubTeamsWithMembers(club.veoClubSlug)
-    if (!veoResult.success || !veoResult.data) {
+    // 1. Get Veo teams+members from cache (updated every 4hrs by cache-sync Lambda)
+    const cachedData = await getCachedClubData(clubSlug)
+    if (!cachedData || cachedData.teams.length === 0) {
       return NextResponse.json(
-        { error: 'Failed to fetch Veo data' },
-        { status: 500 }
+        { error: 'No cached Veo data. Run cache-sync first.' },
+        { status: 404 }
       )
     }
 
@@ -77,55 +74,17 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     // 4. Find removable members
     const { removable, excepted, stats } = findRemovableMembers(
-      veoResult.data.teams,
+      cachedData.teams,
       subscribers,
       exceptionEmails
     )
 
-    // 5. Dry-run: just report
-    if (mode === 'dry-run') {
-      return NextResponse.json({
-        mode: 'dry-run',
-        clubSlug,
-        removable,
-        excepted,
-        stats,
-      })
-    }
-
-    // 6. Execute: remove each member from Veo
-    const results: {
-      email: string
-      teamSlug: string
-      success: boolean
-      message: string
-    }[] = []
-
-    for (const target of removable) {
-      const result = await removeMember(
-        club.veoClubSlug!,
-        target.teamSlug,
-        target.email
-      )
-      results.push({
-        email: target.email,
-        teamSlug: target.teamSlug,
-        success: result.success,
-        message: result.message,
-      })
-    }
-
     return NextResponse.json({
-      mode: 'execute',
+      mode: 'dry-run',
       clubSlug,
-      results,
+      removable,
       excepted,
-      stats: {
-        ...stats,
-        attempted: results.length,
-        succeeded: results.filter((r) => r.success).length,
-        failed: results.filter((r) => !r.success).length,
-      },
+      stats,
     })
   } catch (error) {
     console.error(`Veo sync error (${clubSlug}):`, error)

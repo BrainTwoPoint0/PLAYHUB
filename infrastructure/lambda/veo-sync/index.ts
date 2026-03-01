@@ -8,6 +8,7 @@ import {
   listClubTeamsWithMembers,
   listClubRecordings,
   setMatchPrivacy,
+  removeMembersFromClub,
 } from './veo-scraper'
 import { writeCachedClubData, setSyncStatus } from './cache-writer'
 import { CLUB_VEO_SLUGS, PUBLIC_RECORDING_TEAMS } from './config'
@@ -132,9 +133,22 @@ async function runCleanupSync(): Promise<ClubResult[]> {
   const results: ClubResult[] = []
 
   for (const clubSlug of CLUB_SLUGS) {
+    const veoClubSlug = CLUB_VEO_SLUGS[clubSlug]
+    if (!veoClubSlug) {
+      results.push({
+        clubSlug,
+        action: 'cleanup-sync',
+        status: 'error',
+        error: `No Veo slug configured for club "${clubSlug}"`,
+      })
+      continue
+    }
+
     try {
       console.log(`Cleanup sync: ${clubSlug}...`)
 
+      // Step 1: Call PLAYHUB API in dry-run mode to get the removable members list.
+      //         This uses cached Veo data + live Stripe data — no Playwright needed on Netlify.
       const response = await fetch(
         `${PLAYHUB_URL}/api/academy/${clubSlug}/veo/sync`,
         {
@@ -143,7 +157,7 @@ async function runCleanupSync(): Promise<ClubResult[]> {
             'Content-Type': 'application/json',
             'x-api-key': SYNC_API_KEY,
           },
-          body: JSON.stringify({ mode: SYNC_MODE }),
+          body: JSON.stringify({ mode: 'dry-run' }),
         }
       )
 
@@ -160,30 +174,75 @@ async function runCleanupSync(): Promise<ClubResult[]> {
       }
 
       const data = await response.json()
+      const removable: { email: string; teamSlug: string }[] =
+        data.removable || []
 
-      if (SYNC_MODE === 'execute') {
+      console.log(
+        `${clubSlug} cleanup: ${removable.length} removable, ${data.stats?.exceptedCount ?? 0} excepted`
+      )
+
+      // Dry-run mode: just report what would be removed
+      if (SYNC_MODE !== 'execute') {
         results.push({
           clubSlug,
           action: 'cleanup-sync',
           status: 'success',
-          mode: data.mode,
-          executedCount: data.stats?.attempted ?? 0,
-          succeededCount: data.stats?.succeeded ?? 0,
-          failedCount: data.stats?.failed ?? 0,
+          mode: 'dry-run',
+          removableCount: removable.length,
           exceptedCount: data.stats?.exceptedCount ?? 0,
         })
-      } else {
-        results.push({
-          clubSlug,
-          action: 'cleanup-sync',
-          status: 'success',
-          mode: data.mode,
-          removableCount: data.stats?.removableCount ?? 0,
-          exceptedCount: data.stats?.exceptedCount ?? 0,
-        })
+        continue
       }
 
-      console.log(`${clubSlug} cleanup: ${JSON.stringify(data.stats)}`)
+      // Nothing to remove
+      if (removable.length === 0) {
+        results.push({
+          clubSlug,
+          action: 'cleanup-sync',
+          status: 'success',
+          mode: 'execute',
+          executedCount: 0,
+          succeededCount: 0,
+          failedCount: 0,
+          exceptedCount: data.stats?.exceptedCount ?? 0,
+        })
+        continue
+      }
+
+      // Step 2: Execute mode — open a Playwright session in Lambda and remove directly.
+      //         Lambda has the chromium layer so Playwright works here (5-min timeout).
+      let session: Awaited<ReturnType<typeof getVeoSession>> | null = null
+      try {
+        session = await getVeoSession()
+        const removalResults = await removeMembersFromClub(
+          session,
+          veoClubSlug,
+          removable
+        )
+
+        const succeeded = removalResults.filter((r) => r.success).length
+        const failed = removalResults.filter((r) => !r.success).length
+
+        console.log(
+          `${clubSlug} cleanup executed: ${succeeded} removed, ${failed} failed`
+        )
+        for (const r of removalResults) {
+          console.log(`  ${r.email} (${r.teamSlug}): ${r.message}`)
+        }
+
+        results.push({
+          clubSlug,
+          action: 'cleanup-sync',
+          status: failed > 0 ? 'error' : 'success',
+          mode: 'execute',
+          executedCount: removalResults.length,
+          succeededCount: succeeded,
+          failedCount: failed,
+          exceptedCount: data.stats?.exceptedCount ?? 0,
+        })
+      } finally {
+        await session?.close().catch(() => {})
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       console.error(`${clubSlug} cleanup error:`, message)

@@ -433,6 +433,39 @@ export async function getScenes(
 }
 
 // ============================================================================
+// Graphic Package Functions
+// ============================================================================
+
+export interface SpiideoGraphicPackage {
+  id: string
+  accountId: string
+  name: string
+  sports: SpiideoSport[]
+  type: 'html' | 'svg'
+}
+
+export async function getGraphicPackages(
+  options?: {
+    accountId?: string
+    nameSearch?: string
+    sport?: SpiideoSport[]
+    includePublic?: boolean
+  }
+): Promise<PagedResponse<SpiideoGraphicPackage>> {
+  const params = new URLSearchParams()
+  if (options?.accountId) params.set('accountId', options.accountId)
+  if (options?.nameSearch) params.set('nameSearch', options.nameSearch)
+  if (options?.sport) {
+    options.sport.forEach((s) => params.append('sport', s))
+  }
+  if (options?.includePublic) params.set('includePublicGraphicPackages', 'true')
+  const qs = params.toString()
+  return spiideoRequest<PagedResponse<SpiideoGraphicPackage>>(
+    `/v1/graphic-packages${qs ? `?${qs}` : ''}`
+  )
+}
+
+// ============================================================================
 // Production Recipe Functions
 // ============================================================================
 

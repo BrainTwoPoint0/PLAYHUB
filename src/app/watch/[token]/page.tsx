@@ -11,7 +11,7 @@ import {
 } from '@braintwopoint0/playback-commons/ui'
 import { useAuth } from '@braintwopoint0/playback-commons/auth'
 import { Bookmark, BookmarkCheck, Loader2 } from 'lucide-react'
-import { VideoPlayer, type MediaPack } from '@/components/video/VideoPlayer'
+import { VideoPlayer, type MediaPack, type GraphicPackageOverlay } from '@/components/video/VideoPlayer'
 import { EventTagsList } from '@/components/EventTagsList'
 import { MatchDetails } from '@/components/MatchDetails'
 import type { RecordingEvent } from '@/lib/recordings/event-types'
@@ -37,6 +37,7 @@ export default function PublicWatchPage() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [events, setEvents] = useState<RecordingEvent[]>([])
   const [mediaPack, setMediaPack] = useState<MediaPack | undefined>(undefined)
+  const [graphicPackage, setGraphicPackage] = useState<GraphicPackageOverlay | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -69,6 +70,7 @@ export default function PublicWatchPage() {
       setRecording(data.recording)
       setVideoUrl(data.videoUrl)
       setEvents(data.events || [])
+      if (data.graphicPackage) setGraphicPackage(data.graphicPackage)
       if (data.mediaPack) setMediaPack(data.mediaPack)
     } catch (err) {
       setError('Failed to load recording')
@@ -175,6 +177,7 @@ export default function PublicWatchPage() {
               <VideoPlayer
                 src={videoUrl}
                 events={events}
+                graphicPackage={graphicPackage}
                 mediaPack={mediaPack}
                 className="w-full aspect-video rounded-lg"
               />

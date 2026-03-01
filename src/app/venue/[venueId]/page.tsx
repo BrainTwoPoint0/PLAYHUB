@@ -34,6 +34,10 @@ interface Recording {
   file_size_bytes?: number
   spiideo_game_id?: string
   is_billable?: boolean
+  billable_amount?: number
+  collected_by?: string
+  graphic_package_id?: string
+  graphicPackageName?: string
   accessCount?: number
 }
 
@@ -119,11 +123,7 @@ interface BillingConfig {
   is_active: boolean
   youtube_rtmp_url?: string | null
   youtube_stream_key?: string | null
-  marketplace_enabled?: boolean
-  default_price_amount?: number | null
-  default_price_currency?: string
   marketplace_revenue_split_pct?: number
-  media_pack?: Record<string, string>
 }
 
 interface Invoice {
@@ -311,26 +311,12 @@ function VenueSettings({
   // Local form state
   const [youtubeRtmpUrl, setYoutubeRtmpUrl] = useState(billingConfig?.youtube_rtmp_url || '')
   const [youtubeStreamKey, setYoutubeStreamKey] = useState(billingConfig?.youtube_stream_key || '')
-  const [mpEnabled, setMpEnabled] = useState(billingConfig?.marketplace_enabled || false)
-  const [mpPrice, setMpPrice] = useState(String(billingConfig?.default_price_amount || ''))
-  const [mpCurrency, setMpCurrency] = useState(billingConfig?.default_price_currency || 'AED')
-  const [mediaLogoUrl, setMediaLogoUrl] = useState(billingConfig?.media_pack?.logo_url || '')
-  const [mediaLogoPosition, setMediaLogoPosition] = useState(billingConfig?.media_pack?.logo_position || 'top-right')
-  const [mediaSponsorUrl, setMediaSponsorUrl] = useState(billingConfig?.media_pack?.sponsor_logo_url || '')
-  const [mediaSponsorPosition, setMediaSponsorPosition] = useState(billingConfig?.media_pack?.sponsor_position || 'bottom-left')
 
   // Sync when billingConfig loads/changes
   useEffect(() => {
     if (!billingConfig) return
     setYoutubeRtmpUrl(billingConfig.youtube_rtmp_url || '')
     setYoutubeStreamKey(billingConfig.youtube_stream_key || '')
-    setMpEnabled(billingConfig.marketplace_enabled || false)
-    setMpPrice(String(billingConfig.default_price_amount || ''))
-    setMpCurrency(billingConfig.default_price_currency || 'AED')
-    setMediaLogoUrl(billingConfig.media_pack?.logo_url || '')
-    setMediaLogoPosition(billingConfig.media_pack?.logo_position || 'top-right')
-    setMediaSponsorUrl(billingConfig.media_pack?.sponsor_logo_url || '')
-    setMediaSponsorPosition(billingConfig.media_pack?.sponsor_position || 'bottom-left')
   }, [billingConfig])
 
   async function handleSave() {
@@ -344,15 +330,6 @@ function VenueSettings({
           ...billingConfig,
           youtube_rtmp_url: youtubeRtmpUrl || null,
           youtube_stream_key: youtubeStreamKey || null,
-          marketplace_enabled: mpEnabled,
-          default_price_amount: mpPrice ? Number(mpPrice) : null,
-          default_price_currency: mpCurrency,
-          media_pack: {
-            logo_url: mediaLogoUrl || undefined,
-            logo_position: mediaLogoPosition,
-            sponsor_logo_url: mediaSponsorUrl || undefined,
-            sponsor_position: mediaSponsorPosition,
-          },
         }),
       })
       const data = await res.json()
@@ -417,113 +394,6 @@ function VenueSettings({
             </div>
           </div>
 
-          {/* Marketplace Settings */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-[var(--timberwolf)] uppercase tracking-wider">
-              Marketplace
-            </h3>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={mpEnabled}
-                onChange={(e) => setMpEnabled(e.target.checked)}
-                className="w-4 h-4 rounded border-[var(--ash-grey)]/20 bg-white/5 accent-[var(--timberwolf)]"
-              />
-              <span className="text-sm text-[var(--timberwolf)]">
-                Enable marketplace for this venue
-              </span>
-            </label>
-            {mpEnabled && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs text-[var(--ash-grey)]">Default Price</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={mpPrice}
-                    onChange={(e) => setMpPrice(e.target.value)}
-                    placeholder="25.00"
-                    className={inputClass}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-[var(--ash-grey)]">Currency</label>
-                  <Select value={mpCurrency} onValueChange={setMpCurrency}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="AED">AED</SelectItem>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="GBP">GBP</SelectItem>
-                      <SelectItem value="EUR">EUR</SelectItem>
-                      <SelectItem value="KWD">KWD</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Media Pack Settings */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-[var(--timberwolf)] uppercase tracking-wider">
-              Media Pack
-            </h3>
-            <p className="text-xs text-[var(--ash-grey)]">
-              Logo overlays shown on the video player
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs text-[var(--ash-grey)]">Logo URL</label>
-                <Input
-                  value={mediaLogoUrl}
-                  onChange={(e) => setMediaLogoUrl(e.target.value)}
-                  placeholder="https://..."
-                  className={inputClass}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-[var(--ash-grey)]">Logo Position</label>
-                <Select value={mediaLogoPosition} onValueChange={setMediaLogoPosition}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="top-left">Top Left</SelectItem>
-                    <SelectItem value="top-right">Top Right</SelectItem>
-                    <SelectItem value="bottom-left">Bottom Left</SelectItem>
-                    <SelectItem value="bottom-right">Bottom Right</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-[var(--ash-grey)]">Sponsor Logo URL</label>
-                <Input
-                  value={mediaSponsorUrl}
-                  onChange={(e) => setMediaSponsorUrl(e.target.value)}
-                  placeholder="https://..."
-                  className={inputClass}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-[var(--ash-grey)]">Sponsor Position</label>
-                <Select value={mediaSponsorPosition} onValueChange={setMediaSponsorPosition}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="top-left">Top Left</SelectItem>
-                    <SelectItem value="top-right">Top Right</SelectItem>
-                    <SelectItem value="bottom-left">Bottom Left</SelectItem>
-                    <SelectItem value="bottom-right">Bottom Right</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
           {/* Save button */}
           <div className="flex items-center gap-3">
             <Button
@@ -537,6 +407,737 @@ function VenueSettings({
               <span className="text-sm text-emerald-400">{savedMsg}</span>
             )}
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Graphic Packages (Account-based) ──────────────────────────────
+interface GraphicPackage {
+  id: string
+  organization_id: string
+  name: string
+  is_default: boolean
+  logo_url: string | null
+  logo_position: string
+  sponsor_logo_url: string | null
+  sponsor_position: string
+  spiideo_graphic_package_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+function GraphicPackagesSection({
+  venueSlug,
+  inputClass,
+  outlineBtnClass,
+  primaryBtnClass,
+}: {
+  venueSlug: string | null
+  inputClass: string
+  outlineBtnClass: string
+  primaryBtnClass: string
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [packages, setPackages] = useState<GraphicPackage[]>([])
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
+
+  // Create/Edit form state
+  const [showForm, setShowForm] = useState(false)
+  const [editingPkg, setEditingPkg] = useState<GraphicPackage | null>(null)
+  const [formName, setFormName] = useState('')
+  const [formLogoUrl, setFormLogoUrl] = useState('')
+  const [formLogoPosition, setFormLogoPosition] = useState('top-right')
+  const [formSponsorUrl, setFormSponsorUrl] = useState('')
+  const [formSponsorPosition, setFormSponsorPosition] = useState('bottom-left')
+  const [formIsDefault, setFormIsDefault] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingSponsor, setUploadingSponsor] = useState(false)
+
+  async function uploadFile(file: File, type: 'logo' | 'sponsor'): Promise<string | null> {
+    if (!venueSlug) return null
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('type', type)
+    const res = await fetch(`/api/org/${venueSlug}/graphic-packages/upload`, {
+      method: 'POST',
+      body: formData,
+    })
+    if (!res.ok) {
+      const data = await res.json()
+      setError(data.error || 'Upload failed')
+      return null
+    }
+    const data = await res.json()
+    return data.url
+  }
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingLogo(true)
+    setError(null)
+    const url = await uploadFile(file, 'logo')
+    if (url) setFormLogoUrl(url)
+    setUploadingLogo(false)
+    e.target.value = ''
+  }
+
+  async function handleSponsorUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingSponsor(true)
+    setError(null)
+    const url = await uploadFile(file, 'sponsor')
+    if (url) setFormSponsorUrl(url)
+    setUploadingSponsor(false)
+    e.target.value = ''
+  }
+
+  async function fetchPackages() {
+    if (!venueSlug) return
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/org/${venueSlug}/graphic-packages`)
+      const data = await res.json()
+      setPackages(data.packages || [])
+    } catch {
+      setError('Failed to load graphic packages')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function openCreateForm() {
+    setEditingPkg(null)
+    setFormName('')
+    setFormLogoUrl('')
+    setFormLogoPosition('top-right')
+    setFormSponsorUrl('')
+    setFormSponsorPosition('bottom-left')
+    setFormIsDefault(packages.length === 0)
+    setShowForm(true)
+  }
+
+  function openEditForm(pkg: GraphicPackage) {
+    setEditingPkg(pkg)
+    setFormName(pkg.name)
+    setFormLogoUrl(pkg.logo_url || '')
+    setFormLogoPosition(pkg.logo_position)
+    setFormSponsorUrl(pkg.sponsor_logo_url || '')
+    setFormSponsorPosition(pkg.sponsor_position)
+    setFormIsDefault(pkg.is_default)
+    setShowForm(true)
+  }
+
+  async function handleSave() {
+    if (!venueSlug || !formName.trim()) return
+    setSaving(true)
+    setError(null)
+    try {
+      const body: any = {
+        name: formName.trim(),
+        logo_url: formLogoUrl || null,
+        logo_position: formLogoPosition,
+        sponsor_logo_url: formSponsorUrl || null,
+        sponsor_position: formSponsorPosition,
+        is_default: formIsDefault,
+      }
+
+      let res: Response
+      if (editingPkg) {
+        body.id = editingPkg.id
+        res = await fetch(`/api/org/${venueSlug}/graphic-packages`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      } else {
+        res = await fetch(`/api/org/${venueSlug}/graphic-packages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      }
+
+      if (res.ok) {
+        setShowForm(false)
+        setSuccessMsg(editingPkg ? 'Package updated' : 'Package created')
+        setTimeout(() => setSuccessMsg(null), 3000)
+        fetchPackages()
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Failed to save')
+      }
+    } catch {
+      setError('Failed to save package')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete(pkg: GraphicPackage) {
+    if (!venueSlug || !confirm(`Delete "${pkg.name}"?`)) return
+    try {
+      const res = await fetch(`/api/org/${venueSlug}/graphic-packages?id=${pkg.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setPackages((prev) => prev.filter((p) => p.id !== pkg.id))
+        setSuccessMsg('Package deleted')
+        setTimeout(() => setSuccessMsg(null), 3000)
+      }
+    } catch {
+      setError('Failed to delete')
+    }
+  }
+
+  async function setDefault(pkg: GraphicPackage) {
+    if (!venueSlug) return
+    try {
+      const res = await fetch(`/api/org/${venueSlug}/graphic-packages`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: pkg.id, is_default: true }),
+      })
+      if (res.ok) fetchPackages()
+    } catch {
+      setError('Failed to set default')
+    }
+  }
+
+  // Spiideo import state
+  const [showImport, setShowImport] = useState(false)
+  const [spiideoPackages, setSpiideoPackages] = useState<Array<{ id: string; name: string; type: string; alreadyImported: boolean }>>([])
+  const [loadingImport, setLoadingImport] = useState(false)
+  const [importingId, setImportingId] = useState<string | null>(null)
+
+  async function fetchSpiideoPackages() {
+    if (!venueSlug) return
+    setLoadingImport(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/org/${venueSlug}/graphic-packages/import`)
+      if (!res.ok) {
+        const data = await res.json()
+        setError(data.error || 'Failed to fetch Spiideo packages')
+        return
+      }
+      const data = await res.json()
+      setSpiideoPackages(data.packages || [])
+    } catch {
+      setError('Failed to fetch Spiideo packages')
+    } finally {
+      setLoadingImport(false)
+    }
+  }
+
+  async function importSpiideoPackage(pkg: { id: string; name: string }) {
+    if (!venueSlug) return
+    setImportingId(pkg.id)
+    setError(null)
+    try {
+      const res = await fetch(`/api/org/${venueSlug}/graphic-packages/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ spiideoId: pkg.id, name: pkg.name }),
+      })
+      if (res.ok) {
+        setSuccessMsg(`Imported "${pkg.name}"`)
+        setTimeout(() => setSuccessMsg(null), 3000)
+        setSpiideoPackages((prev) => prev.map((p) => p.id === pkg.id ? { ...p, alreadyImported: true } : p))
+        fetchPackages()
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Import failed')
+      }
+    } catch {
+      setError('Failed to import package')
+    } finally {
+      setImportingId(null)
+    }
+  }
+
+  const positionLabel = (pos: string) => {
+    const labels: Record<string, string> = {
+      'top-left': 'Top Left',
+      'top-right': 'Top Right',
+      'bottom-left': 'Bottom Left',
+      'bottom-right': 'Bottom Right',
+    }
+    return labels[pos] || pos
+  }
+
+  return (
+    <div className="mt-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
+      <div className="p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
+              Graphic Packages
+            </h2>
+            <p className="text-xs text-[var(--ash-grey)] mt-1">
+              Logo overlays shown on recordings — applies to all venues for this account
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            className={`w-full md:w-auto ${outlineBtnClass}`}
+            onClick={() => {
+              setExpanded(!expanded)
+              if (!expanded && packages.length === 0) fetchPackages()
+            }}
+          >
+            {expanded ? 'Hide' : 'Manage'}
+          </Button>
+        </div>
+      </div>
+      {expanded && (
+        <div className="px-6 pb-6 space-y-4">
+          {error && (
+            <p className="text-sm text-red-400">{error}</p>
+          )}
+          {successMsg && (
+            <p className="text-sm text-emerald-400">{successMsg}</p>
+          )}
+
+          {loading ? (
+            <p className="text-sm text-[var(--ash-grey)]">Loading...</p>
+          ) : packages.length === 0 && !showForm ? (
+            <p className="text-sm text-[var(--ash-grey)]">
+              No graphic packages yet. Create one to add logo overlays to your recordings.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {packages.map((pkg) => (
+                <div
+                  key={pkg.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-white/[0.03] border border-[var(--ash-grey)]/10"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    {/* Logo preview */}
+                    {pkg.logo_url ? (
+                      <img
+                        src={pkg.logo_url}
+                        alt=""
+                        className="w-10 h-10 rounded object-contain bg-white/10 p-1 flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded bg-white/5 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs text-[var(--ash-grey)]">No logo</span>
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-[var(--timberwolf)] truncate">
+                          {pkg.name}
+                        </span>
+                        {pkg.is_default && (
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 flex-shrink-0">
+                            Default
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-[var(--ash-grey)]">
+                        <span>Logo: {positionLabel(pkg.logo_position)}</span>
+                        {pkg.sponsor_logo_url && (
+                          <span>Sponsor: {positionLabel(pkg.sponsor_position)}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {!pkg.is_default && (
+                      <button
+                        onClick={() => setDefault(pkg)}
+                        className="text-xs px-2 py-1 rounded text-[var(--ash-grey)] hover:text-[var(--timberwolf)] hover:bg-white/5 transition-colors"
+                      >
+                        Set Default
+                      </button>
+                    )}
+                    <button
+                      onClick={() => openEditForm(pkg)}
+                      className="text-xs px-2 py-1 rounded text-[var(--ash-grey)] hover:text-[var(--timberwolf)] hover:bg-white/5 transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(pkg)}
+                      className="text-xs px-2 py-1 rounded text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Create/Edit Form */}
+          {showForm ? (
+            <div className="space-y-3 p-4 rounded-lg border border-[var(--ash-grey)]/20 bg-white/[0.02]">
+              <h3 className="text-sm font-semibold text-[var(--timberwolf)]">
+                {editingPkg ? 'Edit Package' : 'New Package'}
+              </h3>
+              <div className="space-y-1">
+                <label className="text-xs text-[var(--ash-grey)]">Package Name</label>
+                <Input
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  placeholder="e.g. DAFL Season 2025-26"
+                  className={inputClass}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-[var(--ash-grey)]">Logo</label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={formLogoUrl}
+                      onChange={(e) => setFormLogoUrl(e.target.value)}
+                      placeholder="https://... or upload"
+                      className={`flex-1 ${inputClass}`}
+                    />
+                    <label className={`inline-flex items-center px-3 text-xs rounded cursor-pointer whitespace-nowrap ${outlineBtnClass} border`}>
+                      {uploadingLogo ? '...' : 'Upload'}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                        className="hidden"
+                        onChange={handleLogoUpload}
+                        disabled={uploadingLogo}
+                      />
+                    </label>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-[var(--ash-grey)]">Logo Position</label>
+                  <Select value={formLogoPosition} onValueChange={setFormLogoPosition}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="top-left">Top Left</SelectItem>
+                      <SelectItem value="top-right">Top Right</SelectItem>
+                      <SelectItem value="bottom-left">Bottom Left</SelectItem>
+                      <SelectItem value="bottom-right">Bottom Right</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-[var(--ash-grey)]">Sponsor Logo</label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={formSponsorUrl}
+                      onChange={(e) => setFormSponsorUrl(e.target.value)}
+                      placeholder="https://... or upload"
+                      className={`flex-1 ${inputClass}`}
+                    />
+                    <label className={`inline-flex items-center px-3 text-xs rounded cursor-pointer whitespace-nowrap ${outlineBtnClass} border`}>
+                      {uploadingSponsor ? '...' : 'Upload'}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                        className="hidden"
+                        onChange={handleSponsorUpload}
+                        disabled={uploadingSponsor}
+                      />
+                    </label>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-[var(--ash-grey)]">Sponsor Position</label>
+                  <Select value={formSponsorPosition} onValueChange={setFormSponsorPosition}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="top-left">Top Left</SelectItem>
+                      <SelectItem value="top-right">Top Right</SelectItem>
+                      <SelectItem value="bottom-left">Bottom Left</SelectItem>
+                      <SelectItem value="bottom-right">Bottom Right</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formIsDefault}
+                  onChange={(e) => setFormIsDefault(e.target.checked)}
+                  className="w-4 h-4 rounded border-[var(--ash-grey)]/20 bg-white/5 accent-[var(--timberwolf)]"
+                />
+                <span className="text-sm text-[var(--timberwolf)]">
+                  Set as default package
+                </span>
+              </label>
+
+              {/* Logo preview */}
+              {(formLogoUrl || formSponsorUrl) && (
+                <div className="relative w-full aspect-video bg-zinc-900 rounded-lg overflow-hidden border border-[var(--ash-grey)]/10">
+                  <div className="absolute inset-0 flex items-center justify-center text-xs text-[var(--ash-grey)]">
+                    Preview
+                  </div>
+                  {formLogoUrl && (
+                    <img
+                      src={formLogoUrl}
+                      alt="Logo"
+                      className={`absolute w-12 h-12 object-contain opacity-70 ${
+                        formLogoPosition === 'top-left' ? 'top-2 left-2' :
+                        formLogoPosition === 'top-right' ? 'top-2 right-2' :
+                        formLogoPosition === 'bottom-left' ? 'bottom-2 left-2' :
+                        'bottom-2 right-2'
+                      }`}
+                    />
+                  )}
+                  {formSponsorUrl && (
+                    <img
+                      src={formSponsorUrl}
+                      alt="Sponsor"
+                      className={`absolute w-16 h-8 object-contain opacity-70 ${
+                        formSponsorPosition === 'top-left' ? 'top-2 left-2' :
+                        formSponsorPosition === 'top-right' ? 'top-2 right-2' :
+                        formSponsorPosition === 'bottom-left' ? 'bottom-2 left-2' :
+                        'bottom-2 right-2'
+                      }`}
+                    />
+                  )}
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <Button onClick={handleSave} disabled={saving || !formName.trim()} className={primaryBtnClass}>
+                  {saving ? 'Saving...' : editingPkg ? 'Update' : 'Create'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowForm(false)}
+                  className={outlineBtnClass}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={openCreateForm}
+                className={`flex-1 ${outlineBtnClass}`}
+              >
+                + New Package
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowImport(!showImport)
+                  if (!showImport) fetchSpiideoPackages()
+                }}
+                className={outlineBtnClass}
+              >
+                {showImport ? 'Hide Spiideo' : 'Import from Spiideo'}
+              </Button>
+            </div>
+          )}
+
+          {/* Spiideo Import Panel */}
+          {showImport && !showForm && (
+            <div className="space-y-2 p-4 rounded-lg border border-[var(--ash-grey)]/20 bg-white/[0.02]">
+              <h3 className="text-sm font-semibold text-[var(--timberwolf)]">
+                Import from Spiideo
+              </h3>
+              {loadingImport ? (
+                <p className="text-xs text-[var(--ash-grey)]">Loading...</p>
+              ) : spiideoPackages.length === 0 ? (
+                <p className="text-xs text-[var(--ash-grey)]">No Spiideo packages found</p>
+              ) : (
+                <div className="space-y-1">
+                  {spiideoPackages.map((pkg) => (
+                    <div
+                      key={pkg.id}
+                      className="flex items-center justify-between py-2 px-3 rounded bg-white/[0.02]"
+                    >
+                      <div>
+                        <span className="text-sm text-[var(--timberwolf)]">{pkg.name}</span>
+                        <span className="text-xs text-[var(--ash-grey)] ml-2">({pkg.type})</span>
+                      </div>
+                      {pkg.alreadyImported ? (
+                        <span className="text-xs text-[var(--ash-grey)]">Imported</span>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={outlineBtnClass}
+                          disabled={importingId === pkg.id}
+                          onClick={() => importSpiideoPackage(pkg)}
+                        >
+                          {importingId === pkg.id ? '...' : 'Import'}
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Marketplace Settings (Org-level) ────────────────────────────────
+function MarketplaceSettingsSection({
+  venueSlug,
+  inputClass,
+  outlineBtnClass,
+  primaryBtnClass,
+  onUpdate,
+}: {
+  venueSlug: string | null
+  inputClass: string
+  outlineBtnClass: string
+  primaryBtnClass: string
+  onUpdate: (settings: { marketplace_enabled: boolean; default_price_amount: number | null; default_price_currency: string }) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [savedMsg, setSavedMsg] = useState<string | null>(null)
+
+  const [enabled, setEnabled] = useState(false)
+  const [price, setPrice] = useState('')
+  const [currency, setCurrency] = useState('AED')
+
+  async function fetchSettings() {
+    if (!venueSlug) return
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/org/${venueSlug}/marketplace`)
+      if (res.ok) {
+        const data = await res.json()
+        setEnabled(data.marketplace_enabled || false)
+        setPrice(data.default_price_amount ? String(data.default_price_amount) : '')
+        setCurrency(data.default_price_currency || 'AED')
+      }
+    } catch {
+      // non-critical
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleSave() {
+    if (!venueSlug) return
+    setSaving(true)
+    setSavedMsg(null)
+    try {
+      const res = await fetch(`/api/org/${venueSlug}/marketplace`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          marketplace_enabled: enabled,
+          default_price_amount: price ? Number(price) : null,
+          default_price_currency: currency,
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        onUpdate(data)
+        setSavedMsg('Saved')
+        setTimeout(() => setSavedMsg(null), 3000)
+      }
+    } catch {
+      setSavedMsg('Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="mt-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
+      <div className="p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
+              Marketplace
+            </h2>
+            <p className="text-xs text-[var(--ash-grey)] mt-1">
+              Sell recordings through the PLAYHUB marketplace
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            className={`w-full md:w-auto ${outlineBtnClass}`}
+            onClick={() => {
+              setExpanded(!expanded)
+              if (!expanded) fetchSettings()
+            }}
+          >
+            {expanded ? 'Hide' : 'Configure'}
+          </Button>
+        </div>
+      </div>
+      {expanded && (
+        <div className="px-6 pb-6 space-y-4">
+          {loading ? (
+            <p className="text-xs text-[var(--ash-grey)]">Loading...</p>
+          ) : (
+            <>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={enabled}
+                  onChange={(e) => setEnabled(e.target.checked)}
+                  className="w-4 h-4 rounded border-[var(--ash-grey)]/20 bg-white/5 accent-[var(--timberwolf)]"
+                />
+                <span className="text-sm text-[var(--timberwolf)]">
+                  Enable marketplace for this organization
+                </span>
+              </label>
+              {enabled && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-[var(--ash-grey)]">Default Price</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      placeholder="25.00"
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-[var(--ash-grey)]">Currency</label>
+                    <Select value={currency} onValueChange={setCurrency}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="AED">AED</SelectItem>
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="GBP">GBP</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="KWD">KWD</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center gap-3">
+                <Button onClick={handleSave} disabled={saving} className={primaryBtnClass}>
+                  {saving ? 'Saving...' : 'Save'}
+                </Button>
+                {savedMsg && (
+                  <span className="text-sm text-emerald-400">{savedMsg}</span>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -584,6 +1185,8 @@ export default function VenueManagementPage() {
   const [editAwayTeam, setEditAwayTeam] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
   const [togglingBillable, setTogglingBillable] = useState<string | null>(null)
+  const [editingAmountId, setEditingAmountId] = useState<string | null>(null)
+  const [editingAmountValue, setEditingAmountValue] = useState('')
   const [deletingRecording, setDeletingRecording] = useState<string | null>(null)
 
   // Delete confirmation modal state
@@ -654,10 +1257,31 @@ export default function VenueManagementPage() {
   const [streamEndTime, setStreamEndTime] = useState('')
   const [schedulingStream, setSchedulingStream] = useState(false)
 
-  // YouTube + Marketplace state (for schedule form)
+  // YouTube state (for schedule form)
   const [broadcastToYoutube, setBroadcastToYoutube] = useState(false)
   const [marketplaceEnabled, setMarketplaceEnabled] = useState(false)
   const [marketplacePrice, setMarketplacePrice] = useState('')
+
+  // Org-level marketplace settings
+  const [orgMarketplace, setOrgMarketplace] = useState<{
+    marketplace_enabled: boolean
+    default_price_amount: number | null
+    default_price_currency: string
+  } | null>(null)
+
+  // Graphic package state (for schedule form)
+  const [scheduleGraphicPackages, setScheduleGraphicPackages] = useState<GraphicPackage[]>([])
+  const [selectedGraphicPackageId, setSelectedGraphicPackageId] = useState<string>('default')
+
+  // Fetch graphic packages when schedule form opens
+  useEffect(() => {
+    if (showScheduleForm && venue?.slug) {
+      fetch(`/api/org/${venue.slug}/graphic-packages`)
+        .then((r) => r.json())
+        .then((data) => setScheduleGraphicPackages(data.packages || []))
+        .catch(() => {})
+    }
+  }, [showScheduleForm, venue?.slug])
 
   useEffect(() => {
     fetchVenueData()
@@ -699,6 +1323,19 @@ export default function VenueManagementPage() {
         return
       }
       setVenue(currentVenue)
+
+      // Fetch org marketplace settings
+      if (currentVenue.slug) {
+        try {
+          const mpRes = await fetch(`/api/org/${currentVenue.slug}/marketplace`)
+          if (mpRes.ok) {
+            const mpData = await mpRes.json()
+            setOrgMarketplace(mpData)
+          }
+        } catch {
+          // Non-critical
+        }
+      }
 
       // Fetch scenes for scheduling
       try {
@@ -938,6 +1575,35 @@ export default function VenueManagementPage() {
       setError('Failed to update billable status')
     } finally {
       setTogglingBillable(null)
+    }
+  }
+
+  async function saveBillableAmount(recording: Recording) {
+    const newAmount = parseFloat(editingAmountValue)
+    if (isNaN(newAmount) || newAmount < 0) {
+      setEditingAmountId(null)
+      return
+    }
+    try {
+      const res = await fetch(`/api/recordings/${recording.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ billable_amount: newAmount }),
+      })
+      if (res.ok) {
+        setRecordings((prev) =>
+          prev.map((r) =>
+            r.id === recording.id ? { ...r, billable_amount: newAmount } : r
+          )
+        )
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Failed to update amount')
+      }
+    } catch {
+      setError('Failed to update amount')
+    } finally {
+      setEditingAmountId(null)
     }
   }
 
@@ -1338,7 +2004,8 @@ export default function VenueManagementPage() {
           broadcastToYoutube,
           marketplaceEnabled,
           priceAmount: marketplaceEnabled && marketplacePrice ? Number(marketplacePrice) : undefined,
-          priceCurrency: billingConfig?.default_price_currency || 'AED',
+          priceCurrency: orgMarketplace?.default_price_currency || 'AED',
+          graphicPackageId: selectedGraphicPackageId === 'default' ? undefined : selectedGraphicPackageId === 'none' ? null : selectedGraphicPackageId,
         }),
       })
 
@@ -1358,6 +2025,7 @@ export default function VenueManagementPage() {
         setBroadcastToYoutube(false)
         setMarketplaceEnabled(false)
         setMarketplacePrice('')
+        setSelectedGraphicPackageId('default')
         setShowScheduleForm(false)
         fetchRecordings()
       }
@@ -2241,7 +2909,7 @@ export default function VenueManagementPage() {
                     )}
 
                     {/* List on marketplace */}
-                    {billingConfig?.marketplace_enabled && (
+                    {orgMarketplace?.marketplace_enabled && (
                       <div className="space-y-2">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
@@ -2262,14 +2930,40 @@ export default function VenueManagementPage() {
                               min="0"
                               value={marketplacePrice}
                               onChange={(e) => setMarketplacePrice(e.target.value)}
-                              placeholder={String(billingConfig.default_price_amount || '25.00')}
+                              placeholder={String(orgMarketplace.default_price_amount || '25.00')}
                               className={`w-32 ${inputClass}`}
                             />
                             <span className="text-sm text-[var(--ash-grey)]">
-                              {billingConfig.default_price_currency || 'AED'}
+                              {orgMarketplace.default_price_currency || 'AED'}
                             </span>
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {/* Graphic Package */}
+                    {scheduleGraphicPackages.length > 0 && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-[var(--timberwolf)]">
+                          Graphic Package
+                        </label>
+                        <Select value={selectedGraphicPackageId} onValueChange={setSelectedGraphicPackageId}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="default">Use Default</SelectItem>
+                            <SelectItem value="none">None</SelectItem>
+                            {scheduleGraphicPackages.map((pkg) => (
+                              <SelectItem key={pkg.id} value={pkg.id}>
+                                {pkg.name}{pkg.is_default ? ' (default)' : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-[var(--ash-grey)]">
+                          Logo overlays applied to this recording
+                        </p>
                       </div>
                     )}
 
@@ -2669,7 +3363,7 @@ export default function VenueManagementPage() {
         </FadeIn>
 
         {/* Marketplace Revenue */}
-        {billingConfig?.marketplace_enabled && (
+        {orgMarketplace?.marketplace_enabled && (
           <FadeIn delay={250}>
             <MarketplaceRevenue
               venueId={venueId}
@@ -2803,6 +3497,49 @@ export default function VenueManagementPage() {
                                 ? 'Billable'
                                 : 'Not Billable'}
                           </button>
+                          {recording.is_billable !== false && (
+                            editingAmountId === recording.id ? (
+                              <input
+                                type="number"
+                                step="0.001"
+                                min="0"
+                                autoFocus
+                                className="w-24 text-xs px-2 py-0.5 rounded bg-zinc-800 text-[var(--timberwolf)] border border-[var(--ash-grey)]/30 outline-none"
+                                value={editingAmountValue}
+                                onChange={(e) => setEditingAmountValue(e.target.value)}
+                                onBlur={() => saveBillableAmount(recording)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') saveBillableAmount(recording)
+                                  if (e.key === 'Escape') setEditingAmountId(null)
+                                }}
+                              />
+                            ) : (
+                              <span
+                                className={`text-xs px-2 py-0.5 rounded ${
+                                  recording.collected_by !== 'playhub'
+                                    ? 'cursor-pointer hover:bg-zinc-700/50'
+                                    : ''
+                                } text-[var(--ash-grey)]`}
+                                title={recording.collected_by === 'playhub' ? 'Amount locked (verified transaction)' : 'Click to edit amount'}
+                                onClick={() => {
+                                  if (recording.collected_by !== 'playhub') {
+                                    setEditingAmountId(recording.id)
+                                    setEditingAmountValue(
+                                      String(recording.billable_amount ?? billingConfig?.default_billable_amount ?? '')
+                                    )
+                                  }
+                                }}
+                              >
+                                {(recording.billable_amount ?? billingConfig?.default_billable_amount ?? 0).toFixed(3)}{' '}
+                                {billingConfig?.currency || 'KWD'}
+                              </span>
+                            )
+                          )}
+                          {recording.graphicPackageName && (
+                            <span className="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-400" title="Graphic Package">
+                              {recording.graphicPackageName}
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <Button
@@ -2895,6 +3632,27 @@ export default function VenueManagementPage() {
             inputClass={inputClass}
             outlineBtnClass={outlineBtnClass}
             primaryBtnClass={primaryBtnClass}
+          />
+        </FadeIn>
+
+        {/* Graphic Packages (Account-level) */}
+        <FadeIn delay={375}>
+          <GraphicPackagesSection
+            venueSlug={venue?.slug || null}
+            inputClass={inputClass}
+            outlineBtnClass={outlineBtnClass}
+            primaryBtnClass={primaryBtnClass}
+          />
+        </FadeIn>
+
+        {/* Marketplace Settings (Org-level) */}
+        <FadeIn delay={400}>
+          <MarketplaceSettingsSection
+            venueSlug={venue?.slug || null}
+            inputClass={inputClass}
+            outlineBtnClass={outlineBtnClass}
+            primaryBtnClass={primaryBtnClass}
+            onUpdate={setOrgMarketplace}
           />
         </FadeIn>
 

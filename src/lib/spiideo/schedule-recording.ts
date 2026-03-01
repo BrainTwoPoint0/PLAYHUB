@@ -42,6 +42,8 @@ export interface ScheduleRecordingInput {
   priceAmount?: number
   /** Currency for marketplace price. */
   priceCurrency?: string
+  /** Graphic package to attach to the recording. */
+  graphicPackageId?: string
 }
 
 export interface ScheduleRecordingResult {
@@ -148,6 +150,7 @@ export async function scheduleRecording(
         billableAmount ?? billingConfig?.default_billable_amount ?? null,
       billable_currency: billingConfig?.currency ?? 'KWD',
       collected_by: collectedBy,
+      graphic_package_id: input.graphicPackageId || null,
     })
     .select('id')
     .single()

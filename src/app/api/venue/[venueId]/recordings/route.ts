@@ -34,9 +34,12 @@ export async function GET(
   const searchParams = request.nextUrl.searchParams
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)))
-  const search = searchParams.get('search')?.trim() || ''
+  // Sanitize search: escape PostgREST filter special chars to prevent filter injection
+  const rawSearch = searchParams.get('search')?.trim() || ''
+  const search = rawSearch.replace(/[%_,().\\*]/g, (c) => `\\${c}`)
   const status = searchParams.get('status') || ''
   const billable = searchParams.get('billable') || ''
+  const VALID_STATUSES = ['draft', 'published', 'archived', 'processing', 'ready']
 
   // Use service client for data queries to bypass RLS
   const serviceClient = createServiceClient()
@@ -52,7 +55,7 @@ export async function GET(
       `title.ilike.%${search}%,home_team.ilike.%${search}%,away_team.ilike.%${search}%`
     )
   }
-  if (status) {
+  if (status && VALID_STATUSES.includes(status)) {
     countQuery = countQuery.eq('status', status)
   }
   if (billable === 'true') {
@@ -94,6 +97,9 @@ export async function GET(
       transferred_at,
       spiideo_game_id,
       is_billable,
+      billable_amount,
+      collected_by,
+      graphic_package_id,
       created_at
     `
     )
@@ -146,10 +152,28 @@ export async function GET(
     }
   }
 
-  // Enrich recordings with access count
+  // Get graphic package names for recordings that have one
+  const gpIds = [...new Set((recordings || []).map((r: any) => r.graphic_package_id).filter(Boolean))]
+  let gpNames: Record<string, string> = {}
+
+  if (gpIds.length > 0) {
+    const { data: gpData } = await (serviceClient as any)
+      .from('playhub_graphic_packages')
+      .select('id, name')
+      .in('id', gpIds)
+
+    if (gpData) {
+      gpData.forEach((g: any) => {
+        gpNames[g.id] = g.name
+      })
+    }
+  }
+
+  // Enrich recordings with access count and graphic package name
   const enrichedRecordings = (recordings || []).map((r: any) => ({
     ...r,
     accessCount: accessCounts[r.id] || 0,
+    graphicPackageName: gpNames[r.graphic_package_id] || null,
   }))
 
   return NextResponse.json({
