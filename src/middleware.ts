@@ -6,10 +6,15 @@ export async function middleware(request: NextRequest) {
     request,
   })
 
+  const cookieDomain = process.env.NEXT_PUBLIC_COOKIE_DOMAIN
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      ...(cookieDomain && {
+        cookieOptions: { domain: cookieDomain },
+      }),
       cookies: {
         getAll() {
           return request.cookies.getAll()
