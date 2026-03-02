@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'AvertaStd-Semibold';
+  src: url('/fonts/AvertaStd-Semibold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'AvertaStd-Thin';
+  src: url('/fonts/AvertaStd-Thin.ttf') format('truetype');
+}
+
 :root {
   --night: #0a100d;
   --ash-grey: #b9baa3;
