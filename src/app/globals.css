@@ -17,6 +17,41 @@
   --ash-grey: #b9baa3;
   --timberwolf: #d6d5c9;
   --radius: 0.5rem;
+
+  /* shadcn design tokens mapped to PLAYBACK brand */
+  --background: 143 25% 5%;
+  --foreground: 55 11% 81%;
+
+  --card: 150 15% 8%;
+  --card-foreground: 55 11% 81%;
+
+  --popover: 150 15% 8%;
+  --popover-foreground: 55 11% 81%;
+
+  --primary: 55 11% 81%;
+  --primary-foreground: 143 25% 5%;
+
+  --secondary: 150 10% 14%;
+  --secondary-foreground: 55 11% 81%;
+
+  --muted: 150 10% 14%;
+  --muted-foreground: 63 12% 68%;
+
+  --accent: 150 10% 14%;
+  --accent-foreground: 55 11% 81%;
+
+  --destructive: 0 63% 51%;
+  --destructive-foreground: 0 0% 98%;
+
+  --border: 150 10% 18%;
+  --input: 150 10% 18%;
+  --ring: 55 11% 81%;
+
+  --chart-1: 142 71% 45%;
+  --chart-2: 197 71% 45%;
+  --chart-3: 47 82% 53%;
+  --chart-4: 280 65% 60%;
+  --chart-5: 24 80% 55%;
 }
 
 body {

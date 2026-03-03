@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'motion/react'
 import { formatPrice, formatDate } from '@braintwopoint0/playback-commons/utils'
+import { MapPin, Calendar } from 'lucide-react'
 
 interface MatchCardProps {
   match: {
@@ -43,9 +44,9 @@ export default function MatchCard({ match }: MatchCardProps) {
         transition={{ duration: 0.2 }}
         className="group cursor-pointer"
       >
-        <div className="relative bg-black/30 border border-[var(--ash-grey)]/10 rounded-2xl overflow-hidden hover:border-[var(--accent-purple)]/50 hover:shadow-xl hover:shadow-purple-500/10 transition-all">
+        <div className="relative border border-border bg-card rounded-xl overflow-hidden hover:border-[var(--timberwolf)]/25 transition-all">
           {/* Thumbnail */}
-          <div className="relative h-56 bg-black/40 overflow-hidden">
+          <div className="relative h-56 bg-muted overflow-hidden">
             {match.thumbnail_url ? (
               <Image
                 src={match.thumbnail_url}
@@ -54,8 +55,10 @@ export default function MatchCard({ match }: MatchCardProps) {
                 className="object-cover group-hover:scale-105 transition-transform duration-700"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-black/40">
-                <span className="text-7xl opacity-30">⚽</span>
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="text-4xl font-bold text-muted-foreground/30">
+                  {match.home_team.charAt(0)} v {match.away_team.charAt(0)}
+                </span>
               </div>
             )}
 
@@ -64,77 +67,54 @@ export default function MatchCard({ match }: MatchCardProps) {
 
             {/* Sport Tag */}
             {match.sport && (
-              <div className="absolute top-4 left-4 px-3 py-1 bg-black/60 backdrop-blur-sm border border-[var(--ash-grey)]/20 rounded-lg text-xs font-semibold text-[var(--timberwolf)]">
+              <div className="absolute top-3 left-3 px-2.5 py-1 bg-black/60 backdrop-blur-sm border border-border rounded-md text-xs font-medium text-[var(--timberwolf)]">
                 {match.sport.name}
               </div>
             )}
 
             {/* Price Badge */}
-            <div className="absolute top-4 right-4 px-4 py-2 bg-gradient-to-r from-[var(--accent-purple)] to-[var(--accent-blue)] text-white rounded-lg font-bold text-lg shadow-lg shadow-purple-500/30">
+            <div className="absolute top-3 right-3 px-3 py-1.5 bg-[var(--timberwolf)] text-[var(--night)] rounded-md font-bold text-sm">
               {price}
             </div>
           </div>
 
           {/* Content */}
-          <div className="p-5">
+          <div className="p-4">
             {/* Teams */}
-            <h3 className="text-xl font-bold text-[var(--timberwolf)] mb-2 line-clamp-1">
+            <h3 className="text-lg font-semibold text-[var(--timberwolf)] mb-1 line-clamp-1">
               {match.home_team}{' '}
-              <span className="text-[var(--ash-grey)]/50">vs</span>{' '}
+              <span className="text-muted-foreground">vs</span>{' '}
               {match.away_team}
             </h3>
 
             {/* Competition */}
             {match.competition && (
-              <p className="text-sm text-[var(--ash-grey)]/80 mb-4 font-medium">
+              <p className="text-sm text-muted-foreground mb-3 font-medium">
                 {match.competition}
               </p>
             )}
 
             {/* Meta Info */}
-            <div className="flex items-center gap-4 text-sm text-[var(--ash-grey)]/60">
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
               {match.venue && (
                 <div className="flex items-center gap-1.5">
-                  <svg
-                    className="w-4 h-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+                  <MapPin className="h-3.5 w-3.5" />
                   <span className="line-clamp-1">{match.venue}</span>
                 </div>
               )}
               <div className="flex items-center gap-1.5">
-                <svg
-                  className="w-4 h-4"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+                <Calendar className="h-3.5 w-3.5" />
                 <span>{formatDate(match.match_date)}</span>
               </div>
             </div>
 
             {/* Organization */}
             {match.organization && (
-              <div className="mt-4 pt-4 border-t border-[var(--ash-grey)]/10 text-sm text-[var(--ash-grey)]/60">
+              <div className="mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
                 {match.organization.name}
               </div>
             )}
           </div>
-
-          {/* Hover Overlay */}
-          <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
         </div>
       </motion.div>
     </Link>

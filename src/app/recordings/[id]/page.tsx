@@ -86,10 +86,10 @@ function TagForm({
   const [form, setForm] = useState<TagFormData>(initial)
 
   return (
-    <div className="space-y-3 p-4 rounded-lg border border-[var(--ash-grey)]/10 bg-white/[0.03]">
+    <div className="space-y-3 p-4 rounded-lg border border-border bg-muted/50">
       {/* Event type */}
       <div className="space-y-1.5">
-        <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)]">
+        <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-muted-foreground">
           Event Type
         </Label>
         <Select
@@ -113,7 +113,7 @@ function TagForm({
 
       {/* Timestamp */}
       <div className="space-y-1.5">
-        <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)]">
+        <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-muted-foreground">
           Timestamp
         </Label>
         <div className="flex items-center gap-2">
@@ -130,7 +130,7 @@ function TagForm({
             }
             className="w-24"
           />
-          <span className="text-xs text-[var(--ash-grey)]">
+          <span className="text-xs text-muted-foreground">
             {formatTimestamp(form.timestamp_seconds)}
           </span>
         </div>
@@ -138,7 +138,7 @@ function TagForm({
 
       {/* Team */}
       <div className="space-y-1.5">
-        <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)]">
+        <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-muted-foreground">
           Team (optional)
         </Label>
         <div className="flex gap-2">
@@ -156,7 +156,7 @@ function TagForm({
               className={
                 form.team === opt.value
                   ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 hover:bg-emerald-500/30 text-xs'
-                  : 'border-[var(--ash-grey)]/20 text-[var(--ash-grey)] hover:border-[var(--ash-grey)]/40 text-xs'
+                  : 'border-border text-muted-foreground hover:border-[var(--ash-grey)]/40 text-xs'
               }
             >
               {opt.label}
@@ -167,7 +167,7 @@ function TagForm({
 
       {/* Label */}
       <div className="space-y-1.5">
-        <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)]">
+        <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-muted-foreground">
           Label (optional)
         </Label>
         <Input
@@ -180,7 +180,7 @@ function TagForm({
 
       {/* Visibility */}
       <div className="space-y-1.5">
-        <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)]">
+        <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-muted-foreground">
           Visibility
         </Label>
         <div className="flex gap-2">
@@ -197,7 +197,7 @@ function TagForm({
               className={
                 form.visibility === opt.value
                   ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 hover:bg-emerald-500/30 text-xs gap-1.5'
-                  : 'border-[var(--ash-grey)]/20 text-[var(--ash-grey)] hover:border-[var(--ash-grey)]/40 text-xs gap-1.5'
+                  : 'border-border text-muted-foreground hover:border-[var(--ash-grey)]/40 text-xs gap-1.5'
               }
             >
               <opt.icon className="w-3 h-3" />
@@ -220,7 +220,7 @@ function TagForm({
           onClick={onCancel}
           size="sm"
           variant="ghost"
-          className="text-[var(--ash-grey)] hover:bg-white/10 text-xs"
+          className="text-muted-foreground hover:bg-muted/50 text-xs"
         >
           Cancel
         </Button>
@@ -427,19 +427,19 @@ export default function RecordingPage() {
     return (
       <div className="min-h-screen bg-[var(--night)]">
         <div className="container mx-auto px-4 md:px-5 py-6 md:py-16 max-w-4xl animate-pulse">
-          <div className="bg-[var(--ash-grey)]/10 rounded h-9 w-[170px] mb-4 md:mb-6" />
-          <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-black/20">
+          <div className="bg-muted rounded h-9 w-[170px] mb-4 md:mb-6" />
+          <div className="rounded-xl border border-border bg-black/20">
             <div className="p-4 md:p-6 pb-2 md:pb-3 space-y-2">
-              <div className="bg-[var(--ash-grey)]/10 rounded h-6 md:h-7 w-[200px] md:w-[260px]" />
-              <div className="bg-[var(--ash-grey)]/10 rounded h-3 md:h-4 w-[160px] md:w-[200px]" />
+              <div className="bg-muted rounded h-6 md:h-7 w-[200px] md:w-[260px]" />
+              <div className="bg-muted rounded h-3 md:h-4 w-[160px] md:w-[200px]" />
             </div>
             <div className="px-4 md:px-6 pb-4 md:pb-6 space-y-4">
               <div className="aspect-video bg-black/30 md:rounded-lg -mx-4 md:mx-0" />
               <div className="grid grid-cols-2 gap-4 pt-4">
                 {[0, 1, 2, 3].map((i) => (
                   <div key={i} className="space-y-2">
-                    <div className="bg-[var(--ash-grey)]/10 rounded h-3 w-[80px]" />
-                    <div className="bg-[var(--ash-grey)]/10 rounded h-5 w-[120px]" />
+                    <div className="bg-muted rounded h-3 w-[80px]" />
+                    <div className="bg-muted rounded h-5 w-[120px]" />
                   </div>
                 ))}
               </div>
@@ -454,12 +454,12 @@ export default function RecordingPage() {
     return (
       <div className="min-h-screen bg-[var(--night)]">
         <div className="container mx-auto px-5 py-16 max-w-4xl">
-          <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-6">
+          <div className="rounded-xl border border-border bg-card p-6">
             <p className="text-red-400 mb-4">{error}</p>
             <Button
               variant="outline"
               onClick={() => router.push('/recordings')}
-              className="border-[var(--ash-grey)]/20 text-[var(--timberwolf)] hover:bg-white/10"
+              className="border-border text-[var(--timberwolf)] hover:bg-muted/50"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Recordings
@@ -474,12 +474,12 @@ export default function RecordingPage() {
     return (
       <div className="min-h-screen bg-[var(--night)]">
         <div className="container mx-auto px-5 py-16 max-w-4xl">
-          <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-6">
-            <p className="text-[var(--ash-grey)]">Recording not found</p>
+          <div className="rounded-xl border border-border bg-card p-6">
+            <p className="text-muted-foreground">Recording not found</p>
             <Button
               variant="outline"
               onClick={() => router.push('/recordings')}
-              className="mt-4 border-[var(--ash-grey)]/20 text-[var(--timberwolf)] hover:bg-white/10"
+              className="mt-4 border-border text-[var(--timberwolf)] hover:bg-muted/50"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Recordings
@@ -498,19 +498,19 @@ export default function RecordingPage() {
         <Button
           variant="ghost"
           onClick={() => router.push('/recordings')}
-          className="mb-4 md:mb-6 text-[var(--timberwolf)] hover:bg-white/10"
+          className="mb-4 md:mb-6 text-[var(--timberwolf)] hover:bg-muted/50"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Recordings
         </Button>
 
         <FadeIn>
-          <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
+          <div className="rounded-xl border border-border bg-card">
             <div className="p-4 md:p-6 pb-2 md:pb-3">
               <h1 className="text-xl md:text-3xl font-bold text-[var(--timberwolf)]">
                 {recording.title}
               </h1>
-              <p className="text-xs md:text-sm text-[var(--ash-grey)] mt-1">
+              <p className="text-xs md:text-sm text-muted-foreground mt-1">
                 {formatDate(recording.matchDate)}
               </p>
               <div className="flex gap-2 mt-3">
@@ -518,7 +518,7 @@ export default function RecordingPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setShowShareModal(true)}
-                  className="border-[var(--ash-grey)]/20 text-[var(--timberwolf)] hover:bg-white/10 gap-1.5"
+                  className="border-border text-[var(--timberwolf)] hover:bg-muted/50 gap-1.5"
                 >
                   <Share2 className="w-3.5 h-3.5" />
                   Share
@@ -527,7 +527,7 @@ export default function RecordingPage() {
                   variant="outline"
                   size="sm"
                   onClick={handleDownload}
-                  className="border-[var(--ash-grey)]/20 text-[var(--timberwolf)] hover:bg-white/10 gap-1.5"
+                  className="border-border text-[var(--timberwolf)] hover:bg-muted/50 gap-1.5"
                 >
                   <Download className="w-3.5 h-3.5" />
                   Download
@@ -549,8 +549,8 @@ export default function RecordingPage() {
                   />
                 </div>
               ) : (
-                <div className="aspect-video bg-black/30 md:rounded-lg flex items-center justify-center border-y md:border border-[var(--ash-grey)]/10 -mx-4 md:mx-0">
-                  <p className="text-[var(--ash-grey)]">
+                <div className="aspect-video bg-black/30 md:rounded-lg flex items-center justify-center border-y md:border border-border -mx-4 md:mx-0">
+                  <p className="text-muted-foreground">
                     {recording.status === 'scheduled'
                       ? 'Recording not yet available'
                       : recording.status === 'processing'
@@ -573,7 +573,7 @@ export default function RecordingPage() {
 
         {/* Event Tags Section */}
         <FadeIn delay={100}>
-          <div className="mt-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
+          <div className="mt-6 rounded-xl border border-border bg-card">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
@@ -614,7 +614,7 @@ export default function RecordingPage() {
 
               {/* Events list */}
               {events.length === 0 && !showAddForm ? (
-                <p className="text-sm text-[var(--ash-grey)]">
+                <p className="text-sm text-muted-foreground">
                   No events tagged yet.
                   {canEdit ? ' Click "Add Tag" to get started.' : ''}
                 </p>
@@ -647,7 +647,7 @@ export default function RecordingPage() {
                     return (
                       <div
                         key={event.id}
-                        className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/[0.03] transition-colors group"
+                        className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors group"
                       >
                         {/* Color dot */}
                         <div
@@ -691,7 +691,7 @@ export default function RecordingPage() {
 
                         {/* Team */}
                         {event.team && (
-                          <span className="text-xs text-[var(--ash-grey)]">
+                          <span className="text-xs text-muted-foreground">
                             {event.team === 'home'
                               ? recording.homeTeam
                               : recording.awayTeam}
@@ -707,7 +707,7 @@ export default function RecordingPage() {
 
                         {/* Visibility icon */}
                         {event.visibility === 'private' && (
-                          <Lock className="w-3 h-3 text-[var(--ash-grey)] flex-shrink-0 ml-auto" />
+                          <Lock className="w-3 h-3 text-muted-foreground flex-shrink-0 ml-auto" />
                         )}
 
                         {/* Edit/Delete buttons (own events only) */}
@@ -717,7 +717,7 @@ export default function RecordingPage() {
                               variant="ghost"
                               size="icon"
                               onClick={() => setEditingEventId(event.id)}
-                              className="h-6 w-6 text-[var(--ash-grey)] hover:text-[var(--timberwolf)] hover:bg-white/10"
+                              className="h-6 w-6 text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted/50"
                             >
                               <Pencil className="w-3 h-3" />
                             </Button>
@@ -725,7 +725,7 @@ export default function RecordingPage() {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleDeleteEvent(event.id)}
-                              className="h-6 w-6 text-[var(--ash-grey)] hover:text-red-400 hover:bg-red-500/10"
+                              className="h-6 w-6 text-muted-foreground hover:text-red-400 hover:bg-red-500/10"
                             >
                               <Trash2 className="w-3 h-3" />
                             </Button>

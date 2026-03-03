@@ -189,7 +189,7 @@ export default function PublicWatchPage() {
                 className="w-full aspect-video rounded-lg"
               />
             ) : (
-              <div className="aspect-video bg-zinc-900 rounded-lg flex items-center justify-center">
+              <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
                 <p className="text-muted-foreground">Video not available</p>
               </div>
             )}

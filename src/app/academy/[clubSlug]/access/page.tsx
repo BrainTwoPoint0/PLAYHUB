@@ -2,7 +2,17 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  Search,
+  RefreshCw,
+  ArrowLeftRight,
+  Shield,
+  UserCog,
+  AlertTriangle,
+  X,
+} from 'lucide-react'
 import { Button } from '@braintwopoint0/playback-commons/ui'
 import { FadeIn } from '@/components/FadeIn'
 
@@ -354,9 +364,6 @@ export default function AcademyAccessPage() {
     setExpandedTeams(new Set())
   }
 
-  const outlineBtnClass =
-    'border-[var(--ash-grey)]/20 text-[var(--timberwolf)] hover:bg-white/10'
-
   // ============================================================================
   // Loading state
   // ============================================================================
@@ -364,25 +371,19 @@ export default function AcademyAccessPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--night)]">
-        <div className="container mx-auto px-5 py-16 max-w-4xl animate-pulse">
-          <div className="flex items-center justify-between mb-8">
-            <div className="space-y-2">
-              <div className="bg-[var(--ash-grey)]/10 rounded h-3 w-[180px]" />
-              <div className="bg-[var(--ash-grey)]/10 rounded h-8 w-[300px]" />
-            </div>
-            <div className="bg-[var(--ash-grey)]/10 rounded h-10 w-[110px]" />
+        <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12 max-w-5xl animate-pulse">
+          <div className="space-y-2 mb-10">
+            <div className="bg-white/5 rounded h-3 w-32" />
+            <div className="bg-white/5 rounded h-8 w-64" />
           </div>
-          <p className="text-[var(--ash-grey)] text-sm mb-6">
-            Loading cached data...
-          </p>
-          <div className="space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
             {[0, 1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-4"
-              >
-                <div className="bg-[var(--ash-grey)]/10 rounded h-5 w-[200px]" />
-              </div>
+              <div key={i} className="rounded-lg bg-muted/50 p-4 h-20" />
+            ))}
+          </div>
+          <div className="space-y-2">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="rounded-lg bg-muted/50 h-12" />
             ))}
           </div>
         </div>
@@ -397,25 +398,29 @@ export default function AcademyAccessPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-[var(--night)]">
-        <div className="container mx-auto px-5 py-16 max-w-4xl">
-          <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-6">
-            <p className="text-red-400">{error}</p>
-            <div className="flex items-center gap-2 mt-4">
-              <Button
-                variant="outline"
-                className={outlineBtnClass}
-                onClick={triggerCacheSync}
-                disabled={syncing}
-              >
-                {syncing ? 'Syncing...' : 'Sync Now'}
-              </Button>
-              <Button
-                className={outlineBtnClass}
-                variant="outline"
-                onClick={() => router.push('/academy')}
-              >
-                Switch Club
-              </Button>
+        <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12 max-w-5xl">
+          <div className="rounded-xl border border-red-500/20 bg-red-500/[0.04] p-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="space-y-3">
+                <p className="text-sm text-red-300">{error}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={triggerCacheSync}
+                    disabled={syncing}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[var(--timberwolf)] hover:bg-white/10 transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className={`h-3 w-3 inline mr-1.5 ${syncing ? 'animate-spin' : ''}`} />
+                    {syncing ? 'Syncing...' : 'Sync Now'}
+                  </button>
+                  <button
+                    onClick={() => router.push('/academy')}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[var(--timberwolf)] hover:bg-white/10 transition-colors"
+                  >
+                    Switch Club
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -434,13 +439,11 @@ export default function AcademyAccessPage() {
   ])
 
   // Stats — deduplicate by email so users in multiple teams are counted once.
-  // If someone is a viewer in one team and coach in another, treat them as staff (not flagged).
   const allMembers = data.teams.flatMap((t) => t.members)
   const uniqueByEmail = new Map<string, VeoMember>()
   for (const m of allMembers) {
     const key = m.email?.toLowerCase() || m.id
     const existing = uniqueByEmail.get(key)
-    // Prefer non-player role (coach/admin) — if they're staff in any team, they're staff
     if (!existing || (!m.isPlayer && existing.isPlayer)) {
       uniqueByEmail.set(key, m)
     }
@@ -458,7 +461,6 @@ export default function AcademyAccessPage() {
     ? uniqueMembers.filter((m) => m.isScholarship).length
     : 0
 
-  // Total active academy subscribers (in Veo + not in Veo)
   const activeSubEmails = new Set<string>()
   for (const m of uniqueMembers) {
     if (m.hasSubscription && m.stripeStatus !== 'canceled' && m.email) {
@@ -468,557 +470,506 @@ export default function AcademyAccessPage() {
   const academySubs =
     activeSubEmails.size + (data.stripeOnlySubscribers?.length ?? 0)
 
+  // Stat card config
+  const stats = [
+    { label: 'Active Subs', value: academySubs, color: 'text-emerald-400', dot: 'bg-emerald-400' },
+    { label: 'Veo Members', value: totalMembers, color: 'text-[var(--timberwolf)]', dot: 'bg-muted-foreground' },
+    { label: 'No Sub', value: noSub, color: 'text-red-400', dot: 'bg-red-400', alert: noSub > 0 },
+    { label: 'Not in Veo', value: data.stripeOnlySubscribers?.length ?? 0, color: 'text-orange-400', dot: 'bg-orange-400', alert: (data.stripeOnlySubscribers?.length ?? 0) > 0 },
+    { label: 'Staff', value: staff.length, color: 'text-amber-400', dot: 'bg-amber-400' },
+    ...(data.hasScholarships && scholarships > 0
+      ? [{ label: 'Scholarships', value: scholarships, color: 'text-purple-400', dot: 'bg-purple-400' }]
+      : []),
+  ]
+
   return (
     <div className="min-h-screen bg-[var(--night)]">
-      <div className="container mx-auto px-5 py-16 max-w-4xl">
-        {/* Header */}
+      <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12 max-w-5xl">
+
+        {/* ── Header ──────────────────────────────────────── */}
         <FadeIn>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8">
-            <div>
-              <p className="text-[var(--ash-grey)] text-xs font-semibold tracking-[0.25em] uppercase mb-2">
-                Veo Access Audit
-              </p>
-              <h1 className="text-2xl md:text-3xl font-bold text-[var(--timberwolf)]">
-                {data.clubName}
-              </h1>
-              {data.lastSyncedAt && (
-                <p className="text-xs text-[var(--ash-grey)] mt-1">
-                  Veo data synced {timeAgo(data.lastSyncedAt)}
+          <div className="mb-10">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+              <div>
+                <p className="text-muted-foreground/70 text-[11px] font-medium tracking-[0.2em] uppercase mb-1.5">
+                  Access Audit
                 </p>
-              )}
-            </div>
-            <div className="flex items-center gap-2 self-start sm:self-auto">
-              {isPlatAdmin && (
-                <>
-                  <Button
-                    variant="outline"
-                    className={outlineBtnClass}
-                    onClick={triggerCacheSync}
-                    disabled={syncing}
-                  >
-                    {syncing ? 'Syncing...' : 'Sync Now'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className={outlineBtnClass}
-                    onClick={() => fetchVeoData(true)}
-                  >
-                    Refresh Stripe
-                  </Button>
-                </>
-              )}
-              <Button
-                variant="outline"
-                className={outlineBtnClass}
-                onClick={() => router.push('/academy')}
-              >
-                Switch Club
-              </Button>
-            </div>
-          </div>
-        </FadeIn>
-
-        {/* Summary */}
-        <FadeIn delay={100}>
-          <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 mb-6 text-center">
-            <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-4">
-              <p className="text-xs text-[var(--ash-grey)] uppercase tracking-wider mb-1">
-                Academy Subs
-              </p>
-              <p className="text-2xl font-bold text-[var(--timberwolf)]">
-                {academySubs}
-              </p>
-            </div>
-            <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-4">
-              <p className="text-xs text-[var(--ash-grey)] uppercase tracking-wider mb-1">
-                Veo Members
-              </p>
-              <p className="text-2xl font-bold text-[var(--timberwolf)]">
-                {totalMembers}
-              </p>
-            </div>
-            <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-4">
-              <p className="text-xs text-[var(--ash-grey)] uppercase tracking-wider mb-1">
-                Players No Sub
-              </p>
-              <p className="text-2xl font-bold text-red-400">{noSub}</p>
-            </div>
-            <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-4">
-              <p className="text-xs text-[var(--ash-grey)] uppercase tracking-wider mb-1">
-                Not in Veo
-              </p>
-              <p className="text-2xl font-bold text-orange-400">
-                {data.stripeOnlySubscribers?.length ?? 0}
-              </p>
-            </div>
-            <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-4">
-              <p className="text-xs text-[var(--ash-grey)] uppercase tracking-wider mb-1">
-                Coaches / Staff
-              </p>
-              <p className="text-2xl font-bold text-amber-400">
-                {staff.length}
-              </p>
-            </div>
-            {data.hasScholarships && scholarships > 0 && (
-              <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-4">
-                <p className="text-xs text-[var(--ash-grey)] uppercase tracking-wider mb-1">
-                  Scholarships
-                </p>
-                <p className="text-2xl font-bold text-purple-400">
-                  {scholarships}
-                </p>
-              </div>
-            )}
-          </div>
-        </FadeIn>
-
-        {/* Exceptions — platform admin only */}
-        {isPlatAdmin && (
-          <FadeIn delay={125}>
-            <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] mb-6">
-              <button
-                onClick={() => setExceptionsOpen(!exceptionsOpen)}
-                className="w-full flex items-center justify-between p-4 hover:bg-white/[0.03] transition-colors text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-[var(--ash-grey)]">
-                    {exceptionsOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                  </span>
-                  <span className="font-medium text-[var(--timberwolf)]">
-                    Sync Exceptions
-                  </span>
-                  <span className="text-xs text-[var(--ash-grey)]">
-                    {exceptions.length}{' '}
-                    {exceptions.length === 1 ? 'user' : 'users'} exempt from
-                    auto-removal
-                  </span>
-                </div>
-              </button>
-              {exceptionsOpen && (
-                <div className="border-t border-[var(--ash-grey)]/10 p-4 space-y-3">
-                  {/* Add exception form */}
-                  <div className="flex flex-col sm:flex-row sm:items-end gap-2">
-                    <div className="flex-1">
-                      <label className="text-xs text-[var(--ash-grey)] mb-1 block">
-                        Email
-                      </label>
-                      <input
-                        type="email"
-                        value={newExceptionEmail}
-                        onChange={(e) => setNewExceptionEmail(e.target.value)}
-                        placeholder="user@example.com"
-                        className="w-full text-sm px-3 py-1.5 rounded-lg bg-white/5 border border-[var(--ash-grey)]/20 text-[var(--timberwolf)] placeholder-[var(--ash-grey)]/50 outline-none focus:border-[var(--ash-grey)]/40"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label className="text-xs text-[var(--ash-grey)] mb-1 block">
-                        Reason (optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={newExceptionReason}
-                        onChange={(e) => setNewExceptionReason(e.target.value)}
-                        placeholder="e.g. Staff member"
-                        className="w-full text-sm px-3 py-1.5 rounded-lg bg-white/5 border border-[var(--ash-grey)]/20 text-[var(--timberwolf)] placeholder-[var(--ash-grey)]/50 outline-none focus:border-[var(--ash-grey)]/40"
-                      />
-                    </div>
-                    <Button
-                      variant="outline"
-                      className={`${outlineBtnClass} text-xs`}
-                      onClick={addException}
-                      disabled={exceptionsLoading || !newExceptionEmail.trim()}
-                    >
-                      Add
-                    </Button>
-                  </div>
-
-                  {/* Exception list */}
-                  {exceptions.length === 0 ? (
-                    <p className="text-xs text-[var(--ash-grey)]">
-                      No exceptions configured.
-                    </p>
-                  ) : (
-                    <div className="divide-y divide-[var(--ash-grey)]/5">
-                      {exceptions.map((exc) => (
-                        <div
-                          key={exc.id}
-                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2 py-2 text-sm"
-                        >
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 min-w-0">
-                            <span className="text-[var(--timberwolf)] truncate">
-                              {exc.email}
-                            </span>
-                            {exc.reason && (
-                              <span className="text-xs text-[var(--ash-grey)] truncate">
-                                {exc.reason}
-                              </span>
-                            )}
-                            <span className="text-xs text-[var(--ash-grey)]/50">
-                              {new Date(exc.created_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <button
-                            onClick={() => removeException(exc.email)}
-                            disabled={exceptionsLoading}
-                            className="text-xs px-2 py-1 rounded text-red-400 hover:bg-red-500/10 transition-colors self-start sm:self-auto"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </FadeIn>
-        )}
-
-        {/* Manage Admins — platform admin only */}
-        {isPlatAdmin && (
-          <FadeIn delay={130}>
-            <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] mb-6">
-              <button
-                onClick={() => setAdminsOpen(!adminsOpen)}
-                className="w-full flex items-center justify-between p-4 hover:bg-white/[0.03] transition-colors text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-[var(--ash-grey)]">
-                    {adminsOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                  </span>
-                  <span className="font-medium text-[var(--timberwolf)]">
-                    Manage Admins
-                  </span>
-                  <span className="text-xs text-[var(--ash-grey)]">
-                    {admins.length} {admins.length === 1 ? 'admin' : 'admins'}
-                  </span>
-                </div>
-              </button>
-              {adminsOpen && (
-                <div className="border-t border-[var(--ash-grey)]/10 p-4 space-y-3">
-                  {/* Invite form */}
-                  <div className="flex flex-col sm:flex-row sm:items-end gap-2">
-                    <div className="flex-1">
-                      <label className="text-xs text-[var(--ash-grey)] mb-1 block">
-                        Email
-                      </label>
-                      <input
-                        type="email"
-                        value={newAdminEmail}
-                        onChange={(e) => setNewAdminEmail(e.target.value)}
-                        placeholder="admin@example.com"
-                        className="w-full text-sm px-3 py-1.5 rounded-lg bg-white/5 border border-[var(--ash-grey)]/20 text-[var(--timberwolf)] placeholder-[var(--ash-grey)]/50 outline-none focus:border-[var(--ash-grey)]/40"
-                      />
-                    </div>
-                    <Button
-                      variant="outline"
-                      className={`${outlineBtnClass} text-xs`}
-                      onClick={inviteAdmin}
-                      disabled={adminsLoading || !newAdminEmail.trim()}
-                    >
-                      Invite
-                    </Button>
-                  </div>
-                  {adminMessage && (
-                    <p className="text-xs text-[var(--ash-grey)]">
-                      {adminMessage}
-                    </p>
-                  )}
-
-                  {/* Admin list */}
-                  {admins.length === 0 ? (
-                    <p className="text-xs text-[var(--ash-grey)]">
-                      No admins configured.
-                    </p>
-                  ) : (
-                    <div className="divide-y divide-[var(--ash-grey)]/5">
-                      {admins.map((admin) => (
-                        <div
-                          key={admin.id}
-                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2 py-2 text-sm"
-                        >
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 min-w-0">
-                            <span className="text-[var(--timberwolf)] truncate">
-                              {admin.fullName || 'Unknown'}
-                            </span>
-                            <span className="text-xs text-[var(--ash-grey)] truncate">
-                              {admin.email}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-white/5 text-[var(--ash-grey)]">
-                              {admin.role === 'league_admin'
-                                ? 'League Admin'
-                                : 'Club Admin'}
-                            </span>
-                            <button
-                              onClick={() => removeAdmin(admin.id)}
-                              disabled={adminsLoading}
-                              className="text-xs px-2 py-1 rounded text-red-400 hover:bg-red-500/10 transition-colors"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </FadeIn>
-        )}
-
-        {/* Stripe-only subscribers (paying but not in Veo) */}
-        {data.stripeOnlySubscribers &&
-          data.stripeOnlySubscribers.length > 0 && (
-            <FadeIn delay={135}>
-              <div className="rounded-xl border border-orange-500/20 bg-white/[0.015] mb-6">
-                <button
-                  onClick={() => setStripeOnlyOpen(!stripeOnlyOpen)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-white/[0.03] transition-colors text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-[var(--ash-grey)]">
-                      {stripeOnlyOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                    </span>
-                    <span className="font-medium text-[var(--timberwolf)]">
-                      Not in Veo
-                    </span>
-                    <span className="text-xs text-orange-400">
-                      {data.stripeOnlySubscribers.length}{' '}
-                      {data.stripeOnlySubscribers.length === 1
-                        ? 'subscriber'
-                        : 'subscribers'}{' '}
-                      not found in any Veo team
-                    </span>
-                  </div>
-                </button>
-                {stripeOnlyOpen && (
-                  <div className="border-t border-[var(--ash-grey)]/10 bg-white/[0.02]">
-                    <div className="divide-y divide-[var(--ash-grey)]/5">
-                      {data.stripeOnlySubscribers.map((sub) => (
-                        <div
-                          key={sub.email}
-                          className="flex items-center justify-between gap-2 px-4 py-1.5 text-sm"
-                        >
-                          <div className="min-w-0">
-                            <div className="text-[var(--timberwolf)] truncate text-sm">
-                              {sub.name || 'Unknown'}
-                            </div>
-                            <div className="text-[11px] text-[var(--ash-grey)]/60 truncate">
-                              {sub.email}
-                              {sub.registrationTeam && (
-                                <span className="ml-1.5 text-[var(--ash-grey)]/40">
-                                  {sub.registrationTeam}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5 flex-shrink-0">
-                            {data.hasScholarships && sub.isScholarship && (
-                              <span className="text-[10px] leading-none px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400">
-                                scholarship
-                              </span>
-                            )}
-                            <span
-                              className={`text-[10px] leading-none px-1.5 py-0.5 rounded ${stripeStatusColor(
-                                sub.status,
-                                true
-                              )}`}
-                            >
-                              {sub.status}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                <h1 className="text-2xl sm:text-3xl font-semibold text-[var(--timberwolf)] tracking-tight">
+                  {data.clubName}
+                </h1>
+                {data.lastSyncedAt && (
+                  <p className="text-[11px] text-muted-foreground/50 mt-1.5">
+                    Last synced {timeAgo(data.lastSyncedAt)}
+                  </p>
                 )}
               </div>
-            </FadeIn>
-          )}
-
-        {/* Controls */}
-        <FadeIn delay={150}>
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name or email..."
-              className="text-sm px-3 py-1.5 rounded-lg bg-white/5 border border-[var(--ash-grey)]/20 text-[var(--timberwolf)] placeholder-[var(--ash-grey)]/50 outline-none focus:border-[var(--ash-grey)]/40 w-full sm:w-64"
-            />
-            <button
-              onClick={() => setFilterNoSub(!filterNoSub)}
-              className={`text-xs px-3 py-1.5 rounded-lg transition-colors border ${
-                filterNoSub
-                  ? 'bg-red-500/20 border-red-500/30 text-red-400'
-                  : 'border-[var(--ash-grey)]/20 text-[var(--ash-grey)] hover:text-[var(--timberwolf)]'
-              }`}
-            >
-              {filterNoSub
-                ? 'Showing: No sub'
-                : 'Filter: No sub'}
-            </button>
-            <button
-              onClick={expandAll}
-              className="text-xs px-3 py-1.5 rounded-lg border border-[var(--ash-grey)]/20 text-[var(--ash-grey)] hover:text-[var(--timberwolf)] transition-colors"
-            >
-              Expand all
-            </button>
-            <button
-              onClick={collapseAll}
-              className="text-xs px-3 py-1.5 rounded-lg border border-[var(--ash-grey)]/20 text-[var(--ash-grey)] hover:text-[var(--timberwolf)] transition-colors"
-            >
-              Collapse all
-            </button>
+              <div className="flex items-center gap-1.5">
+                {isPlatAdmin && (
+                  <>
+                    <button
+                      onClick={triggerCacheSync}
+                      disabled={syncing}
+                      className="text-[11px] px-3 py-1.5 rounded-lg bg-muted text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted transition-all disabled:opacity-50"
+                    >
+                      <RefreshCw className={`h-3 w-3 inline mr-1 ${syncing ? 'animate-spin' : ''}`} />
+                      {syncing ? 'Syncing' : 'Sync'}
+                    </button>
+                    <button
+                      onClick={() => fetchVeoData(true)}
+                      className="text-[11px] px-3 py-1.5 rounded-lg bg-muted text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted transition-all"
+                    >
+                      <ArrowLeftRight className="h-3 w-3 inline mr-1" />
+                      Refresh
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => router.push('/academy')}
+                  className="text-[11px] px-3 py-1.5 rounded-lg bg-muted text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted transition-all"
+                >
+                  Switch
+                </button>
+              </div>
+            </div>
           </div>
         </FadeIn>
 
-        {/* Teams */}
-        <FadeIn delay={200}>
-          <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
-            <div className="p-6">
-              <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-                Veo Teams
-              </h2>
-              <p className="text-sm text-[var(--ash-grey)]">
-                {data.teams.length} teams across {data.clubName}
-              </p>
-            </div>
-            <div className="px-6 pb-6 space-y-1">
-              {data.teams.map((team) => {
-                const query = searchQuery.toLowerCase().trim()
-                const isExpanded = expandedTeams.has(team.slug) || !!query
-                const teamNoSub = team.members.filter(
-                  (m) =>
-                    m.isPlayer &&
-                    (!m.hasSubscription || m.stripeStatus === 'canceled') &&
-                    !exemptEmails.has(m.email?.toLowerCase())
-                ).length
-                const teamStaff = team.members.filter((m) => !m.isPlayer).length
-                let displayMembers = filterNoSub
-                  ? team.members.filter(
-                      (m) =>
-                        m.isPlayer &&
-                        (!m.hasSubscription || m.stripeStatus === 'canceled') &&
-                        !exemptEmails.has(m.email?.toLowerCase())
-                    )
-                  : team.members
-                if (query) {
-                  displayMembers = displayMembers.filter(
-                    (m) =>
-                      m.name?.toLowerCase().includes(query) ||
-                      m.email?.toLowerCase().includes(query)
-                  )
-                }
+        {/* ── Stats ───────────────────────────────────────── */}
+        <FadeIn delay={80}>
+          <div className={`grid gap-px bg-muted rounded-xl overflow-hidden mb-8 ${
+            stats.length === 6 ? 'grid-cols-3 sm:grid-cols-6' : 'grid-cols-6 sm:grid-cols-5'
+          }`}>
+            {stats.map((s, i) => (
+              <div
+                key={s.label}
+                className={`bg-[var(--night)] px-3 py-3.5 sm:py-4 text-center ${
+                  stats.length === 5 ? (i < 2 ? 'col-span-3 sm:col-span-1' : 'col-span-2 sm:col-span-1') : ''
+                }`}
+              >
+                <div className={`text-xl sm:text-2xl font-semibold tabular-nums ${s.color}`}>
+                  {s.value}
+                </div>
+                <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider mt-0.5">
+                  {s.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        </FadeIn>
 
-                // When filtering or searching, skip teams with no matching members
-                if ((filterNoSub || query) && displayMembers.length === 0)
-                  return null
-
-                return (
-                  <div
-                    key={team.slug}
-                    className="rounded-lg border border-[var(--ash-grey)]/10 overflow-hidden"
-                  >
-                    {/* Team header */}
-                    <button
-                      onClick={() => toggleTeam(team.slug)}
-                      className="w-full flex items-center justify-between p-3 hover:bg-white/[0.03] transition-colors text-left"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-[var(--ash-grey)]">
-                          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                        </span>
-                        <span className="font-medium text-[var(--timberwolf)]">
-                          {team.name}
-                        </span>
-                        <span className="text-xs text-[var(--ash-grey)]">
-                          {team.members.length} members
-                        </span>
+        {/* ── Admin Panels (platform admin only) ─────────── */}
+        {isPlatAdmin && (
+          <FadeIn delay={100}>
+            <div className="space-y-2 mb-8">
+              {/* Exceptions */}
+              <div className="rounded-xl bg-card overflow-hidden">
+                <button
+                  onClick={() => setExceptionsOpen(!exceptionsOpen)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
+                >
+                  <Shield className="h-3.5 w-3.5 text-blue-400/70" />
+                  <span className="text-sm font-medium text-[var(--timberwolf)]">
+                    Exceptions
+                  </span>
+                  <span className="text-[11px] text-muted-foreground/50">
+                    {exceptions.length}
+                  </span>
+                  <ChevronDown className={`h-3 w-3 text-muted-foreground/40 ml-auto transition-transform ${exceptionsOpen ? '' : '-rotate-90'}`} />
+                </button>
+                {exceptionsOpen && (
+                  <div className="border-t border-white/[0.04] px-4 py-3 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+                      <div className="flex-1">
+                        <label className="text-[10px] text-muted-foreground/50 uppercase tracking-wider mb-1 block">
+                          Email
+                        </label>
+                        <input
+                          type="email"
+                          value={newExceptionEmail}
+                          onChange={(e) => setNewExceptionEmail(e.target.value)}
+                          placeholder="user@example.com"
+                          className="w-full text-sm px-3 py-1.5 rounded-lg bg-muted border border-border text-[var(--timberwolf)] placeholder-muted-foreground outline-none focus:border-ring transition-colors"
+                        />
                       </div>
-                      <div className="flex items-center gap-2">
-                        {teamStaff > 0 && (
-                          <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400">
-                            {teamStaff} staff
-                          </span>
-                        )}
-                        {teamNoSub > 0 && (
-                          <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400">
-                            {teamNoSub} no sub
-                          </span>
-                        )}
+                      <div className="flex-1">
+                        <label className="text-[10px] text-muted-foreground/50 uppercase tracking-wider mb-1 block">
+                          Reason
+                        </label>
+                        <input
+                          type="text"
+                          value={newExceptionReason}
+                          onChange={(e) => setNewExceptionReason(e.target.value)}
+                          placeholder="Optional"
+                          className="w-full text-sm px-3 py-1.5 rounded-lg bg-muted border border-border text-[var(--timberwolf)] placeholder-muted-foreground outline-none focus:border-ring transition-colors"
+                        />
                       </div>
-                    </button>
-
-                    {/* Expanded member list */}
-                    {isExpanded && (
-                      <div className="border-t border-[var(--ash-grey)]/10 bg-white/[0.02]">
-                        {displayMembers.length === 0 ? (
-                          <p className="text-xs text-[var(--ash-grey)] p-3">
-                            {filterNoSub
-                              ? 'All members have subscriptions'
-                              : 'No members'}
-                          </p>
-                        ) : (
-                          <div className="divide-y divide-[var(--ash-grey)]/5">
-                            {displayMembers.map((member) => {
-                              const isExempt = exemptEmails.has(member.email?.toLowerCase())
-                              const statusBadge = member.isPlayer ? (
-                                <span
-                                  className={`text-[10px] leading-none px-1.5 py-0.5 rounded ${stripeStatusColor(
-                                    member.stripeStatus,
-                                    member.hasSubscription,
-                                    isExempt
-                                  )}`}
-                                >
-                                  {stripeStatusLabel(
-                                    member.stripeStatus,
-                                    member.hasSubscription,
-                                    isExempt
-                                  )}
-                                </span>
-                              ) : (
-                                <span className="text-[10px] leading-none px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">
-                                  {roleLabel(member.veoRole)}
-                                </span>
-                              )
-                              const scholarshipBadge = data.hasScholarships && member.isScholarship ? (
-                                <span className="text-[10px] leading-none px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400">
-                                  scholarship
-                                </span>
-                              ) : null
-
-                              return (
-                                <div
-                                  key={member.id}
-                                  className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm"
-                                >
-                                  <div className="min-w-0">
-                                    <div className="text-[var(--timberwolf)] truncate text-sm">
-                                      {member.name || 'Unknown'}
-                                    </div>
-                                    <div className="text-[11px] text-[var(--ash-grey)]/60 truncate">
-                                      {member.email}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                                    {scholarshipBadge}
-                                    {statusBadge}
-                                  </div>
-                                </div>
-                              )
-                            })}
+                      <button
+                        onClick={addException}
+                        disabled={exceptionsLoading || !newExceptionEmail.trim()}
+                        className="text-xs px-4 py-1.5 rounded-lg bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors disabled:opacity-30"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    {exceptions.length > 0 && (
+                      <div className="space-y-0.5">
+                        {exceptions.map((exc) => (
+                          <div
+                            key={exc.id}
+                            className="flex items-center justify-between gap-2 py-1.5 group"
+                          >
+                            <div className="flex items-center gap-2 min-w-0 text-sm">
+                              <span className="text-[var(--timberwolf)]/80 truncate">{exc.email}</span>
+                              {exc.reason && (
+                                <span className="text-[11px] text-muted-foreground/40 truncate hidden sm:inline">{exc.reason}</span>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => removeException(exc.email)}
+                              disabled={exceptionsLoading}
+                              className="opacity-0 group-hover:opacity-100 text-muted-foreground/40 hover:text-red-400 transition-all p-1"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
                           </div>
-                        )}
+                        ))}
                       </div>
                     )}
                   </div>
-                )
-              })}
+                )}
+              </div>
+
+              {/* Admins */}
+              <div className="rounded-xl bg-card overflow-hidden">
+                <button
+                  onClick={() => setAdminsOpen(!adminsOpen)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
+                >
+                  <UserCog className="h-3.5 w-3.5 text-muted-foreground/50" />
+                  <span className="text-sm font-medium text-[var(--timberwolf)]">
+                    Admins
+                  </span>
+                  <span className="text-[11px] text-muted-foreground/50">
+                    {admins.length}
+                  </span>
+                  <ChevronDown className={`h-3 w-3 text-muted-foreground/40 ml-auto transition-transform ${adminsOpen ? '' : '-rotate-90'}`} />
+                </button>
+                {adminsOpen && (
+                  <div className="border-t border-white/[0.04] px-4 py-3 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+                      <div className="flex-1">
+                        <label className="text-[10px] text-muted-foreground/50 uppercase tracking-wider mb-1 block">
+                          Email
+                        </label>
+                        <input
+                          type="email"
+                          value={newAdminEmail}
+                          onChange={(e) => setNewAdminEmail(e.target.value)}
+                          placeholder="admin@example.com"
+                          className="w-full text-sm px-3 py-1.5 rounded-lg bg-muted border border-border text-[var(--timberwolf)] placeholder-muted-foreground outline-none focus:border-ring transition-colors"
+                        />
+                      </div>
+                      <button
+                        onClick={inviteAdmin}
+                        disabled={adminsLoading || !newAdminEmail.trim()}
+                        className="text-xs px-4 py-1.5 rounded-lg bg-muted text-[var(--timberwolf)] hover:bg-white/[0.1] transition-colors disabled:opacity-30"
+                      >
+                        Invite
+                      </button>
+                    </div>
+                    {adminMessage && (
+                      <p className="text-[11px] text-muted-foreground/60">{adminMessage}</p>
+                    )}
+                    {admins.length > 0 && (
+                      <div className="space-y-0.5">
+                        {admins.map((admin) => (
+                          <div
+                            key={admin.id}
+                            className="flex items-center justify-between gap-2 py-1.5 group"
+                          >
+                            <div className="min-w-0">
+                              <span className="text-sm text-[var(--timberwolf)]/80 truncate block">{admin.fullName || 'Unknown'}</span>
+                              <span className="text-[11px] text-muted-foreground/40 truncate block">{admin.email}</span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-[10px] text-muted-foreground/40">
+                                {admin.role === 'league_admin' ? 'League' : 'Club'}
+                              </span>
+                              <button
+                                onClick={() => removeAdmin(admin.id)}
+                                disabled={adminsLoading}
+                                className="opacity-0 group-hover:opacity-100 text-muted-foreground/40 hover:text-red-400 transition-all p-1"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
+          </FadeIn>
+        )}
+
+        {/* ── Stripe-only (not in Veo) ───────────────────── */}
+        {data.stripeOnlySubscribers && data.stripeOnlySubscribers.length > 0 && (
+          <FadeIn delay={120}>
+            <div className="rounded-xl bg-card overflow-hidden mb-8">
+              <button
+                onClick={() => setStripeOnlyOpen(!stripeOnlyOpen)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 text-orange-400/70" />
+                <span className="text-sm font-medium text-[var(--timberwolf)]">
+                  Not in Veo
+                </span>
+                <span className="text-[11px] text-orange-400/70">
+                  {data.stripeOnlySubscribers.length} paying but missing
+                </span>
+                <ChevronDown className={`h-3 w-3 text-muted-foreground/40 ml-auto transition-transform ${stripeOnlyOpen ? '' : '-rotate-90'}`} />
+              </button>
+              {stripeOnlyOpen && (
+                <div className="border-t border-white/[0.04]">
+                  {data.stripeOnlySubscribers.map((sub, i) => (
+                    <div
+                      key={sub.email}
+                      className={`flex items-center justify-between gap-2 px-4 py-2 ${
+                        i > 0 ? 'border-t border-white/[0.02]' : ''
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm text-[var(--timberwolf)]/90 truncate">
+                          {sub.name || 'Unknown'}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground/40 truncate">
+                          {sub.email}
+                          {sub.registrationTeam && (
+                            <span className="ml-2 text-muted-foreground/25">{sub.registrationTeam}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {data.hasScholarships && sub.isScholarship && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400/80">
+                            scholarship
+                          </span>
+                        )}
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded-full ${stripeStatusColor(sub.status, true)}`}
+                        >
+                          {sub.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </FadeIn>
+        )}
+
+        {/* ── Search & Filters ───────────────────────────── */}
+        <FadeIn delay={140}>
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <div className="relative w-full sm:w-auto sm:flex-1 sm:max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/30" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search members..."
+                className="w-full text-sm pl-9 pr-3 py-2 rounded-lg bg-muted border border-border text-[var(--timberwolf)] placeholder-muted-foreground outline-none focus:border-ring transition-colors"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setFilterNoSub(!filterNoSub)}
+                className={`text-[11px] px-3 py-2 rounded-lg transition-all ${
+                  filterNoSub
+                    ? 'bg-red-500/15 text-red-400 ring-1 ring-red-500/20'
+                    : 'bg-muted text-muted-foreground/60 hover:text-[var(--timberwolf)] hover:bg-muted'
+                }`}
+              >
+                No sub
+              </button>
+              <button
+                onClick={expandAll}
+                className="text-[11px] px-3 py-2 rounded-lg bg-muted text-muted-foreground/60 hover:text-[var(--timberwolf)] hover:bg-muted transition-all"
+              >
+                Expand
+              </button>
+              <button
+                onClick={collapseAll}
+                className="text-[11px] px-3 py-2 rounded-lg bg-muted text-muted-foreground/60 hover:text-[var(--timberwolf)] hover:bg-muted transition-all"
+              >
+                Collapse
+              </button>
+            </div>
+          </div>
+        </FadeIn>
+
+        {/* ── Teams ──────────────────────────────────────── */}
+        <FadeIn delay={180}>
+          <div className="space-y-1.5">
+            {data.teams.map((team) => {
+              const query = searchQuery.toLowerCase().trim()
+              const isExpanded = expandedTeams.has(team.slug) || !!query
+              const teamPlayers = team.members.filter((m) => m.isPlayer)
+              const teamNoSub = teamPlayers.filter(
+                (m) =>
+                  (!m.hasSubscription || m.stripeStatus === 'canceled') &&
+                  !exemptEmails.has(m.email?.toLowerCase())
+              ).length
+              const teamStaff = team.members.filter((m) => !m.isPlayer).length
+              const subRate = teamPlayers.length > 0
+                ? Math.round(((teamPlayers.length - teamNoSub) / teamPlayers.length) * 100)
+                : 100
+
+              let displayMembers = filterNoSub
+                ? team.members.filter(
+                    (m) =>
+                      m.isPlayer &&
+                      (!m.hasSubscription || m.stripeStatus === 'canceled') &&
+                      !exemptEmails.has(m.email?.toLowerCase())
+                  )
+                : team.members
+              if (query) {
+                displayMembers = displayMembers.filter(
+                  (m) =>
+                    m.name?.toLowerCase().includes(query) ||
+                    m.email?.toLowerCase().includes(query)
+                )
+              }
+
+              if ((filterNoSub || query) && displayMembers.length === 0)
+                return null
+
+              return (
+                <div
+                  key={team.slug}
+                  className="rounded-xl bg-card overflow-hidden"
+                >
+                  {/* Team header */}
+                  <button
+                    onClick={() => toggleTeam(team.slug)}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
+                  >
+                    <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground/40 flex-shrink-0 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-[var(--timberwolf)] truncate">
+                          {team.name}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground/40">
+                          {team.members.length}
+                        </span>
+                      </div>
+                      {/* Sub coverage bar */}
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <div className="h-1 flex-1 max-w-[120px] rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              subRate === 100 ? 'bg-emerald-500/60' : subRate >= 70 ? 'bg-yellow-500/60' : 'bg-red-500/60'
+                            }`}
+                            style={{ width: `${subRate}%` }}
+                          />
+                        </div>
+                        <span className={`text-[10px] tabular-nums ${
+                          subRate === 100 ? 'text-emerald-400/60' : subRate >= 70 ? 'text-yellow-400/60' : 'text-red-400/60'
+                        }`}>
+                          {subRate}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {teamStaff > 0 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400/70">
+                          {teamStaff} staff
+                        </span>
+                      )}
+                      {teamNoSub > 0 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400/70">
+                          {teamNoSub} no sub
+                        </span>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Members */}
+                  {isExpanded && (
+                    <div className="border-t border-white/[0.04]">
+                      {displayMembers.length === 0 ? (
+                        <p className="text-[11px] text-muted-foreground/40 px-4 py-3">
+                          {filterNoSub ? 'All members have subscriptions' : 'No members'}
+                        </p>
+                      ) : (
+                        displayMembers.map((member, i) => {
+                          const isExempt = exemptEmails.has(member.email?.toLowerCase())
+                          return (
+                            <div
+                              key={member.id}
+                              className={`flex items-center gap-3 px-4 py-2 hover:bg-white/[0.015] transition-colors ${
+                                i > 0 ? 'border-t border-white/[0.02]' : ''
+                              }`}
+                            >
+                              {/* Status dot */}
+                              <div className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${
+                                !member.isPlayer
+                                  ? 'bg-amber-400/60'
+                                  : member.hasSubscription && member.stripeStatus !== 'canceled'
+                                    ? 'bg-emerald-400/60'
+                                    : isExempt
+                                      ? 'bg-blue-400/60'
+                                      : 'bg-red-400/60'
+                              }`} />
+                              {/* Name & email */}
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm text-[var(--timberwolf)]/90 truncate">
+                                  {member.name || 'Unknown'}
+                                </div>
+                                <div className="text-[11px] text-muted-foreground/35 truncate">
+                                  {member.email}
+                                </div>
+                              </div>
+                              {/* Badges */}
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                {data.hasScholarships && member.isScholarship && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400/80">
+                                    scholarship
+                                  </span>
+                                )}
+                                {member.isPlayer ? (
+                                  <span
+                                    className={`text-[10px] px-1.5 py-0.5 rounded-full ${stripeStatusColor(
+                                      member.stripeStatus,
+                                      member.hasSubscription,
+                                      isExempt
+                                    )}`}
+                                  >
+                                    {stripeStatusLabel(
+                                      member.stripeStatus,
+                                      member.hasSubscription,
+                                      isExempt
+                                    )}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400/70">
+                                    {roleLabel(member.veoRole)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </FadeIn>
       </div>

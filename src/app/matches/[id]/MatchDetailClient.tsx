@@ -13,6 +13,7 @@ import {
 } from '@braintwopoint0/playback-commons/ui'
 import { formatPrice, formatDate } from '@braintwopoint0/playback-commons/utils'
 import { useState } from 'react'
+import { ArrowLeft, Zap, Film, Repeat, ShieldCheck, Play, CheckCircle } from 'lucide-react'
 
 interface MatchDetailClientProps {
   match: any
@@ -37,7 +38,7 @@ export default function MatchDetailClient({
     }
   }
   return (
-    <div className="container mx-auto px-5 py-12">
+    <div className="mx-auto max-w-screen-xl px-4 py-12 sm:px-6 lg:px-8">
       {/* Back Button */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
@@ -46,24 +47,24 @@ export default function MatchDetailClient({
       >
         <Link
           href="/matches"
-          className="text-[var(--ash-grey)] hover:text-[var(--timberwolf)] mb-8 inline-flex items-center text-lg transition-colors duration-300"
+          className="text-muted-foreground hover:text-[var(--timberwolf)] mb-8 inline-flex items-center text-sm transition-colors duration-300 gap-2"
         >
-          ← Back to Matches
+          <ArrowLeft className="h-4 w-4" />
+          Back to Matches
         </Link>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 mt-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6">
         {/* Main Content */}
-        <div className="lg:col-span-2 space-y-8">
-          {/* Hero Thumbnail with Play Button */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Hero Thumbnail */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="relative h-[500px] bg-zinc-900 rounded-2xl overflow-hidden border border-[var(--ash-grey)]/20 group"
+            className="relative h-[400px] lg:h-[500px] bg-muted rounded-xl overflow-hidden border border-border group"
           >
-            {/* Gradient Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent z-10" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[var(--night)] via-transparent to-transparent z-10" />
 
             {match.thumbnail_url ? (
               <Image
@@ -74,14 +75,16 @@ export default function MatchDetailClient({
                 priority
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-[var(--ash-grey)] bg-gradient-to-br from-zinc-800 to-zinc-900">
-                <span className="text-9xl">⚽</span>
+              <div className="w-full h-full flex items-center justify-center bg-muted">
+                <span className="text-5xl font-bold text-muted-foreground/30">
+                  {match.home_team?.charAt(0)} v {match.away_team?.charAt(0)}
+                </span>
               </div>
             )}
 
             {/* Sport Badge */}
             {match.sport && (
-              <Badge className="absolute top-6 left-6 bg-zinc-900/90 backdrop-blur-sm text-[var(--timberwolf)] border-[var(--ash-grey)]/30 shadow-xl text-base px-4 py-2 z-20">
+              <Badge className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm text-[var(--timberwolf)] border-border z-20 px-3 py-1.5">
                 {match.sport.name}
               </Badge>
             )}
@@ -89,13 +92,9 @@ export default function MatchDetailClient({
             {/* Play Button Overlay */}
             {!hasAccess && (
               <div className="absolute inset-0 flex items-center justify-center z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <motion.div
-                  initial={{ scale: 0.9 }}
-                  whileHover={{ scale: 1.1 }}
-                  className="w-24 h-24 rounded-full bg-[var(--timberwolf)]/95 backdrop-blur-sm flex items-center justify-center shadow-2xl"
-                >
-                  <span className="text-5xl text-[var(--night)] ml-1">▶</span>
-                </motion.div>
+                <div className="w-16 h-16 rounded-full bg-[var(--timberwolf)]/90 backdrop-blur-sm flex items-center justify-center">
+                  <Play className="h-7 w-7 text-[var(--night)] ml-0.5" />
+                </div>
               </div>
             )}
           </motion.div>
@@ -106,55 +105,55 @@ export default function MatchDetailClient({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
           >
-            <Card className="bg-zinc-900 border-[var(--ash-grey)]/20 shadow-xl">
-              <CardHeader className="pb-6">
-                <CardTitle className="text-4xl md:text-5xl text-[var(--timberwolf)] font-bold">
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-2xl md:text-3xl text-[var(--timberwolf)]">
                   {match.home_team}{' '}
-                  <span className="text-[var(--ash-grey)]">vs</span>{' '}
+                  <span className="text-muted-foreground">vs</span>{' '}
                   {match.away_team}
                 </CardTitle>
                 {match.competition && (
-                  <p className="text-xl text-[var(--ash-grey)] mt-3 font-medium">
+                  <p className="text-base text-muted-foreground mt-1 font-medium">
                     {match.competition}
                   </p>
                 )}
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="p-4 bg-zinc-800 rounded-lg">
-                    <p className="text-[var(--ash-grey)] mb-2 text-sm uppercase tracking-wide">
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-muted-foreground mb-1 text-xs uppercase tracking-wide">
                       Date
                     </p>
-                    <p className="text-[var(--timberwolf)] font-semibold text-lg">
+                    <p className="text-[var(--timberwolf)] font-medium text-sm">
                       {formatDate(match.match_date)}
                     </p>
                   </div>
                   {match.venue && (
-                    <div className="p-4 bg-zinc-800 rounded-lg">
-                      <p className="text-[var(--ash-grey)] mb-2 text-sm uppercase tracking-wide">
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-muted-foreground mb-1 text-xs uppercase tracking-wide">
                         Venue
                       </p>
-                      <p className="text-[var(--timberwolf)] font-semibold text-lg">
+                      <p className="text-[var(--timberwolf)] font-medium text-sm">
                         {match.venue}
                       </p>
                     </div>
                   )}
                   {match.organization && (
-                    <div className="p-4 bg-zinc-800 rounded-lg">
-                      <p className="text-[var(--ash-grey)] mb-2 text-sm uppercase tracking-wide">
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-muted-foreground mb-1 text-xs uppercase tracking-wide">
                         Organization
                       </p>
-                      <p className="text-[var(--timberwolf)] font-semibold text-lg">
+                      <p className="text-[var(--timberwolf)] font-medium text-sm">
                         {match.organization.name}
                       </p>
                     </div>
                   )}
                   {match.duration_seconds && (
-                    <div className="p-4 bg-zinc-800 rounded-lg">
-                      <p className="text-[var(--ash-grey)] mb-2 text-sm uppercase tracking-wide">
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-muted-foreground mb-1 text-xs uppercase tracking-wide">
                         Duration
                       </p>
-                      <p className="text-[var(--timberwolf)] font-semibold text-lg">
+                      <p className="text-[var(--timberwolf)] font-medium text-sm">
                         {Math.floor(match.duration_seconds / 60)} minutes
                       </p>
                     </div>
@@ -162,11 +161,11 @@ export default function MatchDetailClient({
                 </div>
 
                 {match.description && (
-                  <div className="pt-6 border-t border-[var(--ash-grey)]/10">
-                    <h3 className="text-xl font-bold text-[var(--timberwolf)] mb-3">
+                  <div className="pt-4 border-t border-border">
+                    <h3 className="text-sm font-semibold text-[var(--timberwolf)] mb-2">
                       About This Match
                     </h3>
-                    <p className="text-[var(--ash-grey)] leading-relaxed text-lg">
+                    <p className="text-sm text-muted-foreground leading-relaxed">
                       {match.description}
                     </p>
                   </div>
@@ -184,71 +183,58 @@ export default function MatchDetailClient({
           className="lg:col-span-1"
         >
           <div className="sticky top-8">
-            <Card className="bg-zinc-900 border-[var(--ash-grey)]/20 shadow-2xl overflow-hidden">
-              {/* Gradient Background */}
-              <div className="absolute inset-0 bg-gradient-to-br from-[var(--ash-grey)]/5 to-transparent pointer-events-none" />
-
-              <CardHeader className="relative">
-                <CardTitle className="text-2xl text-[var(--timberwolf)]">
-                  {hasAccess ? '✓ You own this match' : 'Purchase Access'}
+            <Card className="bg-card border-border overflow-hidden">
+              <CardHeader>
+                <CardTitle className="text-lg text-[var(--timberwolf)] flex items-center gap-2">
+                  {hasAccess && <CheckCircle className="h-5 w-5 text-emerald-400" />}
+                  {hasAccess ? 'You own this match' : 'Purchase Access'}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6 relative">
+              <CardContent className="space-y-5">
                 {product && (
                   <>
                     {/* Price */}
-                    <div className="text-center py-6 bg-zinc-800 rounded-xl">
-                      <p className="text-5xl font-bold text-[var(--timberwolf)] mb-2">
+                    <div className="text-center py-5 bg-muted rounded-lg">
+                      <p className="text-4xl font-bold text-[var(--timberwolf)] mb-1">
                         {formatPrice(product.price_amount, product.currency)}
                       </p>
-                      <p className="text-base text-[var(--ash-grey)] mt-2">
+                      <p className="text-sm text-muted-foreground">
                         {product.access_duration_days
                           ? `${product.access_duration_days} days access`
-                          : '🎉 Lifetime access'}
+                          : 'Lifetime access'}
                       </p>
                     </div>
 
                     {/* CTA Button */}
                     {hasAccess ? (
-                      <Button
-                        className="w-full bg-[var(--timberwolf)] text-[var(--night)] hover:bg-[var(--ash-grey)] text-lg py-6 shadow-lg"
-                        asChild
-                      >
-                        <Link href={`/library`}>Watch Now →</Link>
+                      <Button className="w-full" asChild>
+                        <Link href={`/library`}>Watch Now</Link>
                       </Button>
                     ) : (
-                      <motion.div
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                      <Button
+                        onClick={handlePurchase}
+                        disabled={isLoading}
+                        className="w-full bg-[var(--timberwolf)] text-[var(--night)] hover:bg-[var(--ash-grey)]"
                       >
-                        <Button
-                          onClick={handlePurchase}
-                          disabled={isLoading}
-                          className="w-full bg-gradient-to-r from-[var(--accent-purple)] to-[var(--accent-blue)] text-white hover:opacity-90 text-lg py-6 shadow-xl hover:shadow-2xl shadow-purple-500/30 transition-all duration-300 disabled:opacity-50"
-                        >
-                          {isLoading ? 'Processing...' : 'Purchase Now →'}
-                        </Button>
-                      </motion.div>
+                        {isLoading ? 'Processing...' : 'Purchase Now'}
+                      </Button>
                     )}
 
                     {/* Features List */}
-                    <div className="pt-6 border-t border-[var(--ash-grey)]/10 space-y-3">
+                    <div className="pt-4 border-t border-border space-y-3">
                       {[
-                        { icon: '⚡', text: 'Instant access after purchase' },
-                        { icon: '🎬', text: 'Stream in HD quality' },
-                        { icon: '♾️', text: 'Watch unlimited times' },
-                        { icon: '🔒', text: 'Secure payment with Stripe' },
+                        { icon: Zap, text: 'Instant access after purchase' },
+                        { icon: Film, text: 'Stream in HD quality' },
+                        { icon: Repeat, text: 'Watch unlimited times' },
+                        { icon: ShieldCheck, text: 'Secure payment with Stripe' },
                       ].map((feature, idx) => (
-                        <motion.div
+                        <div
                           key={idx}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ duration: 0.3, delay: 0.3 + idx * 0.1 }}
-                          className="flex items-center text-[var(--ash-grey)] group hover:text-[var(--timberwolf)] transition-colors duration-300"
+                          className="flex items-center text-muted-foreground text-sm gap-3"
                         >
-                          <span className="mr-3 text-xl">{feature.icon}</span>
-                          <span className="text-base">{feature.text}</span>
-                        </motion.div>
+                          <feature.icon className="h-4 w-4 flex-shrink-0" />
+                          <span>{feature.text}</span>
+                        </div>
                       ))}
                     </div>
                   </>

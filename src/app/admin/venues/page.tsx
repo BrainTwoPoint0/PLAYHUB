@@ -5,10 +5,11 @@ import Link from 'next/link'
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
   Button,
+  Skeleton,
+  EmptyState,
 } from '@braintwopoint0/playback-commons/ui'
+import { Building2 } from 'lucide-react'
 
 interface Venue {
   id: string
@@ -49,7 +50,14 @@ export default function AdminVenuesPage() {
   }
 
   if (loading) {
-    return <p className="text-muted-foreground">Loading venues...</p>
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-32" />
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-20 rounded-lg" />
+        ))}
+      </div>
+    )
   }
 
   return (
@@ -60,17 +68,16 @@ export default function AdminVenuesPage() {
       </div>
 
       {venues.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center">
-            <p className="text-muted-foreground">No venues found</p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={<Building2 className="h-10 w-10" />}
+          title="No venues found"
+        />
       ) : (
         <div className="space-y-4">
           {venues.map((venue) => (
             <Card key={venue.id}>
               <CardContent className="p-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div className="flex items-center gap-4">
                     {venue.logo_url ? (
                       <img
@@ -79,8 +86,8 @@ export default function AdminVenuesPage() {
                         className="w-12 h-12 rounded-lg object-cover"
                       />
                     ) : (
-                      <div className="w-12 h-12 rounded-lg bg-zinc-800 flex items-center justify-center text-xl">
-                        🏟️
+                      <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center">
+                        <Building2 className="h-5 w-5 text-muted-foreground" />
                       </div>
                     )}
                     <div>

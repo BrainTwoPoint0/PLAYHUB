@@ -6,6 +6,9 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  Badge,
+  StatsGrid,
+  Skeleton,
 } from '@braintwopoint0/playback-commons/ui'
 
 interface Stats {
@@ -57,7 +60,16 @@ export default function AdminDashboard() {
   }
 
   if (loading) {
-    return <p className="text-muted-foreground">Loading dashboard...</p>
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-20 rounded-lg" />
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -65,51 +77,16 @@ export default function AdminDashboard() {
       <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Users
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{stats?.users || 0}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Venues
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{stats?.venues || 0}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Recordings
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{stats?.recordings || 0}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pending Invites
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{stats?.pendingInvites || 0}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <StatsGrid
+        className="mb-8"
+        columns={4}
+        stats={[
+          { label: 'Total Users', value: stats?.users || 0 },
+          { label: 'Venues', value: stats?.venues || 0 },
+          { label: 'Recordings', value: stats?.recordings || 0 },
+          { label: 'Pending Invites', value: stats?.pendingInvites || 0, color: stats?.pendingInvites ? 'yellow' : 'default' },
+        ]}
+      />
 
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -124,7 +101,7 @@ export default function AdminDashboard() {
                 {stats.recentUsers.map((user) => (
                   <div
                     key={user.id}
-                    className="flex items-center justify-between py-2 border-b border-zinc-800 last:border-0"
+                    className="flex items-center justify-between py-2 border-b border-border last:border-0"
                   >
                     <div>
                       <p className="font-medium">
@@ -157,21 +134,28 @@ export default function AdminDashboard() {
                 {stats.recentRecordings.map((recording) => (
                   <div
                     key={recording.id}
-                    className="flex items-center justify-between py-2 border-b border-zinc-800 last:border-0"
+                    className="flex items-center justify-between py-2 border-b border-border last:border-0"
                   >
                     <div>
                       <p className="font-medium">{recording.title}</p>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded ${
+                      <Badge
+                        variant={
                           recording.status === 'published'
-                            ? 'bg-green-500/20 text-green-500'
+                            ? 'default'
                             : recording.status === 'scheduled'
-                              ? 'bg-yellow-500/20 text-yellow-500'
-                              : 'bg-gray-500/20 text-gray-500'
-                        }`}
+                              ? 'secondary'
+                              : 'outline'
+                        }
+                        className={
+                          recording.status === 'published'
+                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                            : recording.status === 'scheduled'
+                              ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                              : ''
+                        }
                       >
                         {recording.status}
-                      </span>
+                      </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {formatDate(recording.created_at)}

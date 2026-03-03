@@ -72,13 +72,13 @@ function LoginForm() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="bg-zinc-900/50 border border-[var(--ash-grey)]/20 rounded-xl p-8 space-y-6">
+        <div className="bg-card border border-border rounded-xl p-8 space-y-6">
           {/* Header */}
           <div className="text-center">
             <h1 className="text-2xl font-bold text-[var(--timberwolf)] mb-2">
               Welcome back
             </h1>
-            <p className="text-sm text-[var(--ash-grey)]">
+            <p className="text-sm text-muted-foreground">
               Sign in to access your purchases
             </p>
           </div>
@@ -109,7 +109,7 @@ function LoginForm() {
                   disabled={loading}
                   autoComplete="email"
                 />
-                <Mail className="h-4 w-4 absolute left-3 top-3.5 text-[var(--ash-grey)]" />
+                <Mail className="h-4 w-4 absolute left-3 top-3.5 text-muted-foreground" />
               </div>
             </div>
 
@@ -128,11 +128,11 @@ function LoginForm() {
                   disabled={loading}
                   autoComplete="current-password"
                 />
-                <Lock className="h-4 w-4 absolute left-3 top-3.5 text-[var(--ash-grey)]" />
+                <Lock className="h-4 w-4 absolute left-3 top-3.5 text-muted-foreground" />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3.5 text-[var(--ash-grey)] hover:text-[var(--timberwolf)]"
+                  className="absolute right-3 top-3.5 text-muted-foreground hover:text-[var(--timberwolf)]"
                   disabled={loading}
                 >
                   {showPassword ? (
@@ -161,7 +161,7 @@ function LoginForm() {
           </form>
 
           <div className="text-center text-sm">
-            <p className="text-[var(--ash-grey)]">
+            <p className="text-muted-foreground">
               Don&apos;t have an account?{' '}
               <Link
                 href="/auth/register"

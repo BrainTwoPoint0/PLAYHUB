@@ -32,13 +32,13 @@ vi.mock('../config', () => ({
     const clubs: Record<string, any> = {
       cfa: {
         slug: 'cfa',
-        name: 'PLAYBACK Academy - CFA',
+        name: 'Complete Football Academy',
         stripeProductId: 'prod_RWhRQ4wM3PiEBJ',
         veoClubSlug: 'playback-15fdc44b',
       },
       sefa: {
         slug: 'sefa',
-        name: 'PLAYBACK Academy - SEFA',
+        name: 'Soccer Elite FA',
         stripeProductId: 'prod_QiMBPC4wf4nff1',
         additionalStripeProductIds: [
           'prod_Qyv9ID1M0sCowi',
@@ -52,13 +52,13 @@ vi.mock('../config', () => ({
   getAllClubs: vi.fn(async () => [
     {
       slug: 'cfa',
-      name: 'PLAYBACK Academy - CFA',
+      name: 'Complete Football Academy',
       stripeProductId: 'prod_RWhRQ4wM3PiEBJ',
       veoClubSlug: 'playback-15fdc44b',
     },
     {
       slug: 'sefa',
-      name: 'PLAYBACK Academy - SEFA',
+      name: 'Soccer Elite FA',
       stripeProductId: 'prod_QiMBPC4wf4nff1',
       additionalStripeProductIds: [
         'prod_Qyv9ID1M0sCowi',
@@ -226,7 +226,7 @@ describe('getAcademySummary', () => {
     const summary = await getAcademySummary('cfa')
 
     expect(summary.clubSlug).toBe('cfa')
-    expect(summary.clubName).toBe('PLAYBACK Academy - CFA')
+    expect(summary.clubName).toBe('Complete Football Academy')
     expect(summary.active).toBe(0)
     expect(summary.pastDue).toBe(0)
     expect(summary.canceled).toBe(0)

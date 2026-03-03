@@ -205,14 +205,14 @@ function MarketplaceRevenue({
   }
 
   return (
-    <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
+    <div className="mb-6 rounded-xl border border-border bg-card">
       <div className="p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
               Marketplace Revenue
             </h2>
-            <p className="text-sm text-[var(--ash-grey)]">
+            <p className="text-sm text-muted-foreground">
               Sales from recordings listed on the marketplace
             </p>
           </div>
@@ -228,15 +228,15 @@ function MarketplaceRevenue({
       {expanded && (
         <div className="px-6 pb-6">
           {loading ? (
-            <LoadingSpinner size="sm" className="text-[var(--ash-grey)]" />
+            <LoadingSpinner size="sm" className="text-muted-foreground" />
           ) : !data || data.totalSales === 0 ? (
-            <p className="text-sm text-[var(--ash-grey)]">
+            <p className="text-sm text-muted-foreground">
               No marketplace sales yet.
             </p>
           ) : (
             <div className="space-y-4">
               {/* Summary cards */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-[var(--ash-grey)]/[0.06]">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted">
                 {[
                   { label: 'Total Sales', value: String(data.totalSales) },
                   {
@@ -253,7 +253,7 @@ function MarketplaceRevenue({
                   },
                 ].map((card) => (
                   <div key={card.label} className="bg-[var(--night)] p-3.5">
-                    <p className="text-xs text-[var(--ash-grey)] mb-1">
+                    <p className="text-xs text-muted-foreground mb-1">
                       {card.label}
                     </p>
                     <p className="text-lg font-semibold text-[var(--timberwolf)]">
@@ -271,13 +271,13 @@ function MarketplaceRevenue({
                 {data.perRecording.map((rec) => (
                   <div
                     key={rec.recordingId}
-                    className="flex items-center justify-between p-3 rounded-lg bg-white/[0.03] border border-[var(--ash-grey)]/10"
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border"
                   >
                     <div className="min-w-0">
                       <p className="text-sm text-[var(--timberwolf)] truncate">
                         {rec.title}
                       </p>
-                      <p className="text-xs text-[var(--ash-grey)]">
+                      <p className="text-xs text-muted-foreground">
                         {rec.sales} sale{rec.sales !== 1 ? 's' : ''}
                       </p>
                     </div>
@@ -285,7 +285,7 @@ function MarketplaceRevenue({
                       <p className="text-sm font-semibold text-[var(--timberwolf)]">
                         {formatPrice(rec.orgShare, data.currency)}
                       </p>
-                      <p className="text-xs text-[var(--ash-grey)]">
+                      <p className="text-xs text-muted-foreground">
                         of {formatPrice(rec.revenue, data.currency)}
                       </p>
                     </div>
@@ -362,7 +362,7 @@ function VenueSettings({
   }
 
   return (
-    <div className="mt-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
+    <div className="mt-6 rounded-xl border border-border bg-card">
       <div className="p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
@@ -384,12 +384,12 @@ function VenueSettings({
             <h3 className="text-sm font-semibold text-[var(--timberwolf)] uppercase tracking-wider">
               YouTube Broadcasting
             </h3>
-            <p className="text-xs text-[var(--ash-grey)]">
+            <p className="text-xs text-muted-foreground">
               Configure RTMP to broadcast recordings live to YouTube
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs text-[var(--ash-grey)]">
+                <label className="text-xs text-muted-foreground">
                   RTMP URL
                 </label>
                 <Input
@@ -400,7 +400,7 @@ function VenueSettings({
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-[var(--ash-grey)]">
+                <label className="text-xs text-muted-foreground">
                   Stream Key
                 </label>
                 <Input
@@ -703,14 +703,14 @@ function GraphicPackagesSection({
   }
 
   return (
-    <div className="mt-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
+    <div className="mt-6 rounded-xl border border-border bg-card">
       <div className="p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
               Graphic Packages
             </h2>
-            <p className="text-xs text-[var(--ash-grey)] mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Logo overlays shown on recordings — applies to all venues for this
               account
             </p>
@@ -735,9 +735,9 @@ function GraphicPackagesSection({
           )}
 
           {loading ? (
-            <LoadingSpinner size="sm" className="text-[var(--ash-grey)]" />
+            <LoadingSpinner size="sm" className="text-muted-foreground" />
           ) : packages.length === 0 && !showForm ? (
-            <p className="text-sm text-[var(--ash-grey)]">
+            <p className="text-sm text-muted-foreground">
               No graphic packages yet. Create one to add logo overlays to your
               recordings.
             </p>
@@ -746,7 +746,7 @@ function GraphicPackagesSection({
               {packages.map((pkg) => (
                 <div
                   key={pkg.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-white/[0.03] border border-[var(--ash-grey)]/10"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-muted/50 border border-border"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     {/* Logo preview */}
@@ -758,7 +758,7 @@ function GraphicPackagesSection({
                       />
                     ) : (
                       <div className="w-10 h-10 rounded bg-white/5 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs text-[var(--ash-grey)]">
+                        <span className="text-xs text-muted-foreground">
                           No logo
                         </span>
                       </div>
@@ -774,7 +774,7 @@ function GraphicPackagesSection({
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-[var(--ash-grey)]">
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span>Logo: {positionLabel(pkg.logo_position)}</span>
                         {pkg.sponsor_logo_url && (
                           <span>
@@ -788,14 +788,14 @@ function GraphicPackagesSection({
                     {!pkg.is_default && (
                       <button
                         onClick={() => setDefault(pkg)}
-                        className="text-xs px-2 py-1 rounded text-[var(--ash-grey)] hover:text-[var(--timberwolf)] hover:bg-white/5 transition-colors"
+                        className="text-xs px-2 py-1 rounded text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted/50 transition-colors"
                       >
                         Set Default
                       </button>
                     )}
                     <button
                       onClick={() => openEditForm(pkg)}
-                      className="text-xs px-2 py-1 rounded text-[var(--ash-grey)] hover:text-[var(--timberwolf)] hover:bg-white/5 transition-colors"
+                      className="text-xs px-2 py-1 rounded text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted/50 transition-colors"
                     >
                       Edit
                     </button>
@@ -813,12 +813,12 @@ function GraphicPackagesSection({
 
           {/* Create/Edit Form */}
           {showForm ? (
-            <div className="space-y-3 p-4 rounded-lg border border-[var(--ash-grey)]/20 bg-white/[0.02]">
+            <div className="space-y-3 p-4 rounded-lg border border-border bg-card">
               <h3 className="text-sm font-semibold text-[var(--timberwolf)]">
                 {editingPkg ? 'Edit Package' : 'New Package'}
               </h3>
               <div className="space-y-1">
-                <label className="text-xs text-[var(--ash-grey)]">
+                <label className="text-xs text-muted-foreground">
                   Package Name
                 </label>
                 <Input
@@ -830,7 +830,7 @@ function GraphicPackagesSection({
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs text-[var(--ash-grey)]">Logo</label>
+                  <label className="text-xs text-muted-foreground">Logo</label>
                   <div className="flex gap-2">
                     <Input
                       value={formLogoUrl}
@@ -853,7 +853,7 @@ function GraphicPackagesSection({
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs text-[var(--ash-grey)]">
+                  <label className="text-xs text-muted-foreground">
                     Logo Position
                   </label>
                   <Select
@@ -872,7 +872,7 @@ function GraphicPackagesSection({
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs text-[var(--ash-grey)]">
+                  <label className="text-xs text-muted-foreground">
                     Sponsor Logo
                   </label>
                   <div className="flex gap-2">
@@ -897,7 +897,7 @@ function GraphicPackagesSection({
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs text-[var(--ash-grey)]">
+                  <label className="text-xs text-muted-foreground">
                     Sponsor Position
                   </label>
                   <Select
@@ -921,7 +921,7 @@ function GraphicPackagesSection({
                   type="checkbox"
                   checked={formIsDefault}
                   onChange={(e) => setFormIsDefault(e.target.checked)}
-                  className="w-4 h-4 rounded border-[var(--ash-grey)]/20 bg-white/5 accent-[var(--timberwolf)]"
+                  className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
                 />
                 <span className="text-sm text-[var(--timberwolf)]">
                   Set as default package
@@ -930,8 +930,8 @@ function GraphicPackagesSection({
 
               {/* Logo preview */}
               {(formLogoUrl || formSponsorUrl) && (
-                <div className="relative w-full aspect-video bg-zinc-900 rounded-lg overflow-hidden border border-[var(--ash-grey)]/10">
-                  <div className="absolute inset-0 flex items-center justify-center text-xs text-[var(--ash-grey)]">
+                <div className="relative w-full aspect-video bg-muted rounded-lg overflow-hidden border border-border">
+                  <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
                     Preview
                   </div>
                   {formLogoUrl && (
@@ -1008,14 +1008,14 @@ function GraphicPackagesSection({
 
           {/* Spiideo Import Panel */}
           {showImport && !showForm && (
-            <div className="space-y-2 p-4 rounded-lg border border-[var(--ash-grey)]/20 bg-white/[0.02]">
+            <div className="space-y-2 p-4 rounded-lg border border-border bg-card">
               <h3 className="text-sm font-semibold text-[var(--timberwolf)]">
                 Import from Spiideo
               </h3>
               {loadingImport ? (
-                <LoadingSpinner size="sm" className="text-[var(--ash-grey)]" />
+                <LoadingSpinner size="sm" className="text-muted-foreground" />
               ) : spiideoPackages.length === 0 ? (
-                <p className="text-xs text-[var(--ash-grey)]">
+                <p className="text-xs text-muted-foreground">
                   No Spiideo packages found
                 </p>
               ) : (
@@ -1023,18 +1023,18 @@ function GraphicPackagesSection({
                   {spiideoPackages.map((pkg) => (
                     <div
                       key={pkg.id}
-                      className="flex items-center justify-between py-2 px-3 rounded bg-white/[0.02]"
+                      className="flex items-center justify-between py-2 px-3 rounded bg-card"
                     >
                       <div>
                         <span className="text-sm text-[var(--timberwolf)]">
                           {pkg.name}
                         </span>
-                        <span className="text-xs text-[var(--ash-grey)] ml-2">
+                        <span className="text-xs text-muted-foreground ml-2">
                           ({pkg.type})
                         </span>
                       </div>
                       {pkg.alreadyImported ? (
-                        <span className="text-xs text-[var(--ash-grey)]">
+                        <span className="text-xs text-muted-foreground">
                           Imported
                         </span>
                       ) : (
@@ -1135,14 +1135,14 @@ function MarketplaceSettingsSection({
   }
 
   return (
-    <div className="mt-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
+    <div className="mt-6 rounded-xl border border-border bg-card">
       <div className="p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
               Marketplace
             </h2>
-            <p className="text-xs text-[var(--ash-grey)] mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Sell recordings through the PLAYHUB marketplace
             </p>
           </div>
@@ -1161,7 +1161,7 @@ function MarketplaceSettingsSection({
       {expanded && (
         <div className="px-6 pb-6 space-y-4">
           {loading ? (
-            <LoadingSpinner size="sm" className="text-[var(--ash-grey)]" />
+            <LoadingSpinner size="sm" className="text-muted-foreground" />
           ) : (
             <>
               <label className="flex items-center gap-2 cursor-pointer">
@@ -1169,7 +1169,7 @@ function MarketplaceSettingsSection({
                   type="checkbox"
                   checked={enabled}
                   onChange={(e) => setEnabled(e.target.checked)}
-                  className="w-4 h-4 rounded border-[var(--ash-grey)]/20 bg-white/5 accent-[var(--timberwolf)]"
+                  className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
                 />
                 <span className="text-sm text-[var(--timberwolf)]">
                   Enable marketplace for this organization
@@ -1178,7 +1178,7 @@ function MarketplaceSettingsSection({
               {enabled && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-xs text-[var(--ash-grey)]">
+                    <label className="text-xs text-muted-foreground">
                       Default Price
                     </label>
                     <Input
@@ -1192,7 +1192,7 @@ function MarketplaceSettingsSection({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs text-[var(--ash-grey)]">
+                    <label className="text-xs text-muted-foreground">
                       Currency
                     </label>
                     <Select value={currency} onValueChange={setCurrency}>
@@ -2174,9 +2174,9 @@ export default function VenueManagementPage() {
 
   // Shared input styling
   const inputClass =
-    'bg-zinc-800 border-[var(--ash-grey)]/20 text-[var(--timberwolf)] placeholder:text-[var(--ash-grey)]/40'
+    'bg-zinc-800 border-border text-[var(--timberwolf)] placeholder:text-muted-foreground/40'
   const outlineBtnClass =
-    'border-[var(--ash-grey)]/20 text-[var(--timberwolf)] hover:bg-white/10'
+    'border-border text-[var(--timberwolf)] hover:bg-muted'
   const primaryBtnClass =
     'bg-[var(--timberwolf)] text-[var(--night)] hover:bg-[var(--ash-grey)]'
 
@@ -2187,55 +2187,55 @@ export default function VenueManagementPage() {
           {/* Header skeleton */}
           <div className="flex items-center justify-between mb-8">
             <div className="space-y-2">
-              <div className="bg-[var(--ash-grey)]/10 rounded h-3 w-[140px]" />
-              <div className="bg-[var(--ash-grey)]/10 rounded h-8 w-[200px]" />
+              <div className="bg-muted rounded h-3 w-[140px]" />
+              <div className="bg-muted rounded h-8 w-[200px]" />
             </div>
-            <div className="bg-[var(--ash-grey)]/10 rounded h-10 w-[110px]" />
+            <div className="bg-muted rounded h-10 w-[110px]" />
           </div>
 
           {/* Schedule Recording skeleton */}
-          <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-6">
+          <div className="mb-6 rounded-xl border border-border bg-card p-6">
             <div className="flex items-center justify-between">
-              <div className="bg-[var(--ash-grey)]/10 rounded h-5 w-[160px]" />
-              <div className="bg-[var(--ash-grey)]/10 rounded h-10 w-[140px]" />
+              <div className="bg-muted rounded h-5 w-[160px]" />
+              <div className="bg-muted rounded h-10 w-[140px]" />
             </div>
           </div>
 
           {/* Live Streaming skeleton */}
-          <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-6">
+          <div className="mb-6 rounded-xl border border-border bg-card p-6">
             <div className="flex items-center justify-between">
               <div className="space-y-2">
-                <div className="bg-[var(--ash-grey)]/10 rounded h-5 w-[130px]" />
-                <div className="bg-[var(--ash-grey)]/10 rounded h-3 w-[260px]" />
+                <div className="bg-muted rounded h-5 w-[130px]" />
+                <div className="bg-muted rounded h-3 w-[260px]" />
               </div>
-              <div className="bg-[var(--ash-grey)]/10 rounded h-10 w-[130px]" />
+              <div className="bg-muted rounded h-10 w-[130px]" />
             </div>
           </div>
 
           {/* Billing skeleton */}
-          <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
+          <div className="mb-6 rounded-xl border border-border bg-card">
             <div className="p-5">
               {/* Header row */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <div className="space-y-1.5">
-                  <div className="bg-[var(--ash-grey)]/10 rounded h-5 w-[60px]" />
-                  <div className="bg-[var(--ash-grey)]/10 rounded h-3 w-[100px]" />
+                  <div className="bg-muted rounded h-5 w-[60px]" />
+                  <div className="bg-muted rounded h-3 w-[100px]" />
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="bg-[var(--ash-grey)]/10 rounded h-6 w-[80px]" />
-                  <div className="bg-[var(--ash-grey)]/10 rounded h-6 w-[70px]" />
+                  <div className="bg-muted rounded h-6 w-[80px]" />
+                  <div className="bg-muted rounded h-6 w-[70px]" />
                 </div>
               </div>
               {/* 4-column financial grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-[var(--ash-grey)]/[0.06]">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted">
                 {[0, 1, 2, 3].map((i) => (
                   <div key={i} className="bg-[var(--night)] p-3.5 space-y-2">
                     <div className="flex items-center gap-1.5">
-                      <div className="h-1.5 w-1.5 rounded-full bg-[var(--ash-grey)]/10" />
-                      <div className="bg-[var(--ash-grey)]/10 rounded h-2.5 w-[60px]" />
+                      <div className="h-1.5 w-1.5 rounded-full bg-muted" />
+                      <div className="bg-muted rounded h-2.5 w-[60px]" />
                     </div>
-                    <div className="bg-[var(--ash-grey)]/10 rounded h-6 w-[90px]" />
-                    <div className="bg-[var(--ash-grey)]/10 rounded h-2.5 w-[70px]" />
+                    <div className="bg-muted rounded h-6 w-[90px]" />
+                    <div className="bg-muted rounded h-2.5 w-[70px]" />
                   </div>
                 ))}
               </div>
@@ -2243,32 +2243,32 @@ export default function VenueManagementPage() {
           </div>
 
           {/* Recordings skeleton */}
-          <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
+          <div className="rounded-xl border border-border bg-card">
             <div className="p-6 space-y-1">
-              <div className="bg-[var(--ash-grey)]/10 rounded h-5 w-[100px]" />
-              <div className="bg-[var(--ash-grey)]/10 rounded h-3 w-[120px]" />
+              <div className="bg-muted rounded h-5 w-[100px]" />
+              <div className="bg-muted rounded h-3 w-[120px]" />
             </div>
             <div className="px-6 pb-6 space-y-3">
               {[0, 1, 2].map((i) => (
                 <div
                   key={i}
-                  className="p-4 rounded-lg bg-white/[0.03] border border-[var(--ash-grey)]/10"
+                  className="p-4 rounded-lg bg-muted/50 border border-border"
                 >
                   <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-10 h-10 rounded bg-[var(--ash-grey)]/10" />
+                    <div className="flex-shrink-0 w-10 h-10 rounded bg-muted" />
                     <div className="flex-1 min-w-0 space-y-2">
                       <div className="flex items-center gap-2">
-                        <div className="bg-[var(--ash-grey)]/10 rounded h-4 w-2/5" />
-                        <div className="bg-[var(--ash-grey)]/10 rounded h-4 w-16" />
+                        <div className="bg-muted rounded h-4 w-2/5" />
+                        <div className="bg-muted rounded h-4 w-16" />
                       </div>
-                      <div className="bg-[var(--ash-grey)]/10 rounded h-3 w-3/5" />
+                      <div className="bg-muted rounded h-3 w-3/5" />
                     </div>
                   </div>
-                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--ash-grey)]/10">
-                    <div className="bg-[var(--ash-grey)]/10 rounded h-3 w-16" />
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
+                    <div className="bg-muted rounded h-3 w-16" />
                     <div className="flex gap-2">
-                      <div className="bg-[var(--ash-grey)]/10 rounded h-8 w-24" />
-                      <div className="bg-[var(--ash-grey)]/10 rounded h-8 w-28" />
+                      <div className="bg-muted rounded h-8 w-24" />
+                      <div className="bg-muted rounded h-8 w-28" />
                     </div>
                   </div>
                 </div>
@@ -2277,12 +2277,12 @@ export default function VenueManagementPage() {
           </div>
 
           {/* Venue Admins skeleton */}
-          <div className="mt-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-6">
+          <div className="mt-6 rounded-xl border border-border bg-card p-6">
             <div className="flex items-center justify-between mb-1">
-              <div className="bg-[var(--ash-grey)]/10 rounded h-5 w-[120px]" />
-              <div className="bg-[var(--ash-grey)]/10 rounded h-10 w-[130px]" />
+              <div className="bg-muted rounded h-5 w-[120px]" />
+              <div className="bg-muted rounded h-10 w-[130px]" />
             </div>
-            <div className="bg-[var(--ash-grey)]/10 rounded h-3 w-[300px]" />
+            <div className="bg-muted rounded h-3 w-[300px]" />
           </div>
         </div>
       </div>
@@ -2293,7 +2293,7 @@ export default function VenueManagementPage() {
     return (
       <div className="min-h-screen bg-[var(--night)]">
         <div className="container mx-auto px-5 py-16 max-w-6xl">
-          <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-6">
+          <div className="rounded-xl border border-border bg-card p-6">
             <p className="text-red-400">{error}</p>
             <Button
               className={`mt-4 ${outlineBtnClass}`}
@@ -2314,7 +2314,7 @@ export default function VenueManagementPage() {
         <FadeIn>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8">
             <div>
-              <p className="text-[var(--ash-grey)] text-xs font-semibold tracking-[0.25em] uppercase mb-2">
+              <p className="text-muted-foreground text-xs font-semibold tracking-[0.25em] uppercase mb-2">
                 Venue Management
               </p>
               <h1 className="text-2xl md:text-3xl font-bold text-[var(--timberwolf)]">
@@ -2336,7 +2336,7 @@ export default function VenueManagementPage() {
         {/* Billing Overview */}
         {billingConfig?.is_active && (
           <FadeIn delay={100}>
-            <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/8 bg-white/[0.02]">
+            <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/8 bg-card">
               <div className="p-5">
                 {/* Header row */}
                 <div className="relative flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 mb-4">
@@ -2354,11 +2354,11 @@ export default function VenueManagementPage() {
                         setBillingYear(prev.y)
                         fetchBillingData(prev.m, prev.y)
                       }}
-                      className="text-[var(--ash-grey)]/70 hover:text-[var(--timberwolf)] text-base px-1.5 py-0.5"
+                      className="text-muted-foreground/70 hover:text-[var(--timberwolf)] text-base px-1.5 py-0.5"
                     >
                       ‹
                     </button>
-                    <p className="text-sm text-[var(--ash-grey)] font-medium min-w-[120px] text-center">
+                    <p className="text-sm text-muted-foreground font-medium min-w-[120px] text-center">
                       {new Date(
                         billingYear,
                         billingMonth - 1
@@ -2379,7 +2379,7 @@ export default function VenueManagementPage() {
                         fetchBillingData(next.m, next.y)
                       }}
                       disabled={isCurrentBillingMonth}
-                      className={`text-base px-1.5 py-0.5 ${isCurrentBillingMonth ? 'text-[var(--ash-grey)]/20 cursor-not-allowed' : 'text-[var(--ash-grey)]/70 hover:text-[var(--timberwolf)]'}`}
+                      className={`text-base px-1.5 py-0.5 ${isCurrentBillingMonth ? 'text-muted-foreground/20 cursor-not-allowed' : 'text-muted-foreground/70 hover:text-[var(--timberwolf)]'}`}
                     >
                       ›
                     </button>
@@ -2393,31 +2393,31 @@ export default function VenueManagementPage() {
                         >
                           {billingSummary.totalRevenue.toFixed(3)}
                         </span>
-                        <span className="text-[var(--ash-grey)]/60 ml-1 text-xs">
+                        <span className="text-muted-foreground/60 ml-1 text-xs">
                           {billingSummary.currency}
                         </span>
                       </div>
-                      <div className="border-l border-[var(--ash-grey)]/10 pl-3 sm:pl-4">
+                      <div className="border-l border-border pl-3 sm:pl-4">
                         <span
                           className="text-[var(--timberwolf)] font-medium"
                           style={{ fontVariantNumeric: 'tabular-nums' }}
                         >
                           {billingSummary.count}
                         </span>
-                        <span className="text-[var(--ash-grey)]/60 ml-1 text-xs">
+                        <span className="text-muted-foreground/60 ml-1 text-xs">
                           recordings
                         </span>
                       </div>
                       {billingSummary.dailyTarget > 0 &&
                         isCurrentBillingMonth && (
-                          <div className="border-l border-[var(--ash-grey)]/10 pl-3 sm:pl-4">
+                          <div className="border-l border-border pl-3 sm:pl-4">
                             <span
                               className="text-[var(--timberwolf)] font-medium"
                               style={{ fontVariantNumeric: 'tabular-nums' }}
                             >
                               {billingSummary.todayCount}
                             </span>
-                            <span className="text-[var(--ash-grey)]/60 text-xs">
+                            <span className="text-muted-foreground/60 text-xs">
                               /{billingSummary.dailyTarget} today
                             </span>
                           </div>
@@ -2428,12 +2428,12 @@ export default function VenueManagementPage() {
 
                 {/* Financial summary — 3 columns with 1px gap borders */}
                 {billingSummary && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-[var(--ash-grey)]/[0.06] mb-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted mb-4">
                     {/* Venue-collected revenue */}
                     <div className="bg-[var(--night)] p-3.5">
                       <div className="flex items-center gap-1.5 mb-1.5">
                         <div className="h-1.5 w-1.5 rounded-full bg-amber-400/60" />
-                        <p className="text-[10px] text-[var(--ash-grey)]/60 uppercase tracking-widest">
+                        <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
                           At venue
                         </p>
                       </div>
@@ -2442,11 +2442,11 @@ export default function VenueManagementPage() {
                         style={{ fontVariantNumeric: 'tabular-nums' }}
                       >
                         {billingSummary.venueCollectedRevenue.toFixed(3)}
-                        <span className="text-[10px] font-normal text-[var(--ash-grey)]/50 ml-1">
+                        <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
                           {billingSummary.currency}
                         </span>
                       </p>
-                      <p className="text-[10px] text-[var(--ash-grey)]/40 mt-1">
+                      <p className="text-[10px] text-muted-foreground/40 mt-1">
                         {billingSummary.venueCollectedCount} recording
                         {billingSummary.venueCollectedCount === 1 ? '' : 's'}
                       </p>
@@ -2455,7 +2455,7 @@ export default function VenueManagementPage() {
                     <div className="bg-[var(--night)] p-3.5">
                       <div className="flex items-center gap-1.5 mb-1.5">
                         <div className="h-1.5 w-1.5 rounded-full bg-indigo-400/60" />
-                        <p className="text-[10px] text-[var(--ash-grey)]/60 uppercase tracking-widest">
+                        <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
                           QR Code
                         </p>
                       </div>
@@ -2464,11 +2464,11 @@ export default function VenueManagementPage() {
                         style={{ fontVariantNumeric: 'tabular-nums' }}
                       >
                         {billingSummary.playhubCollectedRevenue.toFixed(3)}
-                        <span className="text-[10px] font-normal text-[var(--ash-grey)]/50 ml-1">
+                        <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
                           {billingSummary.currency}
                         </span>
                       </p>
-                      <p className="text-[10px] text-[var(--ash-grey)]/40 mt-1">
+                      <p className="text-[10px] text-muted-foreground/40 mt-1">
                         {billingSummary.playhubCollectedCount} recording
                         {billingSummary.playhubCollectedCount === 1 ? '' : 's'}
                       </p>
@@ -2477,7 +2477,7 @@ export default function VenueManagementPage() {
                     <div className="bg-[var(--night)] p-3.5">
                       <div className="flex items-center gap-1.5 mb-1.5">
                         <div className="h-1.5 w-1.5 rounded-full bg-emerald-400/60" />
-                        <p className="text-[10px] text-[var(--ash-grey)]/60 uppercase tracking-widest">
+                        <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
                           Your profit
                         </p>
                       </div>
@@ -2486,11 +2486,11 @@ export default function VenueManagementPage() {
                         style={{ fontVariantNumeric: 'tabular-nums' }}
                       >
                         {billingSummary.venueTotalProfit.toFixed(3)}
-                        <span className="text-[10px] font-normal text-[var(--ash-grey)]/50 ml-1">
+                        <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
                           {billingSummary.currency}
                         </span>
                       </p>
-                      <p className="text-[10px] text-[var(--ash-grey)]/40 mt-1">
+                      <p className="text-[10px] text-muted-foreground/40 mt-1">
                         {billingSummary.count} recording
                         {billingSummary.count === 1 ? '' : 's'} in{' '}
                         {new Date(
@@ -2505,7 +2505,7 @@ export default function VenueManagementPage() {
                         <div
                           className={`h-1.5 w-1.5 rounded-full ${billingSummary.netBalance > 0 ? 'bg-amber-400/60' : billingSummary.netBalance < 0 ? 'bg-emerald-400/60' : 'bg-[var(--ash-grey)]/40'}`}
                         />
-                        <p className="text-[10px] text-[var(--ash-grey)]/60 uppercase tracking-widest">
+                        <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
                           Net settlement
                         </p>
                       </div>
@@ -2514,11 +2514,11 @@ export default function VenueManagementPage() {
                         style={{ fontVariantNumeric: 'tabular-nums' }}
                       >
                         {Math.abs(billingSummary.netBalance).toFixed(3)}
-                        <span className="text-[10px] font-normal text-[var(--ash-grey)]/50 ml-1">
+                        <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
                           {billingSummary.currency}
                         </span>
                       </p>
-                      <p className="text-[10px] text-[var(--ash-grey)]/40 mt-1">
+                      <p className="text-[10px] text-muted-foreground/40 mt-1">
                         {billingSummary.netBalance > 0
                           ? 'venue owes PLAYBACK'
                           : billingSummary.netBalance < 0
@@ -2533,7 +2533,7 @@ export default function VenueManagementPage() {
                 {dailyStats && dailyStats.scenes.length > 0 && (
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10px] text-[var(--ash-grey)]/60 uppercase tracking-widest">
+                      <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
                         Daily activity
                       </p>
                       {dailyStats.scenes.length > 1 && (
@@ -2541,7 +2541,7 @@ export default function VenueManagementPage() {
                           {dailyStats.scenes.map((scene, i) => (
                             <div
                               key={scene}
-                              className="flex items-center gap-1 text-[10px] text-[var(--ash-grey)]/50"
+                              className="flex items-center gap-1 text-[10px] text-muted-foreground/50"
                             >
                               <div
                                 className="h-1.5 w-1.5 rounded-full"
@@ -2588,11 +2588,13 @@ export default function VenueManagementPage() {
                       className="aspect-[2/1] sm:aspect-[3/1] md:aspect-[4/1] w-full"
                     >
                       <AreaChart
-                        data={dailyStats.days.map((d) => ({
-                          date: d.date.slice(8),
-                          ...d.byScene,
-                          total: d.total,
-                        }))}
+                        data={dailyStats.days
+                          .filter((d) => d.date <= new Date().toISOString().slice(0, 10))
+                          .map((d) => ({
+                            date: d.date.slice(8),
+                            ...d.byScene,
+                            total: d.total,
+                          }))}
                         margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
                       >
                         <defs>
@@ -2724,7 +2726,7 @@ export default function VenueManagementPage() {
               {/* Invoice toggle */}
               <div className="px-5 pb-4">
                 <button
-                  className="text-[11px] text-[var(--ash-grey)]/40 hover:text-[var(--ash-grey)] transition-colors"
+                  className="text-[11px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
                   onClick={() => {
                     setShowBillingSection(!showBillingSection)
                     if (!showBillingSection) fetchBillingData()
@@ -2740,7 +2742,7 @@ export default function VenueManagementPage() {
               {showBillingSection && (
                 <div className="px-5 pb-5 border-t border-[var(--ash-grey)]/[0.06] pt-4 space-y-2">
                   {invoices.length === 0 ? (
-                    <p className="text-xs text-[var(--ash-grey)]/50">
+                    <p className="text-xs text-muted-foreground/50">
                       No invoices yet
                     </p>
                   ) : (
@@ -2751,7 +2753,7 @@ export default function VenueManagementPage() {
                       return (
                         <div
                           key={inv.id}
-                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-white/[0.02] rounded-lg border border-[var(--ash-grey)]/[0.06]"
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-card rounded-lg border border-[var(--ash-grey)]/[0.06]"
                         >
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-[var(--timberwolf)]">
@@ -2760,7 +2762,7 @@ export default function VenueManagementPage() {
                                 { month: 'long', year: 'numeric' }
                               )}
                             </p>
-                            <p className="text-[11px] text-[var(--ash-grey)]/50">
+                            <p className="text-[11px] text-muted-foreground/50">
                               {totalRecordings} recording
                               {totalRecordings === 1 ? '' : 's'}
                               {inv.venue_collected_count > 0 &&
@@ -2776,7 +2778,7 @@ export default function VenueManagementPage() {
                               {net >= 0 ? '' : '-'}
                               {Math.abs(net).toFixed(3)} {inv.currency}
                             </span>
-                            <span className="text-[10px] text-[var(--ash-grey)]/40">
+                            <span className="text-[10px] text-muted-foreground/40">
                               {net >= 0 ? 'owed' : 'due to venue'}
                             </span>
                             <span
@@ -2806,7 +2808,7 @@ export default function VenueManagementPage() {
         {/* Schedule Recording */}
         {scenes.length > 0 && (
           <FadeIn delay={100}>
-            <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
+            <div className="mb-6 rounded-xl border border-border bg-card">
               <div className="p-6">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-2">
                   <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
@@ -2975,7 +2977,7 @@ export default function VenueManagementPage() {
                         placeholder="user1@example.com, user2@example.com"
                         className={inputClass}
                       />
-                      <p className="text-xs text-[var(--ash-grey)]">
+                      <p className="text-xs text-muted-foreground">
                         These users will have access immediately (even before
                         recording is ready)
                       </p>
@@ -2989,7 +2991,7 @@ export default function VenueManagementPage() {
                             type="checkbox"
                             checked={isBillable}
                             onChange={(e) => setIsBillable(e.target.checked)}
-                            className="w-4 h-4 rounded border-[var(--ash-grey)]/20 bg-white/5 accent-[var(--timberwolf)]"
+                            className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
                           />
                           <span className="text-sm font-medium text-[var(--timberwolf)]">
                             Paid recording
@@ -3010,7 +3012,7 @@ export default function VenueManagementPage() {
                               )}
                               className={`w-32 ${inputClass}`}
                             />
-                            <span className="text-sm text-[var(--ash-grey)]">
+                            <span className="text-sm text-muted-foreground">
                               {billingConfig.currency || 'KWD'}
                             </span>
                           </div>
@@ -3029,13 +3031,13 @@ export default function VenueManagementPage() {
                               onChange={(e) =>
                                 setBroadcastToYoutube(e.target.checked)
                               }
-                              className="w-4 h-4 rounded border-[var(--ash-grey)]/20 bg-white/5 accent-[var(--timberwolf)]"
+                              className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
                             />
                             <span className="text-sm font-medium text-[var(--timberwolf)]">
                               Broadcast to YouTube
                             </span>
                           </label>
-                          <p className="text-xs text-[var(--ash-grey)]">
+                          <p className="text-xs text-muted-foreground">
                             Stream will be pushed to the configured YouTube
                             channel via RTMP
                           </p>
@@ -3052,7 +3054,7 @@ export default function VenueManagementPage() {
                             onChange={(e) =>
                               setMarketplaceEnabled(e.target.checked)
                             }
-                            className="w-4 h-4 rounded border-[var(--ash-grey)]/20 bg-white/5 accent-[var(--timberwolf)]"
+                            className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
                           />
                           <span className="text-sm font-medium text-[var(--timberwolf)]">
                             List on marketplace
@@ -3073,7 +3075,7 @@ export default function VenueManagementPage() {
                               )}
                               className={`w-32 ${inputClass}`}
                             />
-                            <span className="text-sm text-[var(--ash-grey)]">
+                            <span className="text-sm text-muted-foreground">
                               {orgMarketplace.default_price_currency || 'AED'}
                             </span>
                           </div>
@@ -3105,7 +3107,7 @@ export default function VenueManagementPage() {
                             ))}
                           </SelectContent>
                         </Select>
-                        <p className="text-xs text-[var(--ash-grey)]">
+                        <p className="text-xs text-muted-foreground">
                           Logo overlays applied to this recording
                         </p>
                       </div>
@@ -3149,14 +3151,14 @@ export default function VenueManagementPage() {
 
         {/* Live Streaming Section */}
         <FadeIn delay={200}>
-          <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
+          <div className="mb-6 rounded-xl border border-border bg-card">
             <div className="p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                 <div>
                   <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
                     Live Streaming
                   </h2>
-                  <p className="text-sm text-[var(--ash-grey)]">
+                  <p className="text-sm text-muted-foreground">
                     Manage live stream channels for this venue
                   </p>
                 </div>
@@ -3197,13 +3199,13 @@ export default function VenueManagementPage() {
                 </form>
 
                 {/* Schedule Live Stream */}
-                <div className="p-4 bg-white/[0.03] rounded-lg border border-[var(--ash-grey)]/10">
+                <div className="p-4 bg-muted/50 rounded-lg border border-border">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                     <div>
                       <h4 className="font-medium text-[var(--timberwolf)]">
                         Schedule Live Stream
                       </h4>
-                      <p className="text-sm text-[var(--ash-grey)]">
+                      <p className="text-sm text-muted-foreground">
                         Create a Spiideo recording + MediaLive stream in one
                         step
                       </p>
@@ -3232,7 +3234,7 @@ export default function VenueManagementPage() {
                     >
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
-                          <label className="text-sm text-[var(--ash-grey)]">
+                          <label className="text-sm text-muted-foreground">
                             Title *
                           </label>
                           <Input
@@ -3244,7 +3246,7 @@ export default function VenueManagementPage() {
                           />
                         </div>
                         <div>
-                          <label className="text-sm text-[var(--ash-grey)]">
+                          <label className="text-sm text-muted-foreground">
                             Camera/Pitch *
                           </label>
                           <Select
@@ -3264,7 +3266,7 @@ export default function VenueManagementPage() {
                           </Select>
                         </div>
                         <div>
-                          <label className="text-sm text-[var(--ash-grey)]">
+                          <label className="text-sm text-muted-foreground">
                             Start Time *
                           </label>
                           <DateTimePicker
@@ -3276,7 +3278,7 @@ export default function VenueManagementPage() {
                           />
                         </div>
                         <div>
-                          <label className="text-sm text-[var(--ash-grey)]">
+                          <label className="text-sm text-muted-foreground">
                             End Time *
                           </label>
                           <DateTimePicker
@@ -3293,7 +3295,7 @@ export default function VenueManagementPage() {
                           type="button"
                           variant="ghost"
                           onClick={() => setShowStreamScheduleForm(false)}
-                          className="text-[var(--timberwolf)] hover:bg-white/10"
+                          className="text-[var(--timberwolf)] hover:bg-muted"
                         >
                           Cancel
                         </Button>
@@ -3313,11 +3315,11 @@ export default function VenueManagementPage() {
 
                 {/* Channels list */}
                 {loadingChannels ? (
-                  <p className="text-sm text-[var(--ash-grey)]">
+                  <p className="text-sm text-muted-foreground">
                     Loading channels...
                   </p>
                 ) : channels.length === 0 ? (
-                  <p className="text-sm text-[var(--ash-grey)] text-center py-4">
+                  <p className="text-sm text-muted-foreground text-center py-4">
                     No streaming channels yet. Create one to get started.
                   </p>
                 ) : (
@@ -3325,7 +3327,7 @@ export default function VenueManagementPage() {
                     {channels.map((channel) => (
                       <div
                         key={channel.id}
-                        className="p-4 bg-white/[0.03] rounded-lg border border-[var(--ash-grey)]/10 space-y-3"
+                        className="p-4 bg-muted/50 rounded-lg border border-border space-y-3"
                       >
                         {/* Channel header */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -3386,7 +3388,7 @@ export default function VenueManagementPage() {
                         {channel.state !== 'CREATING' && channel.rtmp && (
                           <div className="space-y-2 text-sm">
                             <div>
-                              <span className="text-[var(--ash-grey)] text-xs block mb-1">
+                              <span className="text-muted-foreground text-xs block mb-1">
                                 RTMP URL
                               </span>
                               <div className="flex items-center gap-2">
@@ -3396,7 +3398,7 @@ export default function VenueManagementPage() {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  className="flex-shrink-0 text-[var(--timberwolf)] hover:bg-white/10"
+                                  className="flex-shrink-0 text-[var(--timberwolf)] hover:bg-muted"
                                   onClick={() =>
                                     copyToClipboard(
                                       channel.rtmp!.url,
@@ -3411,7 +3413,7 @@ export default function VenueManagementPage() {
                               </div>
                             </div>
                             <div>
-                              <span className="text-[var(--ash-grey)] text-xs block mb-1">
+                              <span className="text-muted-foreground text-xs block mb-1">
                                 Stream Key
                               </span>
                               <div className="flex items-center gap-2">
@@ -3421,7 +3423,7 @@ export default function VenueManagementPage() {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  className="flex-shrink-0 text-[var(--timberwolf)] hover:bg-white/10"
+                                  className="flex-shrink-0 text-[var(--timberwolf)] hover:bg-muted"
                                   onClick={() =>
                                     copyToClipboard(
                                       channel.rtmp!.streamKey,
@@ -3437,7 +3439,7 @@ export default function VenueManagementPage() {
                             </div>
                             {channel.playbackUrl && (
                               <div>
-                                <span className="text-[var(--ash-grey)] text-xs block mb-1">
+                                <span className="text-muted-foreground text-xs block mb-1">
                                   Playback
                                 </span>
                                 <div className="flex items-center gap-2">
@@ -3447,7 +3449,7 @@ export default function VenueManagementPage() {
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="flex-shrink-0 text-[var(--timberwolf)] hover:bg-white/10"
+                                    className="flex-shrink-0 text-[var(--timberwolf)] hover:bg-muted"
                                     onClick={() =>
                                       copyToClipboard(
                                         channel.playbackUrl!,
@@ -3468,7 +3470,7 @@ export default function VenueManagementPage() {
                         {/* Video player when RUNNING */}
                         {channel.state === 'RUNNING' && channel.playbackUrl && (
                           <div className="mt-3">
-                            <p className="text-xs text-[var(--ash-grey)] mb-2">
+                            <p className="text-xs text-muted-foreground mb-2">
                               Live Preview:
                             </p>
                             <div className="aspect-video bg-black rounded-lg overflow-hidden">
@@ -3521,12 +3523,12 @@ export default function VenueManagementPage() {
 
         {/* Recordings List */}
         <FadeIn delay={300}>
-          <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
+          <div className="rounded-xl border border-border bg-card">
             <div className="p-6">
               <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
                 Recordings
               </h2>
-              <p className="text-sm text-[var(--ash-grey)]">
+              <p className="text-sm text-muted-foreground">
                 {totalRecordings} recording
                 {totalRecordings === 1 ? '' : 's'}
               </p>
@@ -3576,7 +3578,7 @@ export default function VenueManagementPage() {
             </div>
             <div className="px-6 pb-6">
               {recordings.length === 0 ? (
-                <p className="text-[var(--ash-grey)] text-center py-8">
+                <p className="text-muted-foreground text-center py-8">
                   {debouncedSearch || statusFilter || billableFilter
                     ? 'No recordings match your filters.'
                     : 'No recordings yet. Schedule a recording to get started.'}
@@ -3586,7 +3588,7 @@ export default function VenueManagementPage() {
                   {recordings.map((recording) => (
                     <div
                       key={recording.id}
-                      className="p-4 rounded-lg bg-white/[0.03] border border-[var(--ash-grey)]/10"
+                      className="p-4 rounded-lg bg-muted/50 border border-border"
                     >
                       {/* Top row: Play button + Info + Status */}
                       <div className="flex items-start gap-3">
@@ -3628,7 +3630,7 @@ export default function VenueManagementPage() {
                               {recording.status}
                             </span>
                           </div>
-                          <p className="text-sm text-[var(--ash-grey)]">
+                          <p className="text-sm text-muted-foreground">
                             {recording.pitch_name &&
                               `${recording.pitch_name} | `}
                             {formatTime(recording.match_date)}
@@ -3637,9 +3639,9 @@ export default function VenueManagementPage() {
                       </div>
 
                       {/* Bottom row: Access count & Actions */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-3 pt-3 border-t border-[var(--ash-grey)]/10 gap-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-3 pt-3 border-t border-border gap-2">
                         <div className="flex items-center gap-3">
-                          <span className="text-sm text-[var(--ash-grey)]">
+                          <span className="text-sm text-muted-foreground">
                             {recording.accessCount || 0} user
                             {(recording.accessCount || 0) === 1 ? '' : 's'}
                           </span>
@@ -3684,7 +3686,7 @@ export default function VenueManagementPage() {
                                   recording.collected_by !== 'playhub'
                                     ? 'cursor-pointer hover:bg-zinc-700/50'
                                     : ''
-                                } text-[var(--ash-grey)]`}
+                                } text-muted-foreground`}
                                 title={
                                   recording.collected_by === 'playhub'
                                     ? 'Amount locked (verified transaction)'
@@ -3720,11 +3722,11 @@ export default function VenueManagementPage() {
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            className={`flex-1 sm:flex-none ${outlineBtnClass}`}
+                            className={outlineBtnClass}
                             onClick={() => getPublicLink(recording)}
                             disabled={
                               generatingLink === recording.id ||
@@ -3738,7 +3740,7 @@ export default function VenueManagementPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className={`flex-1 sm:flex-none ${outlineBtnClass}`}
+                            className={outlineBtnClass}
                             onClick={() => openAccessModal(recording)}
                           >
                             Manage Access
@@ -3746,7 +3748,7 @@ export default function VenueManagementPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className={`flex-shrink-0 ${outlineBtnClass}`}
+                            className={outlineBtnClass}
                             onClick={() => openEditModal(recording)}
                           >
                             Edit
@@ -3754,7 +3756,7 @@ export default function VenueManagementPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="flex-shrink-0 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                            className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
                             onClick={() => promptDeleteRecording(recording)}
                             disabled={deletingRecording === recording.id}
                           >
@@ -3769,13 +3771,13 @@ export default function VenueManagementPage() {
 
                   {/* Pagination controls */}
                   {totalRecordings > pageSize && (
-                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-[var(--ash-grey)]/10">
-                      <p className="text-sm text-[var(--ash-grey)]">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4 pt-4 border-t border-border">
+                      <p className="text-sm text-muted-foreground text-right sm:text-left">
                         {(currentPage - 1) * pageSize + 1}–
                         {Math.min(currentPage * pageSize, totalRecordings)} of{' '}
                         {totalRecordings}
                       </p>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center sm:justify-start gap-2">
                         <Button
                           variant="outline"
                           size="sm"
@@ -3785,7 +3787,7 @@ export default function VenueManagementPage() {
                         >
                           Previous
                         </Button>
-                        <span className="text-sm text-[var(--ash-grey)] px-2">
+                        <span className="text-sm text-muted-foreground px-2 whitespace-nowrap">
                           Page {currentPage} of{' '}
                           {Math.ceil(totalRecordings / pageSize)}
                         </span>
@@ -3844,7 +3846,7 @@ export default function VenueManagementPage() {
 
         {/* Venue Admins Section */}
         <FadeIn delay={400}>
-          <div className="mt-6 rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
+          <div className="mt-6 rounded-xl border border-border bg-card">
             <div className="p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                 <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
@@ -3863,7 +3865,7 @@ export default function VenueManagementPage() {
                   {showAdminSection ? 'Hide' : 'Manage Admins'}
                 </Button>
               </div>
-              <p className="text-sm text-[var(--ash-grey)]">
+              <p className="text-sm text-muted-foreground">
                 Users who can manage this venue and its recordings
               </p>
             </div>
@@ -3905,25 +3907,25 @@ export default function VenueManagementPage() {
                 {/* Admin list */}
                 <div className="space-y-2">
                   {admins.length === 0 ? (
-                    <p className="text-sm text-[var(--ash-grey)]">
+                    <p className="text-sm text-muted-foreground">
                       Loading admins...
                     </p>
                   ) : (
                     admins.map((admin) => (
                       <div
                         key={admin.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-white/[0.03] rounded-lg border border-[var(--ash-grey)]/10"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-muted/50 rounded-lg border border-border"
                       >
                         <div className="min-w-0">
                           <p className="font-medium truncate text-[var(--timberwolf)]">
                             {admin.fullName || admin.email || 'Unknown'}
                             {admin.isCurrentUser && (
-                              <span className="ml-2 text-xs text-[var(--ash-grey)]">
+                              <span className="ml-2 text-xs text-muted-foreground">
                                 (you)
                               </span>
                             )}
                           </p>
-                          <p className="text-sm text-[var(--ash-grey)] truncate">
+                          <p className="text-sm text-muted-foreground truncate">
                             {admin.email}
                           </p>
                         </div>
@@ -3957,12 +3959,12 @@ export default function VenueManagementPage() {
         {/* Access Modal */}
         {showAccessModal && selectedRecording && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-            <div className="w-full max-w-lg m-4 rounded-xl border border-[var(--ash-grey)]/10 bg-[var(--night)]">
+            <div className="w-full max-w-lg m-4 rounded-xl border border-border bg-[var(--night)]">
               <div className="p-6">
                 <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
                   Manage Access
                 </h2>
-                <p className="text-sm text-[var(--ash-grey)]">
+                <p className="text-sm text-muted-foreground">
                   {selectedRecording.title}
                 </p>
               </div>
@@ -3995,7 +3997,7 @@ export default function VenueManagementPage() {
                     Current Access
                   </p>
                   {accessList.length === 0 ? (
-                    <p className="text-sm text-[var(--ash-grey)]">
+                    <p className="text-sm text-muted-foreground">
                       No one has access yet
                     </p>
                   ) : (
@@ -4003,7 +4005,7 @@ export default function VenueManagementPage() {
                       {accessList.map((access) => (
                         <div
                           key={access.id}
-                          className="flex items-center justify-between p-2 bg-white/[0.03] rounded border border-[var(--ash-grey)]/10"
+                          className="flex items-center justify-between p-2 bg-muted/50 rounded border border-border"
                         >
                           <div>
                             <p className="text-sm text-[var(--timberwolf)]">
@@ -4012,7 +4014,7 @@ export default function VenueManagementPage() {
                                 access.userId?.slice(0, 8) + '...'}
                             </p>
                             {access.expiresAt && (
-                              <p className="text-xs text-[var(--ash-grey)]">
+                              <p className="text-xs text-muted-foreground">
                                 Expires: {formatTime(access.expiresAt)}
                               </p>
                             )}
@@ -4028,7 +4030,7 @@ export default function VenueManagementPage() {
                             </Button>
                           )}
                           {!access.isActive && (
-                            <span className="text-xs text-[var(--ash-grey)]">
+                            <span className="text-xs text-muted-foreground">
                               Revoked
                             </span>
                           )}
@@ -4057,7 +4059,7 @@ export default function VenueManagementPage() {
         {/* Edit Recording Modal */}
         {editingRecording && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-            <div className="w-full max-w-lg m-4 rounded-xl border border-[var(--ash-grey)]/10 bg-[var(--night)]">
+            <div className="w-full max-w-lg m-4 rounded-xl border border-border bg-[var(--night)]">
               <div className="p-6">
                 <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
                   Edit Recording
@@ -4123,7 +4125,7 @@ export default function VenueManagementPage() {
                 <h2 className="text-lg font-semibold text-red-400">
                   Delete Recording
                 </h2>
-                <p className="text-sm text-[var(--ash-grey)] mt-2">
+                <p className="text-sm text-muted-foreground mt-2">
                   This will permanently delete{' '}
                   <span className="text-[var(--timberwolf)] font-medium">
                     {deleteConfirmRecording.title}

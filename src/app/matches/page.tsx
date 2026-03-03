@@ -1,9 +1,11 @@
 'use client'
 
 import { createClient } from '@braintwopoint0/playback-commons/supabase'
+import { Skeleton, EmptyState } from '@braintwopoint0/playback-commons/ui'
 import MatchCard from '@/components/MatchCard'
-import { motion } from 'motion/react'
+import { FadeIn } from '@/components/FadeIn'
 import { useEffect, useState } from 'react'
+import { Film } from 'lucide-react'
 
 export default function MatchesPage() {
   const [matches, setMatches] = useState<any[]>([])
@@ -13,7 +15,6 @@ export default function MatchesPage() {
     async function fetchMatches() {
       const supabase = createClient()
 
-      // Type assertion for PLAYHUB tables
       const { data, error } = await (supabase as any)
         .from('playhub_match_recordings')
         .select(
@@ -46,76 +47,54 @@ export default function MatchesPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-[var(--night)]">
-      <div className="container mx-auto px-5 py-16">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mb-12"
-        >
-          <h1 className="text-5xl md:text-6xl font-bold text-[var(--timberwolf)] mb-4">
-            Match Marketplace
-          </h1>
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <p className="text-xl text-[var(--ash-grey)]">
-              Browse professional match recordings
-            </p>
-            <div className="px-4 py-2 bg-black/30 border border-[var(--ash-grey)]/20 rounded-xl">
-              <span className="text-2xl font-bold text-[var(--timberwolf)]">
-                {loading ? '...' : matches.length}
-              </span>
-              <span className="text-[var(--ash-grey)]/60 ml-2">
-                {matches.length === 1 ? 'match' : 'matches'}
-              </span>
-            </div>
+    <div className="mx-auto max-w-screen-xl px-4 py-12 sm:px-6 lg:px-8">
+      <FadeIn className="mb-10">
+        <h1 className="text-3xl md:text-4xl font-bold text-[var(--timberwolf)] mb-2">
+          Match Marketplace
+        </h1>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <p className="text-muted-foreground">
+            Browse professional match recordings
+          </p>
+          <div className="px-3 py-1.5 rounded-lg border border-border bg-card">
+            <span className="text-lg font-bold text-[var(--timberwolf)]">
+              {loading ? '...' : matches.length}
+            </span>
+            <span className="text-muted-foreground ml-2 text-sm">
+              {matches.length === 1 ? 'match' : 'matches'}
+            </span>
           </div>
-        </motion.div>
+        </div>
+      </FadeIn>
 
-        {/* Matches Grid */}
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 0.3, y: 0 }}
-                transition={{ duration: 0.4, delay: i * 0.05 }}
-                className="h-[400px] bg-black/20 border border-[var(--ash-grey)]/10 rounded-2xl animate-pulse"
-              />
-            ))}
-          </div>
-        ) : matches && matches.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {matches.map((match: any, idx: number) => (
-              <motion.div
-                key={match.id}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: idx * 0.05 }}
-              >
-                <MatchCard match={match} />
-              </motion.div>
-            ))}
-          </div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-            className="text-center py-24"
-          >
-            <div className="text-7xl mb-6 opacity-30">🎬</div>
-            <p className="text-3xl font-bold text-[var(--timberwolf)] mb-3">
-              No matches yet
-            </p>
-            <p className="text-lg text-[var(--ash-grey)]/60">
-              Check back soon for new recordings
-            </p>
-          </motion.div>
-        )}
-      </div>
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="rounded-xl border border-border bg-card overflow-hidden">
+              <Skeleton className="h-56 w-full rounded-none" />
+              <div className="p-4 space-y-2">
+                <Skeleton className="h-5 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-3 w-2/3" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : matches.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {matches.map((match: any, idx: number) => (
+            <FadeIn key={match.id} delay={idx * 50}>
+              <MatchCard match={match} />
+            </FadeIn>
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          icon={<Film className="h-10 w-10" />}
+          title="No matches yet"
+          description="Check back soon for new recordings"
+        />
+      )}
     </div>
   )
 }

@@ -9,6 +9,7 @@ import {
   CardDescription,
   Badge,
 } from '@braintwopoint0/playback-commons/ui'
+import { Check } from 'lucide-react'
 
 export default function BookingSuccessPage() {
   const searchParams = useSearchParams()
@@ -21,21 +22,7 @@ export default function BookingSuccessPage() {
       <Card className="max-w-[400px] w-full bg-transparent border-[var(--ash-grey)]/10 text-center">
         <CardHeader className="space-y-4">
           <div className="w-16 h-16 mx-auto rounded-full border border-emerald-400/30 bg-emerald-400/[0.06] flex items-center justify-center">
-            <svg
-              width="28"
-              height="28"
-              viewBox="0 0 24 24"
-              fill="none"
-              className="text-emerald-400"
-            >
-              <path
-                d="M5 13l4 4L19 7"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <Check className="h-7 w-7 text-emerald-400" />
           </div>
           <div>
             <CardTitle className="text-2xl text-[var(--timberwolf)]">

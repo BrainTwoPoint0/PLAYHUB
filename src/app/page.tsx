@@ -7,7 +7,7 @@ import {
   ArrowRight,
   Play,
   Smartphone,
-  CreditCard,
+  CalendarCheck,
   ShieldCheck,
   Zap,
   MonitorPlay,
@@ -63,7 +63,7 @@ function CountUp({ target, suffix = '' }: { target: number; suffix?: string }) {
 
 /* ── Data ── */
 const stats = [
-  { value: 500, suffix: '+', label: 'Recordings' },
+  { value: 1000, suffix: '+', label: 'Recordings' },
   { value: 50, suffix: '+', label: 'Venues' },
   { value: 4, suffix: 'K', label: 'Resolution' },
   { value: 24, suffix: '/7', label: 'Access' },
@@ -86,9 +86,9 @@ const features = [
     desc: 'Watch on phone, tablet, or desktop. Your match travels with you.',
   },
   {
-    icon: CreditCard,
-    title: 'Pay Once',
-    desc: 'One-time purchase. No subscriptions, no hidden fees, ever.',
+    icon: CalendarCheck,
+    title: 'Academy Subscriptions',
+    desc: 'Subscribe to your academy for instant access to every match recording, all season long.',
   },
   {
     icon: ShieldCheck,
@@ -110,8 +110,8 @@ const steps = [
   },
   {
     num: '02',
-    title: 'Purchase access',
-    desc: 'One-time payment. Secure checkout powered by Stripe.',
+    title: 'Get access',
+    desc: 'One-time purchase, academy subscription, or shared link. Multiple ways to watch.',
   },
   {
     num: '03',
@@ -159,13 +159,13 @@ export default function HomePage() {
           <FadeIn delay={450}>
             <p className="text-base md:text-lg text-[var(--ash-grey)] max-w-md mb-10 leading-relaxed">
               Full match recordings from clubs and academies.
-              <br className="hidden sm:block" /> Pay once, watch forever. No
-              subscriptions, no ads.
+              <br className="hidden sm:block" /> Instant access, any device.
+              From individual matches to full academy subscriptions.
             </p>
           </FadeIn>
 
           <FadeIn delay={600} className="flex flex-col sm:flex-row gap-3">
-            <Link href="/recordings">
+            <Link href="/matches">
               <Button
                 size="lg"
                 className="w-full sm:w-auto bg-[var(--timberwolf)] text-[var(--night)] hover:bg-[var(--ash-grey)] font-bold px-8 text-base"
@@ -288,13 +288,14 @@ export default function HomePage() {
               For clubs & academies
             </p>
             <h2 className="text-2xl md:text-4xl font-bold text-[var(--timberwolf)] mb-4 leading-tight">
-              Monetize your
+              Your recordings,
               <br />
-              match recordings.
+              your platform.
             </h2>
             <p className="text-[var(--ash-grey)] leading-relaxed mb-8 max-w-lg">
-              Already recording your matches? Upload them to PLAYHUB and earn
-              revenue from fans, parents, and scouts who want to watch.
+              Connect your Veo or Spiideo recordings, manage academy
+              subscriptions, and give your players instant access to their match
+              footage.
             </p>
             <Link href="https://playbacksports.ai">
               <Button

@@ -165,13 +165,13 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="bg-zinc-900/50 border border-[var(--ash-grey)]/20 rounded-xl p-8 space-y-6">
+        <div className="bg-card border border-border rounded-xl p-8 space-y-6">
           {/* Header */}
           <div className="text-center">
             <h1 className="text-2xl font-bold text-[var(--timberwolf)] mb-2">
               Create account
             </h1>
-            <p className="text-sm text-[var(--ash-grey)]">
+            <p className="text-sm text-muted-foreground">
               Sign up to purchase match recordings
             </p>
           </div>
@@ -202,7 +202,7 @@ export default function RegisterPage() {
                   disabled={loading}
                   autoComplete="name"
                 />
-                <User className="h-4 w-4 absolute left-3 top-3.5 text-[var(--ash-grey)]" />
+                <User className="h-4 w-4 absolute left-3 top-3.5 text-muted-foreground" />
               </div>
             </div>
 
@@ -227,10 +227,10 @@ export default function RegisterPage() {
                   disabled={loading}
                   autoComplete="username"
                 />
-                <AtSign className="h-4 w-4 absolute left-3 top-3.5 text-[var(--ash-grey)]" />
+                <AtSign className="h-4 w-4 absolute left-3 top-3.5 text-muted-foreground" />
                 <div className="absolute right-3 top-3.5">
                   {usernameStatus === 'checking' && (
-                    <Loader2 className="h-4 w-4 animate-spin text-[var(--ash-grey)]" />
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                   )}
                   {usernameStatus === 'available' && (
                     <Check className="h-4 w-4 text-green-400" />
@@ -269,7 +269,7 @@ export default function RegisterPage() {
                   disabled={loading}
                   autoComplete="email"
                 />
-                <Mail className="h-4 w-4 absolute left-3 top-3.5 text-[var(--ash-grey)]" />
+                <Mail className="h-4 w-4 absolute left-3 top-3.5 text-muted-foreground" />
               </div>
             </div>
 
@@ -288,9 +288,9 @@ export default function RegisterPage() {
                   disabled={loading}
                   autoComplete="new-password"
                 />
-                <Lock className="h-4 w-4 absolute left-3 top-3.5 text-[var(--ash-grey)]" />
+                <Lock className="h-4 w-4 absolute left-3 top-3.5 text-muted-foreground" />
               </div>
-              <p className="text-xs text-[var(--ash-grey)]">
+              <p className="text-xs text-muted-foreground">
                 Min 8 characters with uppercase, lowercase, and number
               </p>
             </div>
@@ -313,7 +313,7 @@ export default function RegisterPage() {
                   disabled={loading}
                   autoComplete="new-password"
                 />
-                <Lock className="h-4 w-4 absolute left-3 top-3.5 text-[var(--ash-grey)]" />
+                <Lock className="h-4 w-4 absolute left-3 top-3.5 text-muted-foreground" />
               </div>
             </div>
 
@@ -334,7 +334,7 @@ export default function RegisterPage() {
           </form>
 
           <div className="text-center text-sm">
-            <p className="text-[var(--ash-grey)]">
+            <p className="text-muted-foreground">
               Already have an account?{' '}
               <Link
                 href="/auth/login"

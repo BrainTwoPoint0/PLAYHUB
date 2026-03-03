@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@braintwopoint0/playback-commons/ui'
+import { Button, Skeleton, EmptyState } from '@braintwopoint0/playback-commons/ui'
 import { FadeIn } from '@/components/FadeIn'
+import { Building2 } from 'lucide-react'
 
 interface Club {
   slug: string
@@ -50,30 +51,25 @@ export default function AcademySelectorPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--night)]">
-        <div className="container mx-auto px-5 py-16 max-w-4xl animate-pulse">
-          <div className="mb-10 space-y-3">
-            <div className="bg-[var(--ash-grey)]/10 rounded h-3 w-[140px]" />
-            <div className="bg-[var(--ash-grey)]/10 rounded h-9 w-[200px]" />
-            <div className="bg-[var(--ash-grey)]/10 rounded h-4 w-[300px]" />
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {[0, 1].map((i) => (
-              <div
-                key={i}
-                className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-6"
-              >
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-[var(--ash-grey)]/10" />
-                  <div className="space-y-2 flex-1">
-                    <div className="bg-[var(--ash-grey)]/10 rounded h-5 w-[140px]" />
-                    <div className="bg-[var(--ash-grey)]/10 rounded h-3 w-[100px]" />
-                  </div>
+      <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
+        <div className="mb-10 space-y-3">
+          <Skeleton className="h-3 w-[140px]" />
+          <Skeleton className="h-9 w-[200px]" />
+          <Skeleton className="h-4 w-[300px]" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          {[0, 1].map((i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-6">
+              <div className="flex items-center gap-4 mb-4">
+                <Skeleton className="w-12 h-12 rounded-full" />
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-5 w-[140px]" />
+                  <Skeleton className="h-3 w-[100px]" />
                 </div>
-                <div className="bg-[var(--ash-grey)]/10 rounded h-10 w-full" />
               </div>
-            ))}
-          </div>
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ))}
         </div>
       </div>
     )
@@ -81,18 +77,12 @@ export default function AcademySelectorPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[var(--night)]">
-        <div className="container mx-auto px-5 py-16 max-w-4xl">
-          <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] p-6">
-            <p className="text-red-400">{error}</p>
-            <Button
-              className="mt-4 border-[var(--ash-grey)]/20 text-[var(--timberwolf)] hover:bg-white/10"
-              variant="outline"
-              onClick={() => router.push('/')}
-            >
-              Back to Home
-            </Button>
-          </div>
+      <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
+        <div className="rounded-xl border border-border bg-card p-6">
+          <p className="text-red-400">{error}</p>
+          <Button className="mt-4" variant="outline" onClick={() => router.push('/')}>
+            Back to Home
+          </Button>
         </div>
       </div>
     )
@@ -100,93 +90,78 @@ export default function AcademySelectorPage() {
 
   if (clubs.length === 0) {
     return (
-      <div className="min-h-screen bg-[var(--night)]">
-        <div className="container mx-auto px-5 py-16 max-w-4xl">
-          <div className="rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015]">
-            <div className="p-6">
-              <h1 className="text-2xl font-bold text-[var(--timberwolf)]">
-                No Clubs
-              </h1>
-              <p className="text-sm text-[var(--ash-grey)] mt-1">
-                You do not have access to any academy clubs.
-              </p>
-            </div>
-            <div className="px-6 pb-6">
-              <Button
-                variant="outline"
-                onClick={() => router.push('/')}
-                className="border-[var(--ash-grey)]/20 text-[var(--timberwolf)] hover:bg-white/10"
-              >
-                Back to Home
-              </Button>
-            </div>
-          </div>
-        </div>
+      <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
+        <EmptyState
+          icon={<Building2 className="h-10 w-10" />}
+          title="No Clubs"
+          description="You do not have access to any academy clubs."
+          action={
+            <Button variant="outline" onClick={() => router.push('/')}>
+              Back to Home
+            </Button>
+          }
+        />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[var(--night)]">
-      <div className="container mx-auto px-5 py-16 max-w-4xl">
-        <FadeIn>
-          <p className="text-[var(--ash-grey)] text-xs font-semibold tracking-[0.25em] uppercase mb-3">
-            Academy Subscriptions
-          </p>
-          <h1 className="text-3xl md:text-4xl font-bold text-[var(--timberwolf)] mb-2">
-            Your Clubs
-          </h1>
-          <p className="text-[var(--ash-grey)] mb-10">
-            Select a club to view subscription analytics
-          </p>
-        </FadeIn>
+    <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
+      <FadeIn>
+        <p className="text-muted-foreground text-xs font-semibold tracking-[0.25em] uppercase mb-3">
+          Academy Subscriptions
+        </p>
+        <h1 className="text-3xl md:text-4xl font-bold text-[var(--timberwolf)] mb-2">
+          Your Clubs
+        </h1>
+        <p className="text-muted-foreground mb-10">
+          Select a club to view subscription analytics
+        </p>
+      </FadeIn>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          {clubs.map((club, i) => (
-            <FadeIn key={club.slug} delay={i * 100}>
-              <div
-                className="cursor-pointer rounded-xl border border-[var(--ash-grey)]/10 bg-white/[0.015] hover:border-[var(--timberwolf)]/25 hover:bg-white/[0.035] transition-colors duration-300"
-                onClick={() => router.push(`/academy/${club.slug}/access`)}
-              >
-                <div className="p-6">
-                  <div className="flex items-center gap-4 mb-4">
-                    {club.logoUrl ? (
-                      <img
-                        src={club.logoUrl}
-                        alt={club.name}
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-[var(--timberwolf)]/20 flex items-center justify-center">
-                        <span className="text-xl font-bold text-[var(--timberwolf)]">
-                          {club.name.charAt(0)}
-                        </span>
-                      </div>
-                    )}
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-                          {club.name}
-                        </h2>
-                        <span
-                          className={`text-xs px-1.5 py-0.5 rounded ${role === 'platform_admin' ? 'bg-amber-500/15 text-amber-400' : 'bg-white/5 text-[var(--ash-grey)]'}`}
-                        >
-                          {role === 'platform_admin' ? 'Admin' : 'Viewer'}
-                        </span>
-                      </div>
-                      <p className="text-sm text-[var(--ash-grey)]">
-                        {club.slug}
-                      </p>
+      <div className="grid gap-4 md:grid-cols-2">
+        {clubs.map((club, i) => (
+          <FadeIn key={club.slug} delay={i * 100}>
+            <div
+              className="cursor-pointer rounded-xl border border-border bg-card hover:border-[var(--timberwolf)]/25 hover:bg-muted/50 transition-colors duration-300"
+              onClick={() => router.push(`/academy/${club.slug}/access`)}
+            >
+              <div className="p-6">
+                <div className="flex items-center gap-4 mb-4">
+                  {club.logoUrl ? (
+                    <img
+                      src={club.logoUrl}
+                      alt={club.name}
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                      <span className="text-xl font-bold text-[var(--timberwolf)]">
+                        {club.name.charAt(0)}
+                      </span>
                     </div>
+                  )}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
+                        {club.name}
+                      </h2>
+                      <span
+                        className={`text-xs px-1.5 py-0.5 rounded ${role === 'platform_admin' ? 'bg-amber-500/15 text-amber-400' : 'bg-muted text-muted-foreground'}`}
+                      >
+                        {role === 'platform_admin' ? 'Admin' : 'Viewer'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{club.slug.toUpperCase()}</p>
                   </div>
-                  <Button className="w-full bg-white/10 hover:bg-white/20 text-[var(--timberwolf)] border border-[var(--ash-grey)]/20">
-                    Veo Access Audit
-                  </Button>
                 </div>
+                <Button variant="outline" className="w-full">
+                  Veo Access Audit
+                </Button>
               </div>
-            </FadeIn>
-          ))}
-        </div>
+            </div>
+          </FadeIn>
+        ))}
       </div>
     </div>
   )
