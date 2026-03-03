@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { Button } from '@braintwopoint0/playback-commons/ui'
 import { FadeIn } from '@/components/FadeIn'
 
@@ -43,6 +44,7 @@ interface VeoData {
   role: 'platform_admin' | 'org_admin'
   teams: VeoTeam[]
   stripeOnlySubscribers: StripeOnlySubscriber[]
+  exemptEmails?: string[]
   lastSyncedAt: string | null
 }
 
@@ -425,8 +427,11 @@ export default function AcademyAccessPage() {
 
   const isPlatAdmin = data.role === 'platform_admin'
 
-  // Set of exempt emails for quick lookup
-  const exemptEmails = new Set(exceptions.map((e) => e.email.toLowerCase()))
+  // Set of exempt emails for quick lookup — merge from main endpoint (all roles) and exceptions list (admin CRUD)
+  const exemptEmails = new Set([
+    ...(data.exemptEmails || []),
+    ...exceptions.map((e) => e.email.toLowerCase()),
+  ])
 
   // Stats — deduplicate by email so users in multiple teams are counted once.
   // If someone is a viewer in one team and coach in another, treat them as staff (not flagged).
@@ -576,8 +581,8 @@ export default function AcademyAccessPage() {
                 className="w-full flex items-center justify-between p-4 hover:bg-white/[0.03] transition-colors text-left"
               >
                 <div className="flex items-center gap-3">
-                  <span className="text-[var(--ash-grey)] text-xs w-4">
-                    {exceptionsOpen ? '\u25BC' : '\u25B6'}
+                  <span className="text-[var(--ash-grey)]">
+                    {exceptionsOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                   </span>
                   <span className="font-medium text-[var(--timberwolf)]">
                     Sync Exceptions
@@ -592,7 +597,7 @@ export default function AcademyAccessPage() {
               {exceptionsOpen && (
                 <div className="border-t border-[var(--ash-grey)]/10 p-4 space-y-3">
                   {/* Add exception form */}
-                  <div className="flex items-end gap-2">
+                  <div className="flex flex-col sm:flex-row sm:items-end gap-2">
                     <div className="flex-1">
                       <label className="text-xs text-[var(--ash-grey)] mb-1 block">
                         Email
@@ -637,9 +642,9 @@ export default function AcademyAccessPage() {
                       {exceptions.map((exc) => (
                         <div
                           key={exc.id}
-                          className="flex items-center justify-between py-2 text-sm"
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2 py-2 text-sm"
                         >
-                          <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 min-w-0">
                             <span className="text-[var(--timberwolf)] truncate">
                               {exc.email}
                             </span>
@@ -655,7 +660,7 @@ export default function AcademyAccessPage() {
                           <button
                             onClick={() => removeException(exc.email)}
                             disabled={exceptionsLoading}
-                            className="text-xs px-2 py-1 rounded text-red-400 hover:bg-red-500/10 transition-colors"
+                            className="text-xs px-2 py-1 rounded text-red-400 hover:bg-red-500/10 transition-colors self-start sm:self-auto"
                           >
                             Remove
                           </button>
@@ -678,8 +683,8 @@ export default function AcademyAccessPage() {
                 className="w-full flex items-center justify-between p-4 hover:bg-white/[0.03] transition-colors text-left"
               >
                 <div className="flex items-center gap-3">
-                  <span className="text-[var(--ash-grey)] text-xs w-4">
-                    {adminsOpen ? '\u25BC' : '\u25B6'}
+                  <span className="text-[var(--ash-grey)]">
+                    {adminsOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                   </span>
                   <span className="font-medium text-[var(--timberwolf)]">
                     Manage Admins
@@ -692,7 +697,7 @@ export default function AcademyAccessPage() {
               {adminsOpen && (
                 <div className="border-t border-[var(--ash-grey)]/10 p-4 space-y-3">
                   {/* Invite form */}
-                  <div className="flex items-end gap-2">
+                  <div className="flex flex-col sm:flex-row sm:items-end gap-2">
                     <div className="flex-1">
                       <label className="text-xs text-[var(--ash-grey)] mb-1 block">
                         Email
@@ -730,9 +735,9 @@ export default function AcademyAccessPage() {
                       {admins.map((admin) => (
                         <div
                           key={admin.id}
-                          className="flex items-center justify-between py-2 text-sm"
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2 py-2 text-sm"
                         >
-                          <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 min-w-0">
                             <span className="text-[var(--timberwolf)] truncate">
                               {admin.fullName || 'Unknown'}
                             </span>
@@ -774,8 +779,8 @@ export default function AcademyAccessPage() {
                   className="w-full flex items-center justify-between p-4 hover:bg-white/[0.03] transition-colors text-left"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-[var(--ash-grey)] text-xs w-4">
-                      {stripeOnlyOpen ? '\u25BC' : '\u25B6'}
+                    <span className="text-[var(--ash-grey)]">
+                      {stripeOnlyOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                     </span>
                     <span className="font-medium text-[var(--timberwolf)]">
                       Not in Veo
@@ -795,29 +800,29 @@ export default function AcademyAccessPage() {
                       {data.stripeOnlySubscribers.map((sub) => (
                         <div
                           key={sub.email}
-                          className="flex items-center justify-between gap-2 px-4 py-2 text-sm"
+                          className="flex items-center justify-between gap-2 px-4 py-1.5 text-sm"
                         >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span className="text-[var(--timberwolf)] truncate">
+                          <div className="min-w-0">
+                            <div className="text-[var(--timberwolf)] truncate text-sm">
                               {sub.name || 'Unknown'}
-                            </span>
-                            <span className="text-xs text-[var(--ash-grey)] truncate">
+                            </div>
+                            <div className="text-[11px] text-[var(--ash-grey)]/60 truncate">
                               {sub.email}
-                            </span>
+                              {sub.registrationTeam && (
+                                <span className="ml-1.5 text-[var(--ash-grey)]/40">
+                                  {sub.registrationTeam}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {sub.registrationTeam && (
-                              <span className="text-xs px-1.5 py-0.5 rounded bg-white/5 text-[var(--ash-grey)]">
-                                {sub.registrationTeam}
-                              </span>
-                            )}
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
                             {data.hasScholarships && sub.isScholarship && (
-                              <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400">
+                              <span className="text-[10px] leading-none px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400">
                                 scholarship
                               </span>
                             )}
                             <span
-                              className={`text-xs px-1.5 py-0.5 rounded ${stripeStatusColor(
+                              className={`text-[10px] leading-none px-1.5 py-0.5 rounded ${stripeStatusColor(
                                 sub.status,
                                 true
                               )}`}
@@ -836,13 +841,13 @@ export default function AcademyAccessPage() {
 
         {/* Controls */}
         <FadeIn delay={150}>
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex flex-wrap items-center gap-2 mb-4">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by name or email..."
-              className="text-sm px-3 py-1.5 rounded-lg bg-white/5 border border-[var(--ash-grey)]/20 text-[var(--timberwolf)] placeholder-[var(--ash-grey)]/50 outline-none focus:border-[var(--ash-grey)]/40 w-64"
+              className="text-sm px-3 py-1.5 rounded-lg bg-white/5 border border-[var(--ash-grey)]/20 text-[var(--timberwolf)] placeholder-[var(--ash-grey)]/50 outline-none focus:border-[var(--ash-grey)]/40 w-full sm:w-64"
             />
             <button
               onClick={() => setFilterNoSub(!filterNoSub)}
@@ -853,8 +858,8 @@ export default function AcademyAccessPage() {
               }`}
             >
               {filterNoSub
-                ? 'Showing: Players without subscription'
-                : 'Filter: Players no sub'}
+                ? 'Showing: No sub'
+                : 'Filter: No sub'}
             </button>
             <button
               onClick={expandAll}
@@ -924,8 +929,8 @@ export default function AcademyAccessPage() {
                       className="w-full flex items-center justify-between p-3 hover:bg-white/[0.03] transition-colors text-left"
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-[var(--ash-grey)] text-xs w-4">
-                          {isExpanded ? '\u25BC' : '\u25B6'}
+                        <span className="text-[var(--ash-grey)]">
+                          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                         </span>
                         <span className="font-medium text-[var(--timberwolf)]">
                           {team.name}
@@ -959,57 +964,53 @@ export default function AcademyAccessPage() {
                           </p>
                         ) : (
                           <div className="divide-y divide-[var(--ash-grey)]/5">
-                            {displayMembers.map((member) => (
-                              <div
-                                key={member.id}
-                                className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
-                              >
-                                <div className="flex items-center gap-3 min-w-0">
-                                  <span className="text-[var(--timberwolf)] truncate">
-                                    {member.name || 'Unknown'}
-                                  </span>
-                                  <span className="text-xs text-[var(--ash-grey)] truncate">
-                                    {member.email}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                  {member.registrationTeam && (
-                                    <span className="text-xs px-1.5 py-0.5 rounded bg-white/5 text-[var(--ash-grey)]">
-                                      {member.registrationTeam}
-                                    </span>
+                            {displayMembers.map((member) => {
+                              const isExempt = exemptEmails.has(member.email?.toLowerCase())
+                              const statusBadge = member.isPlayer ? (
+                                <span
+                                  className={`text-[10px] leading-none px-1.5 py-0.5 rounded ${stripeStatusColor(
+                                    member.stripeStatus,
+                                    member.hasSubscription,
+                                    isExempt
+                                  )}`}
+                                >
+                                  {stripeStatusLabel(
+                                    member.stripeStatus,
+                                    member.hasSubscription,
+                                    isExempt
                                   )}
-                                  {data.hasScholarships &&
-                                    member.isScholarship && (
-                                      <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400">
-                                        scholarship
-                                      </span>
-                                    )}
-                                  {member.isPlayer ? (
-                                    <span
-                                      className={`text-xs px-1.5 py-0.5 rounded ${stripeStatusColor(
-                                        member.stripeStatus,
-                                        member.hasSubscription,
-                                        exemptEmails.has(
-                                          member.email?.toLowerCase()
-                                        )
-                                      )}`}
-                                    >
-                                      {stripeStatusLabel(
-                                        member.stripeStatus,
-                                        member.hasSubscription,
-                                        exemptEmails.has(
-                                          member.email?.toLowerCase()
-                                        )
-                                      )}
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">
-                                      {roleLabel(member.veoRole)}
-                                    </span>
-                                  )}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] leading-none px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">
+                                  {roleLabel(member.veoRole)}
+                                </span>
+                              )
+                              const scholarshipBadge = data.hasScholarships && member.isScholarship ? (
+                                <span className="text-[10px] leading-none px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400">
+                                  scholarship
+                                </span>
+                              ) : null
+
+                              return (
+                                <div
+                                  key={member.id}
+                                  className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm"
+                                >
+                                  <div className="min-w-0">
+                                    <div className="text-[var(--timberwolf)] truncate text-sm">
+                                      {member.name || 'Unknown'}
+                                    </div>
+                                    <div className="text-[11px] text-[var(--ash-grey)]/60 truncate">
+                                      {member.email}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                                    {scholarshipBadge}
+                                    {statusBadge}
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              )
+                            })}
                           </div>
                         )}
                       </div>

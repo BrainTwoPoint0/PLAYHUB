@@ -1,7 +1,7 @@
 // GET /api/academy/[clubSlug]/veo
 // Returns Veo ClubHouse teams + members cross-referenced with Stripe subscribers
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
@@ -244,6 +244,21 @@ export async function GET(
       stripeOnlySubscribers.push({ email, ...info })
     }
 
+    // Fetch exempt emails so both platform_admin and org_admin can see correct status
+    let exemptEmails: string[] = []
+    try {
+      const serviceClient = createServiceClient() as any
+      const { data: exceptions } = await serviceClient
+        .from('playhub_veo_exceptions')
+        .select('email')
+        .eq('club_slug', clubSlug)
+      if (exceptions) {
+        exemptEmails = exceptions.map((e: { email: string }) => e.email.toLowerCase())
+      }
+    } catch {
+      // Non-critical — exemptions just won't show
+    }
+
     return NextResponse.json({
       clubName: club.name,
       veoClubSlug: club.veoClubSlug,
@@ -251,6 +266,7 @@ export async function GET(
       role,
       teams,
       stripeOnlySubscribers,
+      exemptEmails,
       lastSyncedAt: cachedData.lastSyncedAt,
     })
   } catch (error) {
