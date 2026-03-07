@@ -1240,6 +1240,11 @@ export default function VenueManagementPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Section loading states (for independent async sections)
+  const [billingLoading, setBillingLoading] = useState(true)
+  const [scenesLoading, setScenesLoading] = useState(true)
+  const [marketplaceLoading, setMarketplaceLoading] = useState(true)
+
   // Scheduling state
   const [scenes, setScenes] = useState<Scene[]>([])
   const [showScheduleForm, setShowScheduleForm] = useState(false)
@@ -1432,6 +1437,9 @@ export default function VenueManagementPage() {
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => { if (data) setOrgMarketplace(data) })
         .catch(() => {})
+        .finally(() => setMarketplaceLoading(false))
+    } else {
+      setMarketplaceLoading(false)
     }
 
     // Fetch scenes for scheduling
@@ -1446,9 +1454,10 @@ export default function VenueManagementPage() {
         }
       })
       .catch(() => {})
+      .finally(() => setScenesLoading(false))
 
     // Fetch billing data
-    fetchBillingData()
+    fetchBillingData().finally(() => setBillingLoading(false))
   }, [venue])
 
   // Debounce search input
@@ -2326,7 +2335,34 @@ export default function VenueManagementPage() {
           </div>
 
         {/* Billing Overview */}
-        {billingConfig?.is_active && (
+        {billingLoading ? (
+          <div className="mb-6 rounded-xl border border-border bg-card animate-pulse">
+            <div className="p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div className="space-y-1.5">
+                  <div className="bg-muted rounded h-5 w-[60px]" />
+                  <div className="bg-muted rounded h-3 w-[100px]" />
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="bg-muted rounded h-6 w-[80px]" />
+                  <div className="bg-muted rounded h-6 w-[70px]" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="bg-[var(--night)] p-3.5 space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-1.5 w-1.5 rounded-full bg-muted" />
+                      <div className="bg-muted rounded h-2.5 w-[60px]" />
+                    </div>
+                    <div className="bg-muted rounded h-6 w-[90px]" />
+                    <div className="bg-muted rounded h-2.5 w-[70px]" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : billingConfig?.is_active && (
             <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/8 bg-card">
               <div className="p-5">
                 {/* Header row */}
@@ -2796,7 +2832,14 @@ export default function VenueManagementPage() {
         )}
 
         {/* Schedule Recording */}
-        {scenes.length > 0 && (
+        {scenesLoading ? (
+          <div className="mb-6 rounded-xl border border-border bg-card p-6 animate-pulse">
+            <div className="flex items-center justify-between">
+              <div className="bg-muted rounded h-5 w-[160px]" />
+              <div className="bg-muted rounded h-10 w-[140px]" />
+            </div>
+          </div>
+        ) : scenes.length > 0 && (
             <div className="mb-6 rounded-xl border border-border bg-card">
               <div className="p-6">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-2">
@@ -3498,7 +3541,17 @@ export default function VenueManagementPage() {
           </div>
 
         {/* Marketplace Revenue */}
-        {orgMarketplace?.marketplace_enabled && (
+        {marketplaceLoading ? (
+          <div className="mb-6 rounded-xl border border-border bg-card p-6 animate-pulse">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+              <div className="space-y-2">
+                <div className="bg-muted rounded h-5 w-[180px]" />
+                <div className="bg-muted rounded h-3 w-[280px]" />
+              </div>
+              <div className="bg-muted rounded h-10 w-[120px]" />
+            </div>
+          </div>
+        ) : orgMarketplace?.marketplace_enabled && (
             <MarketplaceRevenue
               venueId={venueId}
               outlineBtnClass={outlineBtnClass}

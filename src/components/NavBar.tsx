@@ -52,42 +52,45 @@ export default function NavBar() {
   const [hasVenues, setHasVenues] = useState(false)
   const [hasAcademy, setHasAcademy] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [navReady, setNavReady] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [popoverOpen, setPopoverOpen] = useState(false)
 
   useEffect(() => {
     if (user) {
-      fetch('/api/venue')
-        .then((res) => res.json())
-        .then((data) => setHasVenues(data.venues?.length > 0))
-        .catch(() => setHasVenues(false))
-
-      fetch('/api/academy')
-        .then((res) => res.json())
-        .then((data) => setHasAcademy((data.clubs?.length ?? 0) > 0))
-        .catch(() => setHasAcademy(false))
-
-      fetch('/api/admin?section=stats')
-        .then((res) => setIsAdmin(res.ok))
-        .catch(() => setIsAdmin(false))
+      setNavReady(false)
+      Promise.all([
+        fetch('/api/venue')
+          .then((res) => res.json())
+          .then((data) => setHasVenues(data.venues?.length > 0))
+          .catch(() => setHasVenues(false)),
+        fetch('/api/academy')
+          .then((res) => res.json())
+          .then((data) => setHasAcademy((data.clubs?.length ?? 0) > 0))
+          .catch(() => setHasAcademy(false)),
+        fetch('/api/admin?section=stats')
+          .then((res) => setIsAdmin(res.ok))
+          .catch(() => setIsAdmin(false)),
+      ]).finally(() => setNavReady(true))
     } else {
       setHasVenues(false)
       setHasAcademy(false)
       setIsAdmin(false)
+      setNavReady(true)
     }
   }, [user])
 
-  // Build nav links — static ones always, conditional ones when authenticated
+  // Build nav links — static ones always, conditional ones only after all checks complete
   const navLinks = [
     { href: '/matches', label: 'Browse', icon: Compass },
     { href: '/recordings', label: 'My Recordings', icon: Film },
-    ...(hasVenues
+    ...(navReady && hasVenues
       ? [{ href: '/venue', label: 'Manage Venue', icon: Building2 }]
       : []),
-    ...(hasAcademy
+    ...(navReady && hasAcademy
       ? [{ href: '/academy', label: 'Academy', icon: GraduationCap }]
       : []),
-    ...(isAdmin
+    ...(navReady && isAdmin
       ? [{ href: '/admin', label: 'Admin', icon: ShieldCheck }]
       : []),
   ]
