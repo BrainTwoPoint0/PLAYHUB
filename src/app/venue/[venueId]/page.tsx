@@ -26,7 +26,6 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from 'recharts'
-import { FadeIn } from '@/components/FadeIn'
 import { LoadingSpinner } from '@/components/ui/loading'
 import { HlsPlayer } from '@/components/streaming/HlsPlayer'
 
@@ -1398,7 +1397,7 @@ export default function VenueManagementPage() {
     try {
       setLoading(true)
 
-      // Fetch venue info
+      // Fetch venue info first — this is the critical data
       const venuesRes = await fetch('/api/venue')
       const venuesData = await venuesRes.json()
 
@@ -1416,46 +1415,41 @@ export default function VenueManagementPage() {
         return
       }
       setVenue(currentVenue)
-
-      // Fetch org marketplace settings
-      if (currentVenue.slug) {
-        try {
-          const mpRes = await fetch(`/api/org/${currentVenue.slug}/marketplace`)
-          if (mpRes.ok) {
-            const mpData = await mpRes.json()
-            setOrgMarketplace(mpData)
-          }
-        } catch {
-          // Non-critical
-        }
-      }
-
-      // Fetch scenes for scheduling
-      try {
-        const scenesRes = await fetch(`/api/venue/${venueId}/spiideo/scenes`)
-        const scenesData = await scenesRes.json()
-        console.log('Scenes response:', scenesData)
-        if (scenesData.scenes) {
-          setScenes(scenesData.scenes)
-          if (scenesData.scenes.length > 0 && !sceneId) {
-            setSceneId(scenesData.scenes[0].id)
-          }
-        } else if (scenesData.error) {
-          console.error('Scenes error:', scenesData.error)
-        }
-      } catch (e) {
-        // Scenes not available - scheduling will be disabled
-        console.error('Scenes fetch failed:', e)
-      }
-
-      // Fetch billing data
-      await fetchBillingData()
     } catch (err) {
       setError('Failed to load venue data')
     } finally {
       setLoading(false)
     }
   }
+
+  // Load supplementary data independently once venue is available
+  useEffect(() => {
+    if (!venue) return
+
+    // Fetch org marketplace settings
+    if (venue.slug) {
+      fetch(`/api/org/${venue.slug}/marketplace`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => { if (data) setOrgMarketplace(data) })
+        .catch(() => {})
+    }
+
+    // Fetch scenes for scheduling
+    fetch(`/api/venue/${venueId}/spiideo/scenes`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.scenes) {
+          setScenes(data.scenes)
+          if (data.scenes.length > 0 && !sceneId) {
+            setSceneId(data.scenes[0].id)
+          }
+        }
+      })
+      .catch(() => {})
+
+    // Fetch billing data
+    fetchBillingData()
+  }, [venue])
 
   // Debounce search input
   useEffect(() => {
@@ -2311,8 +2305,7 @@ export default function VenueManagementPage() {
   return (
     <div className="min-h-screen bg-[var(--night)]">
       <div className="container mx-auto px-5 py-16 max-w-6xl">
-        <FadeIn>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8">
             <div>
               <p className="text-muted-foreground text-xs font-semibold tracking-[0.25em] uppercase mb-2">
                 Venue Management
@@ -2331,11 +2324,9 @@ export default function VenueManagementPage() {
               </Button>
             )}
           </div>
-        </FadeIn>
 
         {/* Billing Overview */}
         {billingConfig?.is_active && (
-          <FadeIn delay={100}>
             <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/8 bg-card">
               <div className="p-5">
                 {/* Header row */}
@@ -2802,12 +2793,10 @@ export default function VenueManagementPage() {
                 </div>
               )}
             </div>
-          </FadeIn>
         )}
 
         {/* Schedule Recording */}
         {scenes.length > 0 && (
-          <FadeIn delay={100}>
             <div className="mb-6 rounded-xl border border-border bg-card">
               <div className="p-6">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-2">
@@ -3146,11 +3135,9 @@ export default function VenueManagementPage() {
                 </div>
               )}
             </div>
-          </FadeIn>
         )}
 
         {/* Live Streaming Section */}
-        <FadeIn delay={200}>
           <div className="mb-6 rounded-xl border border-border bg-card">
             <div className="p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
@@ -3509,20 +3496,16 @@ export default function VenueManagementPage() {
               </div>
             )}
           </div>
-        </FadeIn>
 
         {/* Marketplace Revenue */}
         {orgMarketplace?.marketplace_enabled && (
-          <FadeIn delay={250}>
             <MarketplaceRevenue
               venueId={venueId}
               outlineBtnClass={outlineBtnClass}
             />
-          </FadeIn>
         )}
 
         {/* Recordings List */}
-        <FadeIn delay={300}>
           <div className="rounded-xl border border-border bg-card">
             <div className="p-6">
               <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
@@ -3809,11 +3792,9 @@ export default function VenueManagementPage() {
               )}
             </div>
           </div>
-        </FadeIn>
 
         {/* Venue Settings (YouTube, Marketplace, Media Pack) */}
-        <FadeIn delay={350}>
-          <VenueSettings
+        <VenueSettings
             venueId={venueId}
             billingConfig={billingConfig}
             onSaved={(updated) => setBillingConfig(updated)}
@@ -3821,31 +3802,25 @@ export default function VenueManagementPage() {
             outlineBtnClass={outlineBtnClass}
             primaryBtnClass={primaryBtnClass}
           />
-        </FadeIn>
 
         {/* Graphic Packages (Account-level) */}
-        <FadeIn delay={375}>
-          <GraphicPackagesSection
+        <GraphicPackagesSection
             venueSlug={venue?.slug || null}
             inputClass={inputClass}
             outlineBtnClass={outlineBtnClass}
             primaryBtnClass={primaryBtnClass}
           />
-        </FadeIn>
 
         {/* Marketplace Settings (Org-level) */}
-        <FadeIn delay={400}>
-          <MarketplaceSettingsSection
+        <MarketplaceSettingsSection
             venueSlug={venue?.slug || null}
             inputClass={inputClass}
             outlineBtnClass={outlineBtnClass}
             primaryBtnClass={primaryBtnClass}
             onUpdate={setOrgMarketplace}
           />
-        </FadeIn>
 
         {/* Venue Admins Section */}
-        <FadeIn delay={400}>
           <div className="mt-6 rounded-xl border border-border bg-card">
             <div className="p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
@@ -3954,7 +3929,6 @@ export default function VenueManagementPage() {
               </div>
             )}
           </div>
-        </FadeIn>
 
         {/* Access Modal */}
         {showAccessModal && selectedRecording && (
