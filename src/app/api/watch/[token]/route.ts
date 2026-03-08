@@ -88,6 +88,24 @@ export async function GET(
     if (gp) graphicPackage = gp
   }
 
+  // Fallback: check parent org's default graphic package (e.g. Li3ib → Nazwa)
+  if (!graphicPackage && recording.organization_id) {
+    const { data: org } = await (serviceClient as any)
+      .from('organizations')
+      .select('parent_organization_id')
+      .eq('id', recording.organization_id)
+      .maybeSingle()
+    if (org?.parent_organization_id) {
+      const { data: gp } = await (serviceClient as any)
+        .from('playhub_graphic_packages')
+        .select('*')
+        .eq('organization_id', org.parent_organization_id)
+        .eq('is_default', true)
+        .maybeSingle()
+      if (gp) graphicPackage = gp
+    }
+  }
+
   if (!graphicPackage && recording.organization_id) {
     const { data: billingCfg } = await (serviceClient as any)
       .from('playhub_venue_billing_config')

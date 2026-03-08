@@ -30,8 +30,14 @@ export interface MediaPack {
 export interface GraphicPackageOverlay {
   logo_url: string | null
   logo_position: string
+  logo_x?: number | null
+  logo_y?: number | null
+  logo_scale?: number | null
   sponsor_logo_url: string | null
   sponsor_position: string
+  sponsor_x?: number | null
+  sponsor_y?: number | null
+  sponsor_scale?: number | null
 }
 
 interface VideoPlayerProps {
@@ -265,16 +271,56 @@ export function VideoPlayer({
       {/* Graphics overlay — prefer graphicPackage over legacy mediaPack */}
       {(() => {
         const logoUrl = graphicPackage?.logo_url || mediaPack?.logo_url
-        const logoPos =
-          graphicPackage?.logo_position ||
-          mediaPack?.logo_position ||
-          'top-right'
         const sponsorUrl =
           graphicPackage?.sponsor_logo_url || mediaPack?.sponsor_logo_url
-        const sponsorPos =
-          graphicPackage?.sponsor_position ||
-          mediaPack?.sponsor_position ||
-          'bottom-left'
+
+        // Use percentage-based positioning if available, else fall back to corner positions
+        const hasPercentPos = graphicPackage?.logo_x != null
+        const logoX = graphicPackage?.logo_x ?? 85
+        const logoY = graphicPackage?.logo_y ?? 3
+        const logoScale = graphicPackage?.logo_scale ?? 8
+        const sponsorX = graphicPackage?.sponsor_x ?? 3
+        const sponsorY = graphicPackage?.sponsor_y ?? 85
+        const sponsorScale = graphicPackage?.sponsor_scale ?? 10
+
+        if (hasPercentPos) {
+          return (
+            <>
+              {logoUrl && (
+                <img
+                  src={logoUrl}
+                  alt=""
+                  className="absolute pointer-events-none object-contain opacity-80"
+                  style={{
+                    left: `${logoX}%`,
+                    top: `${logoY}%`,
+                    width: `${logoScale}%`,
+                    maxWidth: '250px',
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                />
+              )}
+              {sponsorUrl && (
+                <img
+                  src={sponsorUrl}
+                  alt=""
+                  className="absolute pointer-events-none object-contain opacity-80"
+                  style={{
+                    left: `${sponsorX}%`,
+                    top: `${sponsorY}%`,
+                    width: `${sponsorScale}%`,
+                    maxWidth: '250px',
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                />
+              )}
+            </>
+          )
+        }
+
+        // Legacy fallback: fixed corner positions from mediaPack
+        const logoPos = mediaPack?.logo_position || 'top-right'
+        const sponsorPos = mediaPack?.sponsor_position || 'bottom-left'
         const posClass = (pos: string) =>
           pos === 'top-left'
             ? 'top-3 left-3'

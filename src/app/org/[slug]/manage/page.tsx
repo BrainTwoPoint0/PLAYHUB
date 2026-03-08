@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   Button,
@@ -84,8 +84,14 @@ interface GraphicPackage {
   is_default: boolean
   logo_url: string | null
   logo_position: string
+  logo_x: number
+  logo_y: number
+  logo_scale: number
   sponsor_logo_url: string | null
   sponsor_position: string
+  sponsor_x: number
+  sponsor_y: number
+  sponsor_scale: number
   spiideo_graphic_package_id: string | null
   created_at: string
   updated_at: string
@@ -131,11 +137,19 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
   const [formName, setFormName] = useState('')
   const [formLogoUrl, setFormLogoUrl] = useState('')
   const [formLogoPosition, setFormLogoPosition] = useState('top-right')
+  const [formLogoX, setFormLogoX] = useState(85)
+  const [formLogoY, setFormLogoY] = useState(3)
+  const [formLogoScale, setFormLogoScale] = useState(8)
   const [formSponsorUrl, setFormSponsorUrl] = useState('')
   const [formSponsorPosition, setFormSponsorPosition] = useState('bottom-left')
+  const [formSponsorX, setFormSponsorX] = useState(3)
+  const [formSponsorY, setFormSponsorY] = useState(85)
+  const [formSponsorScale, setFormSponsorScale] = useState(10)
   const [formIsDefault, setFormIsDefault] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [uploadingSponsor, setUploadingSponsor] = useState(false)
+  const [dragging, setDragging] = useState<'logo' | 'sponsor' | null>(null)
+  const previewRef = useRef<HTMLDivElement>(null)
 
   // Spiideo import
   const [showImport, setShowImport] = useState(false)
@@ -209,8 +223,14 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
     setFormName('')
     setFormLogoUrl('')
     setFormLogoPosition('top-right')
+    setFormLogoX(85)
+    setFormLogoY(3)
+    setFormLogoScale(8)
     setFormSponsorUrl('')
     setFormSponsorPosition('bottom-left')
+    setFormSponsorX(3)
+    setFormSponsorY(85)
+    setFormSponsorScale(10)
     setFormIsDefault(packages.length === 0)
     setShowForm(true)
   }
@@ -220,8 +240,14 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
     setFormName(pkg.name)
     setFormLogoUrl(pkg.logo_url || '')
     setFormLogoPosition(pkg.logo_position)
+    setFormLogoX(pkg.logo_x ?? 85)
+    setFormLogoY(pkg.logo_y ?? 3)
+    setFormLogoScale(pkg.logo_scale ?? 8)
     setFormSponsorUrl(pkg.sponsor_logo_url || '')
     setFormSponsorPosition(pkg.sponsor_position)
+    setFormSponsorX(pkg.sponsor_x ?? 3)
+    setFormSponsorY(pkg.sponsor_y ?? 85)
+    setFormSponsorScale(pkg.sponsor_scale ?? 10)
     setFormIsDefault(pkg.is_default)
     setShowForm(true)
   }
@@ -235,8 +261,14 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
         name: formName.trim(),
         logo_url: formLogoUrl || null,
         logo_position: formLogoPosition,
+        logo_x: formLogoX,
+        logo_y: formLogoY,
+        logo_scale: formLogoScale,
         sponsor_logo_url: formSponsorUrl || null,
         sponsor_position: formSponsorPosition,
+        sponsor_x: formSponsorX,
+        sponsor_y: formSponsorY,
+        sponsor_scale: formSponsorScale,
         is_default: formIsDefault,
       }
 
@@ -499,7 +531,7 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
 
       {/* Create/Edit Form */}
       {showForm && (
-        <div className="space-y-3 p-4 rounded-lg border border-border bg-[var(--night)]">
+        <div className="space-y-4 p-4 rounded-lg border border-border bg-[var(--night)]">
           <h3 className="text-sm font-semibold text-[var(--timberwolf)]">
             {editingPkg ? 'Edit Package' : 'New Package'}
           </h3>
@@ -514,6 +546,8 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
               className={inputClass}
             />
           </div>
+
+          {/* Upload row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Logo</label>
@@ -540,25 +574,6 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">
-                Logo Position
-              </label>
-              <Select
-                value={formLogoPosition}
-                onValueChange={setFormLogoPosition}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="top-left">Top Left</SelectItem>
-                  <SelectItem value="top-right">Top Right</SelectItem>
-                  <SelectItem value="bottom-left">Bottom Left</SelectItem>
-                  <SelectItem value="bottom-right">Bottom Right</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">
                 Sponsor Logo
               </label>
               <div className="flex gap-2">
@@ -582,26 +597,123 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
                 </label>
               </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">
-                Sponsor Position
-              </label>
-              <Select
-                value={formSponsorPosition}
-                onValueChange={setFormSponsorPosition}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="top-left">Top Left</SelectItem>
-                  <SelectItem value="top-right">Top Right</SelectItem>
-                  <SelectItem value="bottom-left">Bottom Left</SelectItem>
-                  <SelectItem value="bottom-right">Bottom Right</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
+
+          {/* Scale sliders */}
+          {(formLogoUrl || formSponsorUrl) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {formLogoUrl && (
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">
+                    Logo Size — {formLogoScale}%
+                  </label>
+                  <input
+                    type="range"
+                    min="2"
+                    max="30"
+                    step="0.5"
+                    value={formLogoScale}
+                    onChange={(e) => setFormLogoScale(parseFloat(e.target.value))}
+                    className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[var(--timberwolf)]"
+                  />
+                </div>
+              )}
+              {formSponsorUrl && (
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">
+                    Sponsor Size — {formSponsorScale}%
+                  </label>
+                  <input
+                    type="range"
+                    min="2"
+                    max="30"
+                    step="0.5"
+                    value={formSponsorScale}
+                    onChange={(e) => setFormSponsorScale(parseFloat(e.target.value))}
+                    className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[var(--timberwolf)]"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Drag-and-drop preview */}
+          {(formLogoUrl || formSponsorUrl) && (
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">
+                Drag to position overlays
+              </label>
+              <div
+                ref={previewRef}
+                className="relative w-full aspect-video bg-zinc-900 rounded-lg overflow-hidden border border-border select-none"
+                onMouseMove={(e) => {
+                  if (!dragging || !previewRef.current) return
+                  const rect = previewRef.current.getBoundingClientRect()
+                  const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100))
+                  const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100))
+                  if (dragging === 'logo') { setFormLogoX(Math.round(x * 10) / 10); setFormLogoY(Math.round(y * 10) / 10) }
+                  else { setFormSponsorX(Math.round(x * 10) / 10); setFormSponsorY(Math.round(y * 10) / 10) }
+                }}
+                onMouseUp={() => setDragging(null)}
+                onMouseLeave={() => setDragging(null)}
+                onTouchMove={(e) => {
+                  if (!dragging || !previewRef.current) return
+                  e.preventDefault()
+                  const touch = e.touches[0]
+                  const rect = previewRef.current.getBoundingClientRect()
+                  const x = Math.max(0, Math.min(100, ((touch.clientX - rect.left) / rect.width) * 100))
+                  const y = Math.max(0, Math.min(100, ((touch.clientY - rect.top) / rect.height) * 100))
+                  if (dragging === 'logo') { setFormLogoX(Math.round(x * 10) / 10); setFormLogoY(Math.round(y * 10) / 10) }
+                  else { setFormSponsorX(Math.round(x * 10) / 10); setFormSponsorY(Math.round(y * 10) / 10) }
+                }}
+                onTouchEnd={() => setDragging(null)}
+              >
+                {/* Grid lines for guidance */}
+                <div className="absolute inset-0 pointer-events-none">
+                  <div className="absolute left-1/3 top-0 bottom-0 w-px bg-white/5" />
+                  <div className="absolute left-2/3 top-0 bottom-0 w-px bg-white/5" />
+                  <div className="absolute top-1/3 left-0 right-0 h-px bg-white/5" />
+                  <div className="absolute top-2/3 left-0 right-0 h-px bg-white/5" />
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/30 pointer-events-none">
+                  16:9 Preview
+                </div>
+                {formLogoUrl && (
+                  <img
+                    src={formLogoUrl}
+                    alt="Logo"
+                    draggable={false}
+                    className={`absolute object-contain opacity-80 cursor-grab ${dragging === 'logo' ? 'cursor-grabbing ring-2 ring-emerald-500/50' : 'hover:ring-2 hover:ring-white/30'} rounded transition-shadow`}
+                    style={{
+                      left: `${formLogoX}%`,
+                      top: `${formLogoY}%`,
+                      width: `${formLogoScale}%`,
+                      transform: 'translate(-50%, -50%)',
+                    }}
+                    onMouseDown={(e) => { e.preventDefault(); setDragging('logo') }}
+                    onTouchStart={() => setDragging('logo')}
+                  />
+                )}
+                {formSponsorUrl && (
+                  <img
+                    src={formSponsorUrl}
+                    alt="Sponsor"
+                    draggable={false}
+                    className={`absolute object-contain opacity-80 cursor-grab ${dragging === 'sponsor' ? 'cursor-grabbing ring-2 ring-blue-500/50' : 'hover:ring-2 hover:ring-white/30'} rounded transition-shadow`}
+                    style={{
+                      left: `${formSponsorX}%`,
+                      top: `${formSponsorY}%`,
+                      width: `${formSponsorScale}%`,
+                      transform: 'translate(-50%, -50%)',
+                    }}
+                    onMouseDown={(e) => { e.preventDefault(); setDragging('sponsor') }}
+                    onTouchStart={() => setDragging('sponsor')}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -613,45 +725,6 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
               Set as default package
             </span>
           </label>
-
-          {/* Preview */}
-          {(formLogoUrl || formSponsorUrl) && (
-            <div className="relative w-full aspect-video bg-muted rounded-lg overflow-hidden border border-border">
-              <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
-                Preview
-              </div>
-              {formLogoUrl && (
-                <img
-                  src={formLogoUrl}
-                  alt="Logo"
-                  className={`absolute w-12 h-12 object-contain opacity-70 ${
-                    formLogoPosition === 'top-left'
-                      ? 'top-2 left-2'
-                      : formLogoPosition === 'top-right'
-                        ? 'top-2 right-2'
-                        : formLogoPosition === 'bottom-left'
-                          ? 'bottom-2 left-2'
-                          : 'bottom-2 right-2'
-                  }`}
-                />
-              )}
-              {formSponsorUrl && (
-                <img
-                  src={formSponsorUrl}
-                  alt="Sponsor"
-                  className={`absolute w-16 h-8 object-contain opacity-70 ${
-                    formSponsorPosition === 'top-left'
-                      ? 'top-2 left-2'
-                      : formSponsorPosition === 'top-right'
-                        ? 'top-2 right-2'
-                        : formSponsorPosition === 'bottom-left'
-                          ? 'bottom-2 left-2'
-                          : 'bottom-2 right-2'
-                  }`}
-                />
-              )}
-            </div>
-          )}
 
           <div className="flex items-center gap-2">
             <Button
@@ -1210,10 +1283,13 @@ const CHART_COLORS = [
   'hsl(15, 90%, 55%)',
 ]
 
-function GroupDashboardView({ slug }: { slug: string }) {
+type GroupTab = 'overview' | 'graphics' | 'team'
+
+function GroupDashboardView({ slug, hasGraphicPackages }: { slug: string; hasGraphicPackages: boolean }) {
   const router = useRouter()
   const [data, setData] = useState<GroupDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<GroupTab>('overview')
 
   const now = new Date()
   const [month, setMonth] = useState(now.getMonth() + 1)
@@ -1273,9 +1349,39 @@ function GroupDashboardView({ slug }: { slug: string }) {
     }).format(amount)
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
+  if (!data && !loading && activeTab === 'overview') return null
+
+  const currency = data?.currency || 'KWD'
+
+  const groupTabs: Array<{ id: GroupTab; label: string }> = [
+    { id: 'overview', label: 'Overview' },
+    ...(hasGraphicPackages ? [{ id: 'graphics' as GroupTab, label: 'Graphic Packages' }] : []),
+    { id: 'team', label: 'Team' },
+  ]
+
+  return (
+    <div className="space-y-6">
+      {/* Tab navigation */}
+      <div className="flex gap-1 border-b border-border pb-px overflow-x-auto">
+        {groupTabs.map(({ id, label }) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            className={`px-3.5 py-2 text-sm rounded-t-md transition-colors whitespace-nowrap -mb-px border-b-2 ${
+              activeTab === id
+                ? 'text-[var(--timberwolf)] border-[var(--timberwolf)] bg-muted/30'
+                : 'text-muted-foreground border-transparent hover:text-[var(--timberwolf)] hover:bg-muted/20'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'graphics' && <GraphicPackagesTab slug={slug} />}
+      {activeTab === 'team' && <TeamTab slug={slug} />}
+
+      {activeTab === 'overview' && loading && (
         <div className="rounded-xl border border-border bg-card animate-pulse p-6">
           <div className="space-y-4">
             <div className="bg-muted rounded h-5 w-[200px]" />
@@ -1289,16 +1395,9 @@ function GroupDashboardView({ slug }: { slug: string }) {
             </div>
           </div>
         </div>
-      </div>
-    )
-  }
+      )}
 
-  if (!data) return null
-
-  const currency = data.currency || 'KWD'
-
-  return (
-    <div className="space-y-6">
+      {activeTab === 'overview' && data && <>
       {/* Month selector */}
       <div className="flex items-center gap-3">
         <button
@@ -1499,6 +1598,7 @@ function GroupDashboardView({ slug }: { slug: string }) {
           </div>
         </div>
       </div>
+      </>}
     </div>
   )
 }
@@ -1609,7 +1709,7 @@ export default function OrgManagePage() {
       </div>
 
       {org.type === 'group' ? (
-        <GroupDashboardView slug={slug} />
+        <GroupDashboardView slug={slug} hasGraphicPackages={org.featureGraphicPackages} />
       ) : (
         <>
           {/* Tab navigation */}
