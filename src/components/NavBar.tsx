@@ -60,23 +60,21 @@ export default function NavBar() {
   useEffect(() => {
     if (user) {
       setNavReady(false)
-      Promise.all([
-        fetch('/api/venue')
-          .then((res) => res.json())
-          .then((data) => setHasVenues(data.venues?.length > 0))
-          .catch(() => setHasVenues(false)),
-        fetch('/api/academy')
-          .then((res) => res.json())
-          .then((data) => setHasAcademy((data.clubs?.length ?? 0) > 0))
-          .catch(() => setHasAcademy(false)),
-        fetch('/api/admin?section=stats')
-          .then((res) => setIsAdmin(res.ok))
-          .catch(() => setIsAdmin(false)),
-        fetch('/api/org')
-          .then((res) => res.json())
-          .then((data) => setManagedOrgs(data.organizations || []))
-          .catch(() => setManagedOrgs([])),
-      ]).finally(() => setNavReady(true))
+      fetch('/api/nav')
+        .then((res) => res.json())
+        .then((data) => {
+          setHasVenues(data.hasVenues ?? false)
+          setHasAcademy(data.hasAcademy ?? false)
+          setIsAdmin(data.isAdmin ?? false)
+          setManagedOrgs(data.managedOrgs ?? [])
+        })
+        .catch(() => {
+          setHasVenues(false)
+          setHasAcademy(false)
+          setIsAdmin(false)
+          setManagedOrgs([])
+        })
+        .finally(() => setNavReady(true))
     } else {
       setHasVenues(false)
       setHasAcademy(false)
