@@ -44,6 +44,8 @@ export interface ScheduleRecordingInput {
   priceCurrency?: string
   /** Graphic package to attach to the recording. */
   graphicPackageId?: string
+  /** Override organization_id (for tenant orgs scheduling at a venue they don't own). */
+  ownerOrgId?: string
 }
 
 export interface ScheduleRecordingResult {
@@ -132,7 +134,8 @@ export async function scheduleRecording(
   const { data: recording, error: recordingError } = await serviceClient
     .from('playhub_match_recordings')
     .insert({
-      organization_id: venueId,
+      organization_id: input.ownerOrgId || venueId,
+      venue_organization_id: venueId,
       spiideo_game_id: game.id,
       spiideo_production_id: production.id,
       title,

@@ -353,9 +353,9 @@ async function transferGame(
         access_type: 'private_link',
         transferred_at: new Date().toISOString(),
       },
-      { onConflict: 'spiideo_game_id' }
+      { onConflict: 'spiideo_game_id', ignoreDuplicates: false }
     )
-    .select('id, organization_id')
+    .select('id, organization_id, venue_organization_id')
     .single()
 
   if (dbError) {

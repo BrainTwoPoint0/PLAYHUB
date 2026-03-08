@@ -224,7 +224,7 @@ async function notifyVenueAdmins(
     .from('organization_members')
     .select('profile_id')
     .eq('organization_id', venueId)
-    .in('role', ['club_admin', 'league_admin'])
+    .in('role', ['admin', 'club_admin', 'league_admin'])
     .eq('is_active', true)
 
   if (!members || members.length === 0) return

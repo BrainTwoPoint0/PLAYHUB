@@ -31,17 +31,23 @@ export interface Recording {
   status: string
 }
 
+import type { Database } from '@/lib/supabase/types'
+type Role = Database['public']['Enums']['profile_variant_type']
+// Only 'admin' is used going forward. club_admin/league_admin exist in the enum
+// but all data has been migrated to 'admin'. Keep them here temporarily until
+// all RLS policies are migrated to use is_org_member().
+const ADMIN_ROLES: Role[] = ['admin', 'club_admin', 'league_admin']
+
 /**
- * Check if a user is an admin for a specific venue/organization
+ * Check if a user is an admin for a specific venue/organization.
+ * Also checks parent org membership (one level up only).
  */
 export async function isVenueAdmin(
   userId: string,
   organizationId: string
 ): Promise<boolean> {
-  // Use service client to bypass RLS - this is server-side code
   const supabase = createServiceClient()
 
-  // Get user's profile
   const { data: profile } = await supabase
     .from('profiles')
     .select('id')
@@ -50,7 +56,7 @@ export async function isVenueAdmin(
 
   if (!profile) return false
 
-  // Check organization membership
+  // Check direct membership
   const { data: membership } = await supabase
     .from('organization_members')
     .select('role')
@@ -59,26 +65,48 @@ export async function isVenueAdmin(
     .eq('is_active', true)
     .single()
 
-  return (
-    !!membership && ['club_admin', 'league_admin'].includes(membership.role)
-  )
+  if (membership && ADMIN_ROLES.includes(membership.role)) {
+    return true
+  }
+
+  // Check parent org membership (group admin → child venue access)
+  const { data: org } = await (supabase as any)
+    .from('organizations')
+    .select('parent_organization_id')
+    .eq('id', organizationId)
+    .single()
+
+  if (org?.parent_organization_id) {
+    const { data: parentMembership } = await supabase
+      .from('organization_members')
+      .select('role')
+      .eq('profile_id', profile.id)
+      .eq('organization_id', org.parent_organization_id)
+      .eq('is_active', true)
+      .single()
+
+    if (parentMembership && ADMIN_ROLES.includes(parentMembership.role)) {
+      return true
+    }
+  }
+
+  return false
+}
+
+type ManagedVenue = {
+  id: string
+  name: string
+  slug: string | null
+  logo_url: string | null
 }
 
 /**
- * Get venues (organizations) that a user can manage
+ * Get venues (organizations) that a user can manage.
+ * Includes child venues of parent orgs the user is admin of.
  */
-export async function getManagedVenues(userId: string): Promise<
-  Array<{
-    id: string
-    name: string
-    slug: string | null
-    logo_url: string | null
-  }>
-> {
-  // Use service client to bypass RLS - this is server-side code
+export async function getManagedVenues(userId: string): Promise<ManagedVenue[]> {
   const supabase = createServiceClient()
 
-  // Get user's profile
   const { data: profile } = await supabase
     .from('profiles')
     .select('id')
@@ -98,22 +126,48 @@ export async function getManagedVenues(userId: string): Promise<
         id,
         name,
         slug,
-        logo_url
+        logo_url,
+        type
       )
     `
     )
     .eq('profile_id', profile.id)
-    .in('role', ['club_admin', 'league_admin'])
+    .in('role', ADMIN_ROLES)
     .eq('is_active', true)
 
   if (!memberships) return []
 
-  return memberships.map((m: any) => m.organizations).filter(Boolean) as Array<{
-    id: string
-    name: string
-    slug: string | null
-    logo_url: string | null
-  }>
+  const directOrgs = memberships
+    .map((m: any) => m.organizations)
+    .filter(Boolean) as Array<ManagedVenue & { type: string }>
+
+  // For group-type orgs, also include their child venues
+  const groupOrgIds = directOrgs
+    .filter((o) => o.type === 'group')
+    .map((o) => o.id)
+
+  if (groupOrgIds.length === 0) {
+    return directOrgs
+  }
+
+  const { data: childVenues } = await (supabase as any)
+    .from('organizations')
+    .select('id, name, slug, logo_url')
+    .in('parent_organization_id', groupOrgIds)
+    .eq('is_active', true)
+
+  // Merge direct orgs + child venues, deduplicate by id
+  const seen = new Set<string>()
+  const result: ManagedVenue[] = []
+
+  for (const org of [...directOrgs, ...(childVenues || [])]) {
+    if (!seen.has(org.id)) {
+      seen.add(org.id)
+      result.push({ id: org.id, name: org.name, slug: org.slug, logo_url: org.logo_url })
+    }
+  }
+
+  return result
 }
 
 /**
@@ -126,10 +180,10 @@ export async function checkRecordingAccess(
   // Use service client to bypass RLS - this is server-side code
   const supabase = createServiceClient()
 
-  // Fetch recording details
+  // Fetch recording details (include venue_organization_id for parent org check)
   const { data: recording, error } = await (supabase as any)
     .from('playhub_match_recordings')
-    .select('id, organization_id, status')
+    .select('id, organization_id, venue_organization_id, status')
     .eq('id', recordingId)
     .single()
 
