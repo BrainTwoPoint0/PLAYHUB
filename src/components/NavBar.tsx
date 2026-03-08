@@ -52,6 +52,7 @@ export default function NavBar() {
   const [hasVenues, setHasVenues] = useState(false)
   const [hasAcademy, setHasAcademy] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [managedOrgs, setManagedOrgs] = useState<Array<{ slug: string; name: string; type: string }>>([])
   const [navReady, setNavReady] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [popoverOpen, setPopoverOpen] = useState(false)
@@ -71,11 +72,16 @@ export default function NavBar() {
         fetch('/api/admin?section=stats')
           .then((res) => setIsAdmin(res.ok))
           .catch(() => setIsAdmin(false)),
+        fetch('/api/org')
+          .then((res) => res.json())
+          .then((data) => setManagedOrgs(data.organizations || []))
+          .catch(() => setManagedOrgs([])),
       ]).finally(() => setNavReady(true))
     } else {
       setHasVenues(false)
       setHasAcademy(false)
       setIsAdmin(false)
+      setManagedOrgs([])
       setNavReady(true)
     }
   }, [user])
@@ -89,6 +95,15 @@ export default function NavBar() {
       : []),
     ...(navReady && hasAcademy
       ? [{ href: '/academy', label: 'Academy', icon: GraduationCap }]
+      : []),
+    ...(navReady && managedOrgs.length > 0
+      ? [{
+          href: managedOrgs.length === 1
+            ? `/org/${managedOrgs[0].slug}/manage`
+            : '/org',
+          label: 'Manage Org',
+          icon: Building2,
+        }]
       : []),
     ...(navReady && isAdmin
       ? [{ href: '/admin', label: 'Admin', icon: ShieldCheck }]

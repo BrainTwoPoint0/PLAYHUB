@@ -261,3 +261,40 @@ AWS_PROFILE=playhub aws lambda invoke --function-name playhub-veo-sync \
   --region eu-west-2 --cli-binary-format raw-in-base64-out \
   --cli-read-timeout 300 /tmp/result.json && cat /tmp/result.json
 ```
+
+---
+
+# Org Dashboard: Group vs Regular Org
+
+## Goal
+The `/org/[slug]/manage` page should render differently based on org type:
+- **Group orgs (Li3ib)** → Group dashboard with aggregate stats, per-venue breakdown, daily chart
+- **Everything else (venue, league, academy)** → Current manage page (graphic packages, marketplace, recordings, team)
+
+## Tasks
+
+- [x] **1. Update manage API to return `type`**
+  - File: `src/app/api/org/[slug]/manage/route.ts`
+  - Add `type` to the org select query and return it in the response
+
+- [x] **2. Create group dashboard API route**
+  - File: `src/app/api/org/[slug]/manage/group-dashboard/route.ts`
+  - Reuse logic from `/api/venue/[venueId]/group-dashboard` but resolve org by slug instead of ID
+  - Returns: child venues stats, totals, daily chart, venue names, daily target, average per day
+
+- [x] **3. Update manage page to detect group type**
+  - File: `src/app/org/[slug]/manage/page.tsx`
+  - Add `type` to `OrgInfo` interface
+  - When `type === 'group'`, render group dashboard instead of tab UI
+  - When `type !== 'group'`, render existing tab UI (no changes)
+
+- [x] **4. Build group dashboard UI in manage page**
+  - Portfolio Overview: 4 stat cards (total recordings, this month, monthly revenue, today)
+  - Child Venues list: cards with stats, revenue, daily target, "Manage" link
+  - Daily Performance: stacked area chart (per-venue breakdown) with target reference line
+  - Month selector (prev/next month navigation)
+
+## Files Changed
+- `src/app/api/org/[slug]/manage/route.ts` — add `type` field
+- `src/app/api/org/[slug]/manage/group-dashboard/route.ts` — new API (reuse group-dashboard logic)
+- `src/app/org/[slug]/manage/page.tsx` — conditional rendering for group vs regular
