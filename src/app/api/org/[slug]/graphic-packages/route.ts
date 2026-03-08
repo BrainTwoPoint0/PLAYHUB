@@ -3,6 +3,7 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
+import { isPlatformAdmin } from '@/lib/admin/auth'
 
 type RouteContext = { params: Promise<{ slug: string }> }
 
@@ -49,8 +50,11 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
     )
   }
 
-  const isAdmin = await isVenueAdmin(user.id, orgId)
-  if (!isAdmin) {
+  const [isAdmin, isPlatform] = await Promise.all([
+    isVenueAdmin(user.id, orgId),
+    isPlatformAdmin(user.id),
+  ])
+  if (!isAdmin && !isPlatform) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
@@ -93,8 +97,11 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     )
   }
 
-  const isAdmin = await isVenueAdmin(user.id, orgId)
-  if (!isAdmin) {
+  const [isAdmin, isPlatform] = await Promise.all([
+    isVenueAdmin(user.id, orgId),
+    isPlatformAdmin(user.id),
+  ])
+  if (!isAdmin && !isPlatform) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
@@ -113,6 +120,12 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     sponsor_position,
     is_default,
     spiideo_graphic_package_id,
+    logo_x,
+    logo_y,
+    logo_scale,
+    sponsor_x,
+    sponsor_y,
+    sponsor_scale,
   } = body
 
   if (
@@ -135,19 +148,6 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       { status: 400 }
     )
   }
-  if (logo_position && !VALID_POSITIONS.includes(logo_position)) {
-    return NextResponse.json(
-      { error: 'Invalid logo position' },
-      { status: 400 }
-    )
-  }
-  if (sponsor_position && !VALID_POSITIONS.includes(sponsor_position)) {
-    return NextResponse.json(
-      { error: 'Invalid sponsor position' },
-      { status: 400 }
-    )
-  }
-
   const serviceClient = createServiceClient() as any
 
   // If setting as default, unset any existing default first
@@ -170,6 +170,12 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       sponsor_position: sponsor_position || 'bottom-left',
       is_default: is_default || false,
       spiideo_graphic_package_id: spiideo_graphic_package_id || null,
+      logo_x: logo_x ?? 85,
+      logo_y: logo_y ?? 3,
+      logo_scale: logo_scale ?? 8,
+      sponsor_x: sponsor_x ?? 3,
+      sponsor_y: sponsor_y ?? 85,
+      sponsor_scale: sponsor_scale ?? 10,
     })
     .select()
     .single()
@@ -205,8 +211,11 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     )
   }
 
-  const isAdmin = await isVenueAdmin(user.id, orgId)
-  if (!isAdmin) {
+  const [isAdmin, isPlatform] = await Promise.all([
+    isVenueAdmin(user.id, orgId),
+    isPlatformAdmin(user.id),
+  ])
+  if (!isAdmin && !isPlatform) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
@@ -247,22 +256,6 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       { status: 400 }
     )
   }
-  if (fields.logo_position && !VALID_POSITIONS.includes(fields.logo_position)) {
-    return NextResponse.json(
-      { error: 'Invalid logo position' },
-      { status: 400 }
-    )
-  }
-  if (
-    fields.sponsor_position &&
-    !VALID_POSITIONS.includes(fields.sponsor_position)
-  ) {
-    return NextResponse.json(
-      { error: 'Invalid sponsor position' },
-      { status: 400 }
-    )
-  }
-
   const allowedFields = [
     'name',
     'logo_url',
@@ -270,6 +263,12 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     'sponsor_logo_url',
     'sponsor_position',
     'is_default',
+    'logo_x',
+    'logo_y',
+    'logo_scale',
+    'sponsor_x',
+    'sponsor_y',
+    'sponsor_scale',
   ]
   const updates: Record<string, any> = {}
   for (const field of allowedFields) {
@@ -337,8 +336,11 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
     )
   }
 
-  const isAdmin = await isVenueAdmin(user.id, orgId)
-  if (!isAdmin) {
+  const [isAdmin, isPlatform] = await Promise.all([
+    isVenueAdmin(user.id, orgId),
+    isPlatformAdmin(user.id),
+  ])
+  if (!isAdmin && !isPlatform) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 

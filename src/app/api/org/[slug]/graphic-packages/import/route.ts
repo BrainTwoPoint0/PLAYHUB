@@ -4,6 +4,7 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
+import { isPlatformAdmin } from '@/lib/admin/auth'
 import { getGraphicPackages, getAccountConfig } from '@/lib/spiideo/client'
 
 type RouteContext = { params: Promise<{ slug: string }> }
@@ -38,8 +39,11 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     )
   }
 
-  const isAdmin = await isVenueAdmin(user.id, orgId)
-  if (!isAdmin) {
+  const [isAdmin, isPlatform] = await Promise.all([
+    isVenueAdmin(user.id, orgId),
+    isPlatformAdmin(user.id),
+  ])
+  if (!isAdmin && !isPlatform) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
@@ -97,8 +101,11 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     )
   }
 
-  const isAdmin = await isVenueAdmin(user.id, orgId)
-  if (!isAdmin) {
+  const [isAdmin, isPlatform] = await Promise.all([
+    isVenueAdmin(user.id, orgId),
+    isPlatformAdmin(user.id),
+  ])
+  if (!isAdmin && !isPlatform) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
