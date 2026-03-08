@@ -5,11 +5,12 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@braintwopoint0/playback-commons/auth'
 import { LoadingSpinner } from '@/components/ui/loading'
-import { BarChart3, Building2, Users, Film, ArrowLeft, Menu, X } from 'lucide-react'
+import { BarChart3, Building2, Users, Film, Layers, ArrowLeft, Menu, X } from 'lucide-react'
 
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: BarChart3 },
   { href: '/admin/venues', label: 'Venues', icon: Building2 },
+  { href: '/admin/organizations', label: 'Organizations', icon: Layers },
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/recordings', label: 'Recordings', icon: Film },
 ]

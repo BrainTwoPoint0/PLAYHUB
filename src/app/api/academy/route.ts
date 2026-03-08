@@ -49,7 +49,7 @@ export async function GET() {
     .from('organization_members')
     .select('organization_id')
     .eq('profile_id', profile.id)
-    .in('role', ['club_admin', 'league_admin'])
+    .in('role', ['admin', 'club_admin', 'league_admin'])
     .eq('is_active', true)
 
   const orgIds = new Set((memberships || []).map((m: any) => m.organization_id))

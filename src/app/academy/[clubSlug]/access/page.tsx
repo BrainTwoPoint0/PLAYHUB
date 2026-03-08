@@ -693,7 +693,7 @@ export default function AcademyAccessPage() {
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
                               <span className="text-[10px] text-muted-foreground/40">
-                                {admin.role === 'league_admin' ? 'League' : 'Club'}
+                                {admin.role === 'admin' ? 'Admin' : admin.role === 'manager' ? 'Manager' : admin.role === 'league_admin' ? 'League' : 'Admin'}
                               </span>
                               <button
                                 onClick={() => removeAdmin(admin.id)}

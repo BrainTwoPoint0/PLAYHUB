@@ -101,13 +101,86 @@ export async function POST(
     }
   }
 
-  // Auto-resolve org's default graphic package if none provided
+  // Determine if user is a tenant (schedules at venue via organization_venue_access)
+  // Check if user is a direct member or parent admin of this venue
+  let ownerOrgId: string | undefined
+  let tenantGraphicPackageId: string | undefined
+
+  const { data: userProfile } = await serviceClient
+    .from('profiles')
+    .select('id')
+    .eq('user_id', user.id)
+    .single()
+
+  if (userProfile) {
+    // Check direct membership on this venue
+    const { data: directMembership } = await serviceClient
+      .from('organization_members')
+      .select('id')
+      .eq('profile_id', userProfile.id)
+      .eq('organization_id', venueId)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (!directMembership) {
+      // Not a direct member — check if parent org admin or tenant
+      const { data: venueOrg } = await (serviceClient as any)
+        .from('organizations')
+        .select('parent_organization_id')
+        .eq('id', venueId)
+        .single()
+
+      let isParentAdmin = false
+      if (venueOrg?.parent_organization_id) {
+        const { data: parentMembership } = await serviceClient
+          .from('organization_members')
+          .select('id')
+          .eq('profile_id', userProfile.id)
+          .eq('organization_id', venueOrg.parent_organization_id)
+          .eq('is_active', true)
+          .maybeSingle()
+        isParentAdmin = !!parentMembership
+      }
+
+      if (!isParentAdmin) {
+        // User must be a tenant — find their org via organization_venue_access
+        const { data: userOrgs } = await serviceClient
+          .from('organization_members')
+          .select('organization_id')
+          .eq('profile_id', userProfile.id)
+          .in('role', ['admin', 'club_admin', 'league_admin'])
+          .eq('is_active', true)
+
+        if (userOrgs && userOrgs.length > 0) {
+          const userOrgIds = userOrgs.map((o: any) => o.organization_id)
+          const { data: venueAccess } = await (serviceClient as any)
+            .from('organization_venue_access')
+            .select('organization_id, default_graphic_package_id, can_record')
+            .eq('venue_organization_id', venueId)
+            .in('organization_id', userOrgIds)
+            .eq('is_active', true)
+            .eq('can_record', true)
+            .maybeSingle()
+
+          if (venueAccess) {
+            ownerOrgId = venueAccess.organization_id
+            tenantGraphicPackageId = venueAccess.default_graphic_package_id
+          }
+        }
+      }
+    }
+  }
+
+  // Auto-resolve graphic package: tenant default > explicit > venue default
   let resolvedGraphicPackageId = graphicPackageId
+  if (!resolvedGraphicPackageId && tenantGraphicPackageId) {
+    resolvedGraphicPackageId = tenantGraphicPackageId
+  }
   if (!resolvedGraphicPackageId) {
     const { data: defaultPkg } = await (serviceClient as any)
       .from('playhub_graphic_packages')
       .select('id')
-      .eq('organization_id', venueId)
+      .eq('organization_id', ownerOrgId || venueId)
       .eq('is_default', true)
       .maybeSingle()
     if (defaultPkg) resolvedGraphicPackageId = defaultPkg.id
@@ -122,7 +195,7 @@ export async function POST(
       title,
       description: description || '',
       createdBy: user.id,
-      collectedBy: 'venue',
+      collectedBy: ownerOrgId ? 'venue' : 'venue',
       isBillable: isBillable ?? true,
       billableAmount,
       accessEmails,
@@ -137,6 +210,7 @@ export async function POST(
       priceAmount: priceAmount ? Number(priceAmount) : undefined,
       priceCurrency,
       graphicPackageId: resolvedGraphicPackageId,
+      ownerOrgId,
     })
 
     return NextResponse.json({

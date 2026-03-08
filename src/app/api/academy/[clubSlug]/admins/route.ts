@@ -53,7 +53,7 @@ export async function GET(
     `
     )
     .eq('organization_id', club.organizationId)
-    .in('role', ['club_admin', 'league_admin'])
+    .in('role', ['admin', 'club_admin', 'league_admin'])
     .eq('is_active', true)
     .order('created_at', { ascending: true })
 
@@ -111,13 +111,13 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
-  const { email, role = 'club_admin' } = body
+  const { email, role = 'admin' } = body
 
   if (!email || typeof email !== 'string') {
     return NextResponse.json({ error: 'Email is required' }, { status: 400 })
   }
 
-  if (!['club_admin', 'league_admin'].includes(role)) {
+  if (!['admin', 'manager', 'club_admin', 'league_admin'].includes(role)) {
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
   }
 

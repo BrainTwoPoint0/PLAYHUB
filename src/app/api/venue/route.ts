@@ -2,6 +2,7 @@
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { isPlatformAdmin } from '@/lib/admin/auth'
 
 export async function GET() {
   const supabase = await createClient()
@@ -30,6 +31,19 @@ export async function GET() {
     return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
   }
 
+  // Platform admins see all organizations
+  const isAdmin = await isPlatformAdmin(user.id)
+  if (isAdmin) {
+    const { data: allOrgs } = await (serviceClient as any)
+      .from('organizations')
+      .select('id, name, slug, logo_url, type, feature_recordings, feature_streaming, feature_graphic_packages')
+      .eq('type', 'venue')
+      .eq('is_active', true)
+      .order('name', { ascending: true })
+
+    return NextResponse.json({ venues: allOrgs || [] })
+  }
+
   // Process any pending admin invites for this user's email
   if (profile.email) {
     await processPendingAdminInvites(serviceClient, profile.id, profile.email)
@@ -46,12 +60,16 @@ export async function GET() {
         id,
         name,
         slug,
-        logo_url
+        logo_url,
+        type,
+        feature_recordings,
+        feature_streaming,
+        feature_graphic_packages
       )
     `
     )
     .eq('profile_id', profile.id)
-    .in('role', ['club_admin', 'league_admin'])
+    .in('role', ['admin', 'club_admin', 'league_admin'])
     .eq('is_active', true)
 
   if (error) {
@@ -62,9 +80,35 @@ export async function GET() {
     )
   }
 
-  const venues = (memberships || [])
+  const directOrgs = (memberships || [])
     .map((m: any) => m.organizations)
-    .filter(Boolean)
+    .filter(Boolean) as any[]
+
+  // For group-type orgs, also include their child venues
+  const groupOrgIds = directOrgs
+    .filter((o: any) => o.type === 'group')
+    .map((o: any) => o.id)
+
+  let childVenues: any[] = []
+  if (groupOrgIds.length > 0) {
+    const { data: children } = await (serviceClient as any)
+      .from('organizations')
+      .select('id, name, slug, logo_url, type, feature_recordings, feature_streaming, feature_graphic_packages')
+      .in('parent_organization_id', groupOrgIds)
+      .eq('is_active', true)
+
+    childVenues = children || []
+  }
+
+  // Merge direct orgs + child venues, deduplicate by id
+  const seen = new Set<string>()
+  const venues: any[] = []
+  for (const org of [...directOrgs, ...childVenues]) {
+    if (!seen.has(org.id)) {
+      seen.add(org.id)
+      venues.push(org)
+    }
+  }
 
   return NextResponse.json({ venues })
 }

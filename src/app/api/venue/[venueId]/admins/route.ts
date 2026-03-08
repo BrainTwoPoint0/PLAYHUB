@@ -52,7 +52,7 @@ export async function GET(
     `
     )
     .eq('organization_id', venueId)
-    .in('role', ['club_admin', 'league_admin'])
+    .in('role', ['admin', 'club_admin', 'league_admin'])
     .eq('is_active', true)
     .order('created_at', { ascending: true })
 
@@ -106,14 +106,14 @@ export async function POST(
   }
 
   const body = await request.json()
-  const { email, role = 'club_admin' } = body
+  const { email, role = 'admin' } = body
 
   if (!email) {
     return NextResponse.json({ error: 'Email is required' }, { status: 400 })
   }
 
   // Validate role
-  if (!['club_admin', 'league_admin'].includes(role)) {
+  if (!['admin', 'manager', 'club_admin', 'league_admin'].includes(role)) {
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
   }
 

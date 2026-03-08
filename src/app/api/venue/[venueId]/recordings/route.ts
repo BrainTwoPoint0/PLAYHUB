@@ -53,11 +53,31 @@ export async function GET(
   // Use service client for data queries to bypass RLS
   const serviceClient = createServiceClient()
 
+  // For group-type orgs, include child venue recordings
+  const { data: orgInfo } = await (serviceClient as any)
+    .from('organizations')
+    .select('type')
+    .eq('id', venueId)
+    .single()
+
+  let orgIds = [venueId]
+  if (orgInfo?.type === 'group') {
+    const { data: children } = await (serviceClient as any)
+      .from('organizations')
+      .select('id')
+      .eq('parent_organization_id', venueId)
+      .eq('is_active', true)
+
+    if (children) {
+      orgIds = [venueId, ...children.map((c: any) => c.id)]
+    }
+  }
+
   // Build count query (same filters, head-only for count)
   let countQuery = (serviceClient as any)
     .from('playhub_match_recordings')
     .select('id', { count: 'exact', head: true })
-    .eq('organization_id', venueId)
+    .in('organization_id', orgIds)
 
   if (search) {
     countQuery = countQuery.or(
@@ -109,10 +129,11 @@ export async function GET(
       billable_amount,
       collected_by,
       graphic_package_id,
+      organization_id,
       created_at
     `
     )
-    .eq('organization_id', venueId)
+    .in('organization_id', orgIds)
 
   if (search) {
     dataQuery = dataQuery.or(
@@ -182,11 +203,27 @@ export async function GET(
     }
   }
 
+  // Get org names for group-type views (recordings from child venues)
+  let orgNames: Record<string, string> = {}
+  if (orgIds.length > 1) {
+    const { data: orgs } = await (serviceClient as any)
+      .from('organizations')
+      .select('id, name')
+      .in('id', orgIds)
+
+    if (orgs) {
+      orgs.forEach((o: any) => { orgNames[o.id] = o.name })
+    }
+  }
+
   // Enrich recordings with access count and graphic package name
   const enrichedRecordings = (recordings || []).map((r: any) => ({
     ...r,
     accessCount: accessCounts[r.id] || 0,
     graphicPackageName: gpNames[r.graphic_package_id] || null,
+    ownerOrgName: orgIds.length > 1 && r.organization_id !== venueId
+      ? orgNames[r.organization_id] || null
+      : null,
   }))
 
   return NextResponse.json({

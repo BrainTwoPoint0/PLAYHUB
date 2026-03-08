@@ -47,6 +47,7 @@ interface Recording {
   collected_by?: string
   graphic_package_id?: string
   graphicPackageName?: string
+  ownerOrgName?: string
   accessCount?: number
 }
 
@@ -66,6 +67,40 @@ interface Venue {
   name: string
   slug: string | null
   logo_url: string | null
+  type?: string
+  feature_recordings?: boolean
+  feature_streaming?: boolean
+  feature_graphic_packages?: boolean
+}
+
+interface ChildVenueStat {
+  id: string
+  name: string
+  slug: string | null
+  type: string
+  totalRecordings: number
+  publishedRecordings: number
+  monthRecordings: number
+  monthRevenue: number
+  todayCount: number
+  dailyTarget: number
+  currency: string
+}
+
+interface GroupDashboardData {
+  childVenues: ChildVenueStat[]
+  totals: {
+    totalRecordings: number
+    publishedRecordings: number
+    monthRecordings: number
+    monthRevenue: number
+    todayCount: number
+  }
+  dailyChart: Array<Record<string, number | string>>
+  venueNames: string[]
+  totalDailyTarget: number
+  averagePerDay: number
+  currency: string
 }
 
 interface Scene {
@@ -432,801 +467,10 @@ function VenueSettings({
   )
 }
 
-// ── Graphic Packages (Account-based) ──────────────────────────────
 interface GraphicPackage {
   id: string
-  organization_id: string
   name: string
   is_default: boolean
-  logo_url: string | null
-  logo_position: string
-  sponsor_logo_url: string | null
-  sponsor_position: string
-  spiideo_graphic_package_id: string | null
-  created_at: string
-  updated_at: string
-}
-
-function GraphicPackagesSection({
-  venueSlug,
-  inputClass,
-  outlineBtnClass,
-  primaryBtnClass,
-}: {
-  venueSlug: string | null
-  inputClass: string
-  outlineBtnClass: string
-  primaryBtnClass: string
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const [packages, setPackages] = useState<GraphicPackage[]>([])
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [successMsg, setSuccessMsg] = useState<string | null>(null)
-
-  // Create/Edit form state
-  const [showForm, setShowForm] = useState(false)
-  const [editingPkg, setEditingPkg] = useState<GraphicPackage | null>(null)
-  const [formName, setFormName] = useState('')
-  const [formLogoUrl, setFormLogoUrl] = useState('')
-  const [formLogoPosition, setFormLogoPosition] = useState('top-right')
-  const [formSponsorUrl, setFormSponsorUrl] = useState('')
-  const [formSponsorPosition, setFormSponsorPosition] = useState('bottom-left')
-  const [formIsDefault, setFormIsDefault] = useState(false)
-  const [uploadingLogo, setUploadingLogo] = useState(false)
-  const [uploadingSponsor, setUploadingSponsor] = useState(false)
-
-  async function uploadFile(
-    file: File,
-    type: 'logo' | 'sponsor'
-  ): Promise<string | null> {
-    if (!venueSlug) return null
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('type', type)
-    const res = await fetch(`/api/org/${venueSlug}/graphic-packages/upload`, {
-      method: 'POST',
-      body: formData,
-    })
-    if (!res.ok) {
-      const data = await res.json()
-      setError(data.error || 'Upload failed')
-      return null
-    }
-    const data = await res.json()
-    return data.url
-  }
-
-  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploadingLogo(true)
-    setError(null)
-    const url = await uploadFile(file, 'logo')
-    if (url) setFormLogoUrl(url)
-    setUploadingLogo(false)
-    e.target.value = ''
-  }
-
-  async function handleSponsorUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploadingSponsor(true)
-    setError(null)
-    const url = await uploadFile(file, 'sponsor')
-    if (url) setFormSponsorUrl(url)
-    setUploadingSponsor(false)
-    e.target.value = ''
-  }
-
-  async function fetchPackages() {
-    if (!venueSlug) return
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/org/${venueSlug}/graphic-packages`)
-      const data = await res.json()
-      setPackages(data.packages || [])
-    } catch {
-      setError('Failed to load graphic packages')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  function openCreateForm() {
-    setEditingPkg(null)
-    setFormName('')
-    setFormLogoUrl('')
-    setFormLogoPosition('top-right')
-    setFormSponsorUrl('')
-    setFormSponsorPosition('bottom-left')
-    setFormIsDefault(packages.length === 0)
-    setShowForm(true)
-  }
-
-  function openEditForm(pkg: GraphicPackage) {
-    setEditingPkg(pkg)
-    setFormName(pkg.name)
-    setFormLogoUrl(pkg.logo_url || '')
-    setFormLogoPosition(pkg.logo_position)
-    setFormSponsorUrl(pkg.sponsor_logo_url || '')
-    setFormSponsorPosition(pkg.sponsor_position)
-    setFormIsDefault(pkg.is_default)
-    setShowForm(true)
-  }
-
-  async function handleSave() {
-    if (!venueSlug || !formName.trim()) return
-    setSaving(true)
-    setError(null)
-    try {
-      const body: any = {
-        name: formName.trim(),
-        logo_url: formLogoUrl || null,
-        logo_position: formLogoPosition,
-        sponsor_logo_url: formSponsorUrl || null,
-        sponsor_position: formSponsorPosition,
-        is_default: formIsDefault,
-      }
-
-      let res: Response
-      if (editingPkg) {
-        body.id = editingPkg.id
-        res = await fetch(`/api/org/${venueSlug}/graphic-packages`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        })
-      } else {
-        res = await fetch(`/api/org/${venueSlug}/graphic-packages`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        })
-      }
-
-      if (res.ok) {
-        setShowForm(false)
-        setSuccessMsg(editingPkg ? 'Package updated' : 'Package created')
-        setTimeout(() => setSuccessMsg(null), 3000)
-        fetchPackages()
-      } else {
-        const data = await res.json()
-        setError(data.error || 'Failed to save')
-      }
-    } catch {
-      setError('Failed to save package')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleDelete(pkg: GraphicPackage) {
-    if (!venueSlug || !confirm(`Delete "${pkg.name}"?`)) return
-    try {
-      const res = await fetch(
-        `/api/org/${venueSlug}/graphic-packages?id=${pkg.id}`,
-        { method: 'DELETE' }
-      )
-      if (res.ok) {
-        setPackages((prev) => prev.filter((p) => p.id !== pkg.id))
-        setSuccessMsg('Package deleted')
-        setTimeout(() => setSuccessMsg(null), 3000)
-      }
-    } catch {
-      setError('Failed to delete')
-    }
-  }
-
-  async function setDefault(pkg: GraphicPackage) {
-    if (!venueSlug) return
-    try {
-      const res = await fetch(`/api/org/${venueSlug}/graphic-packages`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: pkg.id, is_default: true }),
-      })
-      if (res.ok) fetchPackages()
-    } catch {
-      setError('Failed to set default')
-    }
-  }
-
-  // Spiideo import state
-  const [showImport, setShowImport] = useState(false)
-  const [spiideoPackages, setSpiideoPackages] = useState<
-    Array<{ id: string; name: string; type: string; alreadyImported: boolean }>
-  >([])
-  const [loadingImport, setLoadingImport] = useState(false)
-  const [importingId, setImportingId] = useState<string | null>(null)
-
-  async function fetchSpiideoPackages() {
-    if (!venueSlug) return
-    setLoadingImport(true)
-    setError(null)
-    try {
-      const res = await fetch(`/api/org/${venueSlug}/graphic-packages/import`)
-      if (!res.ok) {
-        const data = await res.json()
-        setError(data.error || 'Failed to fetch Spiideo packages')
-        return
-      }
-      const data = await res.json()
-      setSpiideoPackages(data.packages || [])
-    } catch {
-      setError('Failed to fetch Spiideo packages')
-    } finally {
-      setLoadingImport(false)
-    }
-  }
-
-  async function importSpiideoPackage(pkg: { id: string; name: string }) {
-    if (!venueSlug) return
-    setImportingId(pkg.id)
-    setError(null)
-    try {
-      const res = await fetch(`/api/org/${venueSlug}/graphic-packages/import`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ spiideoId: pkg.id, name: pkg.name }),
-      })
-      if (res.ok) {
-        setSuccessMsg(`Imported "${pkg.name}"`)
-        setTimeout(() => setSuccessMsg(null), 3000)
-        setSpiideoPackages((prev) =>
-          prev.map((p) =>
-            p.id === pkg.id ? { ...p, alreadyImported: true } : p
-          )
-        )
-        fetchPackages()
-      } else {
-        const data = await res.json()
-        setError(data.error || 'Import failed')
-      }
-    } catch {
-      setError('Failed to import package')
-    } finally {
-      setImportingId(null)
-    }
-  }
-
-  const positionLabel = (pos: string) => {
-    const labels: Record<string, string> = {
-      'top-left': 'Top Left',
-      'top-right': 'Top Right',
-      'bottom-left': 'Bottom Left',
-      'bottom-right': 'Bottom Right',
-    }
-    return labels[pos] || pos
-  }
-
-  return (
-    <div className="mt-6 rounded-xl border border-border bg-card">
-      <div className="p-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-              Graphic Packages
-            </h2>
-            <p className="text-xs text-muted-foreground mt-1">
-              Logo overlays shown on recordings — applies to all venues for this
-              account
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            className={`w-full md:w-auto ${outlineBtnClass}`}
-            onClick={() => {
-              setExpanded(!expanded)
-              if (!expanded && packages.length === 0) fetchPackages()
-            }}
-          >
-            {expanded ? 'Hide' : 'Manage'}
-          </Button>
-        </div>
-      </div>
-      {expanded && (
-        <div className="px-6 pb-6 space-y-4">
-          {error && <p className="text-sm text-red-400">{error}</p>}
-          {successMsg && (
-            <p className="text-sm text-emerald-400">{successMsg}</p>
-          )}
-
-          {loading ? (
-            <LoadingSpinner size="sm" className="text-muted-foreground" />
-          ) : packages.length === 0 && !showForm ? (
-            <p className="text-sm text-muted-foreground">
-              No graphic packages yet. Create one to add logo overlays to your
-              recordings.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {packages.map((pkg) => (
-                <div
-                  key={pkg.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-muted/50 border border-border"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    {/* Logo preview */}
-                    {pkg.logo_url ? (
-                      <img
-                        src={pkg.logo_url}
-                        alt=""
-                        className="w-10 h-10 rounded object-contain bg-white/10 p-1 flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded bg-white/5 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs text-muted-foreground">
-                          No logo
-                        </span>
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-[var(--timberwolf)] truncate">
-                          {pkg.name}
-                        </span>
-                        {pkg.is_default && (
-                          <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 flex-shrink-0">
-                            Default
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span>Logo: {positionLabel(pkg.logo_position)}</span>
-                        {pkg.sponsor_logo_url && (
-                          <span>
-                            Sponsor: {positionLabel(pkg.sponsor_position)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {!pkg.is_default && (
-                      <button
-                        onClick={() => setDefault(pkg)}
-                        className="text-xs px-2 py-1 rounded text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted/50 transition-colors"
-                      >
-                        Set Default
-                      </button>
-                    )}
-                    <button
-                      onClick={() => openEditForm(pkg)}
-                      className="text-xs px-2 py-1 rounded text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted/50 transition-colors"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(pkg)}
-                      className="text-xs px-2 py-1 rounded text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Create/Edit Form */}
-          {showForm ? (
-            <div className="space-y-3 p-4 rounded-lg border border-border bg-card">
-              <h3 className="text-sm font-semibold text-[var(--timberwolf)]">
-                {editingPkg ? 'Edit Package' : 'New Package'}
-              </h3>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">
-                  Package Name
-                </label>
-                <Input
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  placeholder="e.g. DAFL Season 2025-26"
-                  className={inputClass}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Logo</label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={formLogoUrl}
-                      onChange={(e) => setFormLogoUrl(e.target.value)}
-                      placeholder="https://... or upload"
-                      className={`flex-1 ${inputClass}`}
-                    />
-                    <label
-                      className={`inline-flex items-center px-3 text-xs rounded cursor-pointer whitespace-nowrap ${outlineBtnClass} border`}
-                    >
-                      {uploadingLogo ? '...' : 'Upload'}
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                        className="hidden"
-                        onChange={handleLogoUpload}
-                        disabled={uploadingLogo}
-                      />
-                    </label>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">
-                    Logo Position
-                  </label>
-                  <Select
-                    value={formLogoPosition}
-                    onValueChange={setFormLogoPosition}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="top-left">Top Left</SelectItem>
-                      <SelectItem value="top-right">Top Right</SelectItem>
-                      <SelectItem value="bottom-left">Bottom Left</SelectItem>
-                      <SelectItem value="bottom-right">Bottom Right</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">
-                    Sponsor Logo
-                  </label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={formSponsorUrl}
-                      onChange={(e) => setFormSponsorUrl(e.target.value)}
-                      placeholder="https://... or upload"
-                      className={`flex-1 ${inputClass}`}
-                    />
-                    <label
-                      className={`inline-flex items-center px-3 text-xs rounded cursor-pointer whitespace-nowrap ${outlineBtnClass} border`}
-                    >
-                      {uploadingSponsor ? '...' : 'Upload'}
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                        className="hidden"
-                        onChange={handleSponsorUpload}
-                        disabled={uploadingSponsor}
-                      />
-                    </label>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">
-                    Sponsor Position
-                  </label>
-                  <Select
-                    value={formSponsorPosition}
-                    onValueChange={setFormSponsorPosition}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="top-left">Top Left</SelectItem>
-                      <SelectItem value="top-right">Top Right</SelectItem>
-                      <SelectItem value="bottom-left">Bottom Left</SelectItem>
-                      <SelectItem value="bottom-right">Bottom Right</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formIsDefault}
-                  onChange={(e) => setFormIsDefault(e.target.checked)}
-                  className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
-                />
-                <span className="text-sm text-[var(--timberwolf)]">
-                  Set as default package
-                </span>
-              </label>
-
-              {/* Logo preview */}
-              {(formLogoUrl || formSponsorUrl) && (
-                <div className="relative w-full aspect-video bg-muted rounded-lg overflow-hidden border border-border">
-                  <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
-                    Preview
-                  </div>
-                  {formLogoUrl && (
-                    <img
-                      src={formLogoUrl}
-                      alt="Logo"
-                      className={`absolute w-12 h-12 object-contain opacity-70 ${
-                        formLogoPosition === 'top-left'
-                          ? 'top-2 left-2'
-                          : formLogoPosition === 'top-right'
-                            ? 'top-2 right-2'
-                            : formLogoPosition === 'bottom-left'
-                              ? 'bottom-2 left-2'
-                              : 'bottom-2 right-2'
-                      }`}
-                    />
-                  )}
-                  {formSponsorUrl && (
-                    <img
-                      src={formSponsorUrl}
-                      alt="Sponsor"
-                      className={`absolute w-16 h-8 object-contain opacity-70 ${
-                        formSponsorPosition === 'top-left'
-                          ? 'top-2 left-2'
-                          : formSponsorPosition === 'top-right'
-                            ? 'top-2 right-2'
-                            : formSponsorPosition === 'bottom-left'
-                              ? 'bottom-2 left-2'
-                              : 'bottom-2 right-2'
-                      }`}
-                    />
-                  )}
-                </div>
-              )}
-
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={handleSave}
-                  disabled={saving || !formName.trim()}
-                  className={primaryBtnClass}
-                >
-                  {saving ? 'Saving...' : editingPkg ? 'Update' : 'Create'}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowForm(false)}
-                  className={outlineBtnClass}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={openCreateForm}
-                className={`flex-1 ${outlineBtnClass}`}
-              >
-                + New Package
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowImport(!showImport)
-                  if (!showImport) fetchSpiideoPackages()
-                }}
-                className={outlineBtnClass}
-              >
-                {showImport ? 'Hide Spiideo' : 'Import from Spiideo'}
-              </Button>
-            </div>
-          )}
-
-          {/* Spiideo Import Panel */}
-          {showImport && !showForm && (
-            <div className="space-y-2 p-4 rounded-lg border border-border bg-card">
-              <h3 className="text-sm font-semibold text-[var(--timberwolf)]">
-                Import from Spiideo
-              </h3>
-              {loadingImport ? (
-                <LoadingSpinner size="sm" className="text-muted-foreground" />
-              ) : spiideoPackages.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  No Spiideo packages found
-                </p>
-              ) : (
-                <div className="space-y-1">
-                  {spiideoPackages.map((pkg) => (
-                    <div
-                      key={pkg.id}
-                      className="flex items-center justify-between py-2 px-3 rounded bg-card"
-                    >
-                      <div>
-                        <span className="text-sm text-[var(--timberwolf)]">
-                          {pkg.name}
-                        </span>
-                        <span className="text-xs text-muted-foreground ml-2">
-                          ({pkg.type})
-                        </span>
-                      </div>
-                      {pkg.alreadyImported ? (
-                        <span className="text-xs text-muted-foreground">
-                          Imported
-                        </span>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={outlineBtnClass}
-                          disabled={importingId === pkg.id}
-                          onClick={() => importSpiideoPackage(pkg)}
-                        >
-                          {importingId === pkg.id ? '...' : 'Import'}
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Marketplace Settings (Org-level) ────────────────────────────────
-function MarketplaceSettingsSection({
-  venueSlug,
-  inputClass,
-  outlineBtnClass,
-  primaryBtnClass,
-  onUpdate,
-}: {
-  venueSlug: string | null
-  inputClass: string
-  outlineBtnClass: string
-  primaryBtnClass: string
-  onUpdate: (settings: {
-    marketplace_enabled: boolean
-    default_price_amount: number | null
-    default_price_currency: string
-  }) => void
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [savedMsg, setSavedMsg] = useState<string | null>(null)
-
-  const [enabled, setEnabled] = useState(false)
-  const [price, setPrice] = useState('')
-  const [currency, setCurrency] = useState('AED')
-
-  async function fetchSettings() {
-    if (!venueSlug) return
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/org/${venueSlug}/marketplace`)
-      if (res.ok) {
-        const data = await res.json()
-        setEnabled(data.marketplace_enabled || false)
-        setPrice(
-          data.default_price_amount ? String(data.default_price_amount) : ''
-        )
-        setCurrency(data.default_price_currency || 'AED')
-      }
-    } catch {
-      // non-critical
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleSave() {
-    if (!venueSlug) return
-    setSaving(true)
-    setSavedMsg(null)
-    try {
-      const res = await fetch(`/api/org/${venueSlug}/marketplace`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          marketplace_enabled: enabled,
-          default_price_amount: price ? Number(price) : null,
-          default_price_currency: currency,
-        }),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        onUpdate(data)
-        setSavedMsg('Saved')
-        setTimeout(() => setSavedMsg(null), 3000)
-      }
-    } catch {
-      setSavedMsg('Failed to save')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="mt-6 rounded-xl border border-border bg-card">
-      <div className="p-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-              Marketplace
-            </h2>
-            <p className="text-xs text-muted-foreground mt-1">
-              Sell recordings through the PLAYHUB marketplace
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            className={`w-full md:w-auto ${outlineBtnClass}`}
-            onClick={() => {
-              setExpanded(!expanded)
-              if (!expanded) fetchSettings()
-            }}
-          >
-            {expanded ? 'Hide' : 'Configure'}
-          </Button>
-        </div>
-      </div>
-      {expanded && (
-        <div className="px-6 pb-6 space-y-4">
-          {loading ? (
-            <LoadingSpinner size="sm" className="text-muted-foreground" />
-          ) : (
-            <>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={enabled}
-                  onChange={(e) => setEnabled(e.target.checked)}
-                  className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
-                />
-                <span className="text-sm text-[var(--timberwolf)]">
-                  Enable marketplace for this organization
-                </span>
-              </label>
-              {enabled && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">
-                      Default Price
-                    </label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      placeholder="25.00"
-                      className={inputClass}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">
-                      Currency
-                    </label>
-                    <Select value={currency} onValueChange={setCurrency}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="AED">AED</SelectItem>
-                        <SelectItem value="USD">USD</SelectItem>
-                        <SelectItem value="GBP">GBP</SelectItem>
-                        <SelectItem value="EUR">EUR</SelectItem>
-                        <SelectItem value="KWD">KWD</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              )}
-              <div className="flex items-center gap-3">
-                <Button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className={primaryBtnClass}
-                >
-                  {saving ? 'Saving...' : 'Save'}
-                </Button>
-                {savedMsg && (
-                  <span className="text-sm text-emerald-400">{savedMsg}</span>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  )
 }
 
 export default function VenueManagementPage() {
@@ -1239,6 +483,10 @@ export default function VenueManagementPage() {
   const [recordings, setRecordings] = useState<Recording[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Group dashboard state (for group-type orgs)
+  const [groupData, setGroupData] = useState<GroupDashboardData | null>(null)
+  const [groupLoading, setGroupLoading] = useState(false)
 
   // Section loading states (for independent async sections)
   const [billingLoading, setBillingLoading] = useState(true)
@@ -1430,6 +678,26 @@ export default function VenueManagementPage() {
   // Load supplementary data independently once venue is available
   useEffect(() => {
     if (!venue) return
+
+    // If group org, fetch group dashboard data instead of venue-specific data
+    if (venue.type === 'group') {
+      setGroupLoading(true)
+      fetch(`/api/venue/${venueId}/group-dashboard`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (!data.error) setGroupData(data)
+        })
+        .catch(() => {})
+        .finally(() => {
+          setGroupLoading(false)
+          setBillingLoading(false)
+          setScenesLoading(false)
+          setMarketplaceLoading(false)
+        })
+      // Also fetch recordings (aggregated from child venues via Phase 4)
+      fetchRecordings()
+      return
+    }
 
     // Fetch org marketplace settings
     if (venue.slug) {
@@ -2317,7 +1585,7 @@ export default function VenueManagementPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8">
             <div>
               <p className="text-muted-foreground text-xs font-semibold tracking-[0.25em] uppercase mb-2">
-                Venue Management
+                {venue?.type === 'group' ? 'Group Overview' : 'Venue Management'}
               </p>
               <h1 className="text-2xl md:text-3xl font-bold text-[var(--timberwolf)]">
                 {venue?.name}
@@ -2334,7 +1602,245 @@ export default function VenueManagementPage() {
             )}
           </div>
 
-        {/* Billing Overview */}
+        {/* Group Dashboard — shown for group-type orgs */}
+        {venue?.type === 'group' && (
+          <>
+            {groupLoading ? (
+              <div className="mb-6 rounded-xl border border-border bg-card animate-pulse p-6">
+                <div className="space-y-4">
+                  <div className="bg-muted rounded h-5 w-[200px]" />
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted">
+                    {[0, 1, 2, 3].map((i) => (
+                      <div key={i} className="bg-[var(--night)] p-3.5 space-y-2">
+                        <div className="bg-muted rounded h-2.5 w-[60px]" />
+                        <div className="bg-muted rounded h-6 w-[90px]" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : groupData && (
+              <div className="space-y-6 mb-6">
+                {/* Aggregated totals */}
+                <div className="rounded-xl border border-border bg-card">
+                  <div className="p-5">
+                    <h2 className="text-base font-semibold text-[var(--timberwolf)] mb-4">
+                      Portfolio Overview
+                    </h2>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted">
+                      {[
+                        {
+                          label: 'Total Recordings',
+                          value: String(groupData.totals.totalRecordings),
+                          sub: `${groupData.totals.publishedRecordings} published`,
+                        },
+                        {
+                          label: 'This Month',
+                          value: String(groupData.totals.monthRecordings),
+                          sub: 'recordings',
+                        },
+                        {
+                          label: 'Monthly Revenue',
+                          value: groupData.childVenues.length > 0
+                            ? new Intl.NumberFormat('en-GB', {
+                                style: 'currency',
+                                currency: groupData.childVenues[0]?.currency || 'KWD',
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 3,
+                              }).format(groupData.totals.monthRevenue)
+                            : '0',
+                          sub: 'billable',
+                        },
+                        {
+                          label: 'Today',
+                          value: String(groupData.totals.todayCount),
+                          sub: 'recordings',
+                        },
+                      ].map((card) => (
+                        <div key={card.label} className="bg-[var(--night)] p-3.5">
+                          <p className="text-xs text-muted-foreground mb-1">
+                            {card.label}
+                          </p>
+                          <p className="text-lg font-semibold text-[var(--timberwolf)]">
+                            {card.value}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {card.sub}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Daily performance chart */}
+                {groupData.dailyChart.length > 0 && (
+                  <div className="rounded-xl border border-border bg-card">
+                    <div className="p-5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                        <div>
+                          <h2 className="text-base font-semibold text-[var(--timberwolf)]">
+                            Daily Performance
+                          </h2>
+                          <p className="text-xs text-muted-foreground">
+                            Avg {groupData.averagePerDay}/day
+                            {groupData.totalDailyTarget > 0 && ` · Target: ${groupData.totalDailyTarget}/day`}
+                          </p>
+                        </div>
+                      </div>
+                      <ChartContainer
+                        config={Object.fromEntries(
+                          groupData.venueNames.map((name, i) => [
+                            name,
+                            {
+                              label: name,
+                              color: [
+                                'hsl(142, 71%, 45%)',
+                                'hsl(217, 91%, 60%)',
+                                'hsl(47, 96%, 53%)',
+                                'hsl(280, 65%, 60%)',
+                                'hsl(15, 90%, 55%)',
+                              ][i % 5],
+                            },
+                          ])
+                        ) as ChartConfig}
+                        className="h-[220px] w-full"
+                      >
+                        <AreaChart data={groupData.dailyChart}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(d: string) => {
+                              const day = parseInt(d.split('-')[2], 10)
+                              return day % 5 === 1 || day === 1 ? String(day) : ''
+                            }}
+                            stroke="hsl(var(--muted-foreground))"
+                            fontSize={11}
+                          />
+                          <YAxis
+                            stroke="hsl(var(--muted-foreground))"
+                            fontSize={11}
+                            allowDecimals={false}
+                          />
+                          <ChartTooltip
+                            content={
+                              <ChartTooltipContent
+                                labelFormatter={(label: string) => {
+                                  const d = new Date(label + 'T00:00:00')
+                                  return d.toLocaleDateString('en-GB', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                  })
+                                }}
+                              />
+                            }
+                          />
+                          {groupData.totalDailyTarget > 0 && (
+                            <ReferenceLine
+                              y={groupData.totalDailyTarget}
+                              stroke="hsl(var(--muted-foreground))"
+                              strokeDasharray="6 4"
+                              strokeOpacity={0.5}
+                            />
+                          )}
+                          {groupData.venueNames.map((name, i) => (
+                            <Area
+                              key={name}
+                              type="monotone"
+                              dataKey={name}
+                              stackId="1"
+                              fill={[
+                                'hsl(142, 71%, 45%)',
+                                'hsl(217, 91%, 60%)',
+                                'hsl(47, 96%, 53%)',
+                                'hsl(280, 65%, 60%)',
+                                'hsl(15, 90%, 55%)',
+                              ][i % 5]}
+                              fillOpacity={0.4}
+                              stroke={[
+                                'hsl(142, 71%, 45%)',
+                                'hsl(217, 91%, 60%)',
+                                'hsl(47, 96%, 53%)',
+                                'hsl(280, 65%, 60%)',
+                                'hsl(15, 90%, 55%)',
+                              ][i % 5]}
+                              strokeWidth={1.5}
+                            />
+                          ))}
+                        </AreaChart>
+                      </ChartContainer>
+                    </div>
+                  </div>
+                )}
+
+                {/* Per-venue breakdown */}
+                <div className="rounded-xl border border-border bg-card">
+                  <div className="p-5">
+                    <h2 className="text-base font-semibold text-[var(--timberwolf)] mb-4">
+                      Venues ({groupData.childVenues.length})
+                    </h2>
+                    <div className="space-y-3">
+                      {groupData.childVenues.map((child) => (
+                        <div
+                          key={child.id}
+                          className="p-4 rounded-lg bg-muted/50 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-[var(--timberwolf)] truncate">
+                                {child.name}
+                              </p>
+                              <span className="text-xs px-2 py-0.5 rounded bg-zinc-700 text-muted-foreground flex-shrink-0">
+                                {child.type}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                              <span>{child.totalRecordings} recordings</span>
+                              <span>{child.monthRecordings} this month</span>
+                              {child.dailyTarget > 0 && (
+                                <span>
+                                  Today: {child.todayCount}/{child.dailyTarget}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            {child.monthRevenue > 0 && (
+                              <span className="text-sm font-semibold text-[var(--timberwolf)]">
+                                {new Intl.NumberFormat('en-GB', {
+                                  style: 'currency',
+                                  currency: child.currency,
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 3,
+                                }).format(child.monthRevenue)}
+                              </span>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className={outlineBtnClass}
+                              onClick={() => router.push(`/venue/${child.id}`)}
+                            >
+                              Manage
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      {groupData.childVenues.length === 0 && (
+                        <p className="text-muted-foreground text-center py-4">
+                          No child venues yet. Add venues from the admin dashboard.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Billing, Scheduling, Streaming, Marketplace — hidden for group orgs */}
+        {venue?.type !== 'group' && (<>
         {billingLoading ? (
           <div className="mb-6 rounded-xl border border-border bg-card animate-pulse">
             <div className="p-5">
@@ -2832,7 +2338,8 @@ export default function VenueManagementPage() {
         )}
 
         {/* Schedule Recording */}
-        {scenesLoading ? (
+        {venue?.feature_recordings !== false && (
+        scenesLoading ? (
           <div className="mb-6 rounded-xl border border-border bg-card p-6 animate-pulse">
             <div className="flex items-center justify-between">
               <div className="bg-muted rounded h-5 w-[160px]" />
@@ -3178,9 +2685,10 @@ export default function VenueManagementPage() {
                 </div>
               )}
             </div>
-        )}
+        ))}
 
         {/* Live Streaming Section */}
+        {venue?.feature_streaming !== false && (
           <div className="mb-6 rounded-xl border border-border bg-card">
             <div className="p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
@@ -3539,6 +3047,7 @@ export default function VenueManagementPage() {
               </div>
             )}
           </div>
+        )}
 
         {/* Marketplace Revenue */}
         {marketplaceLoading ? (
@@ -3557,6 +3066,7 @@ export default function VenueManagementPage() {
               outlineBtnClass={outlineBtnClass}
             />
         )}
+        </>)}
 
         {/* Recordings List */}
           <div className="rounded-xl border border-border bg-card">
@@ -3665,6 +3175,11 @@ export default function VenueManagementPage() {
                             >
                               {recording.status}
                             </span>
+                            {recording.ownerOrgName && (
+                              <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 flex-shrink-0">
+                                {recording.ownerOrgName}
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm text-muted-foreground">
                             {recording.pitch_name &&
@@ -3846,7 +3361,9 @@ export default function VenueManagementPage() {
             </div>
           </div>
 
-        {/* Venue Settings (YouTube, Marketplace, Media Pack) */}
+
+        {/* Venue Settings & Admins — hidden for group orgs */}
+        {venue?.type !== 'group' && (<>
         <VenueSettings
             venueId={venueId}
             billingConfig={billingConfig}
@@ -3854,23 +3371,6 @@ export default function VenueManagementPage() {
             inputClass={inputClass}
             outlineBtnClass={outlineBtnClass}
             primaryBtnClass={primaryBtnClass}
-          />
-
-        {/* Graphic Packages (Account-level) */}
-        <GraphicPackagesSection
-            venueSlug={venue?.slug || null}
-            inputClass={inputClass}
-            outlineBtnClass={outlineBtnClass}
-            primaryBtnClass={primaryBtnClass}
-          />
-
-        {/* Marketplace Settings (Org-level) */}
-        <MarketplaceSettingsSection
-            venueSlug={venue?.slug || null}
-            inputClass={inputClass}
-            outlineBtnClass={outlineBtnClass}
-            primaryBtnClass={primaryBtnClass}
-            onUpdate={setOrgMarketplace}
           />
 
         {/* Venue Admins Section */}
@@ -3982,6 +3482,7 @@ export default function VenueManagementPage() {
               </div>
             )}
           </div>
+        </>)}
 
         {/* Access Modal */}
         {showAccessModal && selectedRecording && (

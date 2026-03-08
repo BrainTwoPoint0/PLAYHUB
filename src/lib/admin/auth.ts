@@ -80,6 +80,7 @@ export async function getAllVenues() {
       created_at
     `
     )
+    .eq('type', 'venue')
     .order('name', { ascending: true })
 
   if (!venues) return []
@@ -91,7 +92,7 @@ export async function getAllVenues() {
     .from('organization_members')
     .select('organization_id')
     .in('organization_id', venueIds)
-    .in('role', ['club_admin', 'league_admin'])
+    .in('role', ['admin', 'club_admin', 'league_admin'])
     .eq('is_active', true)
 
   const { data: recordingCounts } = await supabase
@@ -197,6 +198,137 @@ export async function getAllRecordings() {
     venueName: r.organization_id ? venueMap[r.organization_id] : null,
     accessCount: accessCountMap[r.id] || 0,
   }))
+}
+
+/**
+ * Get all organizations with feature flags and hierarchy data
+ */
+export async function getAllOrganizations() {
+  const supabase = createServiceClient() as any
+
+  const { data: orgs } = await supabase
+    .from('organizations')
+    .select(
+      `
+      id,
+      name,
+      slug,
+      type,
+      logo_url,
+      is_active,
+      is_verified,
+      marketplace_enabled,
+      feature_recordings,
+      feature_streaming,
+      feature_graphic_packages,
+      parent_organization_id,
+      created_at
+    `
+    )
+    .order('type', { ascending: true })
+    .order('name', { ascending: true })
+
+  if (!orgs) return []
+
+  // Build parent name map and children map
+  const orgMap: Record<string, any> = {}
+  orgs.forEach((o: any) => { orgMap[o.id] = o })
+
+  return orgs.map((o: any) => ({
+    ...o,
+    parent_name: o.parent_organization_id ? orgMap[o.parent_organization_id]?.name || null : null,
+    children: orgs.filter((c: any) => c.parent_organization_id === o.id).map((c: any) => ({
+      id: c.id, name: c.name, slug: c.slug, type: c.type,
+    })),
+  }))
+}
+
+/**
+ * Get all venue access entries
+ */
+export async function getAllVenueAccess() {
+  const supabase = createServiceClient() as any
+
+  const { data } = await supabase
+    .from('organization_venue_access')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  return data || []
+}
+
+/**
+ * Set parent organization for a child org
+ */
+export async function setParentOrg(
+  childOrgId: string,
+  parentOrgId: string | null
+) {
+  const supabase = createServiceClient() as any
+
+  const { error } = await supabase
+    .from('organizations')
+    .update({ parent_organization_id: parentOrgId })
+    .eq('id', childOrgId)
+
+  return { success: !error, error: error?.message }
+}
+
+/**
+ * Create or update a venue access entry
+ */
+export async function upsertVenueAccess(data: {
+  organization_id: string
+  venue_organization_id: string
+  can_record?: boolean
+  can_stream?: boolean
+  billing_responsibility?: string
+  is_active?: boolean
+  notes?: string
+}) {
+  const supabase = createServiceClient() as any
+
+  const { error } = await supabase
+    .from('organization_venue_access')
+    .upsert(data, { onConflict: 'organization_id,venue_organization_id' })
+
+  return { success: !error, error: error?.message }
+}
+
+/**
+ * Delete a venue access entry
+ */
+export async function deleteVenueAccess(id: string) {
+  const supabase = createServiceClient() as any
+
+  const { error } = await supabase
+    .from('organization_venue_access')
+    .delete()
+    .eq('id', id)
+
+  return { success: !error, error: error?.message }
+}
+
+/**
+ * Update feature flags for an organization
+ */
+export async function updateOrgFeatures(
+  orgId: string,
+  features: {
+    feature_recordings?: boolean
+    feature_streaming?: boolean
+    feature_graphic_packages?: boolean
+    marketplace_enabled?: boolean
+  }
+) {
+  const supabase = createServiceClient() as any
+
+  const { error } = await supabase
+    .from('organizations')
+    .update(features)
+    .eq('id', orgId)
+
+  return { success: !error, error: error?.message }
 }
 
 /**
