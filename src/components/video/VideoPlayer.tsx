@@ -64,7 +64,6 @@ export function VideoPlayer({
   const videoRef = useRef<HTMLVideoElement>(null)
   const hlsRef = useRef<Hls | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [isFakeFullscreen, setIsFakeFullscreen] = useState(false)
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -157,14 +156,6 @@ export function VideoPlayer({
     }
   }, [])
 
-  // Lock body scroll when in fake fullscreen
-  useEffect(() => {
-    if (isFakeFullscreen) {
-      document.body.style.overflow = 'hidden'
-      return () => { document.body.style.overflow = '' }
-    }
-  }, [isFakeFullscreen])
-
   // Auto-hide controls
   useEffect(() => {
     if (isPlaying && showControls) {
@@ -226,18 +217,13 @@ export function VideoPlayer({
   }
 
   const toggleFullscreen = () => {
+    const video = videoRef.current
     const container = containerRef.current
     const doc = document as any
 
-    // Check if already in real fullscreen — exit if so
+    // Check if already fullscreen — exit if so
     if (doc.fullscreenElement || doc.webkitFullscreenElement) {
       ;(doc.exitFullscreen || doc.webkitExitFullscreen)?.call(doc)
-      return
-    }
-
-    // Check if in fake fullscreen — exit if so
-    if (isFakeFullscreen) {
-      setIsFakeFullscreen(false)
       return
     }
 
@@ -253,8 +239,10 @@ export function VideoPlayer({
       return
     }
 
-    // 3. iOS Safari — use CSS fake fullscreen to keep overlays visible
-    setIsFakeFullscreen(true)
+    // 3. iOS Safari — native video fullscreen (standard approach used by YouTube/Vimeo)
+    if ((video as any)?.webkitEnterFullscreen) {
+      ;(video as any).webkitEnterFullscreen()
+    }
   }
 
   const handleMouseMove = () => {
@@ -267,8 +255,7 @@ export function VideoPlayer({
   return (
     <div
       ref={containerRef}
-      className={`relative bg-black rounded-lg overflow-hidden group ${className} ${isFakeFullscreen ? 'fixed inset-0 z-[9999] rounded-none !aspect-auto' : ''}`}
-      style={isFakeFullscreen ? { paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' } : undefined}
+      className={`relative bg-black rounded-lg overflow-hidden group ${className}`}
       onMouseMove={handleMouseMove}
       onTouchStart={handleMouseMove}
       onMouseLeave={() => isPlaying && setShowControls(false)}
