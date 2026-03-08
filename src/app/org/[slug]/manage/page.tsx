@@ -860,19 +860,342 @@ function MarketplaceTab({ slug }: { slug: string }) {
   )
 }
 
-// ── Placeholder tabs ──────────────────────────────────────────────────
+// ── Recordings Tab ────────────────────────────────────────────────────
 
-function ComingSoonTab({
-  title,
-  description,
-}: {
+interface OrgRecording {
+  id: string
   title: string
-  description: string
-}) {
+  home_team: string
+  away_team: string
+  match_date: string
+  pitch_name: string | null
+  status: string
+  is_billable: boolean
+  billable_amount: number | null
+  marketplace_enabled: boolean
+  created_at: string
+}
+
+function RecordingsTab({ slug }: { slug: string }) {
+  const [recordings, setRecordings] = useState<OrgRecording[]>([])
+  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [statusFilter, setStatusFilter] = useState<string>('')
+
+  useEffect(() => {
+    fetchRecordings()
+  }, [slug, page, statusFilter])
+
+  async function fetchRecordings() {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ page: String(page) })
+      if (statusFilter) params.set('status', statusFilter)
+      const res = await fetch(`/api/org/${slug}/manage/recordings?${params}`)
+      const data = await res.json()
+      setRecordings(data.recordings || [])
+      setTotalPages(data.totalPages || 1)
+      setTotal(data.total || 0)
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function formatDate(d: string) {
+    return new Date(d).toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
+  }
+
+  const statusColor: Record<string, string> = {
+    published: 'bg-emerald-500/15 text-emerald-400',
+    draft: 'bg-zinc-500/15 text-zinc-400',
+    processing: 'bg-amber-500/15 text-amber-400',
+    archived: 'bg-red-500/15 text-red-400',
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <LoadingSpinner size="sm" className="text-muted-foreground" />
+      </div>
+    )
+  }
+
   return (
-    <div className="rounded-lg border border-dashed border-border py-16 text-center">
-      <p className="text-sm text-muted-foreground">{title}</p>
-      <p className="text-xs text-muted-foreground/60 mt-1">{description}</p>
+    <div className="space-y-4">
+      {/* Filter + count */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">{total} recordings</p>
+        <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v === 'all' ? '' : v); setPage(1) }}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="published">Published</SelectItem>
+            <SelectItem value="processing">Processing</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {recordings.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border py-16 text-center">
+          <Film className="mx-auto h-8 w-8 text-muted-foreground/50 mb-3" />
+          <p className="text-sm text-muted-foreground">No recordings found</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {recordings.map((rec) => (
+            <div
+              key={rec.id}
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-4 rounded-lg border border-border bg-card"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[var(--timberwolf)] truncate">
+                  {rec.title || `${rec.home_team} vs ${rec.away_team}`}
+                </p>
+                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                  <span>{formatDate(rec.match_date || rec.created_at)}</span>
+                  {rec.pitch_name && <span>{rec.pitch_name}</span>}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${statusColor[rec.status] || 'bg-zinc-500/15 text-zinc-400'}`}>
+                  {rec.status}
+                </span>
+                {rec.marketplace_enabled && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-medium">
+                    Marketplace
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          <button
+            onClick={() => setPage(Math.max(1, page - 1))}
+            disabled={page === 1}
+            className="text-xs px-3 py-1.5 rounded-md text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted disabled:opacity-30 transition-colors"
+          >
+            Previous
+          </button>
+          <span className="text-xs text-muted-foreground">
+            {page} / {totalPages}
+          </span>
+          <button
+            onClick={() => setPage(Math.min(totalPages, page + 1))}
+            disabled={page === totalPages}
+            className="text-xs px-3 py-1.5 rounded-md text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted disabled:opacity-30 transition-colors"
+          >
+            Next
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Team Tab ──────────────────────────────────────────────────────────
+
+interface TeamMember {
+  id: string
+  role: string
+  createdAt: string
+  fullName: string | null
+  email: string | null
+  isCurrentUser: boolean
+}
+
+interface PendingInvite {
+  id: string
+  invited_email: string
+  role: string
+  invited_at: string
+}
+
+function TeamTab({ slug }: { slug: string }) {
+  const [admins, setAdmins] = useState<TeamMember[]>([])
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([])
+  const [loading, setLoading] = useState(true)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState('admin')
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+
+  useEffect(() => {
+    fetchTeam()
+  }, [slug])
+
+  async function fetchTeam() {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/org/${slug}/manage/team`)
+      const data = await res.json()
+      setAdmins(data.admins || [])
+      setPendingInvites(data.pendingInvites || [])
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleInvite() {
+    if (!inviteEmail.trim()) return
+    setSaving(true)
+    setMessage(null)
+    try {
+      const res = await fetch(`/api/org/${slug}/manage/team`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setMessage({ text: data.message || 'Added successfully', type: 'success' })
+        setInviteEmail('')
+        fetchTeam()
+      } else {
+        setMessage({ text: data.error || 'Failed', type: 'error' })
+      }
+    } catch {
+      setMessage({ text: 'Failed to send invite', type: 'error' })
+    } finally {
+      setSaving(false)
+      setTimeout(() => setMessage(null), 4000)
+    }
+  }
+
+  async function handleRemove(membershipId: string) {
+    if (!confirm('Remove this team member?')) return
+    try {
+      const res = await fetch(`/api/org/${slug}/manage/team?id=${membershipId}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        setAdmins((prev) => prev.filter((a) => a.id !== membershipId))
+        setMessage({ text: 'Removed', type: 'success' })
+        setTimeout(() => setMessage(null), 3000)
+      }
+    } catch {
+      setMessage({ text: 'Failed to remove', type: 'error' })
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <LoadingSpinner size="sm" className="text-muted-foreground" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      {message && (
+        <p className={`text-sm ${message.type === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>
+          {message.text}
+        </p>
+      )}
+
+      {/* Invite form */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <Input
+          value={inviteEmail}
+          onChange={(e) => setInviteEmail(e.target.value)}
+          placeholder="Email address"
+          type="email"
+          className={`flex-1 ${inputClass}`}
+          onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
+        />
+        <Select value={inviteRole} onValueChange={setInviteRole}>
+          <SelectTrigger className="w-[120px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="manager">Manager</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          onClick={handleInvite}
+          disabled={saving || !inviteEmail.trim()}
+          className={primaryBtnClass}
+        >
+          {saving ? '...' : 'Invite'}
+        </Button>
+      </div>
+
+      {/* Current members */}
+      <div className="space-y-2">
+        {admins.map((admin) => (
+          <div
+            key={admin.id}
+            className="flex items-center justify-between p-3 rounded-lg border border-border bg-card"
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-[var(--timberwolf)] truncate">
+                  {admin.fullName || admin.email}
+                </p>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-700 text-muted-foreground font-medium">
+                  {admin.role}
+                </span>
+                {admin.isCurrentUser && (
+                  <span className="text-[10px] text-muted-foreground">(you)</span>
+                )}
+              </div>
+              {admin.fullName && admin.email && (
+                <p className="text-xs text-muted-foreground mt-0.5">{admin.email}</p>
+              )}
+            </div>
+            {!admin.isCurrentUser && (
+              <button
+                onClick={() => handleRemove(admin.id)}
+                className="text-xs px-2.5 py-1.5 rounded-md text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Pending invites */}
+      {pendingInvites.length > 0 && (
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Pending invites</p>
+          <div className="space-y-1">
+            {pendingInvites.map((inv) => (
+              <div
+                key={inv.id}
+                className="flex items-center justify-between p-2.5 rounded-lg border border-dashed border-border"
+              >
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">{inv.invited_email}</p>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-medium">
+                    Pending
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1311,18 +1634,8 @@ export default function OrgManagePage() {
           <div className="min-h-[400px]">
             {activeTab === 'graphics' && <GraphicPackagesTab slug={slug} />}
             {activeTab === 'marketplace' && <MarketplaceTab slug={slug} />}
-            {activeTab === 'recordings' && (
-              <ComingSoonTab
-                title="Recordings"
-                description="View and manage all recordings across venues — coming soon"
-              />
-            )}
-            {activeTab === 'team' && (
-              <ComingSoonTab
-                title="Team Management"
-                description="Invite employees and manage access — coming soon"
-              />
-            )}
+            {activeTab === 'recordings' && <RecordingsTab slug={slug} />}
+            {activeTab === 'team' && <TeamTab slug={slug} />}
           </div>
         </>
       )}
