@@ -20,16 +20,18 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    let profile: any = null
-    if (user) {
-      // Get user's profile if authenticated
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single()
-      profile = profileData
+    if (!user) {
+      // Redirect unauthenticated users to login before checkout
+      const loginUrl = `${request.nextUrl.origin}/auth/login?redirect=${encodeURIComponent(request.nextUrl.pathname + request.nextUrl.search)}`
+      return NextResponse.redirect(loginUrl)
     }
+
+    // Get user's profile
+    const { data: profile } = await (supabase as any)
+      .from('profiles')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
 
     // Get product and match details
     const { data: product, error: productError } = await supabase
@@ -80,8 +82,8 @@ export async function GET(request: NextRequest) {
       metadata: {
         product_id: productData.id,
         match_recording_id: match.id,
-        user_id: user?.id || 'guest',
-        profile_id: profile?.id || 'guest',
+        user_id: user.id,
+        profile_id: profile?.id || '',
       },
       success_url: `${request.nextUrl.origin}/purchase/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${request.nextUrl.origin}/matches/${match.id}?canceled=true`,
@@ -102,21 +104,21 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { user, supabase } = await getAuthUserStrict()
-    const body = await request.json()
-
-    const { stream_id, success_url, cancel_url } = body
-
-    if (!stream_id) {
-      return NextResponse.json(
-        { error: 'stream_id is required' },
-        { status: 400 }
-      )
-    }
 
     if (!user) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
+      )
+    }
+
+    const body = await request.json()
+    const { stream_id } = body
+
+    if (!stream_id) {
+      return NextResponse.json(
+        { error: 'stream_id is required' },
+        { status: 400 }
       )
     }
 
@@ -215,12 +217,8 @@ export async function POST(request: NextRequest) {
         access_type: stream.access_type,
         user_id: user.id,
       },
-      success_url:
-        success_url ||
-        `${request.nextUrl.origin}/streams/${stream_id}?purchased=true`,
-      cancel_url:
-        cancel_url ||
-        `${request.nextUrl.origin}/streams/${stream_id}?canceled=true`,
+      success_url: `${request.nextUrl.origin}/streams/${stream_id}?purchased=true`,
+      cancel_url: `${request.nextUrl.origin}/streams/${stream_id}?canceled=true`,
     })
 
     return NextResponse.json({ url: session.url })

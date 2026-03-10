@@ -20,14 +20,17 @@ import {
 } from '@/lib/s3/client'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendRecordingReadyEmail } from '@/lib/email'
+import { timingSafeEqual } from 'crypto'
 
 const ACCOUNT_ID = process.env.SPIIDEO_ACCOUNT_ID!
 const SYNC_API_KEY = process.env.SYNC_API_KEY
 
-// Verify API key for protected endpoints
+// Verify API key for protected endpoints (constant-time comparison)
 function verifyApiKey(request: Request): boolean {
   const apiKey = request.headers.get('x-api-key')
-  return apiKey === SYNC_API_KEY && !!SYNC_API_KEY
+  if (!apiKey || !SYNC_API_KEY) return false
+  if (apiKey.length !== SYNC_API_KEY.length) return false
+  return timingSafeEqual(Buffer.from(apiKey), Buffer.from(SYNC_API_KEY))
 }
 
 interface SyncResult {

@@ -190,6 +190,18 @@ async function handleMatchRecordingPurchase(
 
   const supabase = createServiceClient()
 
+  // Idempotency: skip if this session was already processed
+  const { data: existingPurchase } = await (supabase as any)
+    .from('playhub_purchases')
+    .select('id')
+    .eq('stripe_checkout_session_id', session.id)
+    .maybeSingle()
+
+  if (existingPurchase) {
+    console.log('Match recording purchase already processed:', session.id)
+    return NextResponse.json({ received: true })
+  }
+
   // Look up organization_id from the match recording for revenue attribution
   let organizationId: string | null = null
   if (match_recording_id) {
@@ -211,7 +223,7 @@ async function handleMatchRecordingPurchase(
       amount_paid: session.amount_total! / 100,
       currency: session.currency!,
       status: 'completed',
-      stripe_session_id: session.id,
+      stripe_checkout_session_id: session.id,
       stripe_payment_intent_id: session.payment_intent as string,
       customer_email: session.customer_details?.email || null,
       customer_name: session.customer_details?.name || null,

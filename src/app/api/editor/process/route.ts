@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 180 // 3 min timeout for GPU processing
@@ -7,6 +8,11 @@ const MODAL_URL = process.env.NEXT_PUBLIC_MODAL_CROP_URL || ''
 
 export async function POST(request: NextRequest) {
   try {
+    const { user } = await getAuthUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     if (!MODAL_URL) {
       return NextResponse.json(
         { error: 'Processing endpoint not configured' },

@@ -73,9 +73,14 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // Validate upstream content-type is media (prevent serving HTML/JS through our domain)
+    const contentType = upstream.headers.get('content-type') || ''
+    if (!contentType || (!contentType.startsWith('video/') && !contentType.startsWith('image/') && !contentType.startsWith('audio/') && !contentType.startsWith('application/octet-stream'))) {
+      return NextResponse.json({ error: 'Unexpected content type from upstream' }, { status: 502 })
+    }
+
     // Stream the response through, preserving range response headers
     const headers = new Headers()
-    const contentType = upstream.headers.get('content-type')
     if (contentType) headers.set('Content-Type', contentType)
     const contentLength = upstream.headers.get('content-length')
     if (contentLength) headers.set('Content-Length', contentLength)
@@ -83,7 +88,7 @@ export async function GET(request: NextRequest) {
     if (contentRange) headers.set('Content-Range', contentRange)
     const acceptRanges = upstream.headers.get('accept-ranges')
     if (acceptRanges) headers.set('Accept-Ranges', acceptRanges)
-    headers.set('Cache-Control', 'public, max-age=86400')
+    headers.set('Cache-Control', 'private, max-age=86400')
 
     return new NextResponse(upstream.body, {
       status: upstream.status,

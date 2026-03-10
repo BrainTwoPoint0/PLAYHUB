@@ -7,7 +7,12 @@ const APP_URL =
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/'
+  const rawNext = searchParams.get('next') ?? '/'
+  // Validate redirect is a safe relative path (prevent open redirect)
+  const next =
+    rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.includes('@') && !rawNext.includes('\\')
+      ? rawNext
+      : '/'
 
   if (code) {
     const supabase = await createClient()

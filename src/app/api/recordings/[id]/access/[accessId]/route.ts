@@ -29,15 +29,27 @@ export async function DELETE(
     return NextResponse.json({ error: 'Recording not found' }, { status: 404 })
   }
 
-  // Check if user is admin for this venue
-  if (recording.organization_id) {
-    const isAdmin = await isVenueAdmin(user.id, recording.organization_id)
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Not authorized to revoke access for this recording' },
-        { status: 403 }
-      )
-    }
+  // Only venue admins can revoke access
+  if (!recording.organization_id || !await isVenueAdmin(user.id, recording.organization_id)) {
+    return NextResponse.json(
+      { error: 'Not authorized to revoke access for this recording' },
+      { status: 403 }
+    )
+  }
+
+  // Verify the accessId actually belongs to this recording (prevent IDOR)
+  const { data: accessRecord } = await (supabase as any)
+    .from('playhub_access_rights')
+    .select('id')
+    .eq('id', accessId)
+    .eq('match_recording_id', recordingId)
+    .single()
+
+  if (!accessRecord) {
+    return NextResponse.json(
+      { error: 'Access record not found for this recording' },
+      { status: 404 }
+    )
   }
 
   // Revoke access

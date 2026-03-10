@@ -32,8 +32,10 @@ function LoginForm() {
 
   useEffect(() => {
     if (user) {
-      const redirect = searchParams.get('redirect')
-      router.push(redirect || '/')
+      const raw = searchParams.get('redirect') || '/'
+      // Validate redirect is a safe relative path (prevent open redirect)
+      const safe = raw.startsWith('/') && !raw.startsWith('//') && !raw.includes('@') && !raw.includes('\\') ? raw : '/'
+      router.push(safe)
     }
   }, [user, router, searchParams])
 
@@ -59,8 +61,9 @@ function LoginForm() {
       if (error) {
         setError(getAuthErrorMessage(error))
       } else {
-        const redirect = searchParams.get('redirect')
-        router.push(redirect || '/')
+        const raw = searchParams.get('redirect') || '/'
+        const safe = raw.startsWith('/') && !raw.startsWith('//') && !raw.includes('@') && !raw.includes('\\') ? raw : '/'
+        router.push(safe)
       }
     } catch {
       setError('An unexpected error occurred. Please try again.')

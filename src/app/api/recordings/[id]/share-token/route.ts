@@ -28,12 +28,9 @@ export async function POST(
     return NextResponse.json({ error: 'Recording not found' }, { status: 404 })
   }
 
-  // Check if user is admin for this venue
-  if (recording.organization_id) {
-    const isAdmin = await isVenueAdmin(user.id, recording.organization_id)
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
-    }
+  // Only venue admins can generate share tokens
+  if (!recording.organization_id || !await isVenueAdmin(user.id, recording.organization_id)) {
+    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
   // If token already exists, return it
@@ -89,11 +86,8 @@ export async function DELETE(
     return NextResponse.json({ error: 'Recording not found' }, { status: 404 })
   }
 
-  if (recording.organization_id) {
-    const isAdmin = await isVenueAdmin(user.id, recording.organization_id)
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
-    }
+  if (!recording.organization_id || !await isVenueAdmin(user.id, recording.organization_id)) {
+    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
   await (serviceClient as any)

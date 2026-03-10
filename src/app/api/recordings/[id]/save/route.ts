@@ -15,9 +15,22 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // Require the share token in the request body
+  let token: string | undefined
+  try {
+    const body = await request.json()
+    token = body.token
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+
+  if (!token) {
+    return NextResponse.json({ error: 'Share token is required' }, { status: 400 })
+  }
+
   const serviceClient = createServiceClient()
 
-  // Verify recording exists, is published, and has a share_token
+  // Verify recording exists, is published, and the token matches
   const { data: recording, error: recordingError } = await (
     serviceClient as any
   )
@@ -37,14 +50,14 @@ export async function POST(
     )
   }
 
-  if (!recording.share_token) {
+  if (!recording.share_token || recording.share_token !== token) {
     return NextResponse.json(
-      { error: 'Recording is not publicly shared' },
-      { status: 400 }
+      { error: 'Invalid share token' },
+      { status: 403 }
     )
   }
 
-  // Self-grant access (the share token IS the authorization)
+  // Self-grant access (share token validated above)
   const result = await grantRecordingAccess(recordingId, user.id, {
     userId: user.id,
     notes: 'Saved from public share link',

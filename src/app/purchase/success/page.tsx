@@ -1,6 +1,11 @@
 import Link from 'next/link'
 import { Button } from '@braintwopoint0/playback-commons/ui'
-import { CheckCircle } from 'lucide-react'
+import { CheckCircle, AlertCircle } from 'lucide-react'
+import Stripe from 'stripe'
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2025-02-24.acacia',
+})
 
 export default async function PurchaseSuccessPage({
   searchParams,
@@ -8,6 +13,48 @@ export default async function PurchaseSuccessPage({
   searchParams: Promise<{ session_id?: string }>
 }) {
   const resolvedSearchParams = await searchParams
+  const sessionId = resolvedSearchParams.session_id
+
+  // Verify payment with Stripe
+  let verified = false
+  if (sessionId) {
+    try {
+      const session = await stripe.checkout.sessions.retrieve(sessionId)
+      verified = session.payment_status === 'paid'
+    } catch {
+      // Invalid or expired session
+    }
+  }
+
+  if (!verified) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="max-w-md w-full text-center space-y-6">
+          <div className="w-16 h-16 mx-auto rounded-full border border-yellow-400/30 bg-yellow-400/[0.06] flex items-center justify-center">
+            <AlertCircle className="h-8 w-8 text-yellow-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--timberwolf)] mb-2">
+              Payment Processing
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Your payment is being processed. If you completed the checkout,
+              your access will be granted shortly.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 pt-2">
+            <Button asChild>
+              <Link href="/matches">Browse Matches</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/">Go Home</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="max-w-md w-full text-center space-y-6">
@@ -24,15 +71,6 @@ export default async function PurchaseSuccessPage({
             match.
           </p>
         </div>
-
-        {resolvedSearchParams.session_id && (
-          <div className="rounded-lg border border-border bg-card p-3">
-            <p className="text-xs text-muted-foreground mb-1">Order ID</p>
-            <p className="text-xs text-[var(--timberwolf)] font-mono truncate">
-              {resolvedSearchParams.session_id}
-            </p>
-          </div>
-        )}
 
         <div className="flex flex-col gap-3 pt-2">
           <Button asChild>
