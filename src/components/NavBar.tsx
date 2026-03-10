@@ -154,7 +154,7 @@ export default function NavBar() {
           {/* Right side */}
           <div className="ml-auto flex items-center gap-2">
             {/* Desktop auth controls */}
-            <div className="hidden md:flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-4">
               {loading ? (
                 <div className="h-8 w-8 animate-pulse rounded-full bg-muted" />
               ) : user ? (
