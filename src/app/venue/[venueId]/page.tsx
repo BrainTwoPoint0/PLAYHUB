@@ -703,7 +703,9 @@ export default function VenueManagementPage() {
     if (venue.slug) {
       fetch(`/api/org/${venue.slug}/marketplace`)
         .then((res) => (res.ok ? res.json() : null))
-        .then((data) => { if (data) setOrgMarketplace(data) })
+        .then((data) => {
+          if (data) setOrgMarketplace(data)
+        })
         .catch(() => {})
         .finally(() => setMarketplaceLoading(false))
     } else {
@@ -1583,24 +1585,24 @@ export default function VenueManagementPage() {
     <div className="min-h-screen bg-[var(--night)]">
       <div className="container mx-auto px-5 py-16 max-w-6xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8">
-            <div>
-              <p className="text-muted-foreground text-xs font-semibold tracking-[0.25em] uppercase mb-2">
-                {venue?.type === 'group' ? 'Group Overview' : 'Venue Management'}
-              </p>
-              <h1 className="text-2xl md:text-3xl font-bold text-[var(--timberwolf)]">
-                {venue?.name}
-              </h1>
-            </div>
-            {venueCount > 1 && (
-              <Button
-                variant="outline"
-                className={`self-start sm:self-auto ${outlineBtnClass}`}
-                onClick={() => router.push('/venue')}
-              >
-                Switch Venue
-              </Button>
-            )}
+          <div>
+            <p className="text-muted-foreground text-xs font-semibold tracking-[0.25em] uppercase mb-2">
+              {venue?.type === 'group' ? 'Group Overview' : 'Venue Management'}
+            </p>
+            <h1 className="text-2xl md:text-3xl font-bold text-[var(--timberwolf)]">
+              {venue?.name}
+            </h1>
           </div>
+          {venueCount > 1 && (
+            <Button
+              variant="outline"
+              className={`self-start sm:self-auto ${outlineBtnClass}`}
+              onClick={() => router.push('/venue')}
+            >
+              Switch Venue
+            </Button>
+          )}
+        </div>
 
         {/* Group Dashboard — shown for group-type orgs */}
         {venue?.type === 'group' && (
@@ -1611,7 +1613,10 @@ export default function VenueManagementPage() {
                   <div className="bg-muted rounded h-5 w-[200px]" />
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted">
                     {[0, 1, 2, 3].map((i) => (
-                      <div key={i} className="bg-[var(--night)] p-3.5 space-y-2">
+                      <div
+                        key={i}
+                        className="bg-[var(--night)] p-3.5 space-y-2"
+                      >
                         <div className="bg-muted rounded h-2.5 w-[60px]" />
                         <div className="bg-muted rounded h-6 w-[90px]" />
                       </div>
@@ -1619,467 +1624,525 @@ export default function VenueManagementPage() {
                   </div>
                 </div>
               </div>
-            ) : groupData && (
-              <div className="space-y-6 mb-6">
-                {/* Aggregated totals */}
-                <div className="rounded-xl border border-border bg-card">
-                  <div className="p-5">
-                    <h2 className="text-base font-semibold text-[var(--timberwolf)] mb-4">
-                      Portfolio Overview
-                    </h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted">
-                      {[
-                        {
-                          label: 'Total Recordings',
-                          value: String(groupData.totals.totalRecordings),
-                          sub: `${groupData.totals.publishedRecordings} published`,
-                        },
-                        {
-                          label: 'This Month',
-                          value: String(groupData.totals.monthRecordings),
-                          sub: 'recordings',
-                        },
-                        {
-                          label: 'Monthly Revenue',
-                          value: groupData.childVenues.length > 0
-                            ? new Intl.NumberFormat('en-GB', {
-                                style: 'currency',
-                                currency: groupData.childVenues[0]?.currency || 'KWD',
-                                minimumFractionDigits: 0,
-                                maximumFractionDigits: 3,
-                              }).format(groupData.totals.monthRevenue)
-                            : '0',
-                          sub: 'billable',
-                        },
-                        {
-                          label: 'Today',
-                          value: String(groupData.totals.todayCount),
-                          sub: 'recordings',
-                        },
-                      ].map((card) => (
-                        <div key={card.label} className="bg-[var(--night)] p-3.5">
-                          <p className="text-xs text-muted-foreground mb-1">
-                            {card.label}
-                          </p>
-                          <p className="text-lg font-semibold text-[var(--timberwolf)]">
-                            {card.value}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {card.sub}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Daily performance chart */}
-                {groupData.dailyChart.length > 0 && (
+            ) : (
+              groupData && (
+                <div className="space-y-6 mb-6">
+                  {/* Aggregated totals */}
                   <div className="rounded-xl border border-border bg-card">
                     <div className="p-5">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-                        <div>
-                          <h2 className="text-base font-semibold text-[var(--timberwolf)]">
-                            Daily Performance
-                          </h2>
-                          <p className="text-xs text-muted-foreground">
-                            Avg {groupData.averagePerDay}/day
-                            {groupData.totalDailyTarget > 0 && ` · Target: ${groupData.totalDailyTarget}/day`}
-                          </p>
-                        </div>
+                      <h2 className="text-base font-semibold text-[var(--timberwolf)] mb-4">
+                        Portfolio Overview
+                      </h2>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted">
+                        {[
+                          {
+                            label: 'Total Recordings',
+                            value: String(groupData.totals.totalRecordings),
+                            sub: `${groupData.totals.publishedRecordings} published`,
+                          },
+                          {
+                            label: 'This Month',
+                            value: String(groupData.totals.monthRecordings),
+                            sub: 'recordings',
+                          },
+                          {
+                            label: 'Monthly Revenue',
+                            value:
+                              groupData.childVenues.length > 0
+                                ? new Intl.NumberFormat('en-GB', {
+                                    style: 'currency',
+                                    currency:
+                                      groupData.childVenues[0]?.currency ||
+                                      'KWD',
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 3,
+                                  }).format(groupData.totals.monthRevenue)
+                                : '0',
+                            sub: 'billable',
+                          },
+                          {
+                            label: 'Today',
+                            value: String(groupData.totals.todayCount),
+                            sub: 'recordings',
+                          },
+                        ].map((card) => (
+                          <div
+                            key={card.label}
+                            className="bg-[var(--night)] p-3.5"
+                          >
+                            <p className="text-xs text-muted-foreground mb-1">
+                              {card.label}
+                            </p>
+                            <p className="text-lg font-semibold text-[var(--timberwolf)]">
+                              {card.value}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {card.sub}
+                            </p>
+                          </div>
+                        ))}
                       </div>
-                      <ChartContainer
-                        config={Object.fromEntries(
-                          groupData.venueNames.map((name, i) => [
-                            name,
-                            {
-                              label: name,
-                              color: [
-                                'hsl(142, 71%, 45%)',
-                                'hsl(217, 91%, 60%)',
-                                'hsl(47, 96%, 53%)',
-                                'hsl(280, 65%, 60%)',
-                                'hsl(15, 90%, 55%)',
-                              ][i % 5],
-                            },
-                          ])
-                        ) as ChartConfig}
-                        className="h-[220px] w-full"
-                      >
-                        <AreaChart data={groupData.dailyChart}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                          <XAxis
-                            dataKey="date"
-                            tickFormatter={(d: string) => {
-                              const day = parseInt(d.split('-')[2], 10)
-                              return day % 5 === 1 || day === 1 ? String(day) : ''
-                            }}
-                            stroke="hsl(var(--muted-foreground))"
-                            fontSize={11}
-                          />
-                          <YAxis
-                            stroke="hsl(var(--muted-foreground))"
-                            fontSize={11}
-                            allowDecimals={false}
-                          />
-                          <ChartTooltip
-                            content={
-                              <ChartTooltipContent
-                                labelFormatter={(label: string) => {
-                                  const d = new Date(label + 'T00:00:00')
-                                  return d.toLocaleDateString('en-GB', {
-                                    day: 'numeric',
-                                    month: 'short',
-                                  })
-                                }}
-                              />
-                            }
-                          />
-                          {groupData.totalDailyTarget > 0 && (
-                            <ReferenceLine
-                              y={groupData.totalDailyTarget}
-                              stroke="hsl(var(--muted-foreground))"
-                              strokeDasharray="6 4"
-                              strokeOpacity={0.5}
-                            />
-                          )}
-                          {groupData.venueNames.map((name, i) => (
-                            <Area
-                              key={name}
-                              type="monotone"
-                              dataKey={name}
-                              stackId="1"
-                              fill={[
-                                'hsl(142, 71%, 45%)',
-                                'hsl(217, 91%, 60%)',
-                                'hsl(47, 96%, 53%)',
-                                'hsl(280, 65%, 60%)',
-                                'hsl(15, 90%, 55%)',
-                              ][i % 5]}
-                              fillOpacity={0.4}
-                              stroke={[
-                                'hsl(142, 71%, 45%)',
-                                'hsl(217, 91%, 60%)',
-                                'hsl(47, 96%, 53%)',
-                                'hsl(280, 65%, 60%)',
-                                'hsl(15, 90%, 55%)',
-                              ][i % 5]}
-                              strokeWidth={1.5}
-                            />
-                          ))}
-                        </AreaChart>
-                      </ChartContainer>
                     </div>
                   </div>
-                )}
 
-                {/* Per-venue breakdown */}
-                <div className="rounded-xl border border-border bg-card">
-                  <div className="p-5">
-                    <h2 className="text-base font-semibold text-[var(--timberwolf)] mb-4">
-                      Venues ({groupData.childVenues.length})
-                    </h2>
-                    <div className="space-y-3">
-                      {groupData.childVenues.map((child) => (
-                        <div
-                          key={child.id}
-                          className="p-4 rounded-lg bg-muted/50 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                        >
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium text-[var(--timberwolf)] truncate">
-                                {child.name}
-                              </p>
-                              <span className="text-xs px-2 py-0.5 rounded bg-zinc-700 text-muted-foreground flex-shrink-0">
-                                {child.type}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                              <span>{child.totalRecordings} recordings</span>
-                              <span>{child.monthRecordings} this month</span>
-                              {child.dailyTarget > 0 && (
-                                <span>
-                                  Today: {child.todayCount}/{child.dailyTarget}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            {child.monthRevenue > 0 && (
-                              <span className="text-sm font-semibold text-[var(--timberwolf)]">
-                                {new Intl.NumberFormat('en-GB', {
-                                  style: 'currency',
-                                  currency: child.currency,
-                                  minimumFractionDigits: 0,
-                                  maximumFractionDigits: 3,
-                                }).format(child.monthRevenue)}
-                              </span>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className={outlineBtnClass}
-                              onClick={() => router.push(`/venue/${child.id}`)}
-                            >
-                              Manage
-                            </Button>
+                  {/* Daily performance chart */}
+                  {groupData.dailyChart.length > 0 && (
+                    <div className="rounded-xl border border-border bg-card">
+                      <div className="p-5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                          <div>
+                            <h2 className="text-base font-semibold text-[var(--timberwolf)]">
+                              Daily Performance
+                            </h2>
+                            <p className="text-xs text-muted-foreground">
+                              Avg {groupData.averagePerDay}/day
+                              {groupData.totalDailyTarget > 0 &&
+                                ` · Target: ${groupData.totalDailyTarget}/day`}
+                            </p>
                           </div>
                         </div>
-                      ))}
-                      {groupData.childVenues.length === 0 && (
-                        <p className="text-muted-foreground text-center py-4">
-                          No child venues yet. Add venues from the admin dashboard.
-                        </p>
-                      )}
+                        <ChartContainer
+                          config={
+                            Object.fromEntries(
+                              groupData.venueNames.map((name, i) => [
+                                name,
+                                {
+                                  label: name,
+                                  color: [
+                                    'hsl(142, 71%, 45%)',
+                                    'hsl(217, 91%, 60%)',
+                                    'hsl(47, 96%, 53%)',
+                                    'hsl(280, 65%, 60%)',
+                                    'hsl(15, 90%, 55%)',
+                                  ][i % 5],
+                                },
+                              ])
+                            ) as ChartConfig
+                          }
+                          className="h-[220px] w-full"
+                        >
+                          <AreaChart data={groupData.dailyChart}>
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                              stroke="hsl(var(--border))"
+                            />
+                            <XAxis
+                              dataKey="date"
+                              tickFormatter={(d: string) => {
+                                const day = parseInt(d.split('-')[2], 10)
+                                return day % 5 === 1 || day === 1
+                                  ? String(day)
+                                  : ''
+                              }}
+                              stroke="hsl(var(--muted-foreground))"
+                              fontSize={11}
+                            />
+                            <YAxis
+                              stroke="hsl(var(--muted-foreground))"
+                              fontSize={11}
+                              allowDecimals={false}
+                            />
+                            <ChartTooltip
+                              content={
+                                <ChartTooltipContent
+                                  labelFormatter={(label: string) => {
+                                    const d = new Date(label + 'T00:00:00')
+                                    return d.toLocaleDateString('en-GB', {
+                                      day: 'numeric',
+                                      month: 'short',
+                                    })
+                                  }}
+                                />
+                              }
+                            />
+                            {groupData.totalDailyTarget > 0 && (
+                              <ReferenceLine
+                                y={groupData.totalDailyTarget}
+                                stroke="hsl(var(--muted-foreground))"
+                                strokeDasharray="6 4"
+                                strokeOpacity={0.5}
+                              />
+                            )}
+                            {groupData.venueNames.map((name, i) => (
+                              <Area
+                                key={name}
+                                type="monotone"
+                                dataKey={name}
+                                stackId="1"
+                                fill={
+                                  [
+                                    'hsl(142, 71%, 45%)',
+                                    'hsl(217, 91%, 60%)',
+                                    'hsl(47, 96%, 53%)',
+                                    'hsl(280, 65%, 60%)',
+                                    'hsl(15, 90%, 55%)',
+                                  ][i % 5]
+                                }
+                                fillOpacity={0.4}
+                                stroke={
+                                  [
+                                    'hsl(142, 71%, 45%)',
+                                    'hsl(217, 91%, 60%)',
+                                    'hsl(47, 96%, 53%)',
+                                    'hsl(280, 65%, 60%)',
+                                    'hsl(15, 90%, 55%)',
+                                  ][i % 5]
+                                }
+                                strokeWidth={1.5}
+                              />
+                            ))}
+                          </AreaChart>
+                        </ChartContainer>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Per-venue breakdown */}
+                  <div className="rounded-xl border border-border bg-card">
+                    <div className="p-5">
+                      <h2 className="text-base font-semibold text-[var(--timberwolf)] mb-4">
+                        Venues ({groupData.childVenues.length})
+                      </h2>
+                      <div className="space-y-3">
+                        {groupData.childVenues.map((child) => (
+                          <div
+                            key={child.id}
+                            className="p-4 rounded-lg bg-muted/50 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                          >
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-[var(--timberwolf)] truncate">
+                                  {child.name}
+                                </p>
+                                <span className="text-xs px-2 py-0.5 rounded bg-zinc-700 text-muted-foreground flex-shrink-0">
+                                  {child.type}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                                <span>{child.totalRecordings} recordings</span>
+                                <span>{child.monthRecordings} this month</span>
+                                {child.dailyTarget > 0 && (
+                                  <span>
+                                    Today: {child.todayCount}/
+                                    {child.dailyTarget}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                              {child.monthRevenue > 0 && (
+                                <span className="text-sm font-semibold text-[var(--timberwolf)]">
+                                  {new Intl.NumberFormat('en-GB', {
+                                    style: 'currency',
+                                    currency: child.currency,
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 3,
+                                  }).format(child.monthRevenue)}
+                                </span>
+                              )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className={outlineBtnClass}
+                                onClick={() =>
+                                  router.push(`/venue/${child.id}`)
+                                }
+                              >
+                                Manage
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                        {groupData.childVenues.length === 0 && (
+                          <p className="text-muted-foreground text-center py-4">
+                            No child venues yet. Add venues from the admin
+                            dashboard.
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )
             )}
           </>
         )}
 
         {/* Billing, Scheduling, Streaming, Marketplace — hidden for group orgs */}
-        {venue?.type !== 'group' && (<>
-        {billingLoading ? (
-          <div className="mb-6 rounded-xl border border-border bg-card animate-pulse">
-            <div className="p-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                <div className="space-y-1.5">
-                  <div className="bg-muted rounded h-5 w-[60px]" />
-                  <div className="bg-muted rounded h-3 w-[100px]" />
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="bg-muted rounded h-6 w-[80px]" />
-                  <div className="bg-muted rounded h-6 w-[70px]" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted">
-                {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="bg-[var(--night)] p-3.5 space-y-2">
-                    <div className="flex items-center gap-1.5">
-                      <div className="h-1.5 w-1.5 rounded-full bg-muted" />
-                      <div className="bg-muted rounded h-2.5 w-[60px]" />
+        {venue?.type !== 'group' && (
+          <>
+            {billingLoading ? (
+              <div className="mb-6 rounded-xl border border-border bg-card animate-pulse">
+                <div className="p-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                    <div className="space-y-1.5">
+                      <div className="bg-muted rounded h-5 w-[60px]" />
+                      <div className="bg-muted rounded h-3 w-[100px]" />
                     </div>
-                    <div className="bg-muted rounded h-6 w-[90px]" />
-                    <div className="bg-muted rounded h-2.5 w-[70px]" />
+                    <div className="flex items-center gap-4">
+                      <div className="bg-muted rounded h-6 w-[80px]" />
+                      <div className="bg-muted rounded h-6 w-[70px]" />
+                    </div>
                   </div>
-                ))}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted">
+                    {[0, 1, 2, 3].map((i) => (
+                      <div
+                        key={i}
+                        className="bg-[var(--night)] p-3.5 space-y-2"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-1.5 w-1.5 rounded-full bg-muted" />
+                          <div className="bg-muted rounded h-2.5 w-[60px]" />
+                        </div>
+                        <div className="bg-muted rounded h-6 w-[90px]" />
+                        <div className="bg-muted rounded h-2.5 w-[70px]" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        ) : billingConfig?.is_active && (
-            <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/8 bg-card">
-              <div className="p-5">
-                {/* Header row */}
-                <div className="relative flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 mb-4">
-                  <h2 className="text-base font-semibold text-[var(--timberwolf)]">
-                    Billing
-                  </h2>
-                  <div className="flex items-center gap-3 order-last sm:order-none ml-auto sm:ml-0 sm:absolute sm:left-1/2 sm:-translate-x-1/2">
-                    <button
-                      onClick={() => {
-                        const prev =
-                          billingMonth === 1
-                            ? { m: 12, y: billingYear - 1 }
-                            : { m: billingMonth - 1, y: billingYear }
-                        setBillingMonth(prev.m)
-                        setBillingYear(prev.y)
-                        fetchBillingData(prev.m, prev.y)
-                      }}
-                      className="text-muted-foreground/70 hover:text-[var(--timberwolf)] text-base px-1.5 py-0.5"
-                    >
-                      ‹
-                    </button>
-                    <p className="text-sm text-muted-foreground font-medium min-w-[120px] text-center">
-                      {new Date(
-                        billingYear,
-                        billingMonth - 1
-                      ).toLocaleDateString('en-GB', {
-                        month: 'long',
-                        year: 'numeric',
-                      })}
-                    </p>
-                    <button
-                      onClick={() => {
-                        if (isCurrentBillingMonth) return
-                        const next =
-                          billingMonth === 12
-                            ? { m: 1, y: billingYear + 1 }
-                            : { m: billingMonth + 1, y: billingYear }
-                        setBillingMonth(next.m)
-                        setBillingYear(next.y)
-                        fetchBillingData(next.m, next.y)
-                      }}
-                      disabled={isCurrentBillingMonth}
-                      className={`text-base px-1.5 py-0.5 ${isCurrentBillingMonth ? 'text-muted-foreground/20 cursor-not-allowed' : 'text-muted-foreground/70 hover:text-[var(--timberwolf)]'}`}
-                    >
-                      ›
-                    </button>
-                  </div>
-                  {billingSummary && (
-                    <div className="flex items-center gap-3 sm:gap-4 text-sm">
-                      <div>
-                        <span
-                          className="text-[var(--timberwolf)] font-semibold text-base sm:text-lg"
-                          style={{ fontVariantNumeric: 'tabular-nums' }}
+            ) : (
+              billingConfig?.is_active && (
+                <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/8 bg-card">
+                  <div className="p-5">
+                    {/* Header row */}
+                    <div className="relative flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 mb-4">
+                      <h2 className="text-base font-semibold text-[var(--timberwolf)]">
+                        Billing
+                      </h2>
+                      <div className="flex items-center gap-3 order-last sm:order-none ml-auto sm:ml-0 sm:absolute sm:left-1/2 sm:-translate-x-1/2">
+                        <button
+                          onClick={() => {
+                            const prev =
+                              billingMonth === 1
+                                ? { m: 12, y: billingYear - 1 }
+                                : { m: billingMonth - 1, y: billingYear }
+                            setBillingMonth(prev.m)
+                            setBillingYear(prev.y)
+                            fetchBillingData(prev.m, prev.y)
+                          }}
+                          className="text-muted-foreground/70 hover:text-[var(--timberwolf)] text-base px-1.5 py-0.5"
                         >
-                          {billingSummary.totalRevenue.toFixed(3)}
-                        </span>
-                        <span className="text-muted-foreground/60 ml-1 text-xs">
-                          {billingSummary.currency}
-                        </span>
-                      </div>
-                      <div className="border-l border-border pl-3 sm:pl-4">
-                        <span
-                          className="text-[var(--timberwolf)] font-medium"
-                          style={{ fontVariantNumeric: 'tabular-nums' }}
+                          ‹
+                        </button>
+                        <p className="text-sm text-muted-foreground font-medium min-w-[120px] text-center">
+                          {new Date(
+                            billingYear,
+                            billingMonth - 1
+                          ).toLocaleDateString('en-GB', {
+                            month: 'long',
+                            year: 'numeric',
+                          })}
+                        </p>
+                        <button
+                          onClick={() => {
+                            if (isCurrentBillingMonth) return
+                            const next =
+                              billingMonth === 12
+                                ? { m: 1, y: billingYear + 1 }
+                                : { m: billingMonth + 1, y: billingYear }
+                            setBillingMonth(next.m)
+                            setBillingYear(next.y)
+                            fetchBillingData(next.m, next.y)
+                          }}
+                          disabled={isCurrentBillingMonth}
+                          className={`text-base px-1.5 py-0.5 ${isCurrentBillingMonth ? 'text-muted-foreground/20 cursor-not-allowed' : 'text-muted-foreground/70 hover:text-[var(--timberwolf)]'}`}
                         >
-                          {billingSummary.count}
-                        </span>
-                        <span className="text-muted-foreground/60 ml-1 text-xs">
-                          recordings
-                        </span>
+                          ›
+                        </button>
                       </div>
-                      {billingSummary.dailyTarget > 0 &&
-                        isCurrentBillingMonth && (
+                      {billingSummary && (
+                        <div className="flex items-center gap-3 sm:gap-4 text-sm">
+                          <div>
+                            <span
+                              className="text-[var(--timberwolf)] font-semibold text-base sm:text-lg"
+                              style={{ fontVariantNumeric: 'tabular-nums' }}
+                            >
+                              {billingSummary.totalRevenue.toFixed(3)}
+                            </span>
+                            <span className="text-muted-foreground/60 ml-1 text-xs">
+                              {billingSummary.currency}
+                            </span>
+                          </div>
                           <div className="border-l border-border pl-3 sm:pl-4">
                             <span
                               className="text-[var(--timberwolf)] font-medium"
                               style={{ fontVariantNumeric: 'tabular-nums' }}
                             >
-                              {billingSummary.todayCount}
+                              {billingSummary.count}
                             </span>
-                            <span className="text-muted-foreground/60 text-xs">
-                              /{billingSummary.dailyTarget} today
+                            <span className="text-muted-foreground/60 ml-1 text-xs">
+                              recordings
                             </span>
                           </div>
-                        )}
+                          {billingSummary.dailyTarget > 0 &&
+                            isCurrentBillingMonth && (
+                              <div className="border-l border-border pl-3 sm:pl-4">
+                                <span
+                                  className="text-[var(--timberwolf)] font-medium"
+                                  style={{ fontVariantNumeric: 'tabular-nums' }}
+                                >
+                                  {billingSummary.todayCount}
+                                </span>
+                                <span className="text-muted-foreground/60 text-xs">
+                                  /{billingSummary.dailyTarget} today
+                                </span>
+                              </div>
+                            )}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                {/* Financial summary — 3 columns with 1px gap borders */}
-                {billingSummary && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted mb-4">
-                    {/* Venue-collected revenue */}
-                    <div className="bg-[var(--night)] p-3.5">
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <div className="h-1.5 w-1.5 rounded-full bg-amber-400/60" />
-                        <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
-                          At venue
-                        </p>
-                      </div>
-                      <p
-                        className="text-lg font-semibold text-[var(--timberwolf)]"
-                        style={{ fontVariantNumeric: 'tabular-nums' }}
-                      >
-                        {billingSummary.venueCollectedRevenue.toFixed(3)}
-                        <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
-                          {billingSummary.currency}
-                        </span>
-                      </p>
-                      <p className="text-[10px] text-muted-foreground/40 mt-1">
-                        {billingSummary.venueCollectedCount} recording
-                        {billingSummary.venueCollectedCount === 1 ? '' : 's'}
-                      </p>
-                    </div>
-                    {/* QR Code-collected revenue */}
-                    <div className="bg-[var(--night)] p-3.5">
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <div className="h-1.5 w-1.5 rounded-full bg-indigo-400/60" />
-                        <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
-                          QR Code
-                        </p>
-                      </div>
-                      <p
-                        className="text-lg font-semibold text-[var(--timberwolf)]"
-                        style={{ fontVariantNumeric: 'tabular-nums' }}
-                      >
-                        {billingSummary.playhubCollectedRevenue.toFixed(3)}
-                        <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
-                          {billingSummary.currency}
-                        </span>
-                      </p>
-                      <p className="text-[10px] text-muted-foreground/40 mt-1">
-                        {billingSummary.playhubCollectedCount} recording
-                        {billingSummary.playhubCollectedCount === 1 ? '' : 's'}
-                      </p>
-                    </div>
-                    {/* Venue profit share */}
-                    <div className="bg-[var(--night)] p-3.5">
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-400/60" />
-                        <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
-                          Your profit
-                        </p>
-                      </div>
-                      <p
-                        className="text-lg font-semibold text-emerald-400"
-                        style={{ fontVariantNumeric: 'tabular-nums' }}
-                      >
-                        {billingSummary.venueTotalProfit.toFixed(3)}
-                        <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
-                          {billingSummary.currency}
-                        </span>
-                      </p>
-                      <p className="text-[10px] text-muted-foreground/40 mt-1">
-                        {billingSummary.count} recording
-                        {billingSummary.count === 1 ? '' : 's'} in{' '}
-                        {new Date(
-                          billingYear,
-                          billingMonth - 1
-                        ).toLocaleDateString('en-GB', { month: 'long' })}
-                      </p>
-                    </div>
-                    {/* Net settlement */}
-                    <div className="bg-[var(--night)] p-3.5">
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <div
-                          className={`h-1.5 w-1.5 rounded-full ${billingSummary.netBalance > 0 ? 'bg-amber-400/60' : billingSummary.netBalance < 0 ? 'bg-emerald-400/60' : 'bg-[var(--ash-grey)]/40'}`}
-                        />
-                        <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
-                          Net settlement
-                        </p>
-                      </div>
-                      <p
-                        className="text-lg font-semibold text-[var(--timberwolf)]"
-                        style={{ fontVariantNumeric: 'tabular-nums' }}
-                      >
-                        {Math.abs(billingSummary.netBalance).toFixed(3)}
-                        <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
-                          {billingSummary.currency}
-                        </span>
-                      </p>
-                      <p className="text-[10px] text-muted-foreground/40 mt-1">
-                        {billingSummary.netBalance > 0
-                          ? 'venue owes PLAYBACK'
-                          : billingSummary.netBalance < 0
-                            ? 'PLAYBACK owes venue'
-                            : 'settled'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Daily recordings chart */}
-                {dailyStats && dailyStats.scenes.length > 0 && (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
-                        Daily activity
-                      </p>
-                      {dailyStats.scenes.length > 1 && (
-                        <div className="flex items-center gap-3">
-                          {dailyStats.scenes.map((scene, i) => (
+                    {/* Financial summary — 3 columns with 1px gap borders */}
+                    {billingSummary && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted mb-4">
+                        {/* Venue-collected revenue */}
+                        <div className="bg-[var(--night)] p-3.5">
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <div className="h-1.5 w-1.5 rounded-full bg-amber-400/60" />
+                            <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
+                              At venue
+                            </p>
+                          </div>
+                          <p
+                            className="text-lg font-semibold text-[var(--timberwolf)]"
+                            style={{ fontVariantNumeric: 'tabular-nums' }}
+                          >
+                            {billingSummary.venueCollectedRevenue.toFixed(3)}
+                            <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
+                              {billingSummary.currency}
+                            </span>
+                          </p>
+                          <p className="text-[10px] text-muted-foreground/40 mt-1">
+                            {billingSummary.venueCollectedCount} recording
+                            {billingSummary.venueCollectedCount === 1
+                              ? ''
+                              : 's'}
+                          </p>
+                        </div>
+                        {/* QR Code-collected revenue */}
+                        <div className="bg-[var(--night)] p-3.5">
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <div className="h-1.5 w-1.5 rounded-full bg-indigo-400/60" />
+                            <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
+                              QR Code
+                            </p>
+                          </div>
+                          <p
+                            className="text-lg font-semibold text-[var(--timberwolf)]"
+                            style={{ fontVariantNumeric: 'tabular-nums' }}
+                          >
+                            {billingSummary.playhubCollectedRevenue.toFixed(3)}
+                            <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
+                              {billingSummary.currency}
+                            </span>
+                          </p>
+                          <p className="text-[10px] text-muted-foreground/40 mt-1">
+                            {billingSummary.playhubCollectedCount} recording
+                            {billingSummary.playhubCollectedCount === 1
+                              ? ''
+                              : 's'}
+                          </p>
+                        </div>
+                        {/* Venue profit share */}
+                        <div className="bg-[var(--night)] p-3.5">
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <div className="h-1.5 w-1.5 rounded-full bg-emerald-400/60" />
+                            <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
+                              Your profit
+                            </p>
+                          </div>
+                          <p
+                            className="text-lg font-semibold text-emerald-400"
+                            style={{ fontVariantNumeric: 'tabular-nums' }}
+                          >
+                            {billingSummary.venueTotalProfit.toFixed(3)}
+                            <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
+                              {billingSummary.currency}
+                            </span>
+                          </p>
+                          <p className="text-[10px] text-muted-foreground/40 mt-1">
+                            {billingSummary.count} recording
+                            {billingSummary.count === 1 ? '' : 's'} in{' '}
+                            {new Date(
+                              billingYear,
+                              billingMonth - 1
+                            ).toLocaleDateString('en-GB', { month: 'long' })}
+                          </p>
+                        </div>
+                        {/* Net settlement */}
+                        <div className="bg-[var(--night)] p-3.5">
+                          <div className="flex items-center gap-1.5 mb-1.5">
                             <div
-                              key={scene}
-                              className="flex items-center gap-1 text-[10px] text-muted-foreground/50"
-                            >
-                              <div
-                                className="h-1.5 w-1.5 rounded-full"
-                                style={{
-                                  backgroundColor: [
+                              className={`h-1.5 w-1.5 rounded-full ${billingSummary.netBalance > 0 ? 'bg-amber-400/60' : billingSummary.netBalance < 0 ? 'bg-emerald-400/60' : 'bg-[var(--ash-grey)]/40'}`}
+                            />
+                            <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
+                              Net settlement
+                            </p>
+                          </div>
+                          <p
+                            className="text-lg font-semibold text-[var(--timberwolf)]"
+                            style={{ fontVariantNumeric: 'tabular-nums' }}
+                          >
+                            {Math.abs(billingSummary.netBalance).toFixed(3)}
+                            <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
+                              {billingSummary.currency}
+                            </span>
+                          </p>
+                          <p className="text-[10px] text-muted-foreground/40 mt-1">
+                            {billingSummary.netBalance > 0
+                              ? 'venue owes PLAYBACK'
+                              : billingSummary.netBalance < 0
+                                ? 'PLAYBACK owes venue'
+                                : 'settled'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Daily recordings chart */}
+                    {dailyStats && dailyStats.scenes.length > 0 && (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
+                            Daily activity
+                          </p>
+                          {dailyStats.scenes.length > 1 && (
+                            <div className="flex items-center gap-3">
+                              {dailyStats.scenes.map((scene, i) => (
+                                <div
+                                  key={scene}
+                                  className="flex items-center gap-1 text-[10px] text-muted-foreground/50"
+                                >
+                                  <div
+                                    className="h-1.5 w-1.5 rounded-full"
+                                    style={{
+                                      backgroundColor: [
+                                        '#6366f1',
+                                        '#22c55e',
+                                        '#f59e0b',
+                                        '#ef4444',
+                                        '#06b6d4',
+                                        '#ec4899',
+                                        '#8b5cf6',
+                                        '#14b8a6',
+                                      ][i % 8],
+                                    }}
+                                  />
+                                  {scene}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <ChartContainer
+                          config={
+                            Object.fromEntries(
+                              dailyStats.scenes.map((scene, i) => [
+                                scene,
+                                {
+                                  label: scene,
+                                  color: [
                                     '#6366f1',
                                     '#22c55e',
                                     '#f59e0b',
@@ -2089,22 +2152,103 @@ export default function VenueManagementPage() {
                                     '#8b5cf6',
                                     '#14b8a6',
                                   ][i % 8],
-                                }}
-                              />
-                              {scene}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <ChartContainer
-                      config={
-                        Object.fromEntries(
-                          dailyStats.scenes.map((scene, i) => [
-                            scene,
-                            {
-                              label: scene,
-                              color: [
+                                },
+                              ])
+                            ) as ChartConfig
+                          }
+                          className="aspect-[2/1] sm:aspect-[3/1] md:aspect-[4/1] w-full"
+                        >
+                          <AreaChart
+                            data={dailyStats.days
+                              .filter(
+                                (d) =>
+                                  d.date <=
+                                  new Date().toISOString().slice(0, 10)
+                              )
+                              .map((d) => ({
+                                date: d.date.slice(8),
+                                ...d.byScene,
+                                total: d.total,
+                              }))}
+                            margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
+                          >
+                            <defs>
+                              {dailyStats.scenes.map((scene, i) => {
+                                const color = [
+                                  '#6366f1',
+                                  '#22c55e',
+                                  '#f59e0b',
+                                  '#ef4444',
+                                  '#06b6d4',
+                                  '#ec4899',
+                                  '#8b5cf6',
+                                  '#14b8a6',
+                                ][i % 8]
+                                return (
+                                  <linearGradient
+                                    key={scene}
+                                    id={`fill-${i}`}
+                                    x1="0"
+                                    y1="0"
+                                    x2="0"
+                                    y2="1"
+                                  >
+                                    <stop
+                                      offset="5%"
+                                      stopColor={color}
+                                      stopOpacity={0.25}
+                                    />
+                                    <stop
+                                      offset="95%"
+                                      stopColor={color}
+                                      stopOpacity={0}
+                                    />
+                                  </linearGradient>
+                                )
+                              })}
+                            </defs>
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                              stroke="rgba(185,186,163,0.05)"
+                              vertical={false}
+                            />
+                            <XAxis
+                              dataKey="date"
+                              tick={{
+                                fill: 'rgba(185,186,163,0.4)',
+                                fontSize: 9,
+                              }}
+                              axisLine={false}
+                              tickLine={false}
+                              interval="preserveStartEnd"
+                            />
+                            <YAxis
+                              allowDecimals={false}
+                              tick={{
+                                fill: 'rgba(185,186,163,0.4)',
+                                fontSize: 9,
+                              }}
+                              axisLine={false}
+                              tickLine={false}
+                              width={20}
+                            />
+                            <ChartTooltip
+                              content={
+                                <ChartTooltipContent
+                                  indicator="dot"
+                                  labelFormatter={(value) => {
+                                    const dayNum =
+                                      typeof value === 'string'
+                                        ? value
+                                        : String(value)
+                                    const now = new Date()
+                                    return `${dayNum} ${now.toLocaleDateString('en-GB', { month: 'short' })}`
+                                  }}
+                                />
+                              }
+                            />
+                            {dailyStats.scenes.map((scene, i) => {
+                              const color = [
                                 '#6366f1',
                                 '#22c55e',
                                 '#f59e0b',
@@ -2113,1376 +2257,1305 @@ export default function VenueManagementPage() {
                                 '#ec4899',
                                 '#8b5cf6',
                                 '#14b8a6',
-                              ][i % 8],
-                            },
-                          ])
-                        ) as ChartConfig
-                      }
-                      className="aspect-[2/1] sm:aspect-[3/1] md:aspect-[4/1] w-full"
-                    >
-                      <AreaChart
-                        data={dailyStats.days
-                          .filter((d) => d.date <= new Date().toISOString().slice(0, 10))
-                          .map((d) => ({
-                            date: d.date.slice(8),
-                            ...d.byScene,
-                            total: d.total,
-                          }))}
-                        margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
-                      >
-                        <defs>
-                          {dailyStats.scenes.map((scene, i) => {
-                            const color = [
-                              '#6366f1',
-                              '#22c55e',
-                              '#f59e0b',
-                              '#ef4444',
-                              '#06b6d4',
-                              '#ec4899',
-                              '#8b5cf6',
-                              '#14b8a6',
-                            ][i % 8]
-                            return (
-                              <linearGradient
-                                key={scene}
-                                id={`fill-${i}`}
-                                x1="0"
-                                y1="0"
-                                x2="0"
-                                y2="1"
-                              >
-                                <stop
-                                  offset="5%"
-                                  stopColor={color}
-                                  stopOpacity={0.25}
+                              ][i % 8]
+                              return (
+                                <Area
+                                  key={scene}
+                                  dataKey={scene}
+                                  type="monotone"
+                                  stackId="a"
+                                  stroke={color}
+                                  fill={`url(#fill-${i})`}
+                                  strokeWidth={1.5}
                                 />
-                                <stop
-                                  offset="95%"
-                                  stopColor={color}
-                                  stopOpacity={0}
-                                />
-                              </linearGradient>
-                            )
-                          })}
-                        </defs>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="rgba(185,186,163,0.05)"
-                          vertical={false}
-                        />
-                        <XAxis
-                          dataKey="date"
-                          tick={{ fill: 'rgba(185,186,163,0.4)', fontSize: 9 }}
-                          axisLine={false}
-                          tickLine={false}
-                          interval="preserveStartEnd"
-                        />
-                        <YAxis
-                          allowDecimals={false}
-                          tick={{ fill: 'rgba(185,186,163,0.4)', fontSize: 9 }}
-                          axisLine={false}
-                          tickLine={false}
-                          width={20}
-                        />
-                        <ChartTooltip
-                          content={
-                            <ChartTooltipContent
-                              indicator="dot"
-                              labelFormatter={(value) => {
-                                const dayNum =
-                                  typeof value === 'string'
-                                    ? value
-                                    : String(value)
-                                const now = new Date()
-                                return `${dayNum} ${now.toLocaleDateString('en-GB', { month: 'short' })}`
-                              }}
-                            />
-                          }
-                        />
-                        {dailyStats.scenes.map((scene, i) => {
-                          const color = [
-                            '#6366f1',
-                            '#22c55e',
-                            '#f59e0b',
-                            '#ef4444',
-                            '#06b6d4',
-                            '#ec4899',
-                            '#8b5cf6',
-                            '#14b8a6',
-                          ][i % 8]
-                          return (
-                            <Area
-                              key={scene}
-                              dataKey={scene}
-                              type="monotone"
-                              stackId="a"
-                              stroke={color}
-                              fill={`url(#fill-${i})`}
-                              strokeWidth={1.5}
-                            />
-                          )
-                        })}
-                        {/* Target line */}
-                        {dailyStats.dailyTarget > 0 && (
-                          <ReferenceLine
-                            y={dailyStats.dailyTarget}
-                            stroke="rgba(245,158,11,0.35)"
-                            strokeDasharray="6 3"
-                            label={{
-                              value: `Target: ${dailyStats.dailyTarget}/day`,
-                              position: 'insideTopRight',
-                              fill: 'rgba(245,158,11,0.5)',
-                              fontSize: 9,
-                            }}
-                          />
-                        )}
-                        {/* Average line */}
-                        {dailyStats.averagePerDay > 0 && (
-                          <ReferenceLine
-                            y={dailyStats.averagePerDay}
-                            stroke="rgba(99,102,241,0.4)"
-                            strokeDasharray="3 3"
-                            label={{
-                              value: `Avg: ${dailyStats.averagePerDay}/day`,
-                              position: 'insideBottomRight',
-                              fill: 'rgba(99,102,241,0.6)',
-                              fontSize: 9,
-                            }}
-                          />
-                        )}
-                      </AreaChart>
-                    </ChartContainer>
+                              )
+                            })}
+                            {/* Target line */}
+                            {dailyStats.dailyTarget > 0 && (
+                              <ReferenceLine
+                                y={dailyStats.dailyTarget}
+                                stroke="rgba(245,158,11,0.35)"
+                                strokeDasharray="6 3"
+                                label={{
+                                  value: `Target: ${dailyStats.dailyTarget}/day`,
+                                  position: 'insideTopRight',
+                                  fill: 'rgba(245,158,11,0.5)',
+                                  fontSize: 9,
+                                }}
+                              />
+                            )}
+                            {/* Average line */}
+                            {dailyStats.averagePerDay > 0 && (
+                              <ReferenceLine
+                                y={dailyStats.averagePerDay}
+                                stroke="rgba(99,102,241,0.4)"
+                                strokeDasharray="3 3"
+                                label={{
+                                  value: `Avg: ${dailyStats.averagePerDay}/day`,
+                                  position: 'insideBottomRight',
+                                  fill: 'rgba(99,102,241,0.6)',
+                                  fontSize: 9,
+                                }}
+                              />
+                            )}
+                          </AreaChart>
+                        </ChartContainer>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              {/* Invoice toggle */}
-              <div className="px-5 pb-4">
-                <button
-                  className="text-[11px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
-                  onClick={() => {
-                    setShowBillingSection(!showBillingSection)
-                    if (!showBillingSection) fetchBillingData()
-                  }}
-                >
-                  {showBillingSection
-                    ? 'Hide invoices'
-                    : 'View invoices \u2192'}
-                </button>
-              </div>
-
-              {/* Invoices */}
-              {showBillingSection && (
-                <div className="px-5 pb-5 border-t border-[var(--ash-grey)]/[0.06] pt-4 space-y-2">
-                  {invoices.length === 0 ? (
-                    <p className="text-xs text-muted-foreground/50">
-                      No invoices yet
-                    </p>
-                  ) : (
-                    invoices.map((inv) => {
-                      const net = Number(inv.net_amount)
-                      const totalRecordings =
-                        inv.venue_collected_count + inv.playhub_collected_count
-                      return (
-                        <div
-                          key={inv.id}
-                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-card rounded-lg border border-[var(--ash-grey)]/[0.06]"
-                        >
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-[var(--timberwolf)]">
-                              {new Date(inv.period_start).toLocaleDateString(
-                                'en-GB',
-                                { month: 'long', year: 'numeric' }
-                              )}
-                            </p>
-                            <p className="text-[11px] text-muted-foreground/50">
-                              {totalRecordings} recording
-                              {totalRecordings === 1 ? '' : 's'}
-                              {inv.venue_collected_count > 0 &&
-                                inv.playhub_collected_count > 0 &&
-                                ` (${inv.venue_collected_count} venue, ${inv.playhub_collected_count} QR code)`}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span
-                              className={`text-sm font-medium ${net >= 0 ? 'text-[var(--timberwolf)]' : 'text-emerald-400'}`}
-                              style={{ fontVariantNumeric: 'tabular-nums' }}
-                            >
-                              {net >= 0 ? '' : '-'}
-                              {Math.abs(net).toFixed(3)} {inv.currency}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground/40">
-                              {net >= 0 ? 'owed' : 'due to venue'}
-                            </span>
-                            <span
-                              className={`text-[10px] px-1.5 py-0.5 rounded ${
-                                inv.status === 'paid'
-                                  ? 'bg-emerald-500/10 text-emerald-400'
-                                  : inv.status === 'pending'
-                                    ? 'bg-amber-500/10 text-amber-400'
-                                    : inv.status === 'overdue'
-                                      ? 'bg-red-500/10 text-red-400'
-                                      : 'bg-gray-500/10 text-gray-400'
-                              }`}
-                            >
-                              {inv.status}
-                            </span>
-                          </div>
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-              )}
-            </div>
-        )}
-
-        {/* Schedule Recording */}
-        {venue?.feature_recordings !== false && (
-        scenesLoading ? (
-          <div className="mb-6 rounded-xl border border-border bg-card p-6 animate-pulse">
-            <div className="flex items-center justify-between">
-              <div className="bg-muted rounded h-5 w-[160px]" />
-              <div className="bg-muted rounded h-10 w-[140px]" />
-            </div>
-          </div>
-        ) : scenes.length > 0 && (
-            <div className="mb-6 rounded-xl border border-border bg-card">
-              <div className="p-6">
-                <div className="flex flex-col md:flex-row items-center justify-between gap-2">
-                  <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-                    Schedule Recording
-                  </h2>
-                  {!showScheduleForm && (
-                    <Button
-                      className={`w-full md:w-auto ${primaryBtnClass}`}
-                      onClick={() => setShowScheduleForm(true)}
+                  {/* Invoice toggle */}
+                  <div className="px-5 pb-4">
+                    <button
+                      className="text-[11px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                      onClick={() => {
+                        setShowBillingSection(!showBillingSection)
+                        if (!showBillingSection) fetchBillingData()
+                      }}
                     >
-                      + New Recording
-                    </Button>
+                      {showBillingSection
+                        ? 'Hide invoices'
+                        : 'View invoices \u2192'}
+                    </button>
+                  </div>
+
+                  {/* Invoices */}
+                  {showBillingSection && (
+                    <div className="px-5 pb-5 border-t border-[var(--ash-grey)]/[0.06] pt-4 space-y-2">
+                      {invoices.length === 0 ? (
+                        <p className="text-xs text-muted-foreground/50">
+                          No invoices yet
+                        </p>
+                      ) : (
+                        invoices.map((inv) => {
+                          const net = Number(inv.net_amount)
+                          const totalRecordings =
+                            inv.venue_collected_count +
+                            inv.playhub_collected_count
+                          return (
+                            <div
+                              key={inv.id}
+                              className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-card rounded-lg border border-[var(--ash-grey)]/[0.06]"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-[var(--timberwolf)]">
+                                  {new Date(
+                                    inv.period_start
+                                  ).toLocaleDateString('en-GB', {
+                                    month: 'long',
+                                    year: 'numeric',
+                                  })}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground/50">
+                                  {totalRecordings} recording
+                                  {totalRecordings === 1 ? '' : 's'}
+                                  {inv.venue_collected_count > 0 &&
+                                    inv.playhub_collected_count > 0 &&
+                                    ` (${inv.venue_collected_count} venue, ${inv.playhub_collected_count} QR code)`}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span
+                                  className={`text-sm font-medium ${net >= 0 ? 'text-[var(--timberwolf)]' : 'text-emerald-400'}`}
+                                  style={{ fontVariantNumeric: 'tabular-nums' }}
+                                >
+                                  {net >= 0 ? '' : '-'}
+                                  {Math.abs(net).toFixed(3)} {inv.currency}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground/40">
+                                  {net >= 0 ? 'owed' : 'due to venue'}
+                                </span>
+                                <span
+                                  className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                    inv.status === 'paid'
+                                      ? 'bg-emerald-500/10 text-emerald-400'
+                                      : inv.status === 'pending'
+                                        ? 'bg-amber-500/10 text-amber-400'
+                                        : inv.status === 'overdue'
+                                          ? 'bg-red-500/10 text-red-400'
+                                          : 'bg-gray-500/10 text-gray-400'
+                                  }`}
+                                >
+                                  {inv.status}
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
                   )}
                 </div>
-              </div>
-              {showScheduleForm && (
-                <div className="px-6 pb-6">
-                  <form onSubmit={handleSchedule} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-[var(--timberwolf)]">
-                          Title *
-                        </label>
-                        <Input
-                          value={title}
-                          onChange={(e) => setTitle(e.target.value)}
-                          placeholder="Match title"
-                          required
-                          className={inputClass}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-[var(--timberwolf)]">
-                          Pitch/Camera *
-                        </label>
-                        <Select
-                          value={sceneId}
-                          onValueChange={setSceneId}
-                          disabled={scenes.length <= 1}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select pitch..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {scenes.map((scene) => (
-                              <SelectItem key={scene.id} value={scene.id}>
-                                {scene.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+              )
+            )}
+
+            {/* Schedule Recording */}
+            {venue?.feature_recordings !== false &&
+              (scenesLoading ? (
+                <div className="mb-6 rounded-xl border border-border bg-card p-6 animate-pulse">
+                  <div className="flex items-center justify-between">
+                    <div className="bg-muted rounded h-5 w-[160px]" />
+                    <div className="bg-muted rounded h-10 w-[140px]" />
+                  </div>
+                </div>
+              ) : (
+                scenes.length > 0 && (
+                  <div className="mb-6 rounded-xl border border-border bg-card">
+                    <div className="p-6">
+                      <div className="flex flex-col md:flex-row items-center justify-between gap-2">
+                        <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
+                          Schedule Recording
+                        </h2>
+                        {!showScheduleForm && (
+                          <Button
+                            className={`w-full md:w-auto ${primaryBtnClass}`}
+                            onClick={() => setShowScheduleForm(true)}
+                          >
+                            + New Recording
+                          </Button>
+                        )}
                       </div>
                     </div>
+                    {showScheduleForm && (
+                      <div className="px-6 pb-6">
+                        <form onSubmit={handleSchedule} className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-[var(--timberwolf)]">
+                                Title *
+                              </label>
+                              <Input
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                placeholder="Match title"
+                                required
+                                className={inputClass}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-[var(--timberwolf)]">
+                                Pitch/Camera *
+                              </label>
+                              <Select
+                                value={sceneId}
+                                onValueChange={setSceneId}
+                                disabled={scenes.length <= 1}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select pitch..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {scenes.map((scene) => (
+                                    <SelectItem key={scene.id} value={scene.id}>
+                                      {scene.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
 
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-[var(--timberwolf)]">
-                        Description
-                      </label>
-                      <Input
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Optional description"
-                        className={inputClass}
-                      />
-                    </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-[var(--timberwolf)]">
+                              Description
+                            </label>
+                            <Input
+                              value={description}
+                              onChange={(e) => setDescription(e.target.value)}
+                              placeholder="Optional description"
+                              className={inputClass}
+                            />
+                          </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-[var(--timberwolf)]">
-                          Home Team
-                        </label>
-                        <Input
-                          value={homeTeam}
-                          onChange={(e) => setHomeTeam(e.target.value)}
-                          placeholder="Home team name"
-                          className={inputClass}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-[var(--timberwolf)]">
-                          Away Team
-                        </label>
-                        <Input
-                          value={awayTeam}
-                          onChange={(e) => setAwayTeam(e.target.value)}
-                          placeholder="Away team name"
-                          className={inputClass}
-                        />
-                      </div>
-                    </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-[var(--timberwolf)]">
+                                Home Team
+                              </label>
+                              <Input
+                                value={homeTeam}
+                                onChange={(e) => setHomeTeam(e.target.value)}
+                                placeholder="Home team name"
+                                className={inputClass}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-[var(--timberwolf)]">
+                                Away Team
+                              </label>
+                              <Input
+                                value={awayTeam}
+                                onChange={(e) => setAwayTeam(e.target.value)}
+                                placeholder="Away team name"
+                                className={inputClass}
+                              />
+                            </div>
+                          </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-[var(--timberwolf)]">
-                          Start Time *
-                        </label>
-                        <DateTimePicker
-                          value={startTime}
-                          onChange={setStartTime}
-                          required
-                          className={inputClass}
-                          placeholder="Select start time"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={setStartNow}
-                          className={`w-full ${outlineBtnClass}`}
-                        >
-                          Start Now (+1 min)
-                        </Button>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-[var(--timberwolf)]">
-                          End Time *
-                        </label>
-                        <DateTimePicker
-                          value={endTime}
-                          onChange={setEndTime}
-                          required
-                          className={inputClass}
-                          placeholder="Select end time"
-                        />
-                        {startTime && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-[var(--timberwolf)]">
+                                Start Time *
+                              </label>
+                              <DateTimePicker
+                                value={startTime}
+                                onChange={setStartTime}
+                                required
+                                className={inputClass}
+                                placeholder="Select start time"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={setStartNow}
+                                className={`w-full ${outlineBtnClass}`}
+                              >
+                                Start Now (+1 min)
+                              </Button>
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-[var(--timberwolf)]">
+                                End Time *
+                              </label>
+                              <DateTimePicker
+                                value={endTime}
+                                onChange={setEndTime}
+                                required
+                                className={inputClass}
+                                placeholder="Select end time"
+                              />
+                              {startTime && (
+                                <div className="flex gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setDuration(60)}
+                                    className={outlineBtnClass}
+                                  >
+                                    +1h
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setDuration(90)}
+                                    className={outlineBtnClass}
+                                  >
+                                    +1.5h
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setDuration(120)}
+                                    className={outlineBtnClass}
+                                  >
+                                    +2h
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-[var(--timberwolf)]">
+                              Grant Access (emails, comma-separated)
+                            </label>
+                            <Input
+                              value={accessEmails}
+                              onChange={(e) => setAccessEmails(e.target.value)}
+                              placeholder="user1@example.com, user2@example.com"
+                              className={inputClass}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              These users will have access immediately (even
+                              before recording is ready)
+                            </p>
+                          </div>
+
+                          {/* Paid recording */}
+                          {billingConfig?.is_active && (
+                            <div className="space-y-2">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={isBillable}
+                                  onChange={(e) =>
+                                    setIsBillable(e.target.checked)
+                                  }
+                                  className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
+                                />
+                                <span className="text-sm font-medium text-[var(--timberwolf)]">
+                                  Paid recording
+                                </span>
+                              </label>
+                              {isBillable && (
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="number"
+                                    step="0.001"
+                                    min="0"
+                                    value={billableAmount}
+                                    onChange={(e) =>
+                                      setBillableAmount(e.target.value)
+                                    }
+                                    placeholder={String(
+                                      billingConfig.default_billable_amount ||
+                                        '5.000'
+                                    )}
+                                    className={`w-32 ${inputClass}`}
+                                  />
+                                  <span className="text-sm text-muted-foreground">
+                                    {billingConfig.currency || 'KWD'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Broadcast to YouTube */}
+                          {billingConfig?.youtube_rtmp_url &&
+                            billingConfig?.youtube_stream_key && (
+                              <div className="space-y-2">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={broadcastToYoutube}
+                                    onChange={(e) =>
+                                      setBroadcastToYoutube(e.target.checked)
+                                    }
+                                    className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
+                                  />
+                                  <span className="text-sm font-medium text-[var(--timberwolf)]">
+                                    Broadcast to YouTube
+                                  </span>
+                                </label>
+                                <p className="text-xs text-muted-foreground">
+                                  Stream will be pushed to the configured
+                                  YouTube channel via RTMP
+                                </p>
+                              </div>
+                            )}
+
+                          {/* List on marketplace */}
+                          {orgMarketplace?.marketplace_enabled && (
+                            <div className="space-y-2">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={marketplaceEnabled}
+                                  onChange={(e) =>
+                                    setMarketplaceEnabled(e.target.checked)
+                                  }
+                                  className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
+                                />
+                                <span className="text-sm font-medium text-[var(--timberwolf)]">
+                                  List on marketplace
+                                </span>
+                              </label>
+                              {marketplaceEnabled && (
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={marketplacePrice}
+                                    onChange={(e) =>
+                                      setMarketplacePrice(e.target.value)
+                                    }
+                                    placeholder={String(
+                                      orgMarketplace.default_price_amount ||
+                                        '25.00'
+                                    )}
+                                    className={`w-32 ${inputClass}`}
+                                  />
+                                  <span className="text-sm text-muted-foreground">
+                                    {orgMarketplace.default_price_currency ||
+                                      'AED'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Graphic Package */}
+                          {scheduleGraphicPackages.length > 0 && (
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-[var(--timberwolf)]">
+                                Graphic Package
+                              </label>
+                              <Select
+                                value={selectedGraphicPackageId}
+                                onValueChange={setSelectedGraphicPackageId}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="default">
+                                    Use Default
+                                  </SelectItem>
+                                  <SelectItem value="none">None</SelectItem>
+                                  {scheduleGraphicPackages.map((pkg) => (
+                                    <SelectItem key={pkg.id} value={pkg.id}>
+                                      {pkg.name}
+                                      {pkg.is_default ? ' (default)' : ''}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-muted-foreground">
+                                Logo overlays applied to this recording
+                              </p>
+                            </div>
+                          )}
+
+                          {error && (
+                            <div className="bg-red-500/10 text-red-400 p-3 rounded-lg">
+                              {error}
+                            </div>
+                          )}
+
+                          {success && (
+                            <div className="bg-green-500/10 text-green-400 p-3 rounded-lg">
+                              {success}
+                            </div>
+                          )}
+
                           <div className="flex gap-2">
                             <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setDuration(60)}
-                              className={outlineBtnClass}
+                              type="submit"
+                              disabled={submitting}
+                              className={`flex-1 ${primaryBtnClass}`}
                             >
-                              +1h
+                              {submitting
+                                ? 'Scheduling...'
+                                : 'Schedule Recording'}
                             </Button>
                             <Button
                               type="button"
                               variant="outline"
-                              size="sm"
-                              onClick={() => setDuration(90)}
+                              onClick={() => setShowScheduleForm(false)}
                               className={outlineBtnClass}
                             >
-                              +1.5h
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setDuration(120)}
-                              className={outlineBtnClass}
-                            >
-                              +2h
+                              Cancel
                             </Button>
                           </div>
-                        )}
+                        </form>
                       </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-[var(--timberwolf)]">
-                        Grant Access (emails, comma-separated)
-                      </label>
-                      <Input
-                        value={accessEmails}
-                        onChange={(e) => setAccessEmails(e.target.value)}
-                        placeholder="user1@example.com, user2@example.com"
-                        className={inputClass}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        These users will have access immediately (even before
-                        recording is ready)
-                      </p>
-                    </div>
-
-                    {/* Paid recording */}
-                    {billingConfig?.is_active && (
-                      <div className="space-y-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={isBillable}
-                            onChange={(e) => setIsBillable(e.target.checked)}
-                            className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
-                          />
-                          <span className="text-sm font-medium text-[var(--timberwolf)]">
-                            Paid recording
-                          </span>
-                        </label>
-                        {isBillable && (
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="number"
-                              step="0.001"
-                              min="0"
-                              value={billableAmount}
-                              onChange={(e) =>
-                                setBillableAmount(e.target.value)
-                              }
-                              placeholder={String(
-                                billingConfig.default_billable_amount || '5.000'
-                              )}
-                              className={`w-32 ${inputClass}`}
-                            />
-                            <span className="text-sm text-muted-foreground">
-                              {billingConfig.currency || 'KWD'}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Broadcast to YouTube */}
-                    {billingConfig?.youtube_rtmp_url &&
-                      billingConfig?.youtube_stream_key && (
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={broadcastToYoutube}
-                              onChange={(e) =>
-                                setBroadcastToYoutube(e.target.checked)
-                              }
-                              className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
-                            />
-                            <span className="text-sm font-medium text-[var(--timberwolf)]">
-                              Broadcast to YouTube
-                            </span>
-                          </label>
-                          <p className="text-xs text-muted-foreground">
-                            Stream will be pushed to the configured YouTube
-                            channel via RTMP
-                          </p>
-                        </div>
-                      )}
-
-                    {/* List on marketplace */}
-                    {orgMarketplace?.marketplace_enabled && (
-                      <div className="space-y-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={marketplaceEnabled}
-                            onChange={(e) =>
-                              setMarketplaceEnabled(e.target.checked)
-                            }
-                            className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
-                          />
-                          <span className="text-sm font-medium text-[var(--timberwolf)]">
-                            List on marketplace
-                          </span>
-                        </label>
-                        {marketplaceEnabled && (
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={marketplacePrice}
-                              onChange={(e) =>
-                                setMarketplacePrice(e.target.value)
-                              }
-                              placeholder={String(
-                                orgMarketplace.default_price_amount || '25.00'
-                              )}
-                              className={`w-32 ${inputClass}`}
-                            />
-                            <span className="text-sm text-muted-foreground">
-                              {orgMarketplace.default_price_currency || 'AED'}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Graphic Package */}
-                    {scheduleGraphicPackages.length > 0 && (
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-[var(--timberwolf)]">
-                          Graphic Package
-                        </label>
-                        <Select
-                          value={selectedGraphicPackageId}
-                          onValueChange={setSelectedGraphicPackageId}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="default">Use Default</SelectItem>
-                            <SelectItem value="none">None</SelectItem>
-                            {scheduleGraphicPackages.map((pkg) => (
-                              <SelectItem key={pkg.id} value={pkg.id}>
-                                {pkg.name}
-                                {pkg.is_default ? ' (default)' : ''}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">
-                          Logo overlays applied to this recording
-                        </p>
-                      </div>
-                    )}
-
-                    {error && (
-                      <div className="bg-red-500/10 text-red-400 p-3 rounded-lg">
-                        {error}
-                      </div>
-                    )}
-
-                    {success && (
-                      <div className="bg-green-500/10 text-green-400 p-3 rounded-lg">
-                        {success}
-                      </div>
-                    )}
-
-                    <div className="flex gap-2">
-                      <Button
-                        type="submit"
-                        disabled={submitting}
-                        className={`flex-1 ${primaryBtnClass}`}
-                      >
-                        {submitting ? 'Scheduling...' : 'Schedule Recording'}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setShowScheduleForm(false)}
-                        className={outlineBtnClass}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </form>
-                </div>
-              )}
-            </div>
-        ))}
-
-        {/* Live Streaming Section */}
-        {venue?.feature_streaming !== false && (
-          <div className="mb-6 rounded-xl border border-border bg-card">
-            <div className="p-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                <div>
-                  <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-                    Live Streaming
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    Manage live stream channels for this venue
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  className={`w-full md:w-auto ${outlineBtnClass}`}
-                  onClick={() => {
-                    setShowStreamingSection(!showStreamingSection)
-                    if (!showStreamingSection && channels.length === 0) {
-                      fetchChannels()
-                    }
-                  }}
-                >
-                  {showStreamingSection ? 'Hide' : 'Manage Streams'}
-                </Button>
-              </div>
-            </div>
-            {showStreamingSection && (
-              <div className="px-6 pb-6 space-y-4">
-                {/* Create new channel form */}
-                <form
-                  onSubmit={handleCreateChannel}
-                  className="flex flex-col sm:flex-row gap-2"
-                >
-                  <Input
-                    value={newChannelName}
-                    onChange={(e) => setNewChannelName(e.target.value)}
-                    placeholder="Channel name (e.g., Pitch 1 Live)"
-                    className={`flex-1 ${inputClass}`}
-                  />
-                  <Button
-                    type="submit"
-                    className={`w-full sm:w-auto ${primaryBtnClass}`}
-                    disabled={creatingChannel || !newChannelName.trim()}
-                  >
-                    {creatingChannel ? 'Creating...' : '+ Create Channel'}
-                  </Button>
-                </form>
-
-                {/* Schedule Live Stream */}
-                <div className="p-4 bg-muted/50 rounded-lg border border-border">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                    <div>
-                      <h4 className="font-medium text-[var(--timberwolf)]">
-                        Schedule Live Stream
-                      </h4>
-                      <p className="text-sm text-muted-foreground">
-                        Create a Spiideo recording + MediaLive stream in one
-                        step
-                      </p>
-                    </div>
-                    {!showStreamScheduleForm && (
-                      <Button
-                        size="sm"
-                        className={`w-full sm:w-auto ${primaryBtnClass}`}
-                        onClick={() => {
-                          setShowStreamScheduleForm(true)
-                          // Set default scene if available
-                          if (scenes.length > 0 && !streamSceneId) {
-                            setStreamSceneId(scenes[0].id)
-                          }
-                        }}
-                      >
-                        + Schedule Stream
-                      </Button>
                     )}
                   </div>
+                )
+              ))}
 
-                  {showStreamScheduleForm && (
-                    <form
-                      onSubmit={handleScheduleLiveStream}
-                      className="space-y-3"
+            {/* Live Streaming Section */}
+            {venue?.feature_streaming !== false && (
+              <div className="mb-6 rounded-xl border border-border bg-card">
+                <div className="p-6">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                    <div>
+                      <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
+                        Live Streaming
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        Manage live stream channels for this venue
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className={`w-full md:w-auto ${outlineBtnClass}`}
+                      onClick={() => {
+                        setShowStreamingSection(!showStreamingSection)
+                        if (!showStreamingSection && channels.length === 0) {
+                          fetchChannels()
+                        }
+                      }}
                     >
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-sm text-muted-foreground">
-                            Title *
-                          </label>
-                          <Input
-                            value={streamTitle}
-                            onChange={(e) => setStreamTitle(e.target.value)}
-                            placeholder="Match title"
-                            required
-                            className={inputClass}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm text-muted-foreground">
-                            Camera/Pitch *
-                          </label>
-                          <Select
-                            value={streamSceneId}
-                            onValueChange={setStreamSceneId}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select pitch..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {scenes.map((scene) => (
-                                <SelectItem key={scene.id} value={scene.id}>
-                                  {scene.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="text-sm text-muted-foreground">
-                            Start Time *
-                          </label>
-                          <DateTimePicker
-                            value={streamStartTime}
-                            onChange={setStreamStartTime}
-                            required
-                            className={inputClass}
-                            placeholder="Select start time"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm text-muted-foreground">
-                            End Time *
-                          </label>
-                          <DateTimePicker
-                            value={streamEndTime}
-                            onChange={setStreamEndTime}
-                            required
-                            className={inputClass}
-                            placeholder="Select end time"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => setShowStreamScheduleForm(false)}
-                          className="text-[var(--timberwolf)] hover:bg-muted"
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          type="submit"
-                          disabled={schedulingStream}
-                          className={primaryBtnClass}
-                        >
-                          {schedulingStream
-                            ? 'Setting up...'
-                            : 'Create & Start Stream'}
-                        </Button>
-                      </div>
-                    </form>
-                  )}
+                      {showStreamingSection ? 'Hide' : 'Manage Streams'}
+                    </Button>
+                  </div>
                 </div>
-
-                {/* Channels list */}
-                {loadingChannels ? (
-                  <p className="text-sm text-muted-foreground">
-                    Loading channels...
-                  </p>
-                ) : channels.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No streaming channels yet. Create one to get started.
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    {channels.map((channel) => (
-                      <div
-                        key={channel.id}
-                        className="p-4 bg-muted/50 rounded-lg border border-border space-y-3"
+                {showStreamingSection && (
+                  <div className="px-6 pb-6 space-y-4">
+                    {/* Create new channel form */}
+                    <form
+                      onSubmit={handleCreateChannel}
+                      className="flex flex-col sm:flex-row gap-2"
+                    >
+                      <Input
+                        value={newChannelName}
+                        onChange={(e) => setNewChannelName(e.target.value)}
+                        placeholder="Channel name (e.g., Pitch 1 Live)"
+                        className={`flex-1 ${inputClass}`}
+                      />
+                      <Button
+                        type="submit"
+                        className={`w-full sm:w-auto ${primaryBtnClass}`}
+                        disabled={creatingChannel || !newChannelName.trim()}
                       >
-                        {/* Channel header */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-[var(--timberwolf)]">
-                              {channel.name}
-                            </span>
-                            <span
-                              className={`text-xs px-2 py-0.5 rounded ${getStateColor(channel.state)}`}
-                            >
-                              {channel.state}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {channel.state === 'IDLE' && (
-                              <Button
-                                size="sm"
-                                className={primaryBtnClass}
-                                onClick={() => handleStartChannel(channel.id)}
-                                disabled={startingChannelId === channel.id}
-                              >
-                                {startingChannelId === channel.id
-                                  ? 'Starting...'
-                                  : 'Start'}
-                              </Button>
-                            )}
-                            {channel.state === 'RUNNING' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className={outlineBtnClass}
-                                onClick={() => handleStopChannel(channel.id)}
-                                disabled={stoppingChannelId === channel.id}
-                              >
-                                {stoppingChannelId === channel.id
-                                  ? 'Stopping...'
-                                  : 'Stop'}
-                              </Button>
-                            )}
-                            {(channel.state === 'IDLE' ||
-                              channel.state === 'CREATING') && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                                onClick={() => handleDeleteChannel(channel.id)}
-                                disabled={deletingChannelId === channel.id}
-                              >
-                                {deletingChannelId === channel.id
-                                  ? 'Deleting...'
-                                  : 'Delete'}
-                              </Button>
-                            )}
-                          </div>
-                        </div>
+                        {creatingChannel ? 'Creating...' : '+ Create Channel'}
+                      </Button>
+                    </form>
 
-                        {/* RTMP credentials (show when not CREATING) */}
-                        {channel.state !== 'CREATING' && channel.rtmp && (
-                          <div className="space-y-2 text-sm">
+                    {/* Schedule Live Stream */}
+                    <div className="p-4 bg-muted/50 rounded-lg border border-border">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                        <div>
+                          <h4 className="font-medium text-[var(--timberwolf)]">
+                            Schedule Live Stream
+                          </h4>
+                          <p className="text-sm text-muted-foreground">
+                            Create a Spiideo recording + MediaLive stream in one
+                            step
+                          </p>
+                        </div>
+                        {!showStreamScheduleForm && (
+                          <Button
+                            size="sm"
+                            className={`w-full sm:w-auto ${primaryBtnClass}`}
+                            onClick={() => {
+                              setShowStreamScheduleForm(true)
+                              // Set default scene if available
+                              if (scenes.length > 0 && !streamSceneId) {
+                                setStreamSceneId(scenes[0].id)
+                              }
+                            }}
+                          >
+                            + Schedule Stream
+                          </Button>
+                        )}
+                      </div>
+
+                      {showStreamScheduleForm && (
+                        <form
+                          onSubmit={handleScheduleLiveStream}
+                          className="space-y-3"
+                        >
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
-                              <span className="text-muted-foreground text-xs block mb-1">
-                                RTMP URL
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <code className="flex-1 min-w-0 bg-black/30 px-2 py-1 rounded text-xs truncate text-[var(--timberwolf)]">
-                                  {channel.rtmp.url}
-                                </code>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="flex-shrink-0 text-[var(--timberwolf)] hover:bg-muted"
-                                  onClick={() =>
-                                    copyToClipboard(
-                                      channel.rtmp!.url,
-                                      `rtmp-${channel.id}`
-                                    )
-                                  }
-                                >
-                                  {copiedField === `rtmp-${channel.id}`
-                                    ? 'Copied!'
-                                    : 'Copy'}
-                                </Button>
-                              </div>
+                              <label className="text-sm text-muted-foreground">
+                                Title *
+                              </label>
+                              <Input
+                                value={streamTitle}
+                                onChange={(e) => setStreamTitle(e.target.value)}
+                                placeholder="Match title"
+                                required
+                                className={inputClass}
+                              />
                             </div>
                             <div>
-                              <span className="text-muted-foreground text-xs block mb-1">
-                                Stream Key
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <code className="flex-1 min-w-0 bg-black/30 px-2 py-1 rounded text-xs truncate text-[var(--timberwolf)]">
-                                  {channel.rtmp.streamKey}
-                                </code>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="flex-shrink-0 text-[var(--timberwolf)] hover:bg-muted"
-                                  onClick={() =>
-                                    copyToClipboard(
-                                      channel.rtmp!.streamKey,
-                                      `key-${channel.id}`
-                                    )
-                                  }
-                                >
-                                  {copiedField === `key-${channel.id}`
-                                    ? 'Copied!'
-                                    : 'Copy'}
-                                </Button>
-                              </div>
+                              <label className="text-sm text-muted-foreground">
+                                Camera/Pitch *
+                              </label>
+                              <Select
+                                value={streamSceneId}
+                                onValueChange={setStreamSceneId}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select pitch..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {scenes.map((scene) => (
+                                    <SelectItem key={scene.id} value={scene.id}>
+                                      {scene.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
-                            {channel.playbackUrl && (
-                              <div>
-                                <span className="text-muted-foreground text-xs block mb-1">
-                                  Playback
+                            <div>
+                              <label className="text-sm text-muted-foreground">
+                                Start Time *
+                              </label>
+                              <DateTimePicker
+                                value={streamStartTime}
+                                onChange={setStreamStartTime}
+                                required
+                                className={inputClass}
+                                placeholder="Select start time"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-sm text-muted-foreground">
+                                End Time *
+                              </label>
+                              <DateTimePicker
+                                value={streamEndTime}
+                                onChange={setStreamEndTime}
+                                required
+                                className={inputClass}
+                                placeholder="Select end time"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => setShowStreamScheduleForm(false)}
+                              className="text-[var(--timberwolf)] hover:bg-muted"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              type="submit"
+                              disabled={schedulingStream}
+                              className={primaryBtnClass}
+                            >
+                              {schedulingStream
+                                ? 'Setting up...'
+                                : 'Create & Start Stream'}
+                            </Button>
+                          </div>
+                        </form>
+                      )}
+                    </div>
+
+                    {/* Channels list */}
+                    {loadingChannels ? (
+                      <p className="text-sm text-muted-foreground">
+                        Loading channels...
+                      </p>
+                    ) : channels.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No streaming channels yet. Create one to get started.
+                      </p>
+                    ) : (
+                      <div className="space-y-4">
+                        {channels.map((channel) => (
+                          <div
+                            key={channel.id}
+                            className="p-4 bg-muted/50 rounded-lg border border-border space-y-3"
+                          >
+                            {/* Channel header */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-[var(--timberwolf)]">
+                                  {channel.name}
                                 </span>
-                                <div className="flex items-center gap-2">
-                                  <code className="flex-1 min-w-0 bg-black/30 px-2 py-1 rounded text-xs truncate text-[var(--timberwolf)]">
-                                    {channel.playbackUrl}
-                                  </code>
+                                <span
+                                  className={`text-xs px-2 py-0.5 rounded ${getStateColor(channel.state)}`}
+                                >
+                                  {channel.state}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {channel.state === 'IDLE' && (
+                                  <Button
+                                    size="sm"
+                                    className={primaryBtnClass}
+                                    onClick={() =>
+                                      handleStartChannel(channel.id)
+                                    }
+                                    disabled={startingChannelId === channel.id}
+                                  >
+                                    {startingChannelId === channel.id
+                                      ? 'Starting...'
+                                      : 'Start'}
+                                  </Button>
+                                )}
+                                {channel.state === 'RUNNING' && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className={outlineBtnClass}
+                                    onClick={() =>
+                                      handleStopChannel(channel.id)
+                                    }
+                                    disabled={stoppingChannelId === channel.id}
+                                  >
+                                    {stoppingChannelId === channel.id
+                                      ? 'Stopping...'
+                                      : 'Stop'}
+                                  </Button>
+                                )}
+                                {(channel.state === 'IDLE' ||
+                                  channel.state === 'CREATING') && (
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="flex-shrink-0 text-[var(--timberwolf)] hover:bg-muted"
+                                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
                                     onClick={() =>
-                                      copyToClipboard(
-                                        channel.playbackUrl!,
-                                        `hls-${channel.id}`
-                                      )
+                                      handleDeleteChannel(channel.id)
                                     }
+                                    disabled={deletingChannelId === channel.id}
                                   >
-                                    {copiedField === `hls-${channel.id}`
-                                      ? 'Copied!'
-                                      : 'Copy'}
+                                    {deletingChannelId === channel.id
+                                      ? 'Deleting...'
+                                      : 'Delete'}
                                   </Button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* RTMP credentials (show when not CREATING) */}
+                            {channel.state !== 'CREATING' && channel.rtmp && (
+                              <div className="space-y-2 text-sm">
+                                <div>
+                                  <span className="text-muted-foreground text-xs block mb-1">
+                                    RTMP URL
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <code className="flex-1 min-w-0 bg-black/30 px-2 py-1 rounded text-xs truncate text-[var(--timberwolf)]">
+                                      {channel.rtmp.url}
+                                    </code>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="flex-shrink-0 text-[var(--timberwolf)] hover:bg-muted"
+                                      onClick={() =>
+                                        copyToClipboard(
+                                          channel.rtmp!.url,
+                                          `rtmp-${channel.id}`
+                                        )
+                                      }
+                                    >
+                                      {copiedField === `rtmp-${channel.id}`
+                                        ? 'Copied!'
+                                        : 'Copy'}
+                                    </Button>
+                                  </div>
                                 </div>
+                                <div>
+                                  <span className="text-muted-foreground text-xs block mb-1">
+                                    Stream Key
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <code className="flex-1 min-w-0 bg-black/30 px-2 py-1 rounded text-xs truncate text-[var(--timberwolf)]">
+                                      {channel.rtmp.streamKey}
+                                    </code>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="flex-shrink-0 text-[var(--timberwolf)] hover:bg-muted"
+                                      onClick={() =>
+                                        copyToClipboard(
+                                          channel.rtmp!.streamKey,
+                                          `key-${channel.id}`
+                                        )
+                                      }
+                                    >
+                                      {copiedField === `key-${channel.id}`
+                                        ? 'Copied!'
+                                        : 'Copy'}
+                                    </Button>
+                                  </div>
+                                </div>
+                                {channel.playbackUrl && (
+                                  <div>
+                                    <span className="text-muted-foreground text-xs block mb-1">
+                                      Playback
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <code className="flex-1 min-w-0 bg-black/30 px-2 py-1 rounded text-xs truncate text-[var(--timberwolf)]">
+                                        {channel.playbackUrl}
+                                      </code>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="flex-shrink-0 text-[var(--timberwolf)] hover:bg-muted"
+                                        onClick={() =>
+                                          copyToClipboard(
+                                            channel.playbackUrl!,
+                                            `hls-${channel.id}`
+                                          )
+                                        }
+                                      >
+                                        {copiedField === `hls-${channel.id}`
+                                          ? 'Copied!'
+                                          : 'Copy'}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
-                          </div>
-                        )}
 
-                        {/* Video player when RUNNING */}
-                        {channel.state === 'RUNNING' && channel.playbackUrl && (
-                          <div className="mt-3">
-                            <p className="text-xs text-muted-foreground mb-2">
-                              Live Preview:
-                            </p>
-                            <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                              <HlsPlayer
-                                src={channel.playbackUrl}
-                                className="w-full h-full"
-                                autoPlay
-                                muted
-                              />
-                            </div>
-                          </div>
-                        )}
+                            {/* Video player when RUNNING */}
+                            {channel.state === 'RUNNING' &&
+                              channel.playbackUrl && (
+                                <div className="mt-3">
+                                  <p className="text-xs text-muted-foreground mb-2">
+                                    Live Preview:
+                                  </p>
+                                  <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                                    <HlsPlayer
+                                      src={channel.playbackUrl}
+                                      className="w-full h-full"
+                                      autoPlay
+                                      muted
+                                    />
+                                  </div>
+                                </div>
+                              )}
 
-                        {/* State-specific messages */}
-                        {channel.state === 'CREATING' && (
-                          <p className="text-xs text-yellow-500">
-                            Channel is being created. This may take a minute...
+                            {/* State-specific messages */}
+                            {channel.state === 'CREATING' && (
+                              <p className="text-xs text-yellow-500">
+                                Channel is being created. This may take a
+                                minute...
+                              </p>
+                            )}
+                            {channel.state === 'STARTING' && (
+                              <p className="text-xs text-yellow-500">
+                                Channel is starting. This may take 1-2 minutes.
+                                Billing has started.
+                              </p>
+                            )}
+                            {channel.state === 'STOPPING' && (
+                              <p className="text-xs text-yellow-500">
+                                Channel is stopping. Billing will stop when it
+                                reaches IDLE.
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Marketplace Revenue */}
+            {marketplaceLoading ? (
+              <div className="mb-6 rounded-xl border border-border bg-card p-6 animate-pulse">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                  <div className="space-y-2">
+                    <div className="bg-muted rounded h-5 w-[180px]" />
+                    <div className="bg-muted rounded h-3 w-[280px]" />
+                  </div>
+                  <div className="bg-muted rounded h-10 w-[120px]" />
+                </div>
+              </div>
+            ) : (
+              orgMarketplace?.marketplace_enabled && (
+                <MarketplaceRevenue
+                  venueId={venueId}
+                  outlineBtnClass={outlineBtnClass}
+                />
+              )
+            )}
+          </>
+        )}
+
+        {/* Recordings List */}
+        <div className="rounded-xl border border-border bg-card">
+          <div className="p-6">
+            <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
+              Recordings
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {totalRecordings} recording
+              {totalRecordings === 1 ? '' : 's'}
+            </p>
+
+            {/* Search + Filters */}
+            <div className="mt-4 flex flex-col sm:flex-row gap-3">
+              <Input
+                placeholder="Search title or team..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className={`sm:max-w-xs ${inputClass}`}
+              />
+              <Select
+                value={statusFilter || 'all'}
+                onValueChange={(v) => {
+                  setStatusFilter(v === 'all' ? '' : v)
+                  setCurrentPage(1)
+                }}
+              >
+                <SelectTrigger className="sm:w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="published">Published</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="scheduled">Scheduled</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={billableFilter || 'all'}
+                onValueChange={(v) => {
+                  setBillableFilter(v === 'all' ? '' : v)
+                  setCurrentPage(1)
+                }}
+              >
+                <SelectTrigger className="sm:w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="true">Billable</SelectItem>
+                  <SelectItem value="false">Not Billable</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="px-6 pb-6">
+            {recordings.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">
+                {debouncedSearch || statusFilter || billableFilter
+                  ? 'No recordings match your filters.'
+                  : 'No recordings yet. Schedule a recording to get started.'}
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {recordings.map((recording) => (
+                  <div
+                    key={recording.id}
+                    className="p-4 rounded-lg bg-muted/50 border border-border"
+                  >
+                    {/* Top row: Play button + Info + Status */}
+                    <div className="flex items-start gap-3">
+                      {/* Play Button — links to recording detail page */}
+                      {recording.s3_key && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() =>
+                            router.push(`/recordings/${recording.id}`)
+                          }
+                          className={`flex-shrink-0 ${outlineBtnClass}`}
+                        >
+                          <svg
+                            className="w-4 h-4 ml-0.5"
+                            fill="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        </Button>
+                      )}
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium truncate text-[var(--timberwolf)]">
+                            {recording.title}
                           </p>
-                        )}
-                        {channel.state === 'STARTING' && (
-                          <p className="text-xs text-yellow-500">
-                            Channel is starting. This may take 1-2 minutes.
-                            Billing has started.
-                          </p>
-                        )}
-                        {channel.state === 'STOPPING' && (
-                          <p className="text-xs text-yellow-500">
-                            Channel is stopping. Billing will stop when it
-                            reaches IDLE.
-                          </p>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded flex-shrink-0 ${
+                              recording.status === 'published'
+                                ? 'bg-green-500/20 text-green-500'
+                                : recording.status === 'scheduled'
+                                  ? 'bg-yellow-500/20 text-yellow-500'
+                                  : 'bg-gray-500/20 text-gray-500'
+                            }`}
+                          >
+                            {recording.status}
+                          </span>
+                          {recording.ownerOrgName && (
+                            <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 flex-shrink-0">
+                              {recording.ownerOrgName}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {recording.pitch_name && `${recording.pitch_name} | `}
+                          {formatTime(recording.match_date)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Bottom row: Access count & Actions */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-3 pt-3 border-t border-border gap-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-muted-foreground">
+                          {recording.accessCount || 0} user
+                          {(recording.accessCount || 0) === 1 ? '' : 's'}
+                        </span>
+                        <button
+                          onClick={() => toggleBillable(recording)}
+                          disabled={togglingBillable === recording.id}
+                          className={`text-xs px-2 py-0.5 rounded cursor-pointer transition-colors ${
+                            recording.is_billable !== false
+                              ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                              : 'bg-gray-500/20 text-gray-400 hover:bg-gray-500/30'
+                          }`}
+                        >
+                          {togglingBillable === recording.id
+                            ? '...'
+                            : recording.is_billable !== false
+                              ? 'Billable'
+                              : 'Not Billable'}
+                        </button>
+                        {recording.is_billable !== false &&
+                          (editingAmountId === recording.id ? (
+                            <input
+                              type="number"
+                              step="0.001"
+                              min="0"
+                              autoFocus
+                              className="w-24 text-xs px-2 py-0.5 rounded bg-zinc-800 text-[var(--timberwolf)] border border-[var(--ash-grey)]/30 outline-none"
+                              value={editingAmountValue}
+                              onChange={(e) =>
+                                setEditingAmountValue(e.target.value)
+                              }
+                              onBlur={() => saveBillableAmount(recording)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter')
+                                  saveBillableAmount(recording)
+                                if (e.key === 'Escape') setEditingAmountId(null)
+                              }}
+                            />
+                          ) : (
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded ${
+                                recording.collected_by !== 'playhub'
+                                  ? 'cursor-pointer hover:bg-zinc-700/50'
+                                  : ''
+                              } text-muted-foreground`}
+                              title={
+                                recording.collected_by === 'playhub'
+                                  ? 'Amount locked (verified transaction)'
+                                  : 'Click to edit amount'
+                              }
+                              onClick={() => {
+                                if (recording.collected_by !== 'playhub') {
+                                  setEditingAmountId(recording.id)
+                                  setEditingAmountValue(
+                                    String(
+                                      recording.billable_amount ??
+                                        billingConfig?.default_billable_amount ??
+                                        ''
+                                    )
+                                  )
+                                }
+                              }}
+                            >
+                              {(
+                                recording.billable_amount ??
+                                billingConfig?.default_billable_amount ??
+                                0
+                              ).toFixed(3)}{' '}
+                              {billingConfig?.currency || 'KWD'}
+                            </span>
+                          ))}
+                        {recording.graphicPackageName && (
+                          <span
+                            className="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-400"
+                            title="Graphic Package"
+                          >
+                            {recording.graphicPackageName}
+                          </span>
                         )}
                       </div>
-                    ))}
+                      <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={outlineBtnClass}
+                          onClick={() => getPublicLink(recording)}
+                          disabled={
+                            generatingLink === recording.id ||
+                            recording.status !== 'published'
+                          }
+                        >
+                          {generatingLink === recording.id
+                            ? 'Copying...'
+                            : 'Public Link'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={outlineBtnClass}
+                          onClick={() => openAccessModal(recording)}
+                        >
+                          Manage Access
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={outlineBtnClass}
+                          onClick={() => openEditModal(recording)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                          onClick={() => promptDeleteRecording(recording)}
+                          disabled={deletingRecording === recording.id}
+                        >
+                          {deletingRecording === recording.id
+                            ? '...'
+                            : 'Delete'}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Pagination controls */}
+                {totalRecordings > pageSize && (
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4 pt-4 border-t border-border">
+                    <p className="text-sm text-muted-foreground text-right sm:text-left">
+                      {(currentPage - 1) * pageSize + 1}–
+                      {Math.min(currentPage * pageSize, totalRecordings)} of{' '}
+                      {totalRecordings}
+                    </p>
+                    <div className="flex items-center justify-center sm:justify-start gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={outlineBtnClass}
+                        disabled={currentPage <= 1}
+                        onClick={() => setCurrentPage((p) => p - 1)}
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-sm text-muted-foreground px-2 whitespace-nowrap">
+                        Page {currentPage} of{' '}
+                        {Math.ceil(totalRecordings / pageSize)}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={outlineBtnClass}
+                        disabled={
+                          currentPage >= Math.ceil(totalRecordings / pageSize)
+                        }
+                        onClick={() => setCurrentPage((p) => p + 1)}
+                      >
+                        Next
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
             )}
           </div>
-        )}
+        </div>
 
-        {/* Marketplace Revenue */}
-        {marketplaceLoading ? (
-          <div className="mb-6 rounded-xl border border-border bg-card p-6 animate-pulse">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-              <div className="space-y-2">
-                <div className="bg-muted rounded h-5 w-[180px]" />
-                <div className="bg-muted rounded h-3 w-[280px]" />
-              </div>
-              <div className="bg-muted rounded h-10 w-[120px]" />
-            </div>
-          </div>
-        ) : orgMarketplace?.marketplace_enabled && (
-            <MarketplaceRevenue
+        {/* Venue Settings & Admins — hidden for group orgs */}
+        {venue?.type !== 'group' && (
+          <>
+            <VenueSettings
               venueId={venueId}
+              billingConfig={billingConfig}
+              onSaved={(updated) => setBillingConfig(updated)}
+              inputClass={inputClass}
               outlineBtnClass={outlineBtnClass}
+              primaryBtnClass={primaryBtnClass}
             />
-        )}
-        </>)}
 
-        {/* Recordings List */}
-          <div className="rounded-xl border border-border bg-card">
-            <div className="p-6">
-              <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-                Recordings
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {totalRecordings} recording
-                {totalRecordings === 1 ? '' : 's'}
-              </p>
-
-              {/* Search + Filters */}
-              <div className="mt-4 flex flex-col sm:flex-row gap-3">
-                <Input
-                  placeholder="Search title or team..."
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  className={`sm:max-w-xs ${inputClass}`}
-                />
-                <Select
-                  value={statusFilter || 'all'}
-                  onValueChange={(v) => {
-                    setStatusFilter(v === 'all' ? '' : v)
-                    setCurrentPage(1)
-                  }}
-                >
-                  <SelectTrigger className="sm:w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="published">Published</SelectItem>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="scheduled">Scheduled</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={billableFilter || 'all'}
-                  onValueChange={(v) => {
-                    setBillableFilter(v === 'all' ? '' : v)
-                    setCurrentPage(1)
-                  }}
-                >
-                  <SelectTrigger className="sm:w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="true">Billable</SelectItem>
-                    <SelectItem value="false">Not Billable</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="px-6 pb-6">
-              {recordings.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">
-                  {debouncedSearch || statusFilter || billableFilter
-                    ? 'No recordings match your filters.'
-                    : 'No recordings yet. Schedule a recording to get started.'}
+            {/* Venue Admins Section */}
+            <div className="mt-6 rounded-xl border border-border bg-card">
+              <div className="p-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                  <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
+                    Venue Admins
+                  </h2>
+                  <Button
+                    variant="outline"
+                    className={`w-full md:w-auto ${outlineBtnClass}`}
+                    onClick={() => {
+                      setShowAdminSection(!showAdminSection)
+                      if (!showAdminSection && admins.length === 0) {
+                        fetchAdmins()
+                      }
+                    }}
+                  >
+                    {showAdminSection ? 'Hide' : 'Manage Admins'}
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Users who can manage this venue and its recordings
                 </p>
-              ) : (
-                <div className="space-y-3">
-                  {recordings.map((recording) => (
-                    <div
-                      key={recording.id}
-                      className="p-4 rounded-lg bg-muted/50 border border-border"
-                    >
-                      {/* Top row: Play button + Info + Status */}
-                      <div className="flex items-start gap-3">
-                        {/* Play Button — links to recording detail page */}
-                        {recording.s3_key && (
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() =>
-                              router.push(`/recordings/${recording.id}`)
-                            }
-                            className={`flex-shrink-0 ${outlineBtnClass}`}
-                          >
-                            <svg
-                              className="w-4 h-4 ml-0.5"
-                              fill="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path d="M8 5v14l11-7z" />
-                            </svg>
-                          </Button>
-                        )}
-
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-medium truncate text-[var(--timberwolf)]">
-                              {recording.title}
-                            </p>
-                            <span
-                              className={`text-xs px-2 py-0.5 rounded flex-shrink-0 ${
-                                recording.status === 'published'
-                                  ? 'bg-green-500/20 text-green-500'
-                                  : recording.status === 'scheduled'
-                                    ? 'bg-yellow-500/20 text-yellow-500'
-                                    : 'bg-gray-500/20 text-gray-500'
-                              }`}
-                            >
-                              {recording.status}
-                            </span>
-                            {recording.ownerOrgName && (
-                              <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 flex-shrink-0">
-                                {recording.ownerOrgName}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            {recording.pitch_name &&
-                              `${recording.pitch_name} | `}
-                            {formatTime(recording.match_date)}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Bottom row: Access count & Actions */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-3 pt-3 border-t border-border gap-2">
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-muted-foreground">
-                            {recording.accessCount || 0} user
-                            {(recording.accessCount || 0) === 1 ? '' : 's'}
-                          </span>
-                          <button
-                            onClick={() => toggleBillable(recording)}
-                            disabled={togglingBillable === recording.id}
-                            className={`text-xs px-2 py-0.5 rounded cursor-pointer transition-colors ${
-                              recording.is_billable !== false
-                                ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                                : 'bg-gray-500/20 text-gray-400 hover:bg-gray-500/30'
-                            }`}
-                          >
-                            {togglingBillable === recording.id
-                              ? '...'
-                              : recording.is_billable !== false
-                                ? 'Billable'
-                                : 'Not Billable'}
-                          </button>
-                          {recording.is_billable !== false &&
-                            (editingAmountId === recording.id ? (
-                              <input
-                                type="number"
-                                step="0.001"
-                                min="0"
-                                autoFocus
-                                className="w-24 text-xs px-2 py-0.5 rounded bg-zinc-800 text-[var(--timberwolf)] border border-[var(--ash-grey)]/30 outline-none"
-                                value={editingAmountValue}
-                                onChange={(e) =>
-                                  setEditingAmountValue(e.target.value)
-                                }
-                                onBlur={() => saveBillableAmount(recording)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter')
-                                    saveBillableAmount(recording)
-                                  if (e.key === 'Escape')
-                                    setEditingAmountId(null)
-                                }}
-                              />
-                            ) : (
-                              <span
-                                className={`text-xs px-2 py-0.5 rounded ${
-                                  recording.collected_by !== 'playhub'
-                                    ? 'cursor-pointer hover:bg-zinc-700/50'
-                                    : ''
-                                } text-muted-foreground`}
-                                title={
-                                  recording.collected_by === 'playhub'
-                                    ? 'Amount locked (verified transaction)'
-                                    : 'Click to edit amount'
-                                }
-                                onClick={() => {
-                                  if (recording.collected_by !== 'playhub') {
-                                    setEditingAmountId(recording.id)
-                                    setEditingAmountValue(
-                                      String(
-                                        recording.billable_amount ??
-                                          billingConfig?.default_billable_amount ??
-                                          ''
-                                      )
-                                    )
-                                  }
-                                }}
-                              >
-                                {(
-                                  recording.billable_amount ??
-                                  billingConfig?.default_billable_amount ??
-                                  0
-                                ).toFixed(3)}{' '}
-                                {billingConfig?.currency || 'KWD'}
-                              </span>
-                            ))}
-                          {recording.graphicPackageName && (
-                            <span
-                              className="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-400"
-                              title="Graphic Package"
-                            >
-                              {recording.graphicPackageName}
-                            </span>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className={outlineBtnClass}
-                            onClick={() => getPublicLink(recording)}
-                            disabled={
-                              generatingLink === recording.id ||
-                              recording.status !== 'published'
-                            }
-                          >
-                            {generatingLink === recording.id
-                              ? 'Copying...'
-                              : 'Public Link'}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className={outlineBtnClass}
-                            onClick={() => openAccessModal(recording)}
-                          >
-                            Manage Access
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className={outlineBtnClass}
-                            onClick={() => openEditModal(recording)}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                            onClick={() => promptDeleteRecording(recording)}
-                            disabled={deletingRecording === recording.id}
-                          >
-                            {deletingRecording === recording.id
-                              ? '...'
-                              : 'Delete'}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Pagination controls */}
-                  {totalRecordings > pageSize && (
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4 pt-4 border-t border-border">
-                      <p className="text-sm text-muted-foreground text-right sm:text-left">
-                        {(currentPage - 1) * pageSize + 1}–
-                        {Math.min(currentPage * pageSize, totalRecordings)} of{' '}
-                        {totalRecordings}
-                      </p>
-                      <div className="flex items-center justify-center sm:justify-start gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={outlineBtnClass}
-                          disabled={currentPage <= 1}
-                          onClick={() => setCurrentPage((p) => p - 1)}
-                        >
-                          Previous
-                        </Button>
-                        <span className="text-sm text-muted-foreground px-2 whitespace-nowrap">
-                          Page {currentPage} of{' '}
-                          {Math.ceil(totalRecordings / pageSize)}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={outlineBtnClass}
-                          disabled={
-                            currentPage >= Math.ceil(totalRecordings / pageSize)
-                          }
-                          onClick={() => setCurrentPage((p) => p + 1)}
-                        >
-                          Next
-                        </Button>
-                      </div>
+              </div>
+              {showAdminSection && (
+                <div className="px-6 pb-6 space-y-4">
+                  {/* Success/Error messages */}
+                  {success && (
+                    <div className="bg-green-500/10 text-green-400 p-3 rounded-lg text-sm">
+                      {success}
                     </div>
                   )}
+                  {error && (
+                    <div className="bg-red-500/10 text-red-400 p-3 rounded-lg text-sm">
+                      {error}
+                    </div>
+                  )}
+
+                  {/* Add new admin */}
+                  <form
+                    onSubmit={handleAddAdmin}
+                    className="flex flex-col sm:flex-row gap-2"
+                  >
+                    <Input
+                      type="email"
+                      value={newAdminEmail}
+                      onChange={(e) => setNewAdminEmail(e.target.value)}
+                      placeholder="admin@example.com"
+                      className={`flex-1 ${inputClass}`}
+                    />
+                    <Button
+                      type="submit"
+                      className={`w-full sm:w-auto ${primaryBtnClass}`}
+                      disabled={addingAdmin || !newAdminEmail}
+                    >
+                      {addingAdmin ? 'Adding...' : 'Add Admin'}
+                    </Button>
+                  </form>
+
+                  {/* Admin list */}
+                  <div className="space-y-2">
+                    {admins.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Loading admins...
+                      </p>
+                    ) : (
+                      admins.map((admin) => (
+                        <div
+                          key={admin.id}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-muted/50 rounded-lg border border-border"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-medium truncate text-[var(--timberwolf)]">
+                              {admin.fullName || admin.email || 'Unknown'}
+                              {admin.isCurrentUser && (
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  (you)
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-sm text-muted-foreground truncate">
+                              {admin.email}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                              {admin.role.replace('_', ' ')}
+                            </span>
+                            {!admin.isCurrentUser && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveAdmin(admin.id)}
+                                disabled={removingAdminId === admin.id}
+                                className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                              >
+                                {removingAdminId === admin.id
+                                  ? 'Removing...'
+                                  : 'Remove'}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               )}
             </div>
-          </div>
-
-
-        {/* Venue Settings & Admins — hidden for group orgs */}
-        {venue?.type !== 'group' && (<>
-        <VenueSettings
-            venueId={venueId}
-            billingConfig={billingConfig}
-            onSaved={(updated) => setBillingConfig(updated)}
-            inputClass={inputClass}
-            outlineBtnClass={outlineBtnClass}
-            primaryBtnClass={primaryBtnClass}
-          />
-
-        {/* Venue Admins Section */}
-          <div className="mt-6 rounded-xl border border-border bg-card">
-            <div className="p-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-                  Venue Admins
-                </h2>
-                <Button
-                  variant="outline"
-                  className={`w-full md:w-auto ${outlineBtnClass}`}
-                  onClick={() => {
-                    setShowAdminSection(!showAdminSection)
-                    if (!showAdminSection && admins.length === 0) {
-                      fetchAdmins()
-                    }
-                  }}
-                >
-                  {showAdminSection ? 'Hide' : 'Manage Admins'}
-                </Button>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Users who can manage this venue and its recordings
-              </p>
-            </div>
-            {showAdminSection && (
-              <div className="px-6 pb-6 space-y-4">
-                {/* Success/Error messages */}
-                {success && (
-                  <div className="bg-green-500/10 text-green-400 p-3 rounded-lg text-sm">
-                    {success}
-                  </div>
-                )}
-                {error && (
-                  <div className="bg-red-500/10 text-red-400 p-3 rounded-lg text-sm">
-                    {error}
-                  </div>
-                )}
-
-                {/* Add new admin */}
-                <form
-                  onSubmit={handleAddAdmin}
-                  className="flex flex-col sm:flex-row gap-2"
-                >
-                  <Input
-                    type="email"
-                    value={newAdminEmail}
-                    onChange={(e) => setNewAdminEmail(e.target.value)}
-                    placeholder="admin@example.com"
-                    className={`flex-1 ${inputClass}`}
-                  />
-                  <Button
-                    type="submit"
-                    className={`w-full sm:w-auto ${primaryBtnClass}`}
-                    disabled={addingAdmin || !newAdminEmail}
-                  >
-                    {addingAdmin ? 'Adding...' : 'Add Admin'}
-                  </Button>
-                </form>
-
-                {/* Admin list */}
-                <div className="space-y-2">
-                  {admins.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Loading admins...
-                    </p>
-                  ) : (
-                    admins.map((admin) => (
-                      <div
-                        key={admin.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-muted/50 rounded-lg border border-border"
-                      >
-                        <div className="min-w-0">
-                          <p className="font-medium truncate text-[var(--timberwolf)]">
-                            {admin.fullName || admin.email || 'Unknown'}
-                            {admin.isCurrentUser && (
-                              <span className="ml-2 text-xs text-muted-foreground">
-                                (you)
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-sm text-muted-foreground truncate">
-                            {admin.email}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
-                            {admin.role.replace('_', ' ')}
-                          </span>
-                          {!admin.isCurrentUser && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveAdmin(admin.id)}
-                              disabled={removingAdminId === admin.id}
-                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                            >
-                              {removingAdminId === admin.id
-                                ? 'Removing...'
-                                : 'Remove'}
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </>)}
+          </>
+        )}
 
         {/* Access Modal */}
         {showAccessModal && selectedRecording && (

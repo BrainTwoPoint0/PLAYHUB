@@ -36,7 +36,9 @@ export async function GET() {
   if (isAdmin) {
     const { data: allOrgs } = await (serviceClient as any)
       .from('organizations')
-      .select('id, name, slug, logo_url, type, feature_recordings, feature_streaming, feature_graphic_packages')
+      .select(
+        'id, name, slug, logo_url, type, feature_recordings, feature_streaming, feature_graphic_packages'
+      )
       .eq('type', 'venue')
       .eq('is_active', true)
       .order('name', { ascending: true })
@@ -93,7 +95,9 @@ export async function GET() {
   if (groupOrgIds.length > 0) {
     const { data: children } = await (serviceClient as any)
       .from('organizations')
-      .select('id, name, slug, logo_url, type, feature_recordings, feature_streaming, feature_graphic_packages')
+      .select(
+        'id, name, slug, logo_url, type, feature_recordings, feature_streaming, feature_graphic_packages'
+      )
       .in('parent_organization_id', groupOrgIds)
       .eq('is_active', true)
 

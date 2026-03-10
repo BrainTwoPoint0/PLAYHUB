@@ -70,7 +70,10 @@ export default function MatchesPage() {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="rounded-xl border border-border bg-card overflow-hidden">
+            <div
+              key={i}
+              className="rounded-xl border border-border bg-card overflow-hidden"
+            >
               <Skeleton className="h-56 w-full rounded-none" />
               <div className="p-4 space-y-2">
                 <Skeleton className="h-5 w-3/4" />

@@ -297,9 +297,9 @@ export async function POST(request: Request) {
             status: 'published',
             transferred_at: new Date().toISOString(),
           })
-          // Note: venue_organization_id is NOT NULL. Batch import recordings
-          // must already exist (created via schedule-recording) or this insert
-          // will need organization context to set venue_organization_id.
+        // Note: venue_organization_id is NOT NULL. Batch import recordings
+        // must already exist (created via schedule-recording) or this insert
+        // will need organization context to set venue_organization_id.
 
         if (insertError) {
           results.push({

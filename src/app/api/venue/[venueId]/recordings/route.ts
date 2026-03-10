@@ -212,7 +212,9 @@ export async function GET(
       .in('id', orgIds)
 
     if (orgs) {
-      orgs.forEach((o: any) => { orgNames[o.id] = o.name })
+      orgs.forEach((o: any) => {
+        orgNames[o.id] = o.name
+      })
     }
   }
 
@@ -221,9 +223,10 @@ export async function GET(
     ...r,
     accessCount: accessCounts[r.id] || 0,
     graphicPackageName: gpNames[r.graphic_package_id] || null,
-    ownerOrgName: orgIds.length > 1 && r.organization_id !== venueId
-      ? orgNames[r.organization_id] || null
-      : null,
+    ownerOrgName:
+      orgIds.length > 1 && r.organization_id !== venueId
+        ? orgNames[r.organization_id] || null
+        : null,
   }))
 
   return NextResponse.json({

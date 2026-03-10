@@ -13,7 +13,15 @@ import {
 } from '@braintwopoint0/playback-commons/ui'
 import { formatPrice, formatDate } from '@braintwopoint0/playback-commons/utils'
 import { useState } from 'react'
-import { ArrowLeft, Zap, Film, Repeat, ShieldCheck, Play, CheckCircle } from 'lucide-react'
+import {
+  ArrowLeft,
+  Zap,
+  Film,
+  Repeat,
+  ShieldCheck,
+  Play,
+  CheckCircle,
+} from 'lucide-react'
 
 interface MatchDetailClientProps {
   match: any
@@ -186,7 +194,9 @@ export default function MatchDetailClient({
             <Card className="bg-card border-border overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-lg text-[var(--timberwolf)] flex items-center gap-2">
-                  {hasAccess && <CheckCircle className="h-5 w-5 text-emerald-400" />}
+                  {hasAccess && (
+                    <CheckCircle className="h-5 w-5 text-emerald-400" />
+                  )}
                   {hasAccess ? 'You own this match' : 'Purchase Access'}
                 </CardTitle>
               </CardHeader>
@@ -226,7 +236,10 @@ export default function MatchDetailClient({
                         { icon: Zap, text: 'Instant access after purchase' },
                         { icon: Film, text: 'Stream in HD quality' },
                         { icon: Repeat, text: 'Watch unlimited times' },
-                        { icon: ShieldCheck, text: 'Secure payment with Stripe' },
+                        {
+                          icon: ShieldCheck,
+                          text: 'Secure payment with Stripe',
+                        },
                       ].map((feature, idx) => (
                         <div
                           key={idx}

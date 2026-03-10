@@ -104,7 +104,9 @@ type ManagedVenue = {
  * Get venues (organizations) that a user can manage.
  * Includes child venues of parent orgs the user is admin of.
  */
-export async function getManagedVenues(userId: string): Promise<ManagedVenue[]> {
+export async function getManagedVenues(
+  userId: string
+): Promise<ManagedVenue[]> {
   const supabase = createServiceClient()
 
   const { data: profile } = await supabase
@@ -163,7 +165,12 @@ export async function getManagedVenues(userId: string): Promise<ManagedVenue[]> 
   for (const org of [...directOrgs, ...(childVenues || [])]) {
     if (!seen.has(org.id)) {
       seen.add(org.id)
-      result.push({ id: org.id, name: org.name, slug: org.slug, logo_url: org.logo_url })
+      result.push({
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        logo_url: org.logo_url,
+      })
     }
   }
 

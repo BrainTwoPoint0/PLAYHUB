@@ -69,9 +69,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   const searchParams = request.nextUrl.searchParams
   const paramMonth = searchParams.get('month')
   const paramYear = searchParams.get('year')
-  const targetMonth = paramMonth
-    ? parseInt(paramMonth, 10) - 1
-    : now.getMonth()
+  const targetMonth = paramMonth ? parseInt(paramMonth, 10) - 1 : now.getMonth()
   const targetYear = paramYear ? parseInt(paramYear, 10) : now.getFullYear()
 
   const monthStart = new Date(targetYear, targetMonth, 1).toISOString()
@@ -101,7 +99,9 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   // Fetch all recordings for child venues
   const { data: allRecordings } = await serviceClient
     .from('playhub_match_recordings')
-    .select('id, organization_id, status, is_billable, billable_amount, created_at')
+    .select(
+      'id, organization_id, status, is_billable, billable_amount, created_at'
+    )
     .in('organization_id', childIds)
 
   const recs = allRecordings || []
@@ -109,7 +109,9 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   // Fetch billing configs for child venues
   const { data: billingConfigs } = await serviceClient
     .from('playhub_venue_billing_config')
-    .select('organization_id, default_billable_amount, currency, daily_recording_target')
+    .select(
+      'organization_id, default_billable_amount, currency, daily_recording_target'
+    )
     .in('organization_id', childIds)
 
   const configMap: Record<string, any> = {}
@@ -194,14 +196,18 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 
   // Build venue name map for chart series
   const venueNameMap: Record<string, string> = {}
-  childVenues.forEach((v: any) => { venueNameMap[v.id] = v.name })
+  childVenues.forEach((v: any) => {
+    venueNameMap[v.id] = v.name
+  })
 
   // Pre-fill all days
   const dailyMap = new Map<string, Record<string, number>>()
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
     const entry: Record<string, number> = { total: 0 }
-    childIds.forEach((id: string) => { entry[venueNameMap[id]] = 0 })
+    childIds.forEach((id: string) => {
+      entry[venueNameMap[id]] = 0
+    })
     dailyMap.set(dateStr, entry)
   }
 

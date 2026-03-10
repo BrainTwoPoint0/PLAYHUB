@@ -44,8 +44,8 @@ export default async function PurchaseSuccessPage({
         </div>
 
         <p className="text-xs text-muted-foreground">
-          A confirmation email has been sent to your email address. You can
-          now watch your purchased match anytime from your library.
+          A confirmation email has been sent to your email address. You can now
+          watch your purchased match anytime from your library.
         </p>
       </div>
     </div>
