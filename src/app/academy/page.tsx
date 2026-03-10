@@ -2,7 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button, Skeleton, EmptyState } from '@braintwopoint0/playback-commons/ui'
+import {
+  Button,
+  Skeleton,
+  EmptyState,
+} from '@braintwopoint0/playback-commons/ui'
 import { FadeIn } from '@/components/FadeIn'
 import { Building2 } from 'lucide-react'
 
@@ -38,9 +42,9 @@ export default function AcademySelectorPage() {
       setClubs(clubList)
       setRole(data.role || null)
 
-      // If only one club, redirect directly
+      // If only one club, redirect directly to content
       if (clubList.length === 1) {
-        router.replace(`/academy/${clubList[0].slug}`)
+        router.replace(`/academy/${clubList[0].slug}/content`)
       }
     } catch (err) {
       setError('Failed to load clubs')
@@ -59,7 +63,10 @@ export default function AcademySelectorPage() {
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           {[0, 1].map((i) => (
-            <div key={i} className="rounded-xl border border-border bg-card p-6">
+            <div
+              key={i}
+              className="rounded-xl border border-border bg-card p-6"
+            >
               <div className="flex items-center gap-4 mb-4">
                 <Skeleton className="w-12 h-12 rounded-full" />
                 <div className="space-y-2 flex-1">
@@ -80,7 +87,11 @@ export default function AcademySelectorPage() {
       <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
         <div className="rounded-xl border border-border bg-card p-6">
           <p className="text-red-400">{error}</p>
-          <Button className="mt-4" variant="outline" onClick={() => router.push('/')}>
+          <Button
+            className="mt-4"
+            variant="outline"
+            onClick={() => router.push('/')}
+          >
             Back to Home
           </Button>
         </div>
@@ -115,17 +126,14 @@ export default function AcademySelectorPage() {
           Your Clubs
         </h1>
         <p className="text-muted-foreground mb-10">
-          Select a club to view subscription analytics
+          Select a club to manage content and subscriptions
         </p>
       </FadeIn>
 
       <div className="grid gap-4 md:grid-cols-2">
         {clubs.map((club, i) => (
           <FadeIn key={club.slug} delay={i * 100}>
-            <div
-              className="cursor-pointer rounded-xl border border-border bg-card hover:border-[var(--timberwolf)]/25 hover:bg-muted/50 transition-colors duration-300"
-              onClick={() => router.push(`/academy/${club.slug}/access`)}
-            >
+            <div className="rounded-xl border border-border bg-card hover:border-[var(--timberwolf)]/25 transition-colors duration-300">
               <div className="p-6">
                 <div className="flex items-center gap-4 mb-4">
                   {club.logoUrl ? (
@@ -152,12 +160,31 @@ export default function AcademySelectorPage() {
                         {role === 'platform_admin' ? 'Admin' : 'Viewer'}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground">{club.slug.toUpperCase()}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {club.slug.toUpperCase()}
+                    </p>
                   </div>
                 </div>
-                <Button variant="outline" className="w-full">
-                  Veo Access Audit
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() =>
+                      router.push(`/academy/${club.slug}/content`)
+                    }
+                  >
+                    Content
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() =>
+                      router.push(`/academy/${club.slug}/access`)
+                    }
+                  >
+                    Access Audit
+                  </Button>
+                </div>
               </div>
             </div>
           </FadeIn>

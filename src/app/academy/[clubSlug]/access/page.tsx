@@ -370,7 +370,7 @@ export default function AcademyAccessPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--night)]">
+      <div>
         <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12 max-w-5xl animate-pulse">
           <div className="space-y-2 mb-10">
             <div className="bg-white/5 rounded h-3 w-32" />
@@ -397,7 +397,7 @@ export default function AcademyAccessPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[var(--night)]">
+      <div>
         <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12 max-w-5xl">
           <div className="rounded-xl border border-red-500/20 bg-red-500/[0.04] p-6">
             <div className="flex items-start gap-3">
@@ -410,7 +410,9 @@ export default function AcademyAccessPage() {
                     disabled={syncing}
                     className="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[var(--timberwolf)] hover:bg-white/10 transition-colors disabled:opacity-50"
                   >
-                    <RefreshCw className={`h-3 w-3 inline mr-1.5 ${syncing ? 'animate-spin' : ''}`} />
+                    <RefreshCw
+                      className={`h-3 w-3 inline mr-1.5 ${syncing ? 'animate-spin' : ''}`}
+                    />
                     {syncing ? 'Syncing...' : 'Sync Now'}
                   </button>
                   <button
@@ -472,20 +474,53 @@ export default function AcademyAccessPage() {
 
   // Stat card config
   const stats = [
-    { label: 'Active Subs', value: academySubs, color: 'text-emerald-400', dot: 'bg-emerald-400' },
-    { label: 'Veo Members', value: totalMembers, color: 'text-[var(--timberwolf)]', dot: 'bg-muted-foreground' },
-    { label: 'No Sub', value: noSub, color: 'text-red-400', dot: 'bg-red-400', alert: noSub > 0 },
-    { label: 'Not in Veo', value: data.stripeOnlySubscribers?.length ?? 0, color: 'text-orange-400', dot: 'bg-orange-400', alert: (data.stripeOnlySubscribers?.length ?? 0) > 0 },
-    { label: 'Staff', value: staff.length, color: 'text-amber-400', dot: 'bg-amber-400' },
+    {
+      label: 'Active Subs',
+      value: academySubs,
+      color: 'text-emerald-400',
+      dot: 'bg-emerald-400',
+    },
+    {
+      label: 'Veo Members',
+      value: totalMembers,
+      color: 'text-[var(--timberwolf)]',
+      dot: 'bg-muted-foreground',
+    },
+    {
+      label: 'No Sub',
+      value: noSub,
+      color: 'text-red-400',
+      dot: 'bg-red-400',
+      alert: noSub > 0,
+    },
+    {
+      label: 'Not in Veo',
+      value: data.stripeOnlySubscribers?.length ?? 0,
+      color: 'text-orange-400',
+      dot: 'bg-orange-400',
+      alert: (data.stripeOnlySubscribers?.length ?? 0) > 0,
+    },
+    {
+      label: 'Staff',
+      value: staff.length,
+      color: 'text-amber-400',
+      dot: 'bg-amber-400',
+    },
     ...(data.hasScholarships && scholarships > 0
-      ? [{ label: 'Scholarships', value: scholarships, color: 'text-purple-400', dot: 'bg-purple-400' }]
+      ? [
+          {
+            label: 'Scholarships',
+            value: scholarships,
+            color: 'text-purple-400',
+            dot: 'bg-purple-400',
+          },
+        ]
       : []),
   ]
 
   return (
-    <div className="min-h-screen bg-[var(--night)]">
+    <div>
       <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12 max-w-5xl">
-
         {/* ── Header ──────────────────────────────────────── */}
         <FadeIn>
           <div className="mb-10">
@@ -511,7 +546,9 @@ export default function AcademyAccessPage() {
                       disabled={syncing}
                       className="text-[11px] px-3 py-1.5 rounded-lg bg-muted text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted transition-all disabled:opacity-50"
                     >
-                      <RefreshCw className={`h-3 w-3 inline mr-1 ${syncing ? 'animate-spin' : ''}`} />
+                      <RefreshCw
+                        className={`h-3 w-3 inline mr-1 ${syncing ? 'animate-spin' : ''}`}
+                      />
                       {syncing ? 'Syncing' : 'Sync'}
                     </button>
                     <button
@@ -536,17 +573,27 @@ export default function AcademyAccessPage() {
 
         {/* ── Stats ───────────────────────────────────────── */}
         <FadeIn delay={80}>
-          <div className={`grid gap-px bg-muted rounded-xl overflow-hidden mb-8 ${
-            stats.length === 6 ? 'grid-cols-3 sm:grid-cols-6' : 'grid-cols-6 sm:grid-cols-5'
-          }`}>
+          <div
+            className={`grid gap-px bg-muted rounded-xl overflow-hidden mb-8 ${
+              stats.length === 6
+                ? 'grid-cols-3 sm:grid-cols-6'
+                : 'grid-cols-6 sm:grid-cols-5'
+            }`}
+          >
             {stats.map((s, i) => (
               <div
                 key={s.label}
                 className={`bg-[var(--night)] px-3 py-3.5 sm:py-4 text-center ${
-                  stats.length === 5 ? (i < 2 ? 'col-span-3 sm:col-span-1' : 'col-span-2 sm:col-span-1') : ''
+                  stats.length === 5
+                    ? i < 2
+                      ? 'col-span-3 sm:col-span-1'
+                      : 'col-span-2 sm:col-span-1'
+                    : ''
                 }`}
               >
-                <div className={`text-xl sm:text-2xl font-semibold tabular-nums ${s.color}`}>
+                <div
+                  className={`text-xl sm:text-2xl font-semibold tabular-nums ${s.color}`}
+                >
                   {s.value}
                 </div>
                 <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider mt-0.5">
@@ -574,7 +621,9 @@ export default function AcademyAccessPage() {
                   <span className="text-[11px] text-muted-foreground/50">
                     {exceptions.length}
                   </span>
-                  <ChevronDown className={`h-3 w-3 text-muted-foreground/40 ml-auto transition-transform ${exceptionsOpen ? '' : '-rotate-90'}`} />
+                  <ChevronDown
+                    className={`h-3 w-3 text-muted-foreground/40 ml-auto transition-transform ${exceptionsOpen ? '' : '-rotate-90'}`}
+                  />
                 </button>
                 {exceptionsOpen && (
                   <div className="border-t border-white/[0.04] px-4 py-3 space-y-3">
@@ -598,14 +647,18 @@ export default function AcademyAccessPage() {
                         <input
                           type="text"
                           value={newExceptionReason}
-                          onChange={(e) => setNewExceptionReason(e.target.value)}
+                          onChange={(e) =>
+                            setNewExceptionReason(e.target.value)
+                          }
                           placeholder="Optional"
                           className="w-full text-sm px-3 py-1.5 rounded-lg bg-muted border border-border text-[var(--timberwolf)] placeholder-muted-foreground outline-none focus:border-ring transition-colors"
                         />
                       </div>
                       <button
                         onClick={addException}
-                        disabled={exceptionsLoading || !newExceptionEmail.trim()}
+                        disabled={
+                          exceptionsLoading || !newExceptionEmail.trim()
+                        }
                         className="text-xs px-4 py-1.5 rounded-lg bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors disabled:opacity-30"
                       >
                         Add
@@ -619,9 +672,13 @@ export default function AcademyAccessPage() {
                             className="flex items-center justify-between gap-2 py-1.5 group"
                           >
                             <div className="flex items-center gap-2 min-w-0 text-sm">
-                              <span className="text-[var(--timberwolf)]/80 truncate">{exc.email}</span>
+                              <span className="text-[var(--timberwolf)]/80 truncate">
+                                {exc.email}
+                              </span>
                               {exc.reason && (
-                                <span className="text-[11px] text-muted-foreground/40 truncate hidden sm:inline">{exc.reason}</span>
+                                <span className="text-[11px] text-muted-foreground/40 truncate hidden sm:inline">
+                                  {exc.reason}
+                                </span>
                               )}
                             </div>
                             <button
@@ -652,7 +709,9 @@ export default function AcademyAccessPage() {
                   <span className="text-[11px] text-muted-foreground/50">
                     {admins.length}
                   </span>
-                  <ChevronDown className={`h-3 w-3 text-muted-foreground/40 ml-auto transition-transform ${adminsOpen ? '' : '-rotate-90'}`} />
+                  <ChevronDown
+                    className={`h-3 w-3 text-muted-foreground/40 ml-auto transition-transform ${adminsOpen ? '' : '-rotate-90'}`}
+                  />
                 </button>
                 {adminsOpen && (
                   <div className="border-t border-white/[0.04] px-4 py-3 space-y-3">
@@ -678,7 +737,9 @@ export default function AcademyAccessPage() {
                       </button>
                     </div>
                     {adminMessage && (
-                      <p className="text-[11px] text-muted-foreground/60">{adminMessage}</p>
+                      <p className="text-[11px] text-muted-foreground/60">
+                        {adminMessage}
+                      </p>
                     )}
                     {admins.length > 0 && (
                       <div className="space-y-0.5">
@@ -688,12 +749,22 @@ export default function AcademyAccessPage() {
                             className="flex items-center justify-between gap-2 py-1.5 group"
                           >
                             <div className="min-w-0">
-                              <span className="text-sm text-[var(--timberwolf)]/80 truncate block">{admin.fullName || 'Unknown'}</span>
-                              <span className="text-[11px] text-muted-foreground/40 truncate block">{admin.email}</span>
+                              <span className="text-sm text-[var(--timberwolf)]/80 truncate block">
+                                {admin.fullName || 'Unknown'}
+                              </span>
+                              <span className="text-[11px] text-muted-foreground/40 truncate block">
+                                {admin.email}
+                              </span>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
                               <span className="text-[10px] text-muted-foreground/40">
-                                {admin.role === 'admin' ? 'Admin' : admin.role === 'manager' ? 'Manager' : admin.role === 'league_admin' ? 'League' : 'Admin'}
+                                {admin.role === 'admin'
+                                  ? 'Admin'
+                                  : admin.role === 'manager'
+                                    ? 'Manager'
+                                    : admin.role === 'league_admin'
+                                      ? 'League'
+                                      : 'Admin'}
                               </span>
                               <button
                                 onClick={() => removeAdmin(admin.id)}
@@ -715,61 +786,66 @@ export default function AcademyAccessPage() {
         )}
 
         {/* ── Stripe-only (not in Veo) ───────────────────── */}
-        {data.stripeOnlySubscribers && data.stripeOnlySubscribers.length > 0 && (
-          <FadeIn delay={120}>
-            <div className="rounded-xl bg-card overflow-hidden mb-8">
-              <button
-                onClick={() => setStripeOnlyOpen(!stripeOnlyOpen)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
-              >
-                <AlertTriangle className="h-3.5 w-3.5 text-orange-400/70" />
-                <span className="text-sm font-medium text-[var(--timberwolf)]">
-                  Not in Veo
-                </span>
-                <span className="text-[11px] text-orange-400/70">
-                  {data.stripeOnlySubscribers.length} paying but missing
-                </span>
-                <ChevronDown className={`h-3 w-3 text-muted-foreground/40 ml-auto transition-transform ${stripeOnlyOpen ? '' : '-rotate-90'}`} />
-              </button>
-              {stripeOnlyOpen && (
-                <div className="border-t border-white/[0.04]">
-                  {data.stripeOnlySubscribers.map((sub, i) => (
-                    <div
-                      key={sub.email}
-                      className={`flex items-center justify-between gap-2 px-4 py-2 ${
-                        i > 0 ? 'border-t border-white/[0.02]' : ''
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        <div className="text-sm text-[var(--timberwolf)]/90 truncate">
-                          {sub.name || 'Unknown'}
+        {data.stripeOnlySubscribers &&
+          data.stripeOnlySubscribers.length > 0 && (
+            <FadeIn delay={120}>
+              <div className="rounded-xl bg-card overflow-hidden mb-8">
+                <button
+                  onClick={() => setStripeOnlyOpen(!stripeOnlyOpen)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
+                >
+                  <AlertTriangle className="h-3.5 w-3.5 text-orange-400/70" />
+                  <span className="text-sm font-medium text-[var(--timberwolf)]">
+                    Not in Veo
+                  </span>
+                  <span className="text-[11px] text-orange-400/70">
+                    {data.stripeOnlySubscribers.length} paying but missing
+                  </span>
+                  <ChevronDown
+                    className={`h-3 w-3 text-muted-foreground/40 ml-auto transition-transform ${stripeOnlyOpen ? '' : '-rotate-90'}`}
+                  />
+                </button>
+                {stripeOnlyOpen && (
+                  <div className="border-t border-white/[0.04]">
+                    {data.stripeOnlySubscribers.map((sub, i) => (
+                      <div
+                        key={sub.email}
+                        className={`flex items-center justify-between gap-2 px-4 py-2 ${
+                          i > 0 ? 'border-t border-white/[0.02]' : ''
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="text-sm text-[var(--timberwolf)]/90 truncate">
+                            {sub.name || 'Unknown'}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground/40 truncate">
+                            {sub.email}
+                            {sub.registrationTeam && (
+                              <span className="ml-2 text-muted-foreground/25">
+                                {sub.registrationTeam}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-[11px] text-muted-foreground/40 truncate">
-                          {sub.email}
-                          {sub.registrationTeam && (
-                            <span className="ml-2 text-muted-foreground/25">{sub.registrationTeam}</span>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {data.hasScholarships && sub.isScholarship && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400/80">
+                              scholarship
+                            </span>
                           )}
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded-full ${stripeStatusColor(sub.status, true)}`}
+                          >
+                            {sub.status}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {data.hasScholarships && sub.isScholarship && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400/80">
-                            scholarship
-                          </span>
-                        )}
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded-full ${stripeStatusColor(sub.status, true)}`}
-                        >
-                          {sub.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </FadeIn>
-        )}
+                    ))}
+                  </div>
+                )}
+              </div>
+            </FadeIn>
+          )}
 
         {/* ── Search & Filters ───────────────────────────── */}
         <FadeIn delay={140}>
@@ -824,9 +900,13 @@ export default function AcademyAccessPage() {
                   !exemptEmails.has(m.email?.toLowerCase())
               ).length
               const teamStaff = team.members.filter((m) => !m.isPlayer).length
-              const subRate = teamPlayers.length > 0
-                ? Math.round(((teamPlayers.length - teamNoSub) / teamPlayers.length) * 100)
-                : 100
+              const subRate =
+                teamPlayers.length > 0
+                  ? Math.round(
+                      ((teamPlayers.length - teamNoSub) / teamPlayers.length) *
+                        100
+                    )
+                  : 100
 
               let displayMembers = filterNoSub
                 ? team.members.filter(
@@ -857,7 +937,9 @@ export default function AcademyAccessPage() {
                     onClick={() => toggleTeam(team.slug)}
                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
                   >
-                    <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground/40 flex-shrink-0 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                    <ChevronDown
+                      className={`h-3.5 w-3.5 text-muted-foreground/40 flex-shrink-0 transition-transform ${isExpanded ? '' : '-rotate-90'}`}
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-[var(--timberwolf)] truncate">
@@ -872,14 +954,24 @@ export default function AcademyAccessPage() {
                         <div className="h-1 flex-1 max-w-[120px] rounded-full bg-muted overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all ${
-                              subRate === 100 ? 'bg-emerald-500/60' : subRate >= 70 ? 'bg-yellow-500/60' : 'bg-red-500/60'
+                              subRate === 100
+                                ? 'bg-emerald-500/60'
+                                : subRate >= 70
+                                  ? 'bg-yellow-500/60'
+                                  : 'bg-red-500/60'
                             }`}
                             style={{ width: `${subRate}%` }}
                           />
                         </div>
-                        <span className={`text-[10px] tabular-nums ${
-                          subRate === 100 ? 'text-emerald-400/60' : subRate >= 70 ? 'text-yellow-400/60' : 'text-red-400/60'
-                        }`}>
+                        <span
+                          className={`text-[10px] tabular-nums ${
+                            subRate === 100
+                              ? 'text-emerald-400/60'
+                              : subRate >= 70
+                                ? 'text-yellow-400/60'
+                                : 'text-red-400/60'
+                          }`}
+                        >
                           {subRate}%
                         </span>
                       </div>
@@ -903,11 +995,15 @@ export default function AcademyAccessPage() {
                     <div className="border-t border-white/[0.04]">
                       {displayMembers.length === 0 ? (
                         <p className="text-[11px] text-muted-foreground/40 px-4 py-3">
-                          {filterNoSub ? 'All members have subscriptions' : 'No members'}
+                          {filterNoSub
+                            ? 'All members have subscriptions'
+                            : 'No members'}
                         </p>
                       ) : (
                         displayMembers.map((member, i) => {
-                          const isExempt = exemptEmails.has(member.email?.toLowerCase())
+                          const isExempt = exemptEmails.has(
+                            member.email?.toLowerCase()
+                          )
                           return (
                             <div
                               key={member.id}
@@ -916,15 +1012,18 @@ export default function AcademyAccessPage() {
                               }`}
                             >
                               {/* Status dot */}
-                              <div className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${
-                                !member.isPlayer
-                                  ? 'bg-amber-400/60'
-                                  : member.hasSubscription && member.stripeStatus !== 'canceled'
-                                    ? 'bg-emerald-400/60'
-                                    : isExempt
-                                      ? 'bg-blue-400/60'
-                                      : 'bg-red-400/60'
-                              }`} />
+                              <div
+                                className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${
+                                  !member.isPlayer
+                                    ? 'bg-amber-400/60'
+                                    : member.hasSubscription &&
+                                        member.stripeStatus !== 'canceled'
+                                      ? 'bg-emerald-400/60'
+                                      : isExempt
+                                        ? 'bg-blue-400/60'
+                                        : 'bg-red-400/60'
+                                }`}
+                              />
                               {/* Name & email */}
                               <div className="flex-1 min-w-0">
                                 <div className="text-sm text-[var(--timberwolf)]/90 truncate">
@@ -936,11 +1035,12 @@ export default function AcademyAccessPage() {
                               </div>
                               {/* Badges */}
                               <div className="flex items-center gap-1.5 flex-shrink-0">
-                                {data.hasScholarships && member.isScholarship && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400/80">
-                                    scholarship
-                                  </span>
-                                )}
+                                {data.hasScholarships &&
+                                  member.isScholarship && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400/80">
+                                      scholarship
+                                    </span>
+                                  )}
                                 {member.isPlayer ? (
                                   <span
                                     className={`text-[10px] px-1.5 py-0.5 rounded-full ${stripeStatusColor(

@@ -253,7 +253,9 @@ export async function GET(
         .select('email')
         .eq('club_slug', clubSlug)
       if (exceptions) {
-        exemptEmails = exceptions.map((e: { email: string }) => e.email.toLowerCase())
+        exemptEmails = exceptions.map((e: { email: string }) =>
+          e.email.toLowerCase()
+        )
       }
     } catch {
       // Non-critical — exemptions just won't show

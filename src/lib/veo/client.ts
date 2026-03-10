@@ -43,6 +43,42 @@ export interface VeoRecording {
   duration: number
   privacy: string
   thumbnail: string
+  uuid?: string
+  match_date?: string
+  home_team?: string | null
+  away_team?: string | null
+  home_score?: number | null
+  away_score?: number | null
+  processing_status?: string
+}
+
+export interface VeoVideo {
+  id: string
+  url: string
+  type?: string
+  width?: number
+  height?: number
+}
+
+export interface VeoHighlight {
+  id: string
+  start: number
+  duration: number
+  tags: string[]
+  team_association?: string
+  thumbnail?: string
+  videos?: VeoVideo[]
+  is_ai_generated?: boolean
+}
+
+export interface VeoMatchStats {
+  [key: string]: unknown
+}
+
+export interface MatchContent {
+  videos: VeoVideo[]
+  highlights: VeoHighlight[]
+  stats: VeoMatchStats | null
 }
 
 export interface VeoInvitation {
@@ -341,7 +377,7 @@ export async function listRecordings(
   return withSession(async (session) => {
     const res = await session.api(
       'GET',
-      `/api/app/clubs/${clubSlug}/recordings/?filter=own&fields=privacy&fields=title&fields=slug&fields=duration&fields=thumbnail&page_size=50`
+      `/api/app/clubs/${clubSlug}/recordings/?filter=own&fields=privacy&fields=title&fields=slug&fields=duration&fields=thumbnail&fields=uuid&fields=match_date&fields=home_team&fields=away_team&fields=home_score&fields=away_score&fields=processing_status&page_size=50`
     )
 
     if (res.status !== 200) {
@@ -595,6 +631,218 @@ export async function removeMembersInBulk(
   })
 }
 
+/**
+ * Get full match details for a single match (probe for CDN/video URLs)
+ * Returns the raw Veo response so we can inspect all available fields
+ */
+export async function getMatchDetails(
+  matchSlug: string
+): Promise<VeoResult<Record<string, unknown>>> {
+  return withSession(async (session) => {
+    const res = await session.api('GET', `/api/app/matches/${matchSlug}/`)
+
+    if (res.status !== 200) {
+      return {
+        success: false,
+        message: `Failed to get match details: ${res.status} - ${res.body.substring(0, 200)}`,
+      }
+    }
+
+    const data = parseBody(res.body)
+    return {
+      success: true,
+      message: 'Match details retrieved',
+      data,
+    }
+  })
+}
+
+/**
+ * Probe multiple sub-endpoints of a match to find full video URLs.
+ */
+export async function probeMatchVideos(
+  matchSlug: string
+): Promise<VeoResult<Record<string, unknown>>> {
+  return withSession(async (session) => {
+    const endpoints = [
+      `/api/app/matches/${matchSlug}/videos/`,
+      `/api/app/matches/${matchSlug}/periods/`,
+      `/api/app/matches/${matchSlug}/highlights/?include_ai=true&fields=id&fields=start&fields=duration&fields=tags&fields=team_association&fields=thumbnail&fields=videos&fields=is_ai_generated`,
+      `/api/app/matches/${matchSlug}/lineup/`,
+      `/api/app/matches/${matchSlug}/stats/`,
+      `/api/app/matches/${matchSlug}/bookmarks/`,
+    ]
+
+    const results: Record<string, unknown> = {}
+
+    for (const endpoint of endpoints) {
+      const res = await session.api('GET', endpoint)
+      const name = endpoint.split('/').filter(Boolean).pop() || endpoint
+      results[name] = {
+        status: res.status,
+        data: res.status === 200 ? parseBody(res.body) : null,
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Probe complete',
+      data: results,
+    }
+  })
+}
+
+/**
+ * Login to Veo via browser, navigate to a match page, and intercept all API
+ * calls to discover endpoints used for Player Spotlight / Player Moments.
+ */
+export async function probeMatchBrowser(
+  matchSlug: string
+): Promise<VeoResult<Record<string, unknown>>> {
+  const { chromium } = await import('playwright')
+
+  const email = process.env.VEO_EMAIL!
+  const password = process.env.VEO_PASSWORD!
+
+  const browser = await chromium.launch({ headless: true })
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+  const page = await context.newPage()
+
+  const capturedRequests: { method: string; url: string; status?: number; body?: string }[] = []
+
+  // Intercept all API responses
+  page.on('response', async (response) => {
+    const url = response.url()
+    if (url.includes('/api/') || url.includes('veocdn.com')) {
+      let body: string | undefined
+      try {
+        const text = await response.text()
+        body = text.substring(0, 5000)
+      } catch { /* stream responses */ }
+      capturedRequests.push({
+        method: response.request().method(),
+        url,
+        status: response.status(),
+        body,
+      })
+    }
+  })
+
+  try {
+    // Step 1: Login
+    await page.goto('https://app.veo.co', { waitUntil: 'commit', timeout: 30000 })
+    await page.waitForURL('**/auth.veo.co/**', { timeout: 20000 })
+
+    const emailInput = await page.waitForSelector(
+      'input[type="email"], input[name="email"], input[type="text"]',
+      { timeout: 15000 }
+    )
+    const passwordInput = await page.waitForSelector('input[type="password"]', { timeout: 5000 })
+
+    await emailInput!.fill(email)
+    await passwordInput!.fill(password)
+    await (await page.$('button[type="submit"]'))?.click()
+
+    // Wait for login redirect
+    await page.waitForURL('**/app.veo.co/**', { timeout: 15000 }).catch(() => {})
+    await page.waitForTimeout(3000)
+
+    // Step 2: Navigate to the match page (now authenticated)
+    // Clear previous captured requests from login
+    capturedRequests.length = 0
+
+    await page.goto(`https://app.veo.co/matches/${matchSlug}/`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    })
+    await page.waitForTimeout(10000)
+
+    // Step 3: Look for and click Player Spotlight / Player Moments UI
+    const spotlightSelectors = [
+      'text=Player Spotlight',
+      'text=Player Moments',
+      'text=Spotlight',
+      'text=Moments',
+      'button:has-text("Player")',
+      'a:has-text("Player")',
+      '[data-testid*="player"]',
+      '[data-testid*="spotlight"]',
+      '[data-testid*="moment"]',
+    ]
+
+    let clickedElement = ''
+    for (const selector of spotlightSelectors) {
+      const el = await page.$(selector)
+      if (el) {
+        const text = await el.textContent().catch(() => '')
+        clickedElement = `${selector} (${text})`
+        await el.click().catch(() => {})
+        await page.waitForTimeout(5000)
+        break
+      }
+    }
+
+    // Step 4: Also grab page text to see what UI elements exist
+    const pageButtons = await page.$$eval(
+      'button, a, [role="tab"], [role="button"]',
+      (els) => els.map((e) => e.textContent?.trim()).filter(Boolean).slice(0, 50)
+    )
+
+    await browser.close()
+
+    return {
+      success: true,
+      message: `Captured ${capturedRequests.length} API requests. Clicked: ${clickedElement || 'nothing found'}`,
+      data: {
+        uiElements: pageButtons,
+        requests: capturedRequests.map((r) => ({
+          method: r.method,
+          url: r.url,
+          status: r.status,
+          bodyPreview: r.body?.substring(0, 500),
+        })),
+      },
+    }
+  } catch (error) {
+    await browser.close()
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error',
+    }
+  }
+}
+
+/**
+ * Get videos, highlights, and stats for a single match (combined in one session)
+ */
+export async function getMatchContent(
+  matchSlug: string
+): Promise<VeoResult<MatchContent>> {
+  return withSession(async (session) => {
+    const [videosRes, highlightsRes, statsRes] = await Promise.all([
+      session.api('GET', `/api/app/matches/${matchSlug}/videos/`),
+      session.api(
+        'GET',
+        `/api/app/matches/${matchSlug}/highlights/?include_ai=true&fields=id&fields=start&fields=duration&fields=tags&fields=team_association&fields=thumbnail&fields=videos&fields=is_ai_generated`
+      ),
+      session.api('GET', `/api/app/matches/${matchSlug}/stats/`),
+    ])
+
+    const videos: VeoVideo[] =
+      videosRes.status === 200 ? parseBody(videosRes.body) || [] : []
+    const highlights: VeoHighlight[] =
+      highlightsRes.status === 200 ? parseBody(highlightsRes.body) || [] : []
+    const stats: VeoMatchStats | null =
+      statsRes.status === 200 ? parseBody(statsRes.body) : null
+
+    return {
+      success: true,
+      message: `Found ${videos.length} videos, ${highlights.length} highlights`,
+      data: { videos, highlights, stats },
+    }
+  })
+}
+
 // ============================================================================
 // Export Client Object
 // ============================================================================
@@ -607,4 +855,6 @@ export const veoClient = {
   listClubsAndTeams,
   listRecordings,
   listTeamMembers,
+  getMatchDetails,
+  getMatchContent,
 }
