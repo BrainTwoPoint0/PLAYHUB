@@ -17,7 +17,7 @@ export default async function MatchDetailPage({
       `
       *,
       sport:sports(name),
-      organization:organizations(name),
+      organization:organizations!organization_id(name),
       products:playhub_products(*)
     `
     )

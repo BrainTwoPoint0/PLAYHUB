@@ -24,7 +24,6 @@ import {
   LogOut,
   ExternalLink,
   Menu,
-  Compass,
   Film,
   Building2,
   GraduationCap,
@@ -88,7 +87,6 @@ export default function NavBar() {
 
   // Build nav links — static ones always, conditional ones only after all checks complete
   const navLinks = [
-    { href: '/matches', label: 'Browse', icon: Compass },
     { href: '/recordings', label: 'My Recordings', icon: Film },
     ...(navReady && hasVenues
       ? [{ href: '/venue', label: 'Manage Venue', icon: Building2 }]

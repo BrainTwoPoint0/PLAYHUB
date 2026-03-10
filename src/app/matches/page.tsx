@@ -21,7 +21,7 @@ export default function MatchesPage() {
           `
           *,
           sport:sports(name),
-          organization:organizations(name),
+          organization:organizations!organization_id(name),
           products:playhub_products(id, price_amount, currency, is_available)
         `
         )
