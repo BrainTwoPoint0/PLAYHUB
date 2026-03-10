@@ -40,22 +40,32 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // This will refresh session if expired - required for Server Components
-  const { error } = await supabase.auth.getUser()
+  // Only refresh session on page navigations and API routes — skip for
+  // static assets, fonts, manifest, etc. to avoid burning through
+  // Supabase Auth rate limits (~30 req/min per IP).
+  const pathname = request.nextUrl.pathname
+  const isPageOrApi =
+    pathname.startsWith('/api/') ||
+    !pathname.includes('.') // pages don't have file extensions
 
-  // If token refresh failed (invalid/expired/rate-limited), clear auth cookies
-  // to prevent an infinite refresh loop that causes 429 rate limiting
-  if (error) {
-    const allCookies = request.cookies.getAll()
-    const authCookies = allCookies.filter((c) => c.name.startsWith('sb-'))
-    if (authCookies.length > 0) {
-      supabaseResponse = NextResponse.next({ request })
-      for (const cookie of authCookies) {
-        supabaseResponse.cookies.set(cookie.name, '', {
-          maxAge: 0,
-          path: '/',
-          ...(cookieDomain && { domain: cookieDomain }),
-        })
+  if (isPageOrApi) {
+    const { error } = await supabase.auth.getUser()
+
+    // If token refresh failed with an auth error (invalid/expired),
+    // clear cookies. Do NOT clear on rate limit (429) — that would
+    // log the user out and make the problem worse.
+    if (error && error.status !== 429) {
+      const allCookies = request.cookies.getAll()
+      const authCookies = allCookies.filter((c) => c.name.startsWith('sb-'))
+      if (authCookies.length > 0) {
+        supabaseResponse = NextResponse.next({ request })
+        for (const cookie of authCookies) {
+          supabaseResponse.cookies.set(cookie.name, '', {
+            maxAge: 0,
+            path: '/',
+            ...(cookieDomain && { domain: cookieDomain }),
+          })
+        }
       }
     }
   }
