@@ -49,3 +49,14 @@ supabase/migrations/
 
 # Local Netlify folder
 .netlify
+
+# Scripts — node_modules, temp files, YOLO weights
+scripts/**/node_modules/
+scripts/**/.tmp/
+scripts/**/*.pt
+
+# Python
+__pycache__/
+
+# Editor test videos (large binary files)
+public/editor-test/*.mp4

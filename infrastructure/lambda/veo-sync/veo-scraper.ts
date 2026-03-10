@@ -20,6 +20,7 @@ interface VeoApiResult {
 export interface VeoSession {
   api: (method: string, path: string, body?: unknown) => Promise<VeoApiResult>
   close: () => Promise<void>
+  tokens: { bearer: string; csrf: string }
 }
 
 export interface VeoTeam {
@@ -202,7 +203,7 @@ export async function getVeoSession(): Promise<VeoSession> {
     await browser.close()
   }
 
-  return { api, close }
+  return { api, close, tokens: { bearer, csrf } }
 }
 
 // ============================================================================

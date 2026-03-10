@@ -103,6 +103,32 @@ export async function writeCachedClubData(
 }
 
 // ============================================================================
+// Auth tokens: store bearer+csrf for direct HTTP calls from Next.js
+// ============================================================================
+
+export async function storeAuthTokens(
+  bearer: string,
+  csrf: string
+): Promise<void> {
+  const supabase = getSupabase()
+
+  const { error } = await supabase.from('playhub_veo_auth_tokens').insert({
+    bearer_token: bearer,
+    csrf_token: csrf,
+    captured_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 55 * 60 * 1000).toISOString(),
+    created_by: 'lambda',
+  })
+
+  if (error) {
+    // Non-critical — log but don't throw
+    console.warn(`Failed to store auth tokens: ${error.message}`)
+  } else {
+    console.log('Stored Veo auth tokens for direct API access')
+  }
+}
+
+// ============================================================================
 // Status: update sync status (syncing / error)
 // ============================================================================
 

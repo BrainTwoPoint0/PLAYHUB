@@ -1,0 +1,58 @@
+{
+  "keyframes": [
+    {
+      "time": 3.203,
+      "x": 648,
+      "source": "ai_tracked",
+      "confidence": 0.425
+    },
+    {
+      "time": 4.404,
+      "x": 679,
+      "source": "ai_tracked",
+      "confidence": 0.5
+    },
+    {
+      "time": 6.206,
+      "x": 919,
+      "source": "ai_ball",
+      "confidence": 0.738
+    },
+    {
+      "time": 8.809,
+      "x": 1204,
+      "source": "ai_ball",
+      "confidence": 0.458
+    },
+    {
+      "time": 10.811,
+      "x": 1082,
+      "source": "ai_ball",
+      "confidence": 0.565
+    },
+    {
+      "time": 12.813,
+      "x": 956,
+      "source": "ai_tracked",
+      "confidence": 0.5
+    },
+    {
+      "time": 14.114,
+      "x": 956,
+      "source": "ai_tracked",
+      "confidence": 0.5
+    },
+    {
+      "time": 14.414,
+      "x": 149,
+      "source": "ai_tracked",
+      "confidence": 0.361
+    },
+    {
+      "time": 22.422,
+      "x": 676,
+      "source": "ai_ball",
+      "confidence": 0.685
+    }
+  ]
+}

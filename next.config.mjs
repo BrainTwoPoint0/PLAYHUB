@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    middlewareClientMaxBodySize: '500mb',
+  },
   images: {
     domains: ['cdn.sanity.io'],
     remotePatterns: [

@@ -1,0 +1,28 @@
+{
+  "keyframes": [
+    {
+      "time": 0,
+      "x": 656,
+      "source": "ai_cluster",
+      "confidence": 0.4
+    },
+    {
+      "time": 11.812,
+      "x": 523,
+      "source": "ai_ball",
+      "confidence": 0.841
+    },
+    {
+      "time": 13.213,
+      "x": 757,
+      "source": "ai_tracked",
+      "confidence": 0.5
+    },
+    {
+      "time": 22.623,
+      "x": 955,
+      "source": "ai_ball",
+      "confidence": 0.52
+    }
+  ]
+}

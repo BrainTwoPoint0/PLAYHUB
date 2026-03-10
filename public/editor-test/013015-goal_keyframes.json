@@ -1,0 +1,64 @@
+{
+  "keyframes": [
+    {
+      "time": 1.201,
+      "x": 564,
+      "source": "ai_ball",
+      "confidence": 0.822
+    },
+    {
+      "time": 4.004,
+      "x": 498,
+      "source": "ai_ball",
+      "confidence": 0.802
+    },
+    {
+      "time": 5.205,
+      "x": 704,
+      "source": "ai_tracked",
+      "confidence": 0.5
+    },
+    {
+      "time": 8.408,
+      "x": 478,
+      "source": "ai_ball",
+      "confidence": 0.782
+    },
+    {
+      "time": 11.211,
+      "x": 802,
+      "source": "ai_ball",
+      "confidence": 0.788
+    },
+    {
+      "time": 13.614,
+      "x": 648,
+      "source": "ai_cluster",
+      "confidence": 0.4
+    },
+    {
+      "time": 16.416,
+      "x": 468,
+      "source": "ai_tracked",
+      "confidence": 0.5
+    },
+    {
+      "time": 18.418,
+      "x": 888,
+      "source": "ai_cluster",
+      "confidence": 0.4
+    },
+    {
+      "time": 24.024,
+      "x": 657,
+      "source": "ai_ball",
+      "confidence": 0.822
+    },
+    {
+      "time": 24.424,
+      "x": 482,
+      "source": "ai_tracked",
+      "confidence": 0.425
+    }
+  ]
+}

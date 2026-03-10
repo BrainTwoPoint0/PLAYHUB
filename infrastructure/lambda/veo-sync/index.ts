@@ -10,7 +10,7 @@ import {
   setMatchPrivacy,
   removeMembersFromClub,
 } from './veo-scraper'
-import { writeCachedClubData, setSyncStatus } from './cache-writer'
+import { writeCachedClubData, setSyncStatus, storeAuthTokens } from './cache-writer'
 import { CLUB_VEO_SLUGS, PUBLIC_RECORDING_TEAMS } from './config'
 
 const PLAYHUB_URL = process.env.PLAYHUB_URL!
@@ -79,6 +79,12 @@ async function runCacheSync(onlyClub?: string): Promise<ClubResult[]> {
 
       // Open browser session and scrape
       session = await getVeoSession()
+
+      // Store auth tokens in Supabase for direct API access from Next.js
+      await storeAuthTokens(session.tokens.bearer, session.tokens.csrf).catch(
+        (e) => console.warn('Token store failed (non-critical):', e)
+      )
+
       const data = await listClubTeamsWithMembers(session, veoClubSlug)
 
       // Write to Supabase

@@ -1,0 +1,86 @@
+{
+  "keyframes": [
+    {
+      "time": 0.2,
+      "x": 823,
+      "source": "ai_ball",
+      "confidence": 0.828
+    },
+    {
+      "time": 2.302,
+      "x": 779,
+      "source": "ai_ball",
+      "confidence": 0.782
+    },
+    {
+      "time": 4.304,
+      "x": 774,
+      "source": "ai_tracked",
+      "confidence": 0.5
+    },
+    {
+      "time": 4.605,
+      "x": 534,
+      "source": "ai_tracked",
+      "confidence": 0.425
+    },
+    {
+      "time": 6.006,
+      "x": 451,
+      "source": "ai_ball",
+      "confidence": 0.847
+    },
+    {
+      "time": 6.306,
+      "x": 328,
+      "source": "ai_ball",
+      "confidence": 0.847
+    },
+    {
+      "time": 10.01,
+      "x": 150,
+      "source": "ai_ball",
+      "confidence": 0.839
+    },
+    {
+      "time": 11.411,
+      "x": 318,
+      "source": "ai_tracked",
+      "confidence": 0.5
+    },
+    {
+      "time": 16.517,
+      "x": 564,
+      "source": "ai_cluster",
+      "confidence": 0.4
+    },
+    {
+      "time": 18.919,
+      "x": 411,
+      "source": "ai_cluster",
+      "confidence": 0.4
+    },
+    {
+      "time": 22.923,
+      "x": 600,
+      "source": "ai_tracked",
+      "confidence": 0.5
+    },
+    {
+      "time": 23.524,
+      "x": 600,
+      "source": "ai_tracked",
+      "confidence": 0.5
+    },
+    {
+      "time": 23.824,
+      "x": 978,
+      "source": "ai_ball",
+      "confidence": 0.779
+    }
+  ],
+  "source_width": 1920,
+  "crop_width": 608,
+  "video_filename": "001159-goal.mp4",
+  "exported_at": "2026-03-08T23:49:30.956Z"
+}

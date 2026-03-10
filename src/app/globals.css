@@ -18,6 +18,12 @@
   --timberwolf: #d6d5c9;
   --radius: 0.5rem;
 
+  /* Editor-specific tokens */
+  --editor-bg: #060b08;
+  --editor-bar: #0a100d;
+  --editor-timeline: #0d1410;
+  --editor-border: rgba(185, 186, 163, 0.08);
+
   /* shadcn design tokens mapped to PLAYBACK brand */
   --background: 143 25% 5%;
   --foreground: 55 11% 81%;
