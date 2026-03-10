@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { JetBrains_Mono } from 'next/font/google'
 
 const jetbrainsMono = JetBrains_Mono({
@@ -15,7 +16,7 @@ export default function EditorLayout({
       className={`fixed inset-0 z-50 flex flex-col overflow-hidden ${jetbrainsMono.variable}`}
       style={{ background: '#070c09' }}
     >
-      {children}
+      <Suspense>{children}</Suspense>
     </div>
   )
 }

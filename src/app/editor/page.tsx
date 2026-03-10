@@ -80,7 +80,8 @@ export default function EditorPage() {
   const jsonInputRef = useRef<HTMLInputElement>(null)
   const outroInputRef = useRef<HTMLInputElement>(null)
 
-  const effectiveCropX = dragCropX ?? interpolateCropX(keyframes, currentTime, sceneChanges)
+  const effectiveCropX =
+    dragCropX ?? interpolateCropX(keyframes, currentTime, sceneChanges)
   const cropPercent = effectiveCropX / (SOURCE_WIDTH - CROP_WIDTH)
 
   /* ───────── auto-detect mobile ───────── */
@@ -100,7 +101,8 @@ export default function EditorPage() {
   /* ───────── cleanup object URL on unmount ───────── */
   useEffect(() => {
     return () => {
-      if (videoUrlRef.current && !isUrlSource) URL.revokeObjectURL(videoUrlRef.current)
+      if (videoUrlRef.current && !isUrlSource)
+        URL.revokeObjectURL(videoUrlRef.current)
     }
   }, [isUrlSource])
 
@@ -116,8 +118,6 @@ export default function EditorPage() {
       setIsUrlSource(true)
     }
   }, [searchParams])
-
-
 
   /* ───────── beforeunload warning ───────── */
   useEffect(() => {
@@ -157,7 +157,10 @@ export default function EditorPage() {
   const undo = useCallback(() => {
     if (history.length === 0) return
     const prev = history[history.length - 1]
-    if (!prev) { setHistory((h) => h.slice(0, -1)); return }
+    if (!prev) {
+      setHistory((h) => h.slice(0, -1))
+      return
+    }
     setHistory((h) => h.slice(0, -1))
     setFuture((f) => [...f, keyframes])
     setKeyframes(prev)
@@ -264,9 +267,13 @@ export default function EditorPage() {
 
     offscreen.addEventListener('timeupdate', onTimeUpdate)
     // Must actually play to get a decoded frame with some codecs
-    offscreen.addEventListener('canplay', () => {
-      if (!cancelled) offscreen.play().catch(() => {})
-    }, { once: true })
+    offscreen.addEventListener(
+      'canplay',
+      () => {
+        if (!cancelled) offscreen.play().catch(() => {})
+      },
+      { once: true }
+    )
 
     return () => {
       cancelled = true
@@ -431,45 +438,50 @@ export default function EditorPage() {
     reader.readAsText(file)
   }, [])
 
-  const handleOutroFile = useCallback((file: File) => {
-    if (!file.type.startsWith('video/')) {
-      setErrorMessage('Outro must be a video file')
-      return
-    }
-    setOutroFile(file)
-    // Capture thumbnail from outro
-    const url = URL.createObjectURL(file)
-    const v = document.createElement('video')
-    v.muted = true
-    v.playsInline = true
-    v.preload = 'auto'
-    v.src = url
-    v.style.position = 'fixed'
-    v.style.top = '-9999px'
-    document.body.appendChild(v)
-    const onTimeUpdate = () => {
-      v.pause()
-      v.removeEventListener('timeupdate', onTimeUpdate)
-      const canvas = document.createElement('canvas')
-      canvas.width = v.videoWidth || 1920
-      canvas.height = v.videoHeight || 1080
-      const ctx = canvas.getContext('2d')
-      if (ctx) {
-        ctx.drawImage(v, 0, 0)
-        canvas.toBlob((blob) => {
-          if (blob) {
-            if (outroThumb) URL.revokeObjectURL(outroThumb)
-            setOutroThumb(URL.createObjectURL(blob))
-          }
-        })
+  const handleOutroFile = useCallback(
+    (file: File) => {
+      if (!file.type.startsWith('video/')) {
+        setErrorMessage('Outro must be a video file')
+        return
       }
-      URL.revokeObjectURL(url)
-      v.src = ''
-      v.remove()
-    }
-    v.addEventListener('timeupdate', onTimeUpdate)
-    v.addEventListener('canplay', () => v.play().catch(() => {}), { once: true })
-  }, [outroThumb])
+      setOutroFile(file)
+      // Capture thumbnail from outro
+      const url = URL.createObjectURL(file)
+      const v = document.createElement('video')
+      v.muted = true
+      v.playsInline = true
+      v.preload = 'auto'
+      v.src = url
+      v.style.position = 'fixed'
+      v.style.top = '-9999px'
+      document.body.appendChild(v)
+      const onTimeUpdate = () => {
+        v.pause()
+        v.removeEventListener('timeupdate', onTimeUpdate)
+        const canvas = document.createElement('canvas')
+        canvas.width = v.videoWidth || 1920
+        canvas.height = v.videoHeight || 1080
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(v, 0, 0)
+          canvas.toBlob((blob) => {
+            if (blob) {
+              if (outroThumb) URL.revokeObjectURL(outroThumb)
+              setOutroThumb(URL.createObjectURL(blob))
+            }
+          })
+        }
+        URL.revokeObjectURL(url)
+        v.src = ''
+        v.remove()
+      }
+      v.addEventListener('timeupdate', onTimeUpdate)
+      v.addEventListener('canplay', () => v.play().catch(() => {}), {
+        once: true,
+      })
+    },
+    [outroThumb]
+  )
 
   const handleExport = useCallback(() => {
     // Only export keyframes within trim range
@@ -484,9 +496,7 @@ export default function EditorPage() {
       source_width: SOURCE_WIDTH,
       crop_width: CROP_WIDTH,
       video_filename: videoFilename,
-      ...(start > 0 || trimEnd > 0
-        ? { trim_start: start, trim_end: end }
-        : {}),
+      ...(start > 0 || trimEnd > 0 ? { trim_start: start, trim_end: end } : {}),
       ...(outroFile ? { outro_filename: outroFile.name } : {}),
       exported_at: new Date().toISOString(),
     }
@@ -528,21 +538,27 @@ export default function EditorPage() {
         video.currentTime = trimStart
         setCurrentTime(trimStart)
       }
-      video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false))
+      video
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch(() => setIsPlaying(false))
     } else {
       video.pause()
       setIsPlaying(false)
     }
   }, [trimStart, trimEnd, duration])
 
-  const seek = useCallback((time: number) => {
-    const video = videoRef.current
-    if (!video) return
-    const end = trimEnd || duration
-    const clamped = Math.max(trimStart, Math.min(end, time))
-    video.currentTime = clamped
-    setCurrentTime(clamped)
-  }, [trimStart, trimEnd, duration])
+  const seek = useCallback(
+    (time: number) => {
+      const video = videoRef.current
+      if (!video) return
+      const end = trimEnd || duration
+      const clamped = Math.max(trimStart, Math.min(end, time))
+      video.currentTime = clamped
+      setCurrentTime(clamped)
+    },
+    [trimStart, trimEnd, duration]
+  )
 
   const stepForward = useCallback(() => {
     const end = trimEnd || duration
@@ -567,8 +583,7 @@ export default function EditorPage() {
         const time = Math.round(currentTime * 1000) / 1000
         updateKeyframes((prev) => {
           const existingIdx = prev.findIndex(
-            (kf) =>
-              kf.source === 'user' && Math.abs(kf.time - time) < 0.05
+            (kf) => kf.source === 'user' && Math.abs(kf.time - time) < 0.05
           )
           if (existingIdx >= 0) {
             const updated = [...prev]
@@ -942,15 +957,29 @@ export default function EditorPage() {
 
           {/* Outro */}
           {outroFile ? (
-            <div className="flex items-center gap-1.5 rounded px-1.5 py-1 min-h-[36px]"
+            <div
+              className="flex items-center gap-1.5 rounded px-1.5 py-1 min-h-[36px]"
               style={{ border: '1px solid rgba(185,186,163,0.1)' }}
             >
               {outroThumb && (
-                <img src={outroThumb} alt="" className="h-6 w-auto rounded" style={{ aspectRatio: '16/9', objectFit: 'cover' }} />
+                <img
+                  src={outroThumb}
+                  alt=""
+                  className="h-6 w-auto rounded"
+                  style={{ aspectRatio: '16/9', objectFit: 'cover' }}
+                />
               )}
-              <span className="text-[10px] opacity-50 max-w-[60px] truncate hidden sm:inline">{outroFile.name}</span>
+              <span className="text-[10px] opacity-50 max-w-[60px] truncate hidden sm:inline">
+                {outroFile.name}
+              </span>
               <button
-                onClick={() => { setOutroFile(null); if (outroThumb) { URL.revokeObjectURL(outroThumb); setOutroThumb(null) } }}
+                onClick={() => {
+                  setOutroFile(null)
+                  if (outroThumb) {
+                    URL.revokeObjectURL(outroThumb)
+                    setOutroThumb(null)
+                  }
+                }}
                 className="rounded p-0.5 hover:bg-white/10 transition-colors"
                 title="Remove outro"
               >
@@ -1455,7 +1484,11 @@ export default function EditorPage() {
             )}
 
             {/* Crop position graph (mini waveform) */}
-            <CropGraph keyframes={keyframes} duration={duration} splits={sceneChanges} />
+            <CropGraph
+              keyframes={keyframes}
+              duration={duration}
+              splits={sceneChanges}
+            />
 
             {/* Scene change markers */}
             {sceneChanges.map((sc, i) => (
@@ -1475,36 +1508,36 @@ export default function EditorPage() {
               const maxX = SOURCE_WIDTH - CROP_WIDTH
               const yPct = 100 - (kf.x / maxX) * 100
               return (
-              <button
-                key={`kf-${i}`}
-                className="absolute z-10 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
-                style={{
-                  left: `${(kf.time / duration) * 100}%`,
-                  top: `${yPct}%`,
-                  width: '28px',
-                  height: '28px',
-                }}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setSelectedIndex(i)
-                  seek(kf.time)
-                }}
-                title={`${kf.source} @ ${formatTime(kf.time)}`}
-              >
-                <div
+                <button
+                  key={`kf-${i}`}
+                  className="absolute z-10 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
                   style={{
-                    width: selectedIndex === i ? '10px' : '6px',
-                    height: selectedIndex === i ? '10px' : '6px',
-                    borderRadius: '50%',
-                    background: KEYFRAME_COLORS[kf.source],
-                    boxShadow:
-                      selectedIndex === i
-                        ? `0 0 8px ${KEYFRAME_COLORS[kf.source]}`
-                        : 'none',
-                    transition: 'all 0.15s ease',
+                    left: `${(kf.time / duration) * 100}%`,
+                    top: `${yPct}%`,
+                    width: '28px',
+                    height: '28px',
                   }}
-                />
-              </button>
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setSelectedIndex(i)
+                    seek(kf.time)
+                  }}
+                  title={`${kf.source} @ ${formatTime(kf.time)}`}
+                >
+                  <div
+                    style={{
+                      width: selectedIndex === i ? '10px' : '6px',
+                      height: selectedIndex === i ? '10px' : '6px',
+                      borderRadius: '50%',
+                      background: KEYFRAME_COLORS[kf.source],
+                      boxShadow:
+                        selectedIndex === i
+                          ? `0 0 8px ${KEYFRAME_COLORS[kf.source]}`
+                          : 'none',
+                      transition: 'all 0.15s ease',
+                    }}
+                  />
+                </button>
               )
             })}
 
@@ -1662,7 +1695,9 @@ function CropDragHandle({
         const deltaPx = me.clientX - startClientX
         const deltaCrop = (deltaPx / videoRect.width) * SOURCE_WIDTH
         const maxCropX = SOURCE_WIDTH - CROP_WIDTH
-        onDrag(Math.round(Math.max(0, Math.min(maxCropX, startCropX + deltaCrop))))
+        onDrag(
+          Math.round(Math.max(0, Math.min(maxCropX, startCropX + deltaCrop)))
+        )
       }
       const onUp = () => {
         onDragEnd()
@@ -1690,7 +1725,9 @@ function CropDragHandle({
         const deltaPx = te.touches[0].clientX - startClientX
         const deltaCrop = (deltaPx / videoRect.width) * SOURCE_WIDTH
         const maxCropX = SOURCE_WIDTH - CROP_WIDTH
-        onDrag(Math.round(Math.max(0, Math.min(maxCropX, startCropX + deltaCrop))))
+        onDrag(
+          Math.round(Math.max(0, Math.min(maxCropX, startCropX + deltaCrop)))
+        )
       }
       const onEnd = () => {
         onDragEnd()

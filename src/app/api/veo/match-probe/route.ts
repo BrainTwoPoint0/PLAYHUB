@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
-import { getMatchDetails, probeMatchVideos, probeMatchBrowser } from '@/lib/veo/client'
+import {
+  getMatchDetails,
+  probeMatchVideos,
+  probeMatchBrowser,
+} from '@/lib/veo/client'
 
 const SYNC_API_KEY = process.env.SYNC_API_KEY
 
@@ -30,11 +34,12 @@ export async function GET(request: Request) {
 
     const mode = searchParams.get('mode') || 'details'
 
-    const result = mode === 'videos'
-      ? await probeMatchVideos(slug)
-      : mode === 'browser'
-        ? await probeMatchBrowser(slug)
-        : await getMatchDetails(slug)
+    const result =
+      mode === 'videos'
+        ? await probeMatchVideos(slug)
+        : mode === 'browser'
+          ? await probeMatchBrowser(slug)
+          : await getMatchDetails(slug)
 
     return NextResponse.json(result, {
       status: result.success ? 200 : 500,

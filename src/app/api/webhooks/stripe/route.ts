@@ -42,8 +42,15 @@ export async function POST(req: Request) {
     // camera_booking is now handled via payment_intent.succeeded (inline payment)
 
     // Ignore sessions without PLAYHUB metadata (e.g. Stripe Payment Links, subscriptions)
-    if (!metadata.type && !metadata.product_id && !metadata.match_recording_id) {
-      console.log('Ignoring checkout session without PLAYHUB metadata:', session.id)
+    if (
+      !metadata.type &&
+      !metadata.product_id &&
+      !metadata.match_recording_id
+    ) {
+      console.log(
+        'Ignoring checkout session without PLAYHUB metadata:',
+        session.id
+      )
       return NextResponse.json({ received: true })
     }
 

@@ -93,7 +93,10 @@ function positionsToCropKeyframes(output: DetectOutput): CropKeyframe[] {
 }
 
 // --- Detection ---
-function runDetection(videoPath: string, detectParams?: Record<string, number>): DetectOutput {
+function runDetection(
+  videoPath: string,
+  detectParams?: Record<string, number>
+): DetectOutput {
   if (useModal) {
     const modalUrl = process.env.NEXT_PUBLIC_MODAL_CROP_URL
     if (!modalUrl) throw new Error('NEXT_PUBLIC_MODAL_CROP_URL not set')
@@ -106,7 +109,9 @@ function runDetection(videoPath: string, detectParams?: Record<string, number>):
   }
 
   // Run locally (supports --params for detection parameter overrides)
-  const paramsArg = detectParams ? ` --params '${JSON.stringify(detectParams)}'` : ''
+  const paramsArg = detectParams
+    ? ` --params '${JSON.stringify(detectParams)}'`
+    : ''
   const result = execSync(
     `python3 "${DETECT_SCRIPT}" "${videoPath}" --fps 5${paramsArg}`,
     { maxBuffer: 50 * 1024 * 1024, timeout: 300_000 }
@@ -160,7 +165,15 @@ function scoreClip(
   const denom = correct + missing + extra
   const score = denom > 0 ? correct / denom : 0
 
-  return { generatedCount: generated.length, truthCount: truth.length, correct, missing, extra, avgError, score }
+  return {
+    generatedCount: generated.length,
+    truthCount: truth.length,
+    correct,
+    missing,
+    extra,
+    avgError,
+    score,
+  }
 }
 
 // --- Main ---
@@ -240,7 +253,8 @@ async function main() {
 
     // Load ground truth
     const truthData = JSON.parse(fs.readFileSync(clip.truth, 'utf-8'))
-    const truthKfs: CropKeyframe[] = truthData.keyframes || truthData.positions || []
+    const truthKfs: CropKeyframe[] =
+      truthData.keyframes || truthData.positions || []
 
     // Score
     const result = scoreClip(simplified, truthKfs)

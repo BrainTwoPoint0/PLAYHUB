@@ -40,7 +40,9 @@ function runEval(params: Record<string, number>): SweepResult {
   const lines = output.trim().split('\n')
   const score = parseFloat(lines[lines.length - 1])
 
-  const correctMatch = output.match(/Correct: (\d+) \| Missing: (\d+) \| Extra: (\d+)/)
+  const correctMatch = output.match(
+    /Correct: (\d+) \| Missing: (\d+) \| Extra: (\d+)/
+  )
   const errorMatch = output.match(/Avg Error: (\d+)px/)
 
   return {
@@ -72,7 +74,9 @@ async function main() {
   let bestScore = baseline.score
 
   // Phase 1: RDP_TOLERANCE
-  console.log('Phase 1: RDP_TOLERANCE (reduces extras via aggressive simplification)')
+  console.log(
+    'Phase 1: RDP_TOLERANCE (reduces extras via aggressive simplification)'
+  )
   const rdpValues = [40, 55, 70, 90, 110, 130, 150]
   let bestRdp = 55
   for (const rdp of rdpValues) {
@@ -85,11 +89,15 @@ async function main() {
     }
   }
   if (bestRdp !== 55) bestParams.RDP_TOLERANCE = bestRdp
-  console.log(`  → Best RDP_TOLERANCE: ${bestRdp} (score: ${bestScore.toFixed(4)})`)
+  console.log(
+    `  → Best RDP_TOLERANCE: ${bestRdp} (score: ${bestScore.toFixed(4)})`
+  )
   console.log()
 
   // Phase 2: HIGH_VELOCITY_MIN_VEL (reduces extras from velocity re-insertion)
-  console.log('Phase 2: HIGH_VELOCITY_MIN_VEL (raise to reduce re-inserted keyframes)')
+  console.log(
+    'Phase 2: HIGH_VELOCITY_MIN_VEL (raise to reduce re-inserted keyframes)'
+  )
   const hvValues = [100, 150, 200, 250, 300, 400]
   let bestHv = 150
   for (const hv of hvValues) {
@@ -102,7 +110,9 @@ async function main() {
     }
   }
   if (bestHv !== 150) bestParams.HIGH_VELOCITY_MIN_VEL = bestHv
-  console.log(`  → Best HIGH_VELOCITY_MIN_VEL: ${bestHv} (score: ${bestScore.toFixed(4)})`)
+  console.log(
+    `  → Best HIGH_VELOCITY_MIN_VEL: ${bestHv} (score: ${bestScore.toFixed(4)})`
+  )
   console.log()
 
   // Phase 3: FILL_GAP_MAX (reduce gap filling)
@@ -119,11 +129,15 @@ async function main() {
     }
   }
   if (bestFg !== 4.0) bestParams.FILL_GAP_MAX = bestFg
-  console.log(`  → Best FILL_GAP_MAX: ${bestFg} (score: ${bestScore.toFixed(4)})`)
+  console.log(
+    `  → Best FILL_GAP_MAX: ${bestFg} (score: ${bestScore.toFixed(4)})`
+  )
   console.log()
 
   // Phase 4: HIGH_VELOCITY_MIN_GAP
-  console.log('Phase 4: HIGH_VELOCITY_MIN_GAP (raise to reduce velocity preservation)')
+  console.log(
+    'Phase 4: HIGH_VELOCITY_MIN_GAP (raise to reduce velocity preservation)'
+  )
   const hgValues = [1.5, 2.0, 3.0, 4.0, 5.0]
   let bestHg = 2.0
   for (const hg of hgValues) {
@@ -136,7 +150,9 @@ async function main() {
     }
   }
   if (bestHg !== 2.0) bestParams.HIGH_VELOCITY_MIN_GAP = bestHg
-  console.log(`  → Best HIGH_VELOCITY_MIN_GAP: ${bestHg} (score: ${bestScore.toFixed(4)})`)
+  console.log(
+    `  → Best HIGH_VELOCITY_MIN_GAP: ${bestHg} (score: ${bestScore.toFixed(4)})`
+  )
   console.log()
 
   // Phase 5: HOLD_PAN_VELOCITY
@@ -153,7 +169,9 @@ async function main() {
     }
   }
   if (bestHpv !== 300) bestParams.HOLD_PAN_VELOCITY = bestHpv
-  console.log(`  → Best HOLD_PAN_VELOCITY: ${bestHpv} (score: ${bestScore.toFixed(4)})`)
+  console.log(
+    `  → Best HOLD_PAN_VELOCITY: ${bestHpv} (score: ${bestScore.toFixed(4)})`
+  )
   console.log()
 
   // Phase 6: ZIGZAG_THRESHOLD
@@ -170,7 +188,9 @@ async function main() {
     }
   }
   if (bestZz !== 100) bestParams.ZIGZAG_THRESHOLD = bestZz
-  console.log(`  → Best ZIGZAG_THRESHOLD: ${bestZz} (score: ${bestScore.toFixed(4)})`)
+  console.log(
+    `  → Best ZIGZAG_THRESHOLD: ${bestZz} (score: ${bestScore.toFixed(4)})`
+  )
   console.log()
 
   // Phase 7: DEAD_ZONE_PX
@@ -187,7 +207,9 @@ async function main() {
     }
   }
   if (bestDz !== 30) bestParams.DEAD_ZONE_PX = bestDz
-  console.log(`  → Best DEAD_ZONE_PX: ${bestDz} (score: ${bestScore.toFixed(4)})`)
+  console.log(
+    `  → Best DEAD_ZONE_PX: ${bestDz} (score: ${bestScore.toFixed(4)})`
+  )
   console.log()
 
   // Phase 8: NEAR_DUPLICATE_PX and NEAR_DUPLICATE_TIME
@@ -204,7 +226,9 @@ async function main() {
     }
   }
   if (bestNdp !== 80) bestParams.NEAR_DUPLICATE_PX = bestNdp
-  console.log(`  → Best NEAR_DUPLICATE_PX: ${bestNdp} (score: ${bestScore.toFixed(4)})`)
+  console.log(
+    `  → Best NEAR_DUPLICATE_PX: ${bestNdp} (score: ${bestScore.toFixed(4)})`
+  )
   console.log()
 
   console.log('Phase 9: NEAR_DUPLICATE_TIME')
@@ -220,14 +244,18 @@ async function main() {
     }
   }
   if (bestNdt !== 0.5) bestParams.NEAR_DUPLICATE_TIME = bestNdt
-  console.log(`  → Best NEAR_DUPLICATE_TIME: ${bestNdt} (score: ${bestScore.toFixed(4)})`)
+  console.log(
+    `  → Best NEAR_DUPLICATE_TIME: ${bestNdt} (score: ${bestScore.toFixed(4)})`
+  )
   console.log()
 
   // Final verification
   console.log('=== FINAL BEST ===')
   const final = runEval(bestParams)
   printResult('optimized', final)
-  console.log(`\nBaseline: ${baseline.score.toFixed(4)} → Optimized: ${final.score.toFixed(4)} (${((final.score - baseline.score) / baseline.score * 100).toFixed(1)}% improvement)`)
+  console.log(
+    `\nBaseline: ${baseline.score.toFixed(4)} → Optimized: ${final.score.toFixed(4)} (${(((final.score - baseline.score) / baseline.score) * 100).toFixed(1)}% improvement)`
+  )
   console.log(`\nBest parameters:`)
   console.log(JSON.stringify(bestParams, null, 2))
   console.log(`\nTo apply: update DEFAULTS in src/lib/editor/simplify.ts`)

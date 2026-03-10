@@ -724,7 +724,7 @@ function fillLongGaps(
       const curr = result[i]
       const gap = curr.time - prev.time
 
-      if (gap > MAX_GAP) {
+      if (gap >= MAX_GAP) {
         // Find the best candidate from original data in this gap
         // Skip extreme-edge points (they'll be removed by edge/drift filters)
         const MAX_CROP = SOURCE_WIDTH - CROP_WIDTH
@@ -805,7 +805,12 @@ export function simplifyCropKeyframes(
 
   // Step 5: Re-insert keyframes in high-velocity gaps that RDP flattened,
   // but only if the interpolated path misses the original by >100px
-  const restored = preserveHighVelocity(deadZoned, simplified, P.HIGH_VELOCITY_MIN_GAP, P.HIGH_VELOCITY_MIN_VEL)
+  const restored = preserveHighVelocity(
+    deadZoned,
+    simplified,
+    P.HIGH_VELOCITY_MIN_GAP,
+    P.HIGH_VELOCITY_MIN_VEL
+  )
 
   // Step 5b: Fill long gaps — re-insert from pre-RDP data when consecutive
   // keyframes are >4s apart (prevents over-simplification of smooth trajectories)

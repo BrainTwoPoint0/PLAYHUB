@@ -38,15 +38,23 @@ function ballXToCropX(ballX: number): number {
 }
 
 interface RawPosition {
-  time: number; x: number; y: number; conf: number; source: string
+  time: number
+  x: number
+  y: number
+  conf: number
+  source: string
 }
 
 interface DetectOutput {
-  positions: RawPosition[]; scene_changes: number[]
+  positions: RawPosition[]
+  scene_changes: number[]
 }
 
 interface CropKeyframe {
-  time: number; x: number; source: 'ai_ball' | 'ai_tracked' | 'ai_cluster' | 'user'; confidence: number
+  time: number
+  x: number
+  source: 'ai_ball' | 'ai_tracked' | 'ai_cluster' | 'user'
+  confidence: number
 }
 
 interface SweepResult {
@@ -65,9 +73,11 @@ function positionsToCropKeyframes(output: DetectOutput): CropKeyframe[] {
       time: p.time,
       x: ballXToCropX(p.x),
       source:
-        p.source === 'ball' ? ('ai_ball' as const) :
-        p.source === 'tracked' ? ('ai_tracked' as const) :
-        ('ai_cluster' as const),
+        p.source === 'ball'
+          ? ('ai_ball' as const)
+          : p.source === 'tracked'
+            ? ('ai_tracked' as const)
+            : ('ai_cluster' as const),
       confidence: p.source === 'cluster' ? 0.4 : p.conf,
     }))
 }
@@ -101,7 +111,8 @@ function scoreClip(generated: CropKeyframe[], truth: CropKeyframe[]) {
   const missing = truth.length - matched.length
   const extra = generated.length - matched.length
   const totalErrors = matched.reduce((sum, m) => sum + m.error, 0)
-  const avgError = matched.length > 0 ? Math.round(totalErrors / matched.length) : 0
+  const avgError =
+    matched.length > 0 ? Math.round(totalErrors / matched.length) : 0
   const denom = correct + missing + extra
   const score = denom > 0 ? correct / denom : 0
 
@@ -116,11 +127,14 @@ function getClipList(): string[] {
     const val = args[clipsIdx + 1]
     if (val === 'worst') return WORST_CLIPS
     if (val === 'all') {
-      const truthFiles = fs.readdirSync(GROUND_TRUTH_DIR)
+      const truthFiles = fs
+        .readdirSync(GROUND_TRUTH_DIR)
         .filter((f: string) => f.endsWith('_keyframes.json'))
       return truthFiles
         .map((f: string) => f.replace('_keyframes.json', ''))
-        .filter((name: string) => fs.existsSync(path.join(TEST_DIR, `${name}.mp4`)))
+        .filter((name: string) =>
+          fs.existsSync(path.join(TEST_DIR, `${name}.mp4`))
+        )
     }
     return val.split(',')
   }
@@ -131,16 +145,20 @@ function getClipList(): string[] {
 // Cache detection results per param hash to avoid re-running
 const detectionCache = new Map<string, DetectOutput>()
 
-function runDetection(clipName: string, detectParams: Record<string, number>): DetectOutput | null {
+function runDetection(
+  clipName: string,
+  detectParams: Record<string, number>
+): DetectOutput | null {
   const cacheKey = `${clipName}:${JSON.stringify(detectParams)}`
   if (detectionCache.has(cacheKey)) return detectionCache.get(cacheKey)!
 
   const videoPath = path.join(TEST_DIR, `${clipName}.mp4`)
   if (!fs.existsSync(videoPath)) return null
 
-  const paramsArg = Object.keys(detectParams).length > 0
-    ? ` --params '${JSON.stringify(detectParams)}'`
-    : ''
+  const paramsArg =
+    Object.keys(detectParams).length > 0
+      ? ` --params '${JSON.stringify(detectParams)}'`
+      : ''
 
   try {
     const result = execSync(
@@ -151,20 +169,28 @@ function runDetection(clipName: string, detectParams: Record<string, number>): D
     detectionCache.set(cacheKey, output)
     return output
   } catch (err) {
-    console.error(`  Detection failed for ${clipName}: ${(err as Error).message?.slice(0, 80)}`)
+    console.error(
+      `  Detection failed for ${clipName}: ${(err as Error).message?.slice(0, 80)}`
+    )
     return null
   }
 }
 
-async function runEval(detectParams: Record<string, number>, clips: string[]): Promise<SweepResult> {
+async function runEval(
+  detectParams: Record<string, number>,
+  clips: string[]
+): Promise<SweepResult> {
   // Dynamic import of simplify
   const simplifyModule = await import(
     path.resolve(__dirname, '../../src/lib/editor/simplify.ts')
   )
   const simplifyCropKeyframes = simplifyModule.simplifyCropKeyframes
 
-  let totalCorrect = 0, totalMissing = 0, totalExtra = 0
-  let totalErrorSum = 0, totalMatched = 0
+  let totalCorrect = 0,
+    totalMissing = 0,
+    totalExtra = 0
+  let totalErrorSum = 0,
+    totalMatched = 0
 
   for (const clipName of clips) {
     const truthPath = path.join(GROUND_TRUTH_DIR, `${clipName}_keyframes.json`)
@@ -174,9 +200,13 @@ async function runEval(detectParams: Record<string, number>, clips: string[]): P
     if (!rawOutput) continue
 
     const cropKeyframes = positionsToCropKeyframes(rawOutput)
-    const simplified = simplifyCropKeyframes(cropKeyframes, rawOutput.scene_changes)
+    const simplified = simplifyCropKeyframes(
+      cropKeyframes,
+      rawOutput.scene_changes
+    )
     const truthData = JSON.parse(fs.readFileSync(truthPath, 'utf-8'))
-    const truthKfs: CropKeyframe[] = truthData.keyframes || truthData.positions || []
+    const truthKfs: CropKeyframe[] =
+      truthData.keyframes || truthData.positions || []
 
     const result = scoreClip(simplified, truthKfs)
     totalCorrect += result.correct
@@ -236,29 +266,51 @@ async function main() {
       }
     }
     if (bestVal !== defaultVal) bestParams[paramName] = bestVal
-    console.log(`  → Best ${paramName}: ${bestVal} (score: ${bestScore.toFixed(4)})\n`)
+    console.log(
+      `  → Best ${paramName}: ${bestVal} (score: ${bestScore.toFixed(4)})\n`
+    )
   }
 
   // Sweep detection parameters — highest impact first, 3 values each to keep runtime ~30min
   // (each detection run = ~3.3min on CPU × 3 clips = ~10min per value)
-  await sweepPhase('MIN_BALL_CONFIDENCE', 'MIN_BALL_CONFIDENCE', [0.20, 0.30, 0.35], 0.35)
+  await sweepPhase(
+    'MIN_BALL_CONFIDENCE',
+    'MIN_BALL_CONFIDENCE',
+    [0.2, 0.3, 0.35],
+    0.35
+  )
   await sweepPhase('IQR_MULTIPLIER', 'IQR_MULTIPLIER', [1.5, 2.0, 3.0], 2.0)
   await sweepPhase('KALMAN_R', 'KALMAN_R', [1.0, 4.0, 8.0], 4.0)
-  await sweepPhase('BIDIR_MAX_GAP_TIME', 'BIDIR_MAX_GAP_TIME', [2.0, 3.0, 5.0], 3.0)
+  await sweepPhase(
+    'BIDIR_MAX_GAP_TIME',
+    'BIDIR_MAX_GAP_TIME',
+    [2.0, 3.0, 5.0],
+    3.0
+  )
   await sweepPhase('EARLY_CONF_GATE', 'EARLY_CONF_GATE', [0.3, 0.5, 0.7], 0.5)
-  await sweepPhase('TRACKER_HIT_COUNTER_MAX', 'TRACKER_HIT_COUNTER_MAX', [25, 50, 100], 50)
+  await sweepPhase(
+    'TRACKER_HIT_COUNTER_MAX',
+    'TRACKER_HIT_COUNTER_MAX',
+    [25, 50, 100],
+    50
+  )
 
   // Final verification
   console.log('=== FINAL BEST ===')
   const final = await runEval(bestParams, clips)
   printResult('optimized', final)
-  const improvement = baseline.score > 0
-    ? ((final.score - baseline.score) / baseline.score * 100).toFixed(1)
-    : 'N/A'
-  console.log(`\nBaseline: ${baseline.score.toFixed(4)} → Optimized: ${final.score.toFixed(4)} (${improvement}% improvement)`)
+  const improvement =
+    baseline.score > 0
+      ? (((final.score - baseline.score) / baseline.score) * 100).toFixed(1)
+      : 'N/A'
+  console.log(
+    `\nBaseline: ${baseline.score.toFixed(4)} → Optimized: ${final.score.toFixed(4)} (${improvement}% improvement)`
+  )
   console.log(`\nBest detection parameters:`)
   console.log(JSON.stringify(bestParams, null, 2))
-  console.log(`\nTo apply: update globals in scripts/portrait-crop/detect_ball.py`)
+  console.log(
+    `\nTo apply: update globals in scripts/portrait-crop/detect_ball.py`
+  )
 }
 
 main().catch((err) => {

@@ -94,7 +94,8 @@ export function interpolateCropX(
   time: number,
   splits: number[] = []
 ): number {
-  if (!keyframes || keyframes.length === 0) return (SOURCE_WIDTH - CROP_WIDTH) / 2
+  if (!keyframes || keyframes.length === 0)
+    return (SOURCE_WIDTH - CROP_WIDTH) / 2
   if (time <= keyframes[0].time) return keyframes[0].x
   if (time >= keyframes[keyframes.length - 1].time)
     return keyframes[keyframes.length - 1].x
