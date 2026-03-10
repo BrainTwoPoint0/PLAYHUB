@@ -1,0 +1,16 @@
+{
+  "name": "portrait-crop",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "crop": "tsx crop.ts"
+  },
+  "dependencies": {
+    "@google/genai": "^1.0.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
