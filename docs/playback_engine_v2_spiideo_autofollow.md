@@ -1,683 +1,599 @@
-# PLAYBACK Engine v2 — Spiideo AutoFollow Pipeline
+# PLAYBACK Engine v2 — AutoFollow Content Pipeline
 
-**Version:** 2.0 | **Date:** February 2026 | **Author:** Karim Fawaz, Founder & CEO
+**Version:** 2.3 | **Date:** March 2026 | **Author:** Karim Fawaz, Founder & CEO
 **Classification:** Internal / Engineering
-**Supersedes:** v1.0 (generic panoramic pipeline)
+**Supersedes:** v2.2 (pre-validation, referenced deprecated Gemini 2.5 Flash)
 
 ---
 
 ## 1. Why This Version Exists
 
-v1 assumed we'd build full CV from scratch on raw panoramic footage — player detection, ball tracking, multi-object tracking, the works. That's a 4-month, GPU-heavy build before anything ships.
+v2.0 assumed we'd build full CV event detection from scratch. The reality is simpler:
 
-The reality is simpler and faster:
+**Spiideo gives us raw 4K panoramic footage with zero event tags.** Their AutoData (manual tagging) is expensive and slow. These recordings benefit the most from automated event detection + portrait conversion. This is where the Engine creates real value.
 
-**Spiideo AutoFollow already solves the hardest problem.** Their 3rd-gen AI model tracks gameplay, follows the ball, switches focus intelligently, and outputs a stabilized virtual camera view that stays on the action. It's essentially a broadcast-quality directed feed generated from their panoramic cameras.
+**Veo already solves its own problem.** Veo tags games with goals, shots, set pieces, fouls, corners — all free. Veo recordings are already directed (AutoFollow). We don't need to tag or convert them. They're useful as a **source of goal clips to convert to portrait for PLAYBACK's social media**, but they're not the core Engine product.
 
-**Spiideo AutoData is manual tagging, not AI.** It's humans marking events — expensive, slow, and why we're not using it.
-
-**The gap is automated event detection + content generation.** Nobody is running an event classifier on AutoFollow output and auto-generating highlights for grassroots social media. That's the product.
+**The gap nobody fills at grassroots level: landscape → portrait auto-crop with ball tracking.** Every recording is 16:9. Social media is 9:16. Clubs manually crop or just post letterboxed. WSC Sports does this for the Bundesliga and La Liga, but at six-figure enterprise pricing. We can build this as a paid PLAYHUB service — particularly powerful on Spiideo's high-res 4K panoramic footage.
 
 ```
 What exists today:
-[Spiideo Camera] → [AutoFollow AI] → [Tracked video on PLAYHUB] → Nothing happens
+[Spiideo 4K panoramic] → [Raw recording on PLAYHUB] → No tags, no portrait, nothing
+[Veo AutoFollow]        → [Tagged recording on PLAYHUB] → Tags exist but clips aren't used
 
 What we're building:
-[Spiideo Camera] → [AutoFollow AI] → [PLAYHUB] → [PLAYBACK Engine] → [Events + Clips] → [Social / WhatsApp / Scouts]
-                                                          │
-                                              Replaces manual AutoData
-                                              at zero marginal cost
+[Spiideo 4K] → [PLAYBACK Engine] → [AI event tags + Portrait crop + Branded clips]
+                                              │
+                                    Primary product — paid service
+                                    for PLAYHUB recording owners
+
+[Veo clips] → [Grab goal clips] → [Portrait convert] → [PLAYBACK social media content]
+                                              │
+                                    Internal use — fuel PLAYBACK's
+                                    own social channels
 ```
+
+### Business Model
+
+This is a **paid optional service** for organizations and users who already have or purchased recordings on PLAYHUB:
+
+- Organization buys/has recordings on PLAYHUB
+- Opts into Engine processing (per-recording or subscription)
+- Gets: portrait-format clips, event-tagged highlights, branded exports
+- Downloads and posts to their own social channels
+
+Revenue is incremental on existing PLAYHUB transactions — not a separate product.
 
 ---
 
-## 2. Input Analysis: AutoFollow Output Characteristics
+## 2. What We Already Have (Don't Rebuild)
 
-The AutoFollow feed is fundamentally different from raw panoramic footage. This changes every model decision:
+### 2.1 Veo Event Data (Available, Low Priority)
 
-| Property                 | Raw Panoramic                 | AutoFollow Output                                |
-| ------------------------ | ----------------------------- | ------------------------------------------------ |
-| **Field of view**        | Full pitch, 180°              | Zoomed to action area (~30-40% of pitch visible) |
-| **Camera motion**        | Static                        | Virtual pan/zoom following play                  |
-| **Player size**          | 15-50px tall (far side tiny)  | 80-200px tall (always reasonable size)           |
-| **Ball visibility**      | Often < 10px, frequently lost | Usually visible, 15-30px                         |
-| **Action framing**       | Action could be anywhere      | Action is centered by design                     |
-| **Resolution**           | 4K spread across full pitch   | Effective ~1080p on area of interest             |
-| **Broadcast similarity** | Low (wide static shot)        | High (looks like a single-camera broadcast)      |
+Veo already tags games with goals, shots, corners, fouls, offsides. Our scraper currently ignores this data — it only pulls title/duration/privacy/thumbnail.
 
-**Key insight:** AutoFollow output is much closer to broadcast footage than to raw panoramic. This means:
+**Not the priority for the Engine.** Veo recordings already have tags and directed footage. The main Engine use case for Veo content is grabbing goal clips and converting them to portrait for PLAYBACK's own social media — a simpler pipeline.
 
-- Academic models trained on broadcast soccer footage transfer better
-- Player/ball detection is dramatically easier (larger objects, centered framing)
-- The problem reduces from "find and track everything on the pitch" to "classify what's happening in the frame"
-- We can use lighter models (no need for small-object specialists)
+**Nice-to-have:** Extend the scraper to pull Veo event tags and store in `playhub_recording_events`. This enriches the PLAYHUB recording detail page but doesn't drive Engine revenue.
+
+### 2.2 Graphic Packages (Fully Built)
+
+The `playhub_graphic_packages` system is production-ready:
+
+| Feature                               | Status   |
+| ------------------------------------- | -------- |
+| Org-level logo + sponsor logo         | ✅ Built |
+| 4-position placement (corners)        | ✅ Built |
+| Default auto-attach to recordings     | ✅ Built |
+| Spiideo package import                | ✅ Built |
+| Supabase Storage (PNG/JPEG/WebP, 5MB) | ✅ Built |
+| CSS overlay on video player           | ✅ Built |
+
+**For the Engine:** Instead of CSS overlay (browser-only), burn logos into exported clips via FFmpeg. The graphic package data (logo URLs, positions) is already queryable per recording.
+
+### 2.3 Recording Events Table (Schema Ready)
+
+```typescript
+// Already exists in PLAYHUB
+interface RecordingEvent {
+  id: string
+  match_recording_id: string
+  event_type:
+    | 'goal'
+    | 'shot'
+    | 'save'
+    | 'corner'
+    | 'free_kick'
+    | 'yellow_card'
+    | 'red_card'
+    | 'penalty'
+    | 'kick_off'
+    | 'half_time'
+    | 'full_time'
+    | 'foul'
+    | 'substitution'
+    | 'other'
+  timestamp_seconds: number
+  team: 'home' | 'away' | null
+  label: string | null
+  source: 'manual' | 'ai_detected'
+  confidence_score: number | null
+  visibility: 'public' | 'private'
+}
+```
+
+Manual tagging API already exists at `/api/recordings/[id]/events`. AI-detected events just need `source: 'ai_detected'`.
+
+### 2.4 AWS Infrastructure (Shared)
+
+Same account (`274921264686`, `eu-west-2`). S3 buckets, Lambda infrastructure, and IAM roles already in place. Engine clips go under a new S3 prefix — no new account setup needed.
 
 ---
 
 ## 3. System Architecture
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│                    PLAYBACK ENGINE v2                           │
-│              (Spiideo AutoFollow Pipeline)                      │
-│                                                                 │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │                    INGEST LAYER                           │  │
-│  │                                                           │  │
-│  │  [PLAYHUB webhook] ──► [Download AutoFollow MP4 from S3]  │  │
-│  │                        [+ raw panoramic if available]      │  │
-│  └────────────────────────────┬──────────────────────────────┘  │
-│                               │                                 │
-│  ┌────────────────────────────▼──────────────────────────────┐  │
-│  │                  EVENT DETECTION                           │  │
-│  │                                                           │  │
-│  │  [Frame Sampling] ──► [Scene Classifier] ──► [Event       │  │
-│  │   2-4 fps            "what's happening?"     Manifest]    │  │
-│  │                                                           │  │
-│  │  Detects: goals, shots, saves, corners, cards,            │  │
-│  │           free kicks, celebrations, kickoffs              │  │
-│  │                                                           │  │
-│  │  Outputs: {timestamp, event_type, confidence,             │  │
-│  │            excitement_score, frame_thumbnail}              │  │
-│  └────────────────────────────┬──────────────────────────────┘  │
-│                               │                                 │
-│  ┌────────────────────────────▼──────────────────────────────┐  │
-│  │                   CLIP ENGINE                              │  │
-│  │                                                           │  │
-│  │  [Event Manifest] ──► [FFmpeg clip extraction]            │  │
-│  │                       [+ transitions]                     │  │
-│  │                       [+ brand overlays]                  │  │
-│  │                       [+ format conversion]               │  │
-│  │                                                           │  │
-│  │  Outputs:                                                 │  │
-│  │    - Match highlight reel (60-90s, top events)            │  │
-│  │    - Individual event clips (goal clip, save clip, etc.)  │  │
-│  │    - Social-ready formats (9:16, 16:9, 1:1)              │  │
-│  │    - Thumbnails (auto-selected key frames)                │  │
-│  └────────────────────────────┬──────────────────────────────┘  │
-│                               │                                 │
-│  ┌────────────────────────────▼──────────────────────────────┐  │
-│  │                 DISTRIBUTION                               │  │
-│  │                                                           │  │
-│  │  [Clips] ──► [Social auto-publish]  Instagram / TikTok   │  │
-│  │          ──► [PLAYHUB library]      OTT playback          │  │
-│  │          ──► [WhatsApp]             Parent delivery (v2)  │  │
-│  │          ──► [Partner dashboard]    Download / embed       │  │
-│  └───────────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                     PLAYBACK ENGINE v2                           │
+│                                                                  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                    INPUT LAYER                             │  │
+│  │                                                            │  │
+│  │  PRIMARY:                                                  │  │
+│  │  [Spiideo 4K panoramic] → Gemini 3 event detection          │  │
+│  │                          → Portrait conversion             │  │
+│  │  [Direct uploads]       → Gemini 3 event detection          │  │
+│  │                          → Portrait conversion             │  │
+│  │                                                            │  │
+│  │  SECONDARY (PLAYBACK social media):                        │  │
+│  │  [Veo goal clips] → Portrait conversion only               │  │
+│  │                     (events already tagged by Veo)          │  │
+│  └──────────────────────────┬────────────────────────────────┘  │
+│                              │                                   │
+│  ┌──────────────────────────▼────────────────────────────────┐  │
+│  │              PORTRAIT CONVERSION (Core Product)            │  │
+│  │                                                            │  │
+│  │  [16:9 recording] → [YOLO ball detection] → [ByteTrack]   │  │
+│  │                      [action area tracking]                │  │
+│  │                      [smooth crop window]                  │  │
+│  │                      → [FFmpeg 9:16 extraction]            │  │
+│  │                                                            │  │
+│  │  Output: Portrait video following the action               │  │
+│  └──────────────────────────┬────────────────────────────────┘  │
+│                              │                                   │
+│  ┌──────────────────────────▼────────────────────────────────┐  │
+│  │                    CLIP ENGINE                             │  │
+│  │                                                            │  │
+│  │  [Events + Portrait] → [FFmpeg clip extraction]            │  │
+│  │                         [+ brand overlay burn-in]          │  │
+│  │                         [+ format variants]                │  │
+│  │                                                            │  │
+│  │  Outputs:                                                  │  │
+│  │    - Full match portrait (9:16)                            │  │
+│  │    - Highlight reel (60-90s, top events by excitement)     │  │
+│  │    - Individual event clips (goal, save, etc.)             │  │
+│  │    - Branded with org's graphic package                    │  │
+│  └──────────────────────────┬────────────────────────────────┘  │
+│                              │                                   │
+│  ┌──────────────────────────▼────────────────────────────────┐  │
+│  │                  DELIVERY                                  │  │
+│  │                                                            │  │
+│  │  [Clips] → [PLAYHUB library]  Download / embed             │  │
+│  │         → [Partner dashboard] Browse events, pick clips    │  │
+│  │         → [PLAYBACK profiles] Import as highlights          │  │
+│  │                                                            │  │
+│  │  Phase 2: Social auto-publish (Instagram, TikTok, YouTube) │  │
+│  └────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ### 3.1 Service Stack
 
-| Component              | Technology                                        | Why                                                  |
-| ---------------------- | ------------------------------------------------- | ---------------------------------------------------- |
-| **API / Orchestrator** | Python 3.11 + FastAPI                             | Lightweight, async, perfect for ML serving           |
-| **Event Detection**    | PyTorch (fine-tuned model)                        | Industry standard, matches WSC stack, huge ecosystem |
-| **Video Processing**   | FFmpeg + MoviePy                                  | Battle-tested, handles all format conversions        |
-| **Message Queue**      | Redis + BullMQ (or SQS)                           | Async job processing for match analysis              |
-| **Storage**            | S3 / Cloudflare R2                                | Cheap, scalable, CDN-ready                           |
-| **Database**           | Supabase (shared with PLAYHUB)                    | Already in use, no new infra                         |
-| **Social Publishing**  | Instagram Graph API, TikTok API, YouTube Data API | Direct platform APIs                                 |
-| **Deployment**         | AWS ECS (API) + single GPU instance (model)       | Minimal infra to start                               |
+| Component                             | Technology                        | Why                                                            |
+| ------------------------------------- | --------------------------------- | -------------------------------------------------------------- |
+| **Event Detection (Spiideo/uploads)** | Gemini 3 Flash API (Batch)        | Only major LLM with native video input, no GPU needed          |
+| **Veo goal clips (secondary)**        | Veo API (already tagged)          | Free, just portrait-convert for social                         |
+| **Portrait Conversion (test first)**  | Cloudinary `g_auto` / OpusClip    | Test ready-made before building custom                         |
+| **Portrait Conversion (custom)**      | FootAndBall + ByteTrack           | 0.909 AP on long-shot cameras (better than YOLO for panoramic) |
+| **Video Processing**                  | FFmpeg on Lambda                  | Burst workload, pay-per-use, existing infra                    |
+| **Job Queue**                         | SQS (or existing Lambda triggers) | Already have Lambda infra, no Redis needed                     |
+| **Storage**                           | S3 (existing bucket, new prefix)  | Same account, no new setup                                     |
+| **Database**                          | Supabase (existing)               | Events table already exists                                    |
+| **Deployment**                        | Lambda (FFmpeg) + EC2 spot (GPU)  | Lambda for clips, GPU only for portrait crop                   |
 
 ---
 
-## 4. Event Detection Model — Technical Specification
+## 4. Portrait Conversion — Technical Specification
+
+This is the core differentiator. WSC Sports charges enterprise pricing for this. We build it as a self-hosted pipeline.
 
 ### 4.1 Problem Definition
 
-This is NOT a general object detection problem. It's a **temporal scene classification** problem:
+Given a 16:9 landscape football recording, produce a 9:16 portrait version where the crop window automatically follows the ball and action area with smooth, broadcast-like camera movement.
 
-Given a sequence of frames from an AutoFollow feed, classify whether a significant event is occurring and what type it is.
+**Critical challenge for Spiideo footage:** The ball is 8-16 pixels wide in raw 4K panoramic frames. It's invisible in 30-65% of frames (behind players, in scrums, off-screen). All three companies that solve this (Spiideo, Veo, Pixellot) use a hybrid approach: track ball when visible, fall back to player cluster centroid when it's not. We must do the same.
 
-This is closer to action recognition than object detection. The AutoFollow camera has already "directed" the footage to point at the action. We just need to understand what we're looking at.
+### 4.2 "Test First" Alternatives
 
-### 4.2 Model Architecture Options
+Before building a custom pipeline, test these ready-made options:
 
-| Approach                                | Model                                    | Pros                             | Cons                              | Recommendation                  |
-| --------------------------------------- | ---------------------------------------- | -------------------------------- | --------------------------------- | ------------------------------- |
-| **A: Frame-level classifier**           | ResNet50/EfficientNet + temporal pooling | Simple, fast, easy to train      | Misses temporal context           | Good for v0 prototype           |
-| **B: Video clip classifier**            | SlowFast / TimeSformer / Video-MAE       | Understands motion, state-of-art | Heavier, needs more training data | Best for production             |
-| **C: Two-stage (detect then classify)** | YOLO for objects + LSTM for events       | Interpretable, can track ball    | More complex pipeline             | Best long-term                  |
-| **D: Fine-tuned foundation model**      | InternVideo2 / VideoLLaMA                | Zero/few-shot capable            | Slow inference, expensive         | Useful for bootstrapping labels |
+| Option                  | What It Does                                         | Cost                                 | Worth Testing?               |
+| ----------------------- | ---------------------------------------------------- | ------------------------------------ | ---------------------------- |
+| **Cloudinary `g_auto`** | AI auto-crop on video, content-aware                 | ~$0.40/min (video transform pricing) | **Yes — test first**         |
+| **OpusClip**            | Claims ball tracking + auto-crop for sports, has API | Unknown (startup pricing)            | **Yes — request API access** |
 
-**Recommended path:**
+If Cloudinary's `g_auto` produces acceptable quality on a few sample recordings, it could replace the entire custom pipeline. Test on 3-5 Spiideo recordings before committing to self-hosted.
+
+### 4.3 Custom Pipeline (If Ready-Made Fails)
 
 ```
-Week 1-2:  Approach D — Use a video LLM (GPT-4o / Claude vision) to
-           bootstrap labels on 50-100 matches. Feed it 10-second clips
-           and ask "what event is happening?" This creates your initial
-           training dataset at near-zero annotation cost.
+Step 1: Ball Detection (FootAndBall or YOLO v11)
+  - FootAndBall: Purpose-built for long-shot static cameras (8-16px balls)
+    - 0.909 AP on ISSIA-CNR dataset (wide-angle sports footage)
+    - Better starting point than generic YOLO for panoramic
+  - YOLO v11: Use with SAHI tiling (split 4K frame into 2x2 grid)
+    - 0.85-0.90 AP on panoramic with tiling (NOT 0.925 — that's broadcast-only)
+    - Generic YOLO without tiling: 0.60-0.70 AP on panoramic (ball too small)
+  - Run at 10-15 fps
+  - Also detect players for action area estimation
 
-Week 3-4:  Approach A — Train a ResNet50 + temporal pooling classifier
-           on the bootstrapped labels. Fast inference, runs on CPU even.
-           Ship this as v0 to prove the pipeline works.
+Step 2: Multi-Object Tracking (ByteTrack)
+  - Consistent ball tracking across frames
+  - Handle occlusions and disappearances (30-65% of frames!)
+  - MANDATORY fallback to player cluster centroid when ball is lost
 
-Week 5-8:  Approach B — Train SlowFast or TimeSformer on the growing
-           dataset. Better accuracy, handles ambiguous events.
-           This becomes the production model.
+Step 3: Crop Window Computation
+  - Primary: ball position (when detected with high confidence)
+  - Fallback 1: player cluster centroid (when ball lost)
+  - Fallback 2: hold position (during stoppages, no motion)
+  - Apply temporal smoothing (exponential moving average)
+  - Constrain: no sudden jumps, max pan speed, stay within frame bounds
+  - Crop aspect ratio: 9:16 from 16:9 source
 
-Month 3+:  Approach C — Add object-level detection (ball, players)
-           for richer metadata. Enables player-level clips, tactical
-           tags, and the "My Child" feature.
+Step 4: FFmpeg Extraction
+  - Apply computed crop coordinates per frame
+  - Output 1080x1920 portrait video
+  - Preserve audio
+  - H.264 encoding, AAC audio
 ```
 
-### 4.3 Event Categories
+**Key difference from v2.1:** The ball is NOT reliably detectable in panoramic footage. The "0.925 mAP" figure cited in v2.1 is for broadcast cameras (close-up, TV-quality). On Spiideo's wide-angle static cameras:
 
-**Phase 1 (ship fast — these are detectable from AutoFollow with high confidence):**
+| Scenario                   | Ball Detection AP | Notes                              |
+| -------------------------- | ----------------- | ---------------------------------- |
+| Broadcast (TV camera)      | 0.92-0.95         | Close-up, ball is 30-50px          |
+| Panoramic with SAHI tiling | 0.85-0.90         | Ball is 8-16px, tiling helps       |
+| Panoramic without tiling   | 0.60-0.70         | Ball too small, many misses        |
+| Ball not visible at all    | 30-65% of frames  | Behind players, scrums, off-screen |
 
-| Event                   | Visual Signal in AutoFollow                                            | Difficulty                          |
-| ----------------------- | ---------------------------------------------------------------------- | ----------------------------------- |
-| **Goal**                | Ball crosses line → celebration (players clustering, arms up, running) | Easy — celebration is unmistakable  |
-| **Shot on target**      | Ball moving toward goal → keeper dive/reaction                         | Medium                              |
-| **Save**                | Keeper dive + ball deflection                                          | Medium                              |
-| **Corner kick**         | Ball placed in corner, players clustering in box                       | Easy — distinctive formation        |
-| **Free kick**           | Player over ball, wall forming                                         | Easy — distinctive formation        |
-| **Card (yellow/red)**   | Referee arm raised, players surrounding                                | Medium — need to detect ref gesture |
-| **Penalty**             | Player at spot, keeper on line, distinctive camera framing             | Easy — very distinctive scene       |
-| **Kickoff / Half-time** | Players at center, ball at center spot                                 | Easy — distinctive formation        |
+**Recommended model stack:**
 
-**Phase 2 (after v1 is live):**
+1. **Start with FootAndBall** — specifically designed for long-shot sports footage, proven on wide-angle cameras
+2. **If FootAndBall underperforms**, try YOLO v11 with SAHI (Slicing Aided Hyper Inference) — splits 4K frame into overlapping tiles, runs detection per tile, merges results
+3. **Never use generic YOLO without tiling** on panoramic footage — will miss most balls
 
-| Event             | Visual Signal                                                           |
-| ----------------- | ----------------------------------------------------------------------- |
-| **Near miss**     | Shot → ball goes wide/over → players react with disappointment          |
-| **Counterattack** | Sudden transition from defense to attack, ball speed + direction change |
-| **Tackle / Duel** | Two players contesting, one goes down                                   |
-| **Substitution**  | Players at sideline exchanging                                          |
-
-### 4.4 Excitement Scoring
-
-Each detected event gets a score (0.0 - 5.0) based on:
+### 4.4 Smooth Camera Logic
 
 ```python
-def compute_excitement(event, match_context):
-    base_scores = {
-        'goal': 5.0, 'penalty_goal': 5.0, 'penalty_miss': 4.5,
-        'save': 3.5, 'shot_on_target': 3.0, 'red_card': 4.0,
-        'yellow_card': 2.0, 'corner': 1.5, 'free_kick': 2.0,
-        'near_miss': 3.5
+class SmartCrop:
+    def __init__(self, frame_width, frame_height, smoothing=0.05):
+        self.crop_w = int(frame_height * 9 / 16)  # Portrait width from landscape
+        self.crop_h = frame_height
+        self.smoothing = smoothing  # Lower = smoother
+        self.current_x = frame_width // 2  # Start centered
+        self.ball_lost_frames = 0
+
+    def update(self, ball_x, ball_y, confidence, players):
+        if ball_x is not None and confidence > 0.5:
+            target_x = ball_x
+            self.ball_lost_frames = 0
+        elif players:
+            self.ball_lost_frames += 1
+            # Fallback: center of player cluster (weighted by proximity to last known ball)
+            target_x = sum(p.center_x for p in players) / len(players)
+        else:
+            self.ball_lost_frames += 1
+            target_x = self.current_x  # Hold position
+
+        # Use slower smoothing when ball is lost (less jumpy)
+        smooth = self.smoothing if self.ball_lost_frames == 0 else self.smoothing * 0.5
+
+        # Exponential smoothing (prevents jarring movement)
+        self.current_x += (target_x - self.current_x) * smooth
+
+        # Clamp to frame bounds
+        half_w = self.crop_w // 2
+        self.current_x = max(half_w, min(self.frame_width - half_w, self.current_x))
+
+        return int(self.current_x - half_w), 0  # crop x, y
+```
+
+### 4.5 Hardware & Cost
+
+| Config                             | Throughput            | Monthly Cost (500 matches/week) |
+| ---------------------------------- | --------------------- | ------------------------------- |
+| EC2 g5.xlarge spot (1x A10G)       | ~3-5 matches/hour     | ~$255/month                     |
+| 2x g5.xlarge spot instances        | ~6-10 matches/hour    | ~$510/month                     |
+| Lambda (FFmpeg clip assembly only) | Burst, per-invocation | ~$50-100/month                  |
+
+At 500 matches/week ≈ 72 matches/day, a single g5.xlarge spot instance handles the load comfortably (~24 matches in an 8-hour window).
+
+---
+
+## 5. Event Detection — Spiideo & Direct Uploads
+
+### 5.1 Primary Target: Spiideo Raw 4K Panoramic
+
+Spiideo recordings have zero event tags (AutoData is manual and expensive). These benefit the most from AI event detection. The raw 4K panoramic footage gives us more visual information to work with than directed footage.
+
+### 5.2 Gemini 3 Flash (Primary Model)
+
+For all recordings that need event detection, use Gemini 3 Flash. **It is the only major LLM with native video input via API** — Claude and GPT-4o do not accept video files.
+
+> **⚠️ VALIDATION REQUIRED — This is an untested bet.**
+> No published case study exists of Gemini being used for full 90-min match event detection in production. The SportU benchmark (Oct 2024, tested on Gemini 1.5) scored ~65% on sports video understanding. Gemini 3 is a significant upgrade (15% improvement on vision tasks, 87.6% on Video-MMMU), but nobody has validated it on panoramic grassroots football footage specifically. **We must test on 5 real Spiideo recordings in Week 1 before committing.**
+
+**Gemini 3 Flash specs (March 2026):**
+
+- Native video understanding (upload MP4, get structured JSON)
+- 15% accuracy improvement over 2.5 Flash on vision tasks
+- "Agentic Vision" capability for real-time video analysis
+- 1M token context window: ~63 minutes at default resolution, ~166 minutes at low resolution mode
+- A 90-min match at low resolution ≈ 540K tokens
+- **2GB max file upload** — 4K Spiideo footage must be transcoded to 720p before upload
+- FPS is configurable — default 1 FPS, can increase for sports (higher FPS = more tokens = more cost)
+- **End-to-end latency: 15-45 minutes per match** (upload + processing + response)
+
+**Cost estimates (to be validated — Gemini 3 Flash pricing may differ from 2.5):**
+
+- Gemini 2.5 Flash pricing: ~$0.17/match at low resolution via Batch API
+- Gemini 3 Flash may be similar or lower (Google typically prices Flash models aggressively)
+- At 500 matches/week with Batch API: estimated ~$340-680/month
+
+**Known issues to test for:**
+
+- **Timestamp drift on long videos** — Multiple forum reports of timestamps ending at 17 min for 30 min videos. Documented on [Google AI Forum](https://discuss.ai.google.dev/t/improve-timestamp-accuracy-on-video-understanding/95356). Uploading files directly (not YouTube URLs) produces better timestamps. May need to chunk 90-min matches into 15-min segments.
+- **1 FPS default sampling** — Events shorter than ~1 second may not register. Can increase FPS but at higher token cost. For grassroots football, most key events (goals, cards, corners) last several seconds — fast deflections and quick free kicks may be missed.
+- **Panoramic footage at low resolution** — Compressing 4K panoramic to 720p means Gemini sees player blobs, not individuals. May struggle to distinguish teams or identify specific event types.
+- **No sports-specific benchmark exists for Gemini 3** — we're extrapolating from general vision improvements.
+
+**Fallback plan if Gemini validation fails:**
+
+1. **Chunk the video** — Split 90-min match into 6x15-min segments, process each separately, merge events. This may fix timestamp drift and improve detail.
+2. **Increase resolution** — Use default resolution instead of low (~$0.45/match instead of $0.17). More detail, still cheaper than alternatives.
+3. **T-DEED (SoccerNet winner)** — Traditional CV model, best-in-class for action spotting. Requires GPU + fine-tuning on our footage, but proven at [SoccerNet 2025](https://arxiv.org/html/2508.19182v1). More engineering effort but no timestamp issues.
+4. **Hybrid approach** — Use Gemini for coarse event detection (goals, halftime, cards), then run a lightweight CV model on the flagged segments for precise timestamps.
+
+**Prompt strategy:**
+
+```
+Analyze this football match recording. For each significant event, provide:
+- timestamp (seconds from start)
+- event_type: goal | shot_on_target | save | corner | free_kick |
+  yellow_card | red_card | penalty | kick_off | half_time | full_time | foul
+- team: home | away (if determinable)
+- confidence: 0.0-1.0
+- excitement: 1-5
+
+Respond as JSON array. Only include events with confidence > 0.7.
+```
+
+**Why not other LLMs:**
+
+- **Claude (Anthropic)**: No native video input API — would need frame extraction + image sequence, much more expensive
+- **GPT-4o (OpenAI)**: No native video input API — same limitation
+- **Twelve Labs**: Good for semantic video search but $3+/match and overkill for event detection
+
+**Compared to v2.0's plan:**
+
+- v2.0: Train ResNet50 → SlowFast → custom pipeline ($500 bootstrapping + $400/month GPU + months of engineering)
+- v2.3: Call Gemini 3 Flash API (estimated ~$340-680/month, ships in a day, but requires validation on our footage first)
+
+### 5.3 Excitement Scoring
+
+Same logic as v2.0 — computed after events are detected, regardless of source:
+
+```python
+base_scores = {
+    'goal': 5.0, 'penalty': 4.5, 'red_card': 4.0,
+    'save': 3.5, 'shot_on_target': 3.0, 'near_miss': 3.5,
+    'yellow_card': 2.0, 'free_kick': 2.0, 'corner': 1.5,
+}
+
+# Context multipliers
+# Late game (last 10 min): ×1.3
+# Close game (1-goal diff): ×1.2
+# Equalizer goal: ×1.5
+```
+
+---
+
+## 6. Clip Generation Engine
+
+### 6.1 Runs on Lambda (Not ECS)
+
+Clip generation is a burst workload — process a batch, done. Lambda with FFmpeg layer is cheaper and simpler than always-on ECS.
+
+```
+Lambda: playback-engine-clip-generator
+  Runtime: Node.js 20 or Python 3.12
+  Memory: 3008 MB (max for FFmpeg)
+  Timeout: 15 minutes
+  Storage: 10 GB ephemeral (/tmp)
+  Layer: FFmpeg binary layer
+  Trigger: SQS queue or direct invoke from analysis step
+```
+
+### 6.2 Highlight Reel Assembly
+
+```python
+def generate_highlight_reel(events, source_video, target_duration=75):
+    # Sort by excitement, take top events that fit
+    ranked = sorted(events, key=lambda e: e.excitement, reverse=True)
+
+    selected = []
+    total = 0
+    for event in ranked:
+        clip_len = get_clip_duration(event)  # 8-15s per event
+        if total + clip_len <= target_duration:
+            selected.append(event)
+            total += clip_len
+
+    # Re-sort chronologically
+    selected.sort(key=lambda e: e.timestamp)
+
+    # Extract and concatenate with crossfade
+    clips = []
+    for event in selected:
+        pre_roll = 4
+        post_roll = 10 if event.type == 'goal' else 6
+        clips.append({
+            'start': max(0, event.timestamp - pre_roll),
+            'end': event.timestamp + post_roll,
+        })
+
+    # FFmpeg: extract, crossfade, overlay brand
+    return assemble_with_ffmpeg(source_video, clips, brand_overlay)
+```
+
+### 6.3 Brand Overlay Burn-in
+
+Uses existing `playhub_graphic_packages` data — no new system needed:
+
+```python
+def get_brand_overlay(recording_id):
+    # Same fallback chain as PLAYHUB video player:
+    # 1. Recording's assigned graphic_package_id
+    # 2. Org's default package (is_default=true)
+    # 3. No overlay
+
+    package = fetch_graphic_package(recording_id)
+    if not package:
+        return None
+
+    return {
+        'logo_url': package.logo_url,           # Already in Supabase Storage
+        'logo_position': package.logo_position,  # top-left, top-right, etc.
+        'sponsor_url': package.sponsor_logo_url,
+        'sponsor_position': package.sponsor_position,
     }
-    score = base_scores.get(event.type, 1.0)
 
-    # Context multipliers
-    if match_context.minutes_remaining < 10:
-        score *= 1.3  # Late game = more exciting
-    if abs(match_context.score_diff) <= 1:
-        score *= 1.2  # Close game = more exciting
-    if event.type == 'goal' and match_context.is_equalizer:
-        score *= 1.5  # Equalizer goal = peak excitement
-
-    return min(score, 5.0)
+# FFmpeg overlay filter:
+# ffmpeg -i input.mp4 -i logo.png -filter_complex "overlay=x:y" output.mp4
 ```
 
-### 4.5 Training Data Strategy
+### 6.4 Output Formats
 
-**The genius move:** Use a video LLM to bootstrap your training data.
-
-```
-Step 1: Take 100 Spiideo AutoFollow recordings from PLAYHUB
-Step 2: Split each into 10-second clips at 1fps (just keyframes)
-Step 3: Feed each clip to GPT-4o / Claude with the prompt:
-
-        "You are watching a youth football match recorded from a
-         single camera. What event is happening in this clip?
-         Options: goal, shot_on_target, save, corner_kick,
-         free_kick, yellow_card, red_card, penalty, kickoff,
-         general_play, stoppage, nothing_significant.
-
-         Also rate the excitement level 1-5.
-
-         Respond in JSON: {event: str, confidence: float, excitement: int}"
-
-Step 4: Filter for high-confidence labels (>0.8)
-Step 5: Human QA on ~20% of labels (spot check)
-Step 6: Train your lightweight model on this dataset
-```
-
-**Cost estimate for bootstrapping:**
-
-- 100 matches × ~90 min × 6 clips/min = ~54,000 clips
-- At ~$0.01/clip via GPT-4o mini with images = ~$540
-- Compared to manual annotation: 100 matches × $50/match = $5,000+
-
-**10x cheaper than Spiideo's AutoData, and you own the pipeline.**
-
-### 4.6 Inference Pipeline
-
-```python
-# Production inference (runs per match, post-upload)
-
-class EventDetector:
-    def __init__(self, model_path: str):
-        self.model = load_model(model_path)  # SlowFast or ResNet50
-        self.fps = 2  # Sample 2 frames per second (sufficient for events)
-
-    def analyze_match(self, video_path: str) -> EventManifest:
-        frames = extract_frames(video_path, fps=self.fps)
-        events = []
-
-        # Sliding window: 5-second clips with 2.5s overlap
-        window_size = self.fps * 5   # 10 frames
-        stride = self.fps * 2.5      # 5 frames
-
-        for i in range(0, len(frames) - window_size, int(stride)):
-            clip = frames[i:i + window_size]
-            prediction = self.model(clip)
-
-            if prediction.confidence > 0.7 and prediction.event != 'general_play':
-                events.append(Event(
-                    timestamp=i / self.fps,
-                    type=prediction.event,
-                    confidence=prediction.confidence,
-                    thumbnail=frames[i + window_size // 2]  # Middle frame
-                ))
-
-        # Deduplicate overlapping detections
-        events = self.merge_nearby_events(events, min_gap_seconds=10)
-
-        # Score excitement
-        match_context = self.infer_match_context(events)
-        for event in events:
-            event.excitement = compute_excitement(event, match_context)
-
-        return EventManifest(
-            match_id=video_path,
-            events=sorted(events, key=lambda e: e.timestamp),
-            total_events=len(events),
-            processing_time=time.time() - start
-        )
-```
-
-### 4.7 Hardware & Performance
-
-| Metric                              | ResNet50 (v0)              | SlowFast (v1)             |
-| ----------------------------------- | -------------------------- | ------------------------- |
-| **Inference time per match**        | ~3 min (CPU)               | ~8 min (GPU)              |
-| **GPU required?**                   | No — runs on CPU           | Yes — A10G or T4          |
-| **Model size**                      | ~100MB                     | ~400MB                    |
-| **Monthly cost (500 matches/week)** | ~£0 (runs on existing ECS) | ~£400 (spot GPU instance) |
-| **Expected accuracy**               | ~75% event detection       | ~88% event detection      |
+| Format                       | Specs                   | Use Case                             |
+| ---------------------------- | ----------------------- | ------------------------------------ |
+| **Portrait full match**      | 1080x1920, 9:16, H.264  | Full game in portrait (core product) |
+| **Portrait highlight reel**  | 1080x1920, 9:16, 60-90s | Social-ready highlight package       |
+| **Individual event clips**   | 1080x1920, 9:16, 8-15s  | Goal clip, save clip, etc.           |
+| **Landscape highlight reel** | 1920x1080, 16:9, 60-90s | YouTube, website embed               |
+| **Thumbnail**                | 1280x720, JPEG          | Preview image for PLAYHUB listing    |
 
 ---
 
-## 5. Clip Generation Engine
+## 7. Delivery
 
-### 5.1 Highlight Reel Generation
+### 7.1 Phase 1: Download from PLAYHUB
 
-```python
-class ClipEngine:
-    def generate_highlight_reel(self, manifest: EventManifest,
-                                 target_duration: int = 75) -> str:
-        """
-        Takes event manifest, produces a 60-90 second highlight reel.
-        """
-        # Sort by excitement, take top events that fit duration
-        ranked = sorted(manifest.events, key=lambda e: e.excitement, reverse=True)
+No social auto-publish. Partners download clips and post themselves.
 
-        selected = []
-        total_duration = 0
-        for event in ranked:
-            clip_duration = self.get_clip_duration(event)  # 8-15s per event
-            if total_duration + clip_duration <= target_duration:
-                selected.append(event)
-                total_duration += clip_duration
-
-        # Re-sort chronologically for the reel
-        selected.sort(key=lambda e: e.timestamp)
-
-        # Build FFmpeg filter complex
-        clips = []
-        for event in selected:
-            pre_roll = 4   # seconds before event
-            post_roll = 6  # seconds after (catches celebration)
-
-            if event.type == 'goal':
-                post_roll = 10  # longer for goal celebrations
-
-            clips.append({
-                'start': max(0, event.timestamp - pre_roll),
-                'end': event.timestamp + post_roll,
-                'event_type': event.type
-            })
-
-        # FFmpeg: extract clips, add crossfade transitions, add overlay
-        output_path = self.assemble_with_ffmpeg(
-            source=manifest.source_video,
-            clips=clips,
-            overlay=self.build_overlay(manifest),  # Partner branding
-            transition='crossfade',
-            transition_duration=0.5
-        )
-
-        return output_path
-
-    def assemble_with_ffmpeg(self, source, clips, overlay,
-                              transition, transition_duration):
-        """
-        FFmpeg command to extract and concatenate clips with transitions.
-        """
-        # Step 1: Extract individual clips
-        clip_files = []
-        for i, clip in enumerate(clips):
-            clip_path = f"/tmp/clip_{i}.mp4"
-            subprocess.run([
-                'ffmpeg', '-y',
-                '-ss', str(clip['start']),
-                '-i', source,
-                '-t', str(clip['end'] - clip['start']),
-                '-c:v', 'libx264', '-preset', 'fast',
-                '-c:a', 'aac',
-                clip_path
-            ])
-            clip_files.append(clip_path)
-
-        # Step 2: Concatenate with crossfade transitions
-        # (using ffmpeg xfade filter for smooth transitions)
-        output = f"/tmp/highlight_{uuid4()}.mp4"
-        # ... ffmpeg filter_complex for xfade between clips
-
-        # Step 3: Apply brand overlay (partner logo, match info)
-        if overlay:
-            self.apply_overlay(output, overlay)
-
-        return output
+```
+PLAYHUB Recording Detail Page:
+┌──────────────────────────────────────────────┐
+│  CFA U14 vs City FC  |  3-1  |  15 Feb 2026 │
+│                                               │
+│  📹 Recording  |  🎬 Engine Clips            │
+│                                               │
+│  ┌────────────┐  ┌────────────┐              │
+│  │ [portrait] │  │ [portrait] │              │
+│  │ Full Match │  │ Highlights │              │
+│  │ 9:16       │  │ 75s, 9:16  │              │
+│  │ [Download] │  │ [Download] │              │
+│  └────────────┘  └────────────┘              │
+│                                               │
+│  Event Clips:                                 │
+│  ⚽ Goal 23:41 (home) ★★★★★  [Download]      │
+│  ⚽ Goal 45:02 (away) ★★★★☆  [Download]      │
+│  🟨 Save 67:15 (away) ★★★☆☆  [Download]      │
+│  ⚽ Goal 89:30 (home) ★★★★★  [Download]      │
+│                                               │
+│  All clips include CFA branding               │
+└──────────────────────────────────────────────┘
 ```
 
-### 5.2 Output Formats
+### 7.2 Phase 2: Social Auto-Publish (Future)
 
-| Format              | Specs                        | Use Case                           | FFmpeg flags                            |
-| ------------------- | ---------------------------- | ---------------------------------- | --------------------------------------- |
-| **Social Vertical** | 1080x1920, 9:16, H.264, <60s | Instagram Reels, TikTok, YT Shorts | `-vf "crop=ih*9/16:ih,scale=1080:1920"` |
-| **Social Square**   | 1080x1080, 1:1, H.264        | Instagram Feed, X/Twitter          | `-vf "crop=ih:ih,scale=1080:1080"`      |
-| **Full Horizontal** | 1920x1080, 16:9, H.264       | YouTube, PLAYHUB, website embed    | Direct copy (native format)             |
-| **WhatsApp**        | 480x854, 9:16, H.264, <16MB  | Parent delivery                    | `-vf "scale=480:854" -b:v 1M`           |
-| **Thumbnail**       | 1280x720, JPEG, 85% quality  | Social preview, PLAYHUB listing    | Single frame extraction                 |
+Instagram Graph API, TikTok Content Posting API, YouTube Data API. Requires app review and business verification — weeks of bureaucratic lead time. Build only after Phase 1 proves clips are worth posting.
 
-### 5.3 Brand Overlay System
+### 7.3 PLAYBACK Profile Integration
 
-```python
-class BrandOverlay:
-    """
-    Each partner org has a brand config stored in Supabase.
-    Applied to every generated clip automatically.
-    """
-    def build_overlay(self, manifest):
-        org = get_org_config(manifest.organization_id)
-
-        return {
-            'logo': org.logo_url,           # Top-left corner
-            'logo_position': 'top-left',
-            'logo_size': '10%',             # 10% of frame width
-
-            'match_info': {                  # Bottom bar
-                'home_team': manifest.home_team,
-                'away_team': manifest.away_team,
-                'score': manifest.final_score,  # If available
-                'date': manifest.date,
-                'competition': manifest.competition_name
-            },
-
-            'sponsor_logo': org.sponsor_logo_url,  # Top-right (monetizable)
-            'watermark': 'PLAYBACK',                # Subtle bottom-right
-
-            'intro_card': {                  # 2-second intro slide
-                'title': f"{manifest.home_team} vs {manifest.away_team}",
-                'subtitle': f"Highlights | {manifest.date}",
-                'background': org.brand_color
-            }
-        }
-```
+Engine clips can be imported as profile highlights via the existing `importRecordingAsHighlight` action. The video resolution API (`/api/highlights/[id]/video`) already handles S3 signed URLs.
 
 ---
 
-## 6. Distribution Engine
+## 8. Data Architecture
 
-### 6.1 Social Auto-Publishing (Phase 1 Priority)
+### 8.1 Supabase Schema (Extends Existing)
 
-```python
-class SocialPublisher:
-    """
-    Auto-publish highlights to partner social accounts.
-    """
-
-    async def publish_match_highlights(self, match_id: str, clips: dict):
-        org = await get_org(match_id)
-
-        for platform in org.connected_platforms:
-            clip = clips[platform.preferred_format]  # 9:16 for IG/TT, 16:9 for YT
-
-            caption = self.generate_caption(
-                match=match,
-                platform=platform.name,
-                tone=org.caption_tone  # 'hype', 'professional', 'casual'
-            )
-
-            if platform.name == 'instagram':
-                await self.publish_instagram_reel(
-                    video_path=clip,
-                    caption=caption,
-                    account=platform.credentials
-                )
-            elif platform.name == 'tiktok':
-                await self.publish_tiktok(
-                    video_path=clip,
-                    caption=caption,
-                    account=platform.credentials
-                )
-            elif platform.name == 'youtube':
-                await self.publish_youtube_short(
-                    video_path=clip,
-                    title=f"{match.home} vs {match.away} | Highlights",
-                    description=caption,
-                    account=platform.credentials
-                )
-
-            # Track distribution
-            await supabase.from_('clip_distributions').insert({
-                'clip_id': clip.id,
-                'channel': platform.name,
-                'status': 'sent',
-                'sent_at': datetime.utcnow()
-            })
-
-    def generate_caption(self, match, platform, tone):
-        """Generate platform-appropriate caption."""
-        if tone == 'hype':
-            return (
-                f"🔥 HIGHLIGHTS | {match.home} vs {match.away}\n"
-                f"⚽ {match.total_goals} goals in this one!\n"
-                f"\n"
-                f"#grassrootsfootball #{match.home_hashtag} "
-                f"#{match.away_hashtag} #PLAYBACK"
-            )
-        # ... other tones
-```
-
-### 6.2 Partner Dashboard Integration
-
-Each partner org gets a simple view in PLAYHUB:
-
-```
-Partner Dashboard (PLAYHUB):
-
-┌─────────────────────────────────────────────────────┐
-│  Recent Matches                                      │
-│                                                      │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐          │
-│  │ [thumb]  │  │ [thumb]  │  │ [thumb]  │          │
-│  │ U14 vs   │  │ U16 vs   │  │ U12 vs   │          │
-│  │ City FC  │  │ Rangers  │  │ United   │          │
-│  │ 3 events │  │ 7 events │  │ 2 events │          │
-│  │ ✅ Clips │  │ ✅ Clips │  │ ⏳ Proc  │          │
-│  │  ready   │  │  ready   │  │  essing  │          │
-│  └──────────┘  └──────────┘  └──────────┘          │
-│                                                      │
-│  [Download All]  [Publish to Social]  [View Clips]  │
-└─────────────────────────────────────────────────────┘
-```
-
----
-
-## 7. Data Architecture
-
-### 7.1 Supabase Schema (Minimal — extends existing PLAYHUB tables)
+The `playhub_recording_events` table already exists. We add two tables:
 
 ```sql
--- Event detection results (one per analyzed match)
-CREATE TABLE match_analysis (
+-- Engine processing jobs (one per recording)
+CREATE TABLE playback_engine_jobs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    match_recording_id UUID REFERENCES match_recordings(id),
-    status TEXT CHECK (status IN ('queued','processing','completed','failed')),
-    event_manifest JSONB,
-    model_version TEXT,
+    match_recording_id UUID REFERENCES playhub_match_recordings(id),
+
+    -- Job config
+    requested_by UUID REFERENCES auth.users(id),
+    job_type TEXT CHECK (job_type IN ('portrait_only', 'events_only', 'full')),
+
+    -- Status
+    status TEXT CHECK (status IN ('queued', 'processing', 'completed', 'failed')),
+
+    -- Results
+    events_detected INTEGER,
+    clips_generated INTEGER,
+    portrait_url TEXT,          -- S3 path to portrait full match
     processing_time_seconds FLOAT,
-    total_events_detected INTEGER,
-    avg_confidence FLOAT,
+    model_version TEXT,         -- 'gemini-3-flash' or 'veo-native'
+    error_message TEXT,
+
     created_at TIMESTAMPTZ DEFAULT NOW(),
     completed_at TIMESTAMPTZ
 );
 
--- Generated clips (multiple per match)
-CREATE TABLE generated_clips (
+-- Generated clips (multiple per job)
+CREATE TABLE playback_engine_clips (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    match_analysis_id UUID REFERENCES match_analysis(id),
+    job_id UUID REFERENCES playback_engine_jobs(id),
+    match_recording_id UUID REFERENCES playhub_match_recordings(id),
+
     clip_type TEXT CHECK (clip_type IN (
-        'highlight_reel','goal_clip','save_clip',
-        'event_clip','social_vertical','social_square'
+        'portrait_full', 'highlight_reel', 'event_clip'
     )),
-    event_type TEXT,               -- 'goal', 'save', etc. (NULL for reel)
-    event_timestamp FLOAT,         -- seconds into match
+    event_type TEXT,               -- 'goal', 'save', etc. (NULL for reel/full)
+    event_timestamp FLOAT,
     excitement_score FLOAT,
     duration_seconds FLOAT,
-    formats JSONB,                 -- {"vertical": "s3://...", "horizontal": "s3://..."}
-    thumbnail_url TEXT,
-    overlay_config JSONB,
+
+    -- Storage
+    s3_key TEXT NOT NULL,
+    s3_bucket TEXT NOT NULL,
+    thumbnail_s3_key TEXT,
+
+    -- Overlay applied
+    graphic_package_id UUID REFERENCES playhub_graphic_packages(id),
+
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Distribution tracking
-CREATE TABLE clip_distributions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    clip_id UUID REFERENCES generated_clips(id),
-    channel TEXT CHECK (channel IN (
-        'instagram','tiktok','youtube','playhub','download'
-    )),
-    status TEXT CHECK (status IN ('pending','sent','published','failed')),
-    platform_post_id TEXT,         -- ID from the platform (for tracking)
-    published_at TIMESTAMPTZ,
-    engagement JSONB               -- {views: N, likes: N, shares: N}
-);
-
--- Indexes
-CREATE INDEX idx_analysis_status ON match_analysis(status);
-CREATE INDEX idx_analysis_recording ON match_analysis(match_recording_id);
-CREATE INDEX idx_clips_analysis ON generated_clips(match_analysis_id);
-CREATE INDEX idx_distributions_clip ON clip_distributions(clip_id);
+CREATE INDEX idx_engine_jobs_recording ON playback_engine_jobs(match_recording_id);
+CREATE INDEX idx_engine_jobs_status ON playback_engine_jobs(status);
+CREATE INDEX idx_engine_clips_job ON playback_engine_clips(job_id);
+CREATE INDEX idx_engine_clips_recording ON playback_engine_clips(match_recording_id);
 ```
 
-### 7.2 S3/R2 Storage
+### 8.2 S3 Storage
 
 ```
-playback-engine/
-├── clips/{match_id}/
-│   ├── highlight_reel_16x9.mp4
-│   ├── highlight_reel_9x16.mp4
-│   ├── highlight_reel_1x1.mp4
-│   ├── events/
-│   │   ├── goal_1_16x9.mp4
-│   │   ├── goal_1_9x16.mp4
-│   │   ├── save_1_16x9.mp4
-│   │   └── ...
-│   └── thumbnails/
-│       ├── highlight_thumb.jpg
-│       ├── goal_1_thumb.jpg
-│       └── ...
-└── models/
-    ├── event_detector_v0.pt      # ResNet50 prototype
-    ├── event_detector_v1.pt      # SlowFast production
-    └── training_data/
-        └── labels/               # Bootstrapped + QA'd labels
-```
-
----
-
-## 8. API Design
-
-```
-PLAYBACK Engine API (FastAPI):
-
-# Trigger analysis (called by PLAYHUB when match upload completes)
-POST /api/v1/matches/{match_id}/analyze
-  Body: { "source_url": "s3://...", "organization_id": "uuid" }
-  Response: { "analysis_id": "uuid", "status": "queued" }
-
-# Check status
-GET /api/v1/matches/{match_id}/status
-  Response: { "status": "completed", "events_detected": 7, "clips_ready": true }
-
-# Get event manifest
-GET /api/v1/matches/{match_id}/events
-  Response: { "events": [{ "type": "goal", "timestamp": 1234.5, ... }] }
-
-# Get generated clips
-GET /api/v1/matches/{match_id}/clips
-  Response: { "clips": [{ "type": "highlight_reel", "formats": {...}, ... }] }
-
-# Trigger social publish
-POST /api/v1/matches/{match_id}/publish
-  Body: { "platforms": ["instagram", "tiktok"], "clip_type": "highlight_reel" }
-  Response: { "distributions": [{ "platform": "instagram", "status": "pending" }] }
-
-# Webhook from PLAYHUB (new recording ready)
-POST /api/v1/webhooks/playhub
-  Body: { "event": "recording_complete", "match_id": "uuid", "source_url": "..." }
-
-# Health
-GET /api/v1/health
-```
-
-### 8.1 PLAYHUB Integration Flow
-
-```
-Recording completes on Spiideo
-        │
-        ▼
-PLAYHUB receives AutoFollow MP4
-(already happens today)
-        │
-        ▼
-PLAYHUB fires webhook to Engine
-POST /api/v1/webhooks/playhub
-        │
-        ▼
-Engine queues analysis job (Redis)
-        │
-        ▼
-Worker downloads video, runs event detection
-(~3-8 min depending on model)
-        │
-        ▼
-Worker generates clips (FFmpeg)
-(~2-3 min for all formats)
-        │
-        ▼
-Worker uploads clips to S3/R2
-        │
-        ▼
-Worker updates Supabase (match_analysis + generated_clips)
-        │
-        ▼
-Engine fires webhook back to PLAYHUB
-"clips_ready" event
-        │
-        ▼
-PLAYHUB displays clips in partner dashboard
-+ triggers auto-publish if configured
-        │
-        ▼
-Partner's social accounts get highlights automatically
-(15-30 min after match ends)
+playhub-recordings/          (existing bucket)
+  └── engine/
+      └── {match_id}/
+          ├── portrait_full.mp4
+          ├── highlight_reel_9x16.mp4
+          ├── highlight_reel_16x9.mp4
+          ├── events/
+          │   ├── goal_1_9x16.mp4
+          │   ├── goal_2_9x16.mp4
+          │   ├── save_1_9x16.mp4
+          │   └── ...
+          └── thumbnails/
+              ├── highlight_thumb.jpg
+              ├── goal_1_thumb.jpg
+              └── ...
 ```
 
 ---
@@ -685,191 +601,253 @@ Partner's social accounts get highlights automatically
 ## 9. Deployment
 
 ```
-Phase 1 Deployment (Minimal):
-
 ┌──────────────────────────────────────────┐
-│              AWS (eu-west-2)             │
+│            AWS (eu-west-2)               │
+│         Same account as PLAYHUB          │
 │                                          │
 │  ┌────────────────┐  ┌───────────────┐  │
-│  │ ECS Fargate     │  │ EC2 Spot      │  │
+│  │ Lambda          │  │ EC2 Spot      │  │
 │  │                 │  │ (g5.xlarge)   │  │
-│  │ Engine API      │  │               │  │
-│  │ (FastAPI)       │  │ CV Worker     │  │
-│  │                 │  │ (PyTorch)     │  │
 │  │ Clip Generator  │  │               │  │
-│  │ (FFmpeg)        │  │ Only runs     │  │
-│  │                 │  │ during batch  │  │
-│  │ Social Publisher│  │ processing    │  │
+│  │ (FFmpeg layer)  │  │ Portrait      │  │
+│  │                 │  │ Converter     │  │
+│  │ Gemini API      │  │ (YOLO +       │  │
+│  │ calls           │  │  ByteTrack)   │  │
+│  │                 │  │               │  │
+│  │ Veo tag sync    │  │ Runs only     │  │
+│  │                 │  │ when jobs      │  │
+│  │                 │  │ are queued     │  │
 │  └───────┬────────┘  └──────┬────────┘  │
 │          │                   │           │
 │  ┌───────▼───────────────────▼────────┐  │
-│  │         Redis (ElastiCache)         │  │
-│  │         Job queue                   │  │
+│  │         SQS (Job queue)            │  │
 │  └────────────────────────────────────┘  │
 │                                          │
 │  ┌──────────────┐  ┌─────────────────┐  │
-│  │ S3 / R2       │  │ Supabase        │  │
-│  │ (clips)       │  │ (DB - existing) │  │
+│  │ S3 (existing) │  │ Supabase        │  │
+│  │ engine/ prefix│  │ (existing DB)   │  │
 │  └──────────────┘  └─────────────────┘  │
 └──────────────────────────────────────────┘
 
-External:
-├── Netlify → PLAYHUB (playhub.playbacksports.ai)
-├── Instagram Graph API
-├── TikTok Content Posting API
-└── YouTube Data API v3
-
-Monthly Cost Estimate (Phase 1):
-├── ECS Fargate (API + FFmpeg): ~£150/mo
-├── EC2 Spot g5.xlarge (GPU, ~20hrs/week): ~£200/mo
-├── Redis (ElastiCache t3.micro): ~£15/mo
-├── S3 storage (~500GB clips/month): ~£12/mo
-├── S3 egress + CDN: ~£30/mo
-└── TOTAL: ~£400-500/mo
+Monthly Cost Estimate (500 matches/week):
+├── EC2 Spot g5.xlarge (~20hrs/week): ~£255/mo
+├── Lambda (clip assembly): ~£50-100/mo
+├── Gemini 3 Flash Batch API: ~£270/mo (estimated, pricing TBC)
+├── S3 storage: ~£20/mo
+├── SQS: ~£5/mo
+└── TOTAL: ~£600-650/mo (custom portrait)
+    OR: ~£400-500/mo (if Cloudinary g_auto works, no EC2 needed)
 ```
-
-**That's less than one month of manual AutoData costs.**
 
 ---
 
-## 10. Build Plan — 6 Weeks to First Highlights
+## 10. Build Plan — 5 Weeks to First Clips
 
-### Week 1: Foundation
+### Week 1: Validation Sprint (CRITICAL — test before building)
 
-- [ ] FastAPI service scaffold with health endpoint
-- [ ] S3 bucket setup (playback-engine/)
-- [ ] Redis queue setup
-- [ ] Supabase schema migration (match_analysis, generated_clips, clip_distributions)
-- [ ] PLAYHUB webhook endpoint (receive recording_complete events)
+- [ ] **Test Gemini 3 Flash** on 5 Spiideo recordings:
+  - Transcode 4K→720p, upload to Gemini, run event detection prompt
+  - Measure: event recall, timestamp accuracy, drift on 90-min matches
+  - Try chunked (6×15 min) vs full upload — compare timestamp quality
+  - Try higher FPS (2-5 FPS) vs default 1 FPS
+  - **Go/no-go decision on Gemini for event detection**
+- [ ] **Test Cloudinary `g_auto`** on 3-5 Spiideo recordings (portrait conversion quality)
+- [ ] **Request OpusClip API access** and evaluate if available
+- [ ] Create `playback_engine_jobs` and `playback_engine_clips` tables
+- [ ] S3 prefix `engine/` under existing bucket
+- [ ] Build 4K→720p transcode step (FFmpeg Lambda)
+- [ ] **Decision gate:** Gemini vs T-DEED for events, Cloudinary vs custom for portrait
 
-### Week 2: Training Data Bootstrap
+### Week 2: Gemini 3 Flash Event Detection on Spiideo
 
-- [ ] Script to download AutoFollow recordings from PLAYHUB/Spiideo
-- [ ] Script to split recordings into 10-second clips at 2fps
-- [ ] GPT-4o / Claude vision labeling pipeline (batch API)
-- [ ] Label QA interface (simple web page to verify/correct labels)
-- [ ] Target: 50 matches labeled by end of week
+- [ ] Gemini 3 Flash event detection pipeline (Batch API)
+- [ ] Handle: transcode → upload to Gemini 3 → parse JSON response → store events
+- [ ] Test on 5-10 Spiideo recordings — verify event accuracy and timestamps
+- [ ] Store results in `playhub_recording_events` (source: 'ai_detected')
+- [ ] Measure: accuracy, missed events, timestamp precision
 
-### Week 3: Event Detection Model v0
+### Week 3: Portrait Conversion Pipeline
 
-- [ ] Train ResNet50 + temporal pooling on bootstrapped labels
-- [ ] Evaluation on held-out test set (target: >70% accuracy on goals/corners)
-- [ ] Inference pipeline: video in → event manifest out
-- [ ] Integration with job queue (worker picks up analysis jobs)
+- [ ] **If Cloudinary works:** integrate `g_auto` API for portrait conversion
+- [ ] **If custom needed:** FootAndBall + ByteTrack on EC2 g5 spot
+- [ ] SmartCrop algorithm with hybrid tracking (ball + player cluster fallback)
+- [ ] FFmpeg 9:16 extraction with computed crop coordinates
+- [ ] Test on 5 CFA recordings — evaluate smoothness and ball-follow accuracy
+- [ ] Lambda function for FFmpeg clip assembly (separate from GPU work)
 
-### Week 4: Clip Engine
+### Week 4: Clip Engine + Brand Overlays
 
-- [ ] FFmpeg clip extraction from timestamps
-- [ ] Highlight reel assembly (top N events by excitement, crossfade transitions)
-- [ ] Format conversion (16:9, 9:16, 1:1)
-- [ ] Brand overlay rendering (partner logo, match info bar)
+- [ ] Highlight reel assembly (top events by excitement, crossfade)
+- [ ] Individual event clip extraction
+- [ ] Brand overlay burn-in using existing graphic packages
 - [ ] Thumbnail generation (key frame extraction)
-- [ ] Upload to S3, update Supabase
+- [ ] Upload to S3, update Supabase tables
 
-### Week 5: Distribution + PLAYHUB Integration
+### Week 5: PLAYHUB Integration + Pilot
 
-- [ ] Instagram Reels auto-publish (Graph API)
-- [ ] TikTok auto-publish (Content Posting API)
-- [ ] YouTube Shorts auto-publish (Data API v3)
-- [ ] Caption generation (template-based, per platform)
-- [ ] PLAYHUB dashboard: show generated clips per match
-- [ ] PLAYHUB: download clips, trigger manual publish
+- [ ] PLAYHUB API: trigger Engine processing for a recording
+- [ ] PLAYHUB UI: "Engine Clips" tab on recording detail page
+- [ ] Download links for all generated clips
+- [ ] End-to-end test: Spiideo recording → events → portrait → clips → download
+- [ ] Run on 20 real CFA matches
+- [ ] Review output quality, fix critical issues
+- [ ] **Ship to CFA as first partner**
 
-### Week 6: Testing + First Partner Pilot
+### Post-Launch (Weeks 6-8):
 
-- [ ] End-to-end test: Spiideo recording → PLAYHUB → Engine → clips → social
-- [ ] Run on 20 real matches from one partner
-- [ ] Measure: detection accuracy, clip quality, publish success rate
-- [ ] Partner feedback session
-- [ ] Fix critical issues
-- [ ] **Ship to first partner org** 🚀
-
-### Post-Launch (Weeks 7-12):
-
-- [ ] Train SlowFast model on growing dataset (accuracy → 88%+)
-- [ ] Add more event types (tackles, near misses, counterattacks)
-- [ ] Engagement tracking (views, likes, shares per clip)
-- [ ] A/B test thumbnail styles
-- [ ] WhatsApp parent delivery (Phase 2 feature)
-- [ ] Player-level clips using panoramic footage + tracking (Phase 2)
+- [ ] Gemini 3 Flash event detection tuning (prompt refinement, edge cases)
+- [ ] Portrait quality improvements (smoothing, edge-case handling)
+- [ ] Pricing/billing integration (per-recording or subscription)
+- [ ] Engagement tracking (downloads, views per clip)
+- [ ] Veo goal clip → portrait pipeline (secondary, for PLAYBACK social media)
+- [ ] Social auto-publish API integration (Instagram, TikTok — Phase 2)
 
 ---
 
 ## 11. Success Metrics
 
-| Metric                                    | Week 6 (Launch)      | Month 3         | Month 6         |
-| ----------------------------------------- | -------------------- | --------------- | --------------- |
-| Matches auto-analyzed                     | 20/week              | 200/week        | 500/week        |
-| Clips auto-generated                      | 100/week             | 1,000/week      | 5,000/week      |
-| Social posts published                    | 40/week              | 400/week        | 1,000/week      |
-| Event detection accuracy                  | >70% goals           | >85% all events | >90% all events |
-| Time: match end → clips ready             | <30 min              | <20 min         | <15 min         |
-| Partner orgs using                        | 1                    | 5               | 15+             |
-| Manual AutoData cost replaced             | £0 (wasn't using it) | £0              | £0              |
-| Social engagement lift (partner accounts) | Baseline             | +50%            | +100%           |
+| Metric                            | Week 4 (Launch)        | Month 3    | Month 6    |
+| --------------------------------- | ---------------------- | ---------- | ---------- |
+| Recordings processed              | 20                     | 200/week   | 500/week   |
+| Portrait conversions              | 20                     | 200/week   | 500/week   |
+| Clips generated                   | 100                    | 1,000/week | 5,000/week |
+| Event detection accuracy (Veo)    | Use Veo's own accuracy | Same       | Same       |
+| Event detection accuracy (Gemini) | >80%                   | >85%       | >90%       |
+| Time: recording → clips ready     | <60 min                | <30 min    | <20 min    |
+| Partner orgs using                | 1 (CFA)                | 5          | 15+        |
 
 ---
 
 ## 12. Cost Comparison
 
-| Approach                      | Monthly Cost  | Clips/Month | Cost/Clip  |
-| ----------------------------- | ------------- | ----------- | ---------- |
-| **Spiideo AutoData (manual)** | ~£2,000-5,000 | ~200        | £10-25     |
-| **Hire a video editor**       | ~£3,000+      | ~100-200    | £15-30     |
-| **PLAYBACK Engine**           | ~£400-500     | 4,000+      | £0.10-0.12 |
-
-**100x cheaper per clip. Fully automated. Scales linearly.**
-
----
-
-## 13. Future: From AutoFollow Events to Full Platform
-
-This Phase 1 pipeline (AutoFollow → events → clips → social) is the wedge. Once it's live and generating content, the path to the full PLAYBACK Engine (v1 spec) becomes:
-
-```
-Phase 1 (THIS DOC):
-AutoFollow footage → Event detection → Highlights → Social publishing
-Timeline: 6 weeks | Cost: ~£500/mo
-
-Phase 2 (Month 3-6):
-+ Raw panoramic footage → Player tracking → "My Child" clips → WhatsApp
-+ Player profiles + auto-showreels
-+ Scout portal
-Timeline: 3-4 months | Cost: ~£2,000/mo
-
-Phase 3 (Month 6-12):
-+ Tactical analysis (formations, press, transitions)
-+ AI commentary / captions (multilingual)
-+ Development tracking (player progression over time)
-+ Multi-sport models (padel, cricket)
-Timeline: 6 months | Cost: ~£5,000/mo
-
-Phase 4 (Year 2):
-+ Full WSC-equivalent platform
-+ PLAYBACK Network (content syndication)
-+ Predictive development insights
-+ Revenue: £500K-2M ARR
-```
-
-The key insight: **Phase 1 generates immediate value (social content for partners) with minimal investment, proving the pipeline works before committing to the full CV stack.**
+| Approach                      | Monthly Cost        | Clips/Month | Cost/Clip  |
+| ----------------------------- | ------------------- | ----------- | ---------- |
+| **WSC Sports (enterprise)**   | ~£50,000-200,000/yr | Unlimited   | N/A        |
+| **Spiideo AutoData (manual)** | ~£2,000-5,000       | ~200        | £10-25     |
+| **Hire a video editor**       | ~£3,000+            | ~100-200    | £15-30     |
+| **PLAYBACK Engine**           | ~£400-650           | 4,000+      | £0.10-0.15 |
 
 ---
 
-## 14. What We DON'T Build in Phase 1
+## 13. What We DON'T Build in Phase 1
 
-Explicitly out of scope to keep the 6-week timeline:
-
-| Feature                          | Why Not Yet                                     | When               |
-| -------------------------------- | ----------------------------------------------- | ------------------ |
-| Player identification / tracking | Needs panoramic footage + annotation investment | Phase 2            |
-| "My Child" player-level clips    | Needs player tracking first                     | Phase 2            |
-| WhatsApp parent delivery         | Needs player-level clips + parent onboarding    | Phase 2            |
-| Tactical analysis                | Needs full-pitch view + formation detection     | Phase 3            |
-| Scout portal                     | Needs player profiles + showreels               | Phase 2            |
-| AI commentary / voiceover        | Nice-to-have, not core                          | Phase 3            |
-| Multi-sport models               | Football first, expand after                    | Phase 3            |
-| Real-time (live) processing      | Post-match processing is fine for grassroots    | Never (or Phase 4) |
+| Feature                     | Why Not Yet                                          | When                                  |
+| --------------------------- | ---------------------------------------------------- | ------------------------------------- |
+| Social auto-publish         | Requires platform app review + business verification | Phase 2                               |
+| Player identification       | Needs annotation investment + panoramic footage      | Phase 3                               |
+| "My Child" player clips     | Needs player tracking first                          | Phase 3                               |
+| WhatsApp parent delivery    | Needs player-level clips                             | Phase 3                               |
+| Tactical analysis           | Needs full-pitch view + formation detection          | Phase 3                               |
+| AI commentary / voiceover   | Nice-to-have, not core                               | Phase 3                               |
+| Real-time (live) processing | Post-match is fine for grassroots                    | Never (or Phase 4)                    |
+| Custom CV model training    | Gemini 3 Flash + FootAndBall is cheaper if validated | Only if API approach fails validation |
 
 ---
 
-_Phase 1 ships in 6 weeks. Replaces manual tagging at 100x lower cost. Every match auto-generates branded highlights for social. The data flywheel starts spinning from day one._
+## 14. Technical Research Findings (March 2026)
+
+This section documents verified research to avoid building on wrong assumptions.
+
+### 14.1 Event Detection — Model Comparison
+
+| Option                 | Cost/Match        | Native Video?         | Proven on Sports?                 | Infra                       |
+| ---------------------- | ----------------- | --------------------- | --------------------------------- | --------------------------- |
+| **Veo built-in tags**  | $0                | N/A                   | Yes (Veo's own system)            | None — just pull data       |
+| **Gemini 3 Flash**     | TBC (~$0.17 est.) | **Yes**               | **No — untested on full matches** | None — API call             |
+| **SoccerNet T-DEED**   | ~$0.10 (GPU)      | N/A (custom CV)       | **Yes — SoccerNet 2025 winner**   | EC2 GPU + fine-tuning       |
+| **Claude (Anthropic)** | N/A               | **No** — no video API | N/A                               | Would need frame extraction |
+| **GPT-4o (OpenAI)**    | N/A               | **No** — no video API | N/A                               | Would need frame extraction |
+| **Twelve Labs**        | ~$3.00            | Yes                   | Unknown                           | API call                    |
+
+**Decision:** Test Gemini 3 Flash first (simplest to try — it's an API call). If timestamp drift or accuracy is unacceptable on our footage, fall back to T-DEED (proven on SoccerNet, but requires more engineering).
+
+**Key caveat: No production evidence exists for Gemini on full-match event detection.** The best evidence is:
+
+- SportU benchmark: ~65% accuracy (Gemini 1.5 Pro, Oct 2024). Gemini 3 is newer but no sports benchmark published.
+- Hobby projects ([Hylytr](https://ai.google.dev/competition/projects/hylytr), [FootballVideoAnalyst](https://github.com/yYorky/FootballVideoAnalyst)) demo feasibility on highlight clips, not full matches.
+- Timestamp drift documented on [Google AI Forum](https://discuss.ai.google.dev/t/improve-timestamp-accuracy-on-video-understanding/95356) — still open as of 2026.
+- SoccerNet 2025 winning models all use traditional CV (T-DEED), not LLMs.
+
+**Gemini caveats to plan for:**
+
+- 2GB file upload limit → must transcode 4K Spiideo footage to 720p before upload
+- 1 FPS default sampling (configurable) → fast events may be missed
+- Timestamp accuracy ±2-5 seconds, worse on long videos → may need video chunking
+- Upload + processing latency: 15-45 minutes per match
+- Compressed panoramic footage loses detail → Gemini sees player blobs, not faces
+
+### 14.2 Ball Detection — Panoramic vs Broadcast Reality
+
+**The "0.925 mAP" figure is misleading.** That's for broadcast cameras (close-up, TV-quality, ball is 30-50px). On Spiideo's static panoramic cameras, the ball is 8-16 pixels wide and invisible 30-65% of the time.
+
+| Scenario                | Ball AP          | Ball Size | Notes                                        |
+| ----------------------- | ---------------- | --------- | -------------------------------------------- |
+| Broadcast (TV camera)   | 0.92-0.95        | 30-50px   | Close-up, well-lit                           |
+| Panoramic + SAHI tiling | 0.85-0.90        | 8-16px    | Tiling splits frame into overlapping regions |
+| Panoramic, no tiling    | 0.60-0.70        | 8-16px    | Ball too small for standard detection        |
+| Ball not visible        | 30-65% of frames | N/A       | Behind players, in scrums, off-screen        |
+
+**Best models for our use case:**
+
+| Model                   | Designed For               | Ball AP (long-shot)    | Notes                                       |
+| ----------------------- | -------------------------- | ---------------------- | ------------------------------------------- |
+| **FootAndBall**         | Long-shot static cameras   | 0.909 (ISSIA-CNR)      | Purpose-built for 8-16px balls              |
+| **YOLO v11 + SAHI**     | General detection + tiling | 0.85-0.90 (panoramic)  | Generic but adaptable                       |
+| **SoccerNet detection** | Broadcast footage          | 0.92+ (broadcast only) | Won't work on panoramic without fine-tuning |
+
+**Hybrid tracking is mandatory (not optional):**
+All three companies that do this at scale (Spiideo AutoFollow, Veo, Pixellot) use the same approach:
+
+1. Track ball when detected with high confidence
+2. Fall back to player cluster centroid when ball is lost
+3. Apply heavy temporal smoothing to prevent jumps
+4. Hold position during stoppages
+
+We must implement the same hybrid approach from day one.
+
+### 14.3 Portrait Conversion — Ready-Made vs Custom
+
+| Option                                   | Cost/Match       | Quality               | Control                | Status                              |
+| ---------------------------------------- | ---------------- | --------------------- | ---------------------- | ----------------------------------- |
+| **Cloudinary `g_auto`**                  | ~$0.40/min video | Unknown (test needed) | Low — black box        | **Test first**                      |
+| **OpusClip API**                         | Unknown          | Claims ball tracking  | Low — black box        | **Request API access**              |
+| **FootAndBall + ByteTrack + FFmpeg**     | ~$0.50 (GPU)     | High (custom tuned)   | Full                   | Build if ready-made fails           |
+| **YOLO v11 + SAHI + ByteTrack + FFmpeg** | ~$0.50 (GPU)     | Good                  | Full                   | Backup option                       |
+| **Google AutoFlip**                      | N/A              | N/A                   | N/A                    | **DEPRECATED (dead since 2023)**    |
+| **WSC Sports**                           | £50K-200K/yr     | Best                  | None — enterprise SaaS | Too expensive                       |
+| **Generative AI (Luma, Runway)**         | N/A              | N/A                   | N/A                    | **Wrong tool** — fabricates content |
+
+**Decision:**
+
+1. **Week 1:** Test Cloudinary `g_auto` on 3-5 Spiideo recordings. If quality is acceptable, use it.
+2. **Week 1:** Request OpusClip API access. If they have real ball tracking, evaluate.
+3. **If both fail:** Build custom pipeline with FootAndBall + ByteTrack + FFmpeg.
+
+**Do NOT use:** Google AutoFlip (deprecated 2023), generative AI models (they fabricate frames), or generic YOLO without tiling.
+
+### 14.4 Video Captioning (Future)
+
+| Option             | Cost/Match        | Best For                                      |
+| ------------------ | ----------------- | --------------------------------------------- |
+| **Gemini 3 Flash** | TBC (~$0.17 est.) | Bulk captioning, event descriptions           |
+| **Twelve Labs**    | ~$3.00            | Semantic video search ("show me all corners") |
+
+---
+
+## 15. Risks and Mitigations
+
+| Risk                                              | Impact                                                 | Likelihood  | Mitigation                                                                                                                                     |
+| ------------------------------------------------- | ------------------------------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ball detection AP too low on panoramic            | Portrait crop wanders aimlessly                        | Medium      | Hybrid tracking (ball + players). Test FootAndBall first. Accept that crop follows "action area" not "ball" most of the time.                  |
+| Gemini 3 misses fast events (1 FPS sampling)      | Missing quick free kicks, deflections, rapid sequences | Medium      | Increase FPS for sports (2-5 FPS). Generous clip pre/post-roll (4s before, 10s after). Accept ~85% event recall as good enough for grassroots. |
+| Gemini 3 timestamp drift on long videos           | Events mislocated by minutes                           | Medium-High | Chunk 90-min match into 6×15-min segments. Process each separately, merge events. Documented issue on Google forums.                           |
+| 4K→720p transcode loses too much detail           | Gemini can't distinguish events                        | Low         | Test at 720p first. Fall back to default resolution (higher cost) if needed.                                                                   |
+| Gemini 3 event detection accuracy insufficient    | <70% recall on grassroots footage                      | Medium      | Fall back to T-DEED (SoccerNet winner, proven CV model). More engineering but reliable.                                                        |
+| Cloudinary g_auto doesn't follow ball             | Quality not acceptable for sports                      | Medium      | This is why we test it first on 3-5 recordings before committing. Have custom pipeline as fallback.                                            |
+| Spiideo 4K files too large for Lambda (10GB /tmp) | Can't process in Lambda                                | Low         | Use EC2 for portrait conversion. Lambda only for final clip assembly (shorter clips).                                                          |
+| GPU spot instance interruptions                   | Processing fails mid-job                               | Low         | Checkpoint progress. Use SQS with visibility timeout for retry. Spot interruption rate for g5 is ~5%.                                          |
+| Gemini API rate limits at scale                   | Can't process 500 matches/week                         | Low         | Batch API has higher limits. Spread across 24 hours.                                                                                           |
+
+---
+
+_Phase 1 ships in 5 weeks. Week 1 validates both Gemini 3 Flash (event detection) and Cloudinary/OpusClip (portrait conversion) on real Spiideo recordings before committing to any approach. Spiideo 4K recordings get AI event tags + portrait conversion as a paid service. T-DEED (SoccerNet winner) is the fallback if Gemini doesn't perform. Brand overlays burned in from existing graphic packages. Partners download and post._

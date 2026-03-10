@@ -10,14 +10,16 @@ All organizations are treated equally today. In reality, there are different rel
 ## Current State
 
 ### Organization Types (in DB)
-| Org | Type | Parent | Notes |
-|-----|------|--------|-------|
-| Nazwa | venue | null | Should be child of Li3ib |
-| CFA | academy | null | Independent |
-| SEFA | academy | null | Independent |
-| DAFL | league | null | Uses external venues (The Sevens, Jebel Ali) |
+
+| Org   | Type    | Parent | Notes                                        |
+| ----- | ------- | ------ | -------------------------------------------- |
+| Nazwa | venue   | null   | Should be child of Li3ib                     |
+| CFA   | academy | null   | Independent                                  |
+| SEFA  | academy | null   | Independent                                  |
+| DAFL  | league  | null   | Uses external venues (The Sevens, Jebel Ali) |
 
 ### Key DB Facts
+
 - `organizations.parent_organization_id` **already exists** as a column with self-referencing FK — just unused
 - `playhub_match_recordings.organization_id` = the org that owns the recording (currently always the venue)
 - `playhub_match_recordings.venue` = free-text venue name (not an FK)
@@ -29,12 +31,13 @@ All organizations are treated equally today. In reality, there are different rel
 ## Proposed Model
 
 ### Organization Types
-| Type | Example | Description |
-|------|---------|-------------|
-| `group` | Li3ib, Powerleague | Contract holder / parent company |
-| `venue` | Nazwa, Powerleague Shoreditch, The Sevens | Physical location with cameras |
-| `league` | DAFL | League that uses venues they don't own |
-| `academy` | CFA, SEFA | Academy (may or may not own venues) |
+
+| Type      | Example                                   | Description                            |
+| --------- | ----------------------------------------- | -------------------------------------- |
+| `group`   | Li3ib, Powerleague                        | Contract holder / parent company       |
+| `venue`   | Nazwa, Powerleague Shoreditch, The Sevens | Physical location with cameras         |
+| `league`  | DAFL                                      | League that uses venues they don't own |
+| `academy` | CFA, SEFA                                 | Academy (may or may not own venues)    |
 
 ### Relationship 1: Ownership (`parent_organization_id`)
 
@@ -49,6 +52,7 @@ Powerleague (group)
 ```
 
 **Rules:**
+
 - Parent org admins automatically have admin access to all child orgs
 - Revenue from child orgs rolls up to parent dashboard
 - Feature flags on the parent cascade to children (unless overridden)
@@ -91,6 +95,7 @@ CREATE INDEX idx_org_venue_access_venue ON organization_venue_access(venue_organ
 | DAFL | Jebel Ali | true | true | DAFL's graphics package |
 
 **Rules:**
+
 - DAFL admins can start recordings at The Sevens
 - Those recordings have `organization_id = DAFL` (belong to DAFL)
 - Those recordings have `venue_organization_id = The Sevens` (location metadata)
@@ -101,10 +106,12 @@ CREATE INDEX idx_org_venue_access_venue ON organization_venue_access(venue_organ
 ### Recording Ownership Change
 
 Currently `playhub_match_recordings` has:
+
 - `organization_id` = the venue (owner)
 - `venue` = free text
 
 **New model:**
+
 - `organization_id` = the org that OWNS/INITIATED the recording (could be DAFL, could be Nazwa)
 - Add `venue_organization_id` = the physical venue where it was recorded (FK to organizations)
 
@@ -119,6 +126,7 @@ UPDATE playhub_match_recordings
 ```
 
 This means:
+
 - When Nazwa schedules a recording → `organization_id = Nazwa`, `venue_organization_id = Nazwa`
 - When DAFL schedules at The Sevens → `organization_id = DAFL`, `venue_organization_id = The Sevens`
 - Venue page filters by `venue_organization_id` OR `organization_id` (depending on context)
@@ -129,7 +137,10 @@ This means:
 ### `isVenueAdmin()` — Update to support parent orgs
 
 ```typescript
-export async function isVenueAdmin(userId: string, organizationId: string): Promise<boolean> {
+export async function isVenueAdmin(
+  userId: string,
+  organizationId: string
+): Promise<boolean> {
   // ... existing profile lookup ...
 
   // Check direct membership (existing)
@@ -141,7 +152,10 @@ export async function isVenueAdmin(userId: string, organizationId: string): Prom
     .eq('is_active', true)
     .single()
 
-  if (directMembership && ['club_admin', 'league_admin'].includes(directMembership.role)) {
+  if (
+    directMembership &&
+    ['club_admin', 'league_admin'].includes(directMembership.role)
+  ) {
     return true
   }
 
@@ -161,7 +175,10 @@ export async function isVenueAdmin(userId: string, organizationId: string): Prom
       .eq('is_active', true)
       .single()
 
-    if (parentMembership && ['club_admin', 'league_admin'].includes(parentMembership.role)) {
+    if (
+      parentMembership &&
+      ['club_admin', 'league_admin'].includes(parentMembership.role)
+    ) {
       return true
     }
   }
@@ -173,18 +190,22 @@ export async function isVenueAdmin(userId: string, organizationId: string): Prom
 ### Venue page recording visibility
 
 When viewing a venue page (e.g., Nazwa):
+
 - Show recordings where `organization_id = venueId` (Nazwa's own recordings)
 - Do NOT show recordings where `venue_organization_id = venueId` but `organization_id != venueId` (DAFL's recordings at Nazwa)
 
 When viewing an org dashboard (e.g., DAFL):
+
 - Show recordings where `organization_id = DAFL` (across all venues)
 
 When viewing a parent dashboard (e.g., Li3ib):
+
 - Show recordings where `organization_id IN (Li3ib, Nazwa, other children)`
 
 ### Scheduling recordings at a tenant venue
 
 When DAFL wants to schedule a recording at The Sevens:
+
 1. Check `organization_venue_access` for DAFL → The Sevens with `can_record = true`
 2. Use The Sevens' Spiideo scenes (camera infrastructure belongs to the venue)
 3. Create recording with `organization_id = DAFL`, `venue_organization_id = The Sevens`
@@ -193,6 +214,7 @@ When DAFL wants to schedule a recording at The Sevens:
 ## Implementation Plan
 
 ### Phase 0: DB cleanup (before hierarchy) — COMPLETED 2026-03-08
+
 - [x] Create `is_org_member()` DB function to centralize admin checks across 10+ RLS policies
   - `SECURITY DEFINER STABLE`, grants to `authenticated` and `anon`
   - Default roles: `admin`, `club_admin`, `league_admin`, `manager`
@@ -209,6 +231,7 @@ When DAFL wants to schedule a recording at The Sevens:
 - [x] Add composite index `organization_members(profile_id, role, is_active)` for RLS perf
 
 ### Phase 1: DB & Data (no UI changes) — COMPLETED 2026-03-08
+
 - [x] Add `venue_organization_id` column to `playhub_match_recordings` (FK to organizations)
   - Added as nullable → backfilled → set NOT NULL
   - Index: `idx_recordings_venue_org` on `(venue_organization_id)`
@@ -235,6 +258,7 @@ When DAFL wants to schedule a recording at The Sevens:
 - [x] Regenerated Supabase TypeScript types — zero type errors
 
 ### Phase 2: Access control updates — COMPLETED 2026-03-08
+
 - [x] Update `isVenueAdmin()` to check parent org membership (one level up only)
   - Queries `organizations.parent_organization_id`, then checks membership on parent
   - Single extra DB query, only when direct membership check fails
@@ -251,17 +275,20 @@ When DAFL wants to schedule a recording at The Sevens:
 - [x] Zero TypeScript errors
 
 ### Phase 3: Admin dashboard — COMPLETED 2026-03-08
+
 - [x] Show org type, parent, and children in admin organizations page
 - [x] Allow setting parent org from admin dashboard
 - [x] Allow creating `organization_venue_access` entries from admin
 - [x] Show org hierarchy (simple parent → children, max 2 levels)
 
 ### Phase 4: Venue page updates — COMPLETED 2026-03-08
+
 - [x] When scheduling recording, if user has tenant access to venue, use their org's graphic package
 - [x] Show which org a recording belongs to on the venue page
 - [x] Parent org users see all child venue recordings in their dashboard
 
 ### Phase 5: Group dashboard — COMPLETED 2026-03-08
+
 - [x] Birds-eye view for parent orgs (Li3ib, Powerleague)
 - [x] Aggregate revenue across all child venues (query existing invoice data, no new tables)
 - [x] Per-venue breakdown with daily targets and monthly stats
@@ -309,16 +336,19 @@ CREATE TABLE organization_venue_access (
 ## Billing Implications
 
 ### Per-venue billing (no change needed)
+
 - `playhub_venue_billing_config` is per-venue — stays as-is
 - Venue-level billing (fixed cost, ambassador %, profit share) continues to work
 - Invoices are generated per venue, not per parent
 
 ### Marketplace revenue attribution
+
 - `playhub_purchases.organization_id` follows the recording's `organization_id`
 - If DAFL sells a recording → revenue goes to DAFL, not The Sevens
 - If Nazwa sells a recording → revenue goes to Nazwa (and rolls up to Li3ib dashboard)
 
 ### Parent group dashboard (Phase 5)
+
 - Aggregates `playhub_venue_billing_config` across child venues
 - Shows combined revenue, per-venue breakdown, targets
 - No new billing tables needed — just query child org IDs
@@ -326,10 +356,12 @@ CREATE TABLE organization_venue_access (
 ### Tenant billing — two models
 
 **Model A: Venue pays (Nazwa/Li3ib)**
+
 - Standard per-recording billing → monthly invoice → profit sharing
 - Venue absorbs infrastructure cost, recoups through walk-in QR sales
 
 **Model B: Free recording / marketplace monetization (DAFL)**
+
 - League records for free (`billing_responsibility: 'none'`)
 - No per-recording invoice — infrastructure cost subsidized by PLAYHUB
 - League monetizes through:
@@ -340,6 +372,7 @@ CREATE TABLE organization_venue_access (
 - Revenue split: PLAYHUB takes a % of marketplace sales (e.g., 20%)
 
 **Implementation:**
+
 - `billing_responsibility` on `organization_venue_access` supports: `'venue'`, `'tenant'`, `'none'`
 - Leagues with `'none'` skip per-recording billing entirely
 - Leagues need marketplace settings: either reuse `organizations` marketplace fields or a lightweight `playhub_org_marketplace_config` table
@@ -348,28 +381,32 @@ CREATE TABLE organization_venue_access (
 ## What Changes for Existing Users
 
 ### Nazwa venue page (li3ib user)
+
 - No visible change — recordings still show, same functionality
 - Li3ib admins will also be able to access it (once parent is set)
 
 ### Existing recordings
+
 - All get `venue_organization_id` backfilled = their current `organization_id`
 - No ownership change — Nazwa's recordings stay as Nazwa's
 
 ### Existing APIs
+
 - Venue recordings API (`/api/venue/[venueId]/recordings`) — no change, already filters by `organization_id`
 - Billing API — no change, billing is per-venue org
 - Access control — enhanced (parent admin support), not changed
 
 ## Risks & Mitigations
 
-| Risk | Mitigation |
-|------|------------|
-| Breaking existing recording queries | Backfill ensures `venue_organization_id = organization_id` for all existing data |
-| Performance: extra DB query for parent check | Single additional query in `isVenueAdmin()`, cacheable |
-| RLS policies need updating | Current RLS checks `organization_members` — parent check would need to be added or handled app-side |
-| Tenant org scheduling at wrong venue | `organization_venue_access` enforces which venues each org can use |
+| Risk                                         | Mitigation                                                                                          |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Breaking existing recording queries          | Backfill ensures `venue_organization_id = organization_id` for all existing data                    |
+| Performance: extra DB query for parent check | Single additional query in `isVenueAdmin()`, cacheable                                              |
+| RLS policies need updating                   | Current RLS checks `organization_members` — parent check would need to be added or handled app-side |
+| Tenant org scheduling at wrong venue         | `organization_venue_access` enforces which venues each org can use                                  |
 
 ## Questions Resolved
+
 - Recordings belong to whoever initiated them (not the venue)
 - Venue admins only see their own org's recordings
 - Tenants (DAFL) can grant access to venue admins via existing access rights system
@@ -381,6 +418,7 @@ CREATE TABLE organization_venue_access (
 ### What Was Done
 
 **Phase 0 — DB cleanup (7 migrations):**
+
 1. Created `is_org_member()` function — centralized admin check for RLS, `SECURITY DEFINER STABLE`
 2. Fixed `playhub_pending_admin_invites` RLS — replaced wide-open `USING (true)` with org-admin-scoped policies
 3. Fixed `profiles` SELECT policy — dropped blanket `"Allow public profile viewing"` with `USING (true)`
@@ -390,6 +428,7 @@ CREATE TABLE organization_venue_access (
 7. Added composite index `(profile_id, role, is_active)` on `organization_members`
 
 **Phase 1 — DB schema & data (5 migrations):**
+
 1. Created circular reference prevention trigger (`prevent_circular_org_reference`)
    - Prevents self-reference, 3+ level depth, and reparenting orgs with children
 2. Added partial index on `organizations.parent_organization_id`
@@ -399,6 +438,7 @@ CREATE TABLE organization_venue_access (
 5. Created Li3ib group org, set Nazwa as child
 
 **Phase 2 — Access control updates (code changes):**
+
 1. `isVenueAdmin()` — now checks parent org membership (one level up)
 2. `getManagedVenues()` — includes child venues of group-type parent orgs
 3. `checkRecordingAccess()` — fetches `venue_organization_id`, parent check via `isVenueAdmin()`
@@ -430,12 +470,14 @@ SEFA (academy, id: 7d12cc1e) — independent
 ```
 
 ### Role Migration Status
+
 - All 6 org members use `admin` role (migrated from `club_admin`/`league_admin`)
 - Code reads still recognize old roles for backward compatibility with existing RLS policies
 - All code that assigns roles uses `admin` only
 - PostgreSQL enum keeps old values (can't remove from enum type)
 
 ### Files Changed
+
 - `src/lib/recordings/access-control.ts` — Parent org checks in isVenueAdmin, getManagedVenues, checkRecordingAccess
 - `src/lib/spiideo/schedule-recording.ts` — Added `venue_organization_id: venueId`
 - `src/app/api/recordings/sync/route.ts` — Upsert now selects `venue_organization_id`
@@ -445,6 +487,7 @@ SEFA (academy, id: 7d12cc1e) — independent
 ## Review: Phases 3-4 Execution — 2026-03-08
 
 ### Phase 3 — Admin Dashboard
+
 - Rewritten admin organizations page with hierarchy tree view, type breakdown stats, tabbed interface
 - Backend: `getAllOrganizations()` returns hierarchy data, new CRUD functions for venue access and parent org assignment
 - API: New actions `setParentOrg`, `upsertVenueAccess`, `deleteVenueAccess` and `venue-access` GET section
@@ -452,12 +495,14 @@ SEFA (academy, id: 7d12cc1e) — independent
 ### Phase 4 — Venue Page Updates
 
 **1. Child venues in venue list (`/api/venue/route.ts`):**
+
 - Added `type` to org select query
 - After fetching direct memberships, detects group-type orgs
 - Queries child venues via `parent_organization_id` and merges with direct orgs
 - Deduplicates by ID — parent org admins now see child venues in the venue selector
 
 **2. Tenant scheduling (`/api/venue/[venueId]/spiideo/games/route.ts`):**
+
 - Added tenant detection logic: checks direct membership → parent admin → tenant via `organization_venue_access`
 - When user is a tenant, finds their org via `organization_venue_access` (requires `can_record = true`)
 - Uses tenant's `default_graphic_package_id` from venue access config
@@ -465,19 +510,23 @@ SEFA (academy, id: 7d12cc1e) — independent
 - Passes `ownerOrgId` to `scheduleRecording()` so recording gets correct `organization_id`
 
 **3. `scheduleRecording()` — new `ownerOrgId` parameter:**
+
 - `organization_id` now uses `input.ownerOrgId || venueId` (tenant org or venue)
 - `venue_organization_id` always stays as `venueId` (physical location)
 
 **4. Group org recordings view (`/api/venue/[venueId]/recordings/route.ts`):**
+
 - Detects group-type orgs and includes child venue IDs in the query
 - Uses `.in('organization_id', orgIds)` instead of `.eq('organization_id', venueId)`
 - Returns `ownerOrgName` field when recording belongs to a child venue (not the group itself)
 
 **5. Venue page UI:**
+
 - Added `ownerOrgName` to Recording interface
 - Shows blue org badge next to status when recording belongs to a child venue
 
 ### Files Changed (Phase 4)
+
 - `src/app/api/venue/route.ts` — Child venue inclusion for group org admins
 - `src/app/api/venue/[venueId]/spiideo/games/route.ts` — Tenant detection and graphic package resolution
 - `src/app/api/venue/[venueId]/recordings/route.ts` — Group org aggregated recording view
@@ -489,6 +538,7 @@ SEFA (academy, id: 7d12cc1e) — independent
 ### Phase 5 — Group Dashboard
 
 **API: `/api/venue/[venueId]/group-dashboard/route.ts`**
+
 - Returns aggregated data for a group org across all child venues
 - Per-venue stats: total recordings, published, this month's billable, revenue, today's count, daily target
 - Aggregated totals across all child venues
@@ -496,6 +546,7 @@ SEFA (academy, id: 7d12cc1e) — independent
 - Access controlled via `isVenueAdmin()` (parent admin check)
 
 **Venue page changes:**
+
 - Added `type` to Venue interface
 - Detects `venue.type === 'group'` and renders group dashboard instead of normal venue management
 - Group dashboard shows:
@@ -506,18 +557,22 @@ SEFA (academy, id: 7d12cc1e) — independent
 - Header shows "Group Overview" instead of "Venue Management" for group orgs
 
 ### Files Created (Phase 5)
+
 - `src/app/api/venue/[venueId]/group-dashboard/route.ts` — Group dashboard API
 
 ### Files Changed (Phase 5)
+
 - `src/app/venue/[venueId]/page.tsx` — Group dashboard UI, conditional section rendering
 
 ## Review: Post-Phase Cleanup — 2026-03-08
 
 ### 1. Default Role Change
+
 - Changed `playhub_pending_admin_invites.role` default from `'club_admin'` to `'admin'`
 - Only affects future INSERTs that don't specify a role
 
 ### 2. RLS Policy Migration to `is_org_member()` (2 migrations)
+
 - **Hardened `is_org_member()` function**: Added `SET search_path = public` (SECURITY DEFINER best practice)
 - **Migrated 10 RLS policies** from inline `organization_members` subqueries to `is_org_member()`:
   1. `playhub_live_streams` — 4 policies (INSERT, DELETE, UPDATE, SELECT)
@@ -531,6 +586,7 @@ SEFA (academy, id: 7d12cc1e) — independent
 - Verified: 0 policies remain with inline `organization_members` subqueries
 
 ### 3. Per-Venue Performance Charts
+
 - Updated group dashboard API to return `dailyChart` data (per-venue breakdown by day)
 - Added stacked area chart to group dashboard UI using recharts
 - Chart shows daily recordings per child venue with color-coded areas
@@ -538,11 +594,14 @@ SEFA (academy, id: 7d12cc1e) — independent
 - Shows average recordings per day
 
 ### Files Created/Changed
+
 - `src/app/api/venue/[venueId]/group-dashboard/route.ts` — Added dailyChart, venueNames, totalDailyTarget, averagePerDay
 - `src/app/venue/[venueId]/page.tsx` — Added stacked area chart to group dashboard view
 
 ### All Work Complete
+
 All phases (0-5) plus all deferred items of the organization hierarchy & multi-tenancy migration are complete:
+
 - **Phase 0**: DB cleanup (7 migrations)
 - **Phase 1**: DB schema & data (5 migrations)
 - **Phase 2**: Access control updates

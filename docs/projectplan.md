@@ -1,11 +1,13 @@
 # Graphic Package Editor — Drag & Drop + Resize
 
 ## Problem
+
 - Logo/sponsor overlays use fixed 4-corner positions and fixed pixel sizes
 - Doesn't scale properly across different screen sizes
 - No visual way to fine-tune placement
 
 ## Solution
+
 Switch to percentage-based positioning and sizing with a visual drag-and-drop editor.
 
 ## Tasks
@@ -32,6 +34,7 @@ Switch to percentage-based positioning and sizing with a visual drag-and-drop ed
 - [x] 5. **Update watch API** and **recordings API**: Return new fields in graphic package data
 
 ## Migration SQL
+
 ```sql
 ALTER TABLE playhub_graphic_packages
   ADD COLUMN logo_x NUMERIC DEFAULT 85,
@@ -46,12 +49,14 @@ ALTER TABLE playhub_graphic_packages DROP CONSTRAINT IF EXISTS valid_sponsor_pos
 ```
 
 ## Defaults Map (old → new)
+
 - `top-right` → x:85, y:3
 - `top-left` → x:3, y:3
 - `bottom-right` → x:85, y:85
 - `bottom-left` → x:3, y:85
 
 ## Notes
+
 - Scale is % of video width (e.g. 8 = logo is 8% of video width)
 - Position is top-left corner of the image as % of video dimensions
 - All values are percentages, so they scale naturally with any screen size

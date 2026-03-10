@@ -1,0 +1,4 @@
+  File "<string>", line 10
+    if row['table_name'] \!= current_table:
+                          ^
+SyntaxError: unexpected character after line continuation character
