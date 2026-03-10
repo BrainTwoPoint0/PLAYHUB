@@ -61,7 +61,7 @@ export async function GET(
     const message = error instanceof Error ? error.message : String(error)
     console.error(`Content API error (${clubSlug}):`, message)
     return NextResponse.json(
-      { error: 'Failed to fetch recordings', detail: message },
+      { error: 'Failed to fetch recordings' },
       { status: 500 }
     )
   }

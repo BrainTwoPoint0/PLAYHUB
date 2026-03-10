@@ -50,7 +50,7 @@ export async function GET(
     const message = error instanceof Error ? error.message : String(error)
     console.error(`Match content API error (${matchSlug}):`, message)
     return NextResponse.json(
-      { error: 'Failed to fetch match content', detail: message },
+      { error: 'Failed to fetch match content' },
       { status: 500 }
     )
   }

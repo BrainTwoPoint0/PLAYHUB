@@ -583,7 +583,7 @@ export default function AcademyContentPage() {
         const json = await res.json()
 
         if (json.error) {
-          setError(json.detail ? `${json.error}: ${json.detail}` : json.error)
+          setError(json.error)
           return
         }
 

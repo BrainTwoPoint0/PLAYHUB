@@ -58,5 +58,8 @@ scripts/**/*.pt
 # Python
 __pycache__/
 
-# Editor test videos (large binary files)
-public/editor-test/*.mp4
+# Editor test data (videos and detection JSON)
+public/editor-test/
+
+# Validation output
+scripts/gemini-validation/validation-review.json

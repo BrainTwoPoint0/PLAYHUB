@@ -36,6 +36,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
   }
 
+  if (parsed.protocol !== 'https:') {
+    return NextResponse.json({ error: 'Only HTTPS URLs allowed' }, { status: 403 })
+  }
+
+  if (parsed.port && parsed.port !== '443') {
+    return NextResponse.json({ error: 'Non-standard ports not allowed' }, { status: 403 })
+  }
+
   if (!ALLOWED_HOSTS.includes(parsed.hostname)) {
     return NextResponse.json(
       { error: 'URL host not allowed' },
@@ -74,7 +82,6 @@ export async function GET(request: NextRequest) {
     const acceptRanges = upstream.headers.get('accept-ranges')
     if (acceptRanges) headers.set('Accept-Ranges', acceptRanges)
     headers.set('Cache-Control', 'public, max-age=86400')
-    headers.set('Access-Control-Allow-Origin', '*')
 
     return new NextResponse(upstream.body, {
       status: upstream.status,
