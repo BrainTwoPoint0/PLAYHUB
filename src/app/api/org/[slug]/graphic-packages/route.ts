@@ -1,6 +1,6 @@
 // CRUD /api/org/[slug]/graphic-packages — Manage graphic packages for an org
 
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
 import { isPlatformAdmin } from '@/lib/admin/auth'
@@ -33,11 +33,7 @@ async function resolveOrg(slug: string) {
 // GET — list graphic packages for an org
 export async function GET(_request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -80,11 +76,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 // POST — create a new graphic package
 export async function POST(request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -194,11 +186,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 // PATCH — update a graphic package
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -319,11 +307,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 // DELETE — delete a graphic package
 export async function DELETE(request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

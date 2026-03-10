@@ -1,7 +1,7 @@
 // GET /api/venue/[venueId]/admins - List venue admins
 // POST /api/venue/[venueId]/admins - Add admin by email
 
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getAuthUserStrict, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
 import { sendAdminInviteEmail, sendAdminAddedEmail } from '@/lib/email'
@@ -11,14 +11,9 @@ export async function GET(
   { params }: { params: Promise<{ venueId: string }> }
 ) {
   const { venueId } = await params
-  const supabase = await createClient()
+  const { user } = await getAuthUserStrict()
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -85,14 +80,9 @@ export async function POST(
   { params }: { params: Promise<{ venueId: string }> }
 ) {
   const { venueId } = await params
-  const supabase = await createClient()
+  const { user } = await getAuthUserStrict()
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

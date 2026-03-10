@@ -19,8 +19,9 @@ const {
 // ── Module mocks ────────────────────────────────────────────────────
 
 vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn().mockResolvedValue({
-    auth: { getUser: () => mockGetUser() },
+  getAuthUser: vi.fn().mockImplementation(async () => {
+    const result = await mockGetUser()
+    return { user: result?.data?.user ?? null, supabase: {} }
   }),
   createServiceClient: vi.fn().mockReturnValue({
     from: (...args: any[]) => mockServiceFrom(...args),

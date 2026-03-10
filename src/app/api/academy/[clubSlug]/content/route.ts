@@ -1,7 +1,7 @@
 // GET /api/academy/[clubSlug]/content
 // Returns Veo recordings list for the club (from Supabase cache)
 
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
@@ -12,14 +12,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ clubSlug: string }> }
 ) {
-  const supabase = await createClient()
+  const { user } = await getAuthUser()
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

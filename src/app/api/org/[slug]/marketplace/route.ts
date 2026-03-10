@@ -1,6 +1,6 @@
 // GET/PUT /api/org/[slug]/marketplace — Org-level marketplace settings
 
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
 
@@ -21,11 +21,7 @@ async function resolveOrg(slug: string) {
 // GET — read marketplace settings for an org
 export async function GET(_request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -53,11 +49,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 // PUT — update marketplace settings
 export async function PUT(request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

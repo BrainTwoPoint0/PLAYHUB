@@ -1,19 +1,13 @@
 // GET /api/venue - List venues (organizations) the user can manage
 
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 
 export async function GET() {
-  const supabase = await createClient()
+  const { user } = await getAuthUser()
 
-  // Get current user
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

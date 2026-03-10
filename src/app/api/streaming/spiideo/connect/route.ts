@@ -1,7 +1,7 @@
 // POST /api/streaming/spiideo/connect - Create Spiideo game + MediaLive channel in one step
 // Can either connect to existing game (gameId) OR create new game (with schedule details)
 
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
 import {
@@ -14,15 +14,9 @@ import {
 import { mediaLiveClient } from '@/lib/aws/medialive'
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
+  const { user } = await getAuthUser()
 
-  // Get current user
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

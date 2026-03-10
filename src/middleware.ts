@@ -40,20 +40,22 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Only refresh session on page navigations and API routes — skip for
-  // static assets, fonts, manifest, etc. to avoid burning through
-  // Supabase Auth rate limits (~30 req/min per IP).
+  // Use getSession() instead of getUser() to refresh the token.
+  // getSession() only makes a network call when the JWT is expired and
+  // needs refreshing (~once per hour). getUser() calls Supabase Auth on
+  // EVERY request, which quickly burns through the ~30 req/min rate limit.
   const pathname = request.nextUrl.pathname
-  const isPageOrApi =
-    pathname.startsWith('/api/') ||
-    !pathname.includes('.') // pages don't have file extensions
+  const isPageOrApi = pathname.startsWith('/api/') || !pathname.includes('.') // pages don't have file extensions
 
   if (isPageOrApi) {
-    const { error } = await supabase.auth.getUser()
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession()
 
-    // If token refresh failed with an auth error (invalid/expired),
-    // clear cookies. Do NOT clear on rate limit (429) — that would
-    // log the user out and make the problem worse.
+    // If token refresh failed with an auth error (invalid/expired refresh
+    // token), clear cookies. Do NOT clear on rate limit (429) or if
+    // there's simply no session (user never logged in).
     if (error && error.status !== 429) {
       const allCookies = request.cookies.getAll()
       const authCookies = allCookies.filter((c) => c.name.startsWith('sb-'))

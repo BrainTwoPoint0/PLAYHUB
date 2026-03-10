@@ -1,7 +1,7 @@
 // DELETE /api/academy/[clubSlug]/admins/[memberId] - Remove admin from academy
 // Platform admin only
 
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getAuthUserStrict, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { getClubBySlug } from '@/lib/academy/config'
@@ -11,14 +11,9 @@ export async function DELETE(
   { params }: { params: Promise<{ clubSlug: string; memberId: string }> }
 ) {
   const { clubSlug, memberId } = await params
-  const supabase = await createClient()
+  const { user } = await getAuthUserStrict()
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

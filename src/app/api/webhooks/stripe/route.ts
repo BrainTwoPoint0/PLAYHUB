@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { scheduleRecording } from '@/lib/spiideo/schedule-recording'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -95,7 +95,7 @@ async function handleStreamAccessPurchase(
     return NextResponse.json({ error: 'Missing metadata' }, { status: 400 })
   }
 
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   try {
     // Grant access to the stream (type assertion for PLAYHUB tables)
@@ -188,7 +188,7 @@ async function handleMatchRecordingPurchase(
     })
   }
 
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   // Look up organization_id from the match recording for revenue attribution
   let organizationId: string | null = null
@@ -275,7 +275,7 @@ async function handleVenueBooking(
       ? (event.payment_intent as string)
       : null) || event.id
 
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   // Check 1: by stripe_payment_intent_id (works for new records that store it)
   if (paymentIntentId) {

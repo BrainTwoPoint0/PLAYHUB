@@ -1,6 +1,6 @@
 // DELETE /api/recordings/[id]/access/[accessId] - Revoke access to a recording
 
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   isVenueAdmin,
@@ -12,15 +12,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; accessId: string }> }
 ) {
   const { id: recordingId, accessId } = await params
-  const supabase = await createClient()
+  const { user, supabase } = await getAuthUser()
 
-  // Get current user
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

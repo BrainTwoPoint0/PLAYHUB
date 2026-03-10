@@ -3,17 +3,14 @@
 // Or pass manual params for sample preview
 // Platform admin only
 
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getAuthUserStrict, createServiceClient } from '@/lib/supabase/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { renderInvoiceEmailHtml } from '@/lib/email'
 import { getKwdToEurRate } from '@/lib/fx/rates'
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUserStrict()
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

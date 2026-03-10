@@ -1,6 +1,6 @@
 // Recordings API - List, get playback URLs, and backfill from S3
 import { NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import {
   getPlaybackUrl,
   getDownloadUrl,
@@ -29,12 +29,7 @@ export async function GET(request: Request) {
   const id = searchParams.get('id')
   const action = searchParams.get('action')
 
-  const supabase = await createClient()
-
-  // Get current user for access checks
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user, supabase } = await getAuthUser()
 
   try {
     // Get playback URL for a specific recording

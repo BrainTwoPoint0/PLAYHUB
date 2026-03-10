@@ -4,7 +4,7 @@
 // Auth: platform admin session (manual Sync Now button)
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { getClubBySlug } from '@/lib/academy/config'
 import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda'
@@ -16,10 +16,7 @@ type RouteContext = { params: Promise<{ clubSlug: string }> }
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
   // Auth: platform admin only
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
   if (!user || !(await isPlatformAdmin(user.id))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

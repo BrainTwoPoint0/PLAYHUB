@@ -1,7 +1,7 @@
 // GET /api/streaming/channels/[channelId] - Get channel details
 // DELETE /api/streaming/channels/[channelId] - Delete a channel
 
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { mediaLiveClient } from '@/lib/aws/medialive'
 import { isPlatformAdmin } from '@/lib/admin/auth'
@@ -36,14 +36,9 @@ export async function GET(
   { params }: { params: Promise<{ channelId: string }> }
 ) {
   const { channelId } = await params
-  const supabase = await createClient()
+  const { user } = await getAuthUser()
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -87,14 +82,9 @@ export async function DELETE(
   { params }: { params: Promise<{ channelId: string }> }
 ) {
   const { channelId } = await params
-  const supabase = await createClient()
+  const { user } = await getAuthUser()
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

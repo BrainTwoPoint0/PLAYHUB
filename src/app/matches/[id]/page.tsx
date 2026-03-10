@@ -35,8 +35,9 @@ export default async function MatchDetailPage({
   let hasAccess = false
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    data: { session },
+  } = await supabase.auth.getSession()
+  const user = session?.user ?? null
 
   if (user) {
     // Get user's profile (type assertion)

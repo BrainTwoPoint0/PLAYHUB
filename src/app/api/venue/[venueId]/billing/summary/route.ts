@@ -1,7 +1,7 @@
 // GET /api/venue/[venueId]/billing/summary
 // Returns current month billing stats with two-way profit share breakdown
 
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
 import { isPlatformAdmin } from '@/lib/admin/auth'
@@ -11,14 +11,9 @@ type RouteContext = { params: Promise<{ venueId: string }> }
 
 export async function GET(request: NextRequest, { params }: RouteContext) {
   const { venueId } = await params
-  const supabase = await createClient()
+  const { user } = await getAuthUser()
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

@@ -1,6 +1,6 @@
 // POST /api/streaming/channels/[channelId]/stop - Stop a channel
 
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { mediaLiveClient } from '@/lib/aws/medialive'
 import { isPlatformAdmin } from '@/lib/admin/auth'
@@ -35,14 +35,9 @@ export async function POST(
   { params }: { params: Promise<{ channelId: string }> }
 ) {
   const { channelId } = await params
-  const supabase = await createClient()
+  const { user } = await getAuthUser()
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

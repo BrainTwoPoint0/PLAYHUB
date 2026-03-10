@@ -1,5 +1,5 @@
 // GET + POST /api/recordings/[id]/events
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { checkRecordingAccess } from '@/lib/recordings/access-control'
 import { isValidEventType } from '@/lib/recordings/event-types'
@@ -9,12 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const supabase = await createClient()
-
-  // Get current user
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user, supabase } = await getAuthUser()
 
   if (!user) {
     return NextResponse.json(
@@ -54,12 +49,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const supabase = await createClient()
-
-  // Get current user
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user, supabase } = await getAuthUser()
 
   if (!user) {
     return NextResponse.json(

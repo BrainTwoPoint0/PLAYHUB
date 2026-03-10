@@ -5,16 +5,13 @@
 // find any API request, and copy the Authorization header (Bearer ...) and
 // X-CSRFToken header.
 
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { storeTokens, getStoredTokens } from '@/lib/veo/direct-client'
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
 
   if (!user || !(await isPlatformAdmin(user.id))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -35,10 +32,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
 
   if (!user || !(await isPlatformAdmin(user.id))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

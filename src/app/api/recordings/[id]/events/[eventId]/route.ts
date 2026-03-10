@@ -1,5 +1,5 @@
 // PATCH + DELETE /api/recordings/[id]/events/[eventId]
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { isValidEventType } from '@/lib/recordings/event-types'
 
@@ -8,12 +8,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; eventId: string }> }
 ) {
   const { id, eventId } = await params
-  const supabase = await createClient()
-
-  // Get current user
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user, supabase } = await getAuthUser()
 
   if (!user) {
     return NextResponse.json(
@@ -126,12 +121,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; eventId: string }> }
 ) {
   const { id, eventId } = await params
-  const supabase = await createClient()
-
-  // Get current user
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user, supabase } = await getAuthUser()
 
   if (!user) {
     return NextResponse.json(

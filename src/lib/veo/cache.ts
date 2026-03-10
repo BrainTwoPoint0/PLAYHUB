@@ -220,9 +220,10 @@ export interface CachedRecording {
   processing_status?: string
 }
 
-export async function getCachedRecordings(
-  clubSlug: string
-): Promise<{ recordings: CachedRecording[]; lastSyncedAt: string | null } | null> {
+export async function getCachedRecordings(clubSlug: string): Promise<{
+  recordings: CachedRecording[]
+  lastSyncedAt: string | null
+} | null> {
   const supabase = createServiceClient() as any
 
   const { data, error } = await supabase
@@ -231,7 +232,8 @@ export async function getCachedRecordings(
     .eq('club_slug', clubSlug)
     .order('match_date', { ascending: false, nullsFirst: false })
 
-  if (error) throw new Error(`Failed to read recordings cache: ${error.message}`)
+  if (error)
+    throw new Error(`Failed to read recordings cache: ${error.message}`)
   if (!data || data.length === 0) return null
 
   return {
@@ -287,7 +289,11 @@ export async function getCachedMatchContent(
 
 export async function writeCachedMatchContent(
   matchSlug: string,
-  content: { videos: any[]; highlights: any[]; stats: Record<string, unknown> | null }
+  content: {
+    videos: any[]
+    highlights: any[]
+    stats: Record<string, unknown> | null
+  }
 ): Promise<void> {
   const supabase = createServiceClient() as any
 

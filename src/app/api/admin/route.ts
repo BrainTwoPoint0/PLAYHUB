@@ -1,7 +1,7 @@
 // GET /api/admin - Get admin dashboard data
 // POST /api/admin - Admin actions
 
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUserStrict } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   isPlatformAdmin,
@@ -20,14 +20,9 @@ import {
 } from '@/lib/admin/auth'
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
+  const { user } = await getAuthUserStrict()
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -71,14 +66,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
+  const { user } = await getAuthUserStrict()
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

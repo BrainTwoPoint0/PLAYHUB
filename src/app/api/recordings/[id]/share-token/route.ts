@@ -1,5 +1,5 @@
 // POST /api/recordings/[id]/share-token - Generate or get public share token
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
 import { randomBytes } from 'crypto'
@@ -9,12 +9,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const supabase = await createClient()
-
-  // Get current user
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -76,11 +71,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

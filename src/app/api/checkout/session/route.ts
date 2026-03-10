@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser, getAuthUserStrict } from '@/lib/supabase/server'
 import Stripe from 'stripe'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -9,7 +9,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 // GET - for match recording purchases (existing flow)
 export async function GET(request: NextRequest) {
   try {
-    const supabase = (await createClient()) as any
+    const { user, supabase } = await getAuthUser()
     const searchParams = request.nextUrl.searchParams
     const productId = searchParams.get('productId')
 
@@ -19,11 +19,6 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       )
     }
-
-    // Get current user (optional for now - can purchase without auth)
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
 
     let profile: any = null
     if (user) {
@@ -106,7 +101,7 @@ export async function GET(request: NextRequest) {
 // POST - for live stream purchases
 export async function POST(request: NextRequest) {
   try {
-    const supabase = (await createClient()) as any
+    const { user, supabase } = await getAuthUserStrict()
     const body = await request.json()
 
     const { stream_id, success_url, cancel_url } = body
@@ -117,11 +112,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
-    // Get current user - required for stream purchases
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
 
     if (!user) {
       return NextResponse.json(

@@ -1,6 +1,6 @@
 // GET /api/venue/[venueId]/spiideo/scenes - List Spiideo scenes mapped to this venue
 
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
 
@@ -65,15 +65,9 @@ export async function GET(
   { params }: { params: Promise<{ venueId: string }> }
 ) {
   const { venueId } = await params
-  const supabase = await createClient()
+  const { user } = await getAuthUser()
 
-  // Get current user
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

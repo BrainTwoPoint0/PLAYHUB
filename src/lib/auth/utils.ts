@@ -1,13 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUserStrict, createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { User } from '@supabase/supabase-js'
 
 // Server-side auth utilities (for server components and API routes only)
 export async function getUser(): Promise<User | null> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUserStrict()
   return user
 }
 

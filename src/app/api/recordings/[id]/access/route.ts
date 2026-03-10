@@ -1,6 +1,6 @@
 // GET/POST /api/recordings/[id]/access - List and grant access to a recording
 
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getAuthUserStrict, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   isVenueAdmin,
@@ -19,15 +19,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: recordingId } = await params
-  const supabase = await createClient()
+  const { user, supabase } = await getAuthUserStrict()
 
-  // Get current user
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -75,15 +69,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: recordingId } = await params
-  const supabase = await createClient()
+  const { user } = await getAuthUserStrict()
 
-  // Get current user
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

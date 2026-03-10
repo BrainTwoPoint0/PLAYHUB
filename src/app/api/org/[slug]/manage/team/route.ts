@@ -2,7 +2,7 @@
 // POST /api/org/[slug]/manage/team — Add admin by email
 // DELETE /api/org/[slug]/manage/team?id=<membershipId> — Remove admin
 
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
 import { isPlatformAdmin } from '@/lib/admin/auth'
@@ -31,11 +31,7 @@ async function resolveOrgAndAuth(slug: string, userId: string) {
 
 export async function GET(_request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -94,11 +90,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -218,11 +210,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
 export async function DELETE(request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

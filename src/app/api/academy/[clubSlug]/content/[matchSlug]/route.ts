@@ -2,29 +2,21 @@
 // Returns full match content (videos, highlights, stats)
 // Cache-first: reads from Supabase cache, falls back to live Veo API if tokens available
 
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
 import { getClubBySlug } from '@/lib/academy/config'
-import {
-  getCachedMatchContent,
-  writeCachedMatchContent,
-} from '@/lib/veo/cache'
+import { getCachedMatchContent, writeCachedMatchContent } from '@/lib/veo/cache'
 import { getMatchContentDirect } from '@/lib/veo/direct-client'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ clubSlug: string; matchSlug: string }> }
 ) {
-  const supabase = await createClient()
+  const { user } = await getAuthUser()
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -75,11 +67,15 @@ export async function GET(
         fromCache: false,
       })
     } catch (liveError) {
-      const msg = liveError instanceof Error ? liveError.message : String(liveError)
+      const msg =
+        liveError instanceof Error ? liveError.message : String(liveError)
       // If tokens expired, tell the user to wait for next sync
       if (msg.includes('expired') || msg.includes('No valid Veo auth tokens')) {
         return NextResponse.json(
-          { error: 'Match content not yet cached. It will be available after the next sync.' },
+          {
+            error:
+              'Match content not yet cached. It will be available after the next sync.',
+          },
           { status: 503 }
         )
       }

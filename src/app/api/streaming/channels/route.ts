@@ -1,21 +1,16 @@
 // GET /api/streaming/channels - List channels (filtered by venueId)
 // POST /api/streaming/channels - Create a new channel
 
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { mediaLiveClient } from '@/lib/aws/medialive'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
+  const { user } = await getAuthUser()
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -58,14 +53,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
+  const { user } = await getAuthUser()
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

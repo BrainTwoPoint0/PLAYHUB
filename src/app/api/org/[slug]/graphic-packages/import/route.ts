@@ -1,7 +1,7 @@
 // GET  /api/org/[slug]/graphic-packages/import — List Spiideo graphic packages available for import
 // POST /api/org/[slug]/graphic-packages/import — Import a Spiideo package as a local record
 
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
 import { isPlatformAdmin } from '@/lib/admin/auth'
@@ -22,11 +22,7 @@ async function resolveOrg(slug: string) {
 // GET — list available Spiideo graphic packages (not yet imported)
 export async function GET(request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -84,11 +80,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 // POST — import a specific Spiideo package
 export async function POST(request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

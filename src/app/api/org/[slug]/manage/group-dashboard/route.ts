@@ -1,7 +1,7 @@
 // GET /api/org/[slug]/manage/group-dashboard
 // Returns aggregated data for a group org across all child venues (resolved by slug)
 
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
 import { isPlatformAdmin } from '@/lib/admin/auth'
@@ -10,14 +10,9 @@ type RouteContext = { params: Promise<{ slug: string }> }
 
 export async function GET(request: NextRequest, { params }: RouteContext) {
   const { slug } = await params
-  const supabase = await createClient()
+  const { user } = await getAuthUser()
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

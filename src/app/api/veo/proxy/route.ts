@@ -2,7 +2,7 @@
 // Server-side proxy for Veo CDN URLs (CORS blocked in browser)
 // Streams video/image content through our API
 
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 const ALLOWED_HOSTS = [
@@ -13,13 +13,9 @@ const ALLOWED_HOSTS = [
 
 export async function GET(request: NextRequest) {
   // Auth check
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
 
-  if (authError || !user) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

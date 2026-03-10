@@ -1,8 +1,7 @@
 // GET/POST/DELETE /api/academy/[clubSlug]/veo/exceptions
 // Manage Veo cleanup exceptions — users exempt from automated removal
 
-import { createClient } from '@/lib/supabase/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { getClubBySlug } from '@/lib/academy/config'
@@ -10,13 +9,9 @@ import { getClubBySlug } from '@/lib/academy/config'
 type RouteContext = { params: Promise<{ clubSlug: string }> }
 
 async function requireAdmin() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
 
-  if (error || !user) return null
+  if (!user) return null
   const isAdmin = await isPlatformAdmin(user.id)
   return isAdmin ? user : null
 }
