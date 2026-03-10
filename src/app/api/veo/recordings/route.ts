@@ -1,18 +1,11 @@
 import { NextResponse } from 'next/server'
 import { listRecordings } from '@/lib/veo/client'
-import { timingSafeEqual } from 'crypto'
+import { verifyApiKey } from '@braintwopoint0/playback-commons/security'
 
-const SYNC_API_KEY = process.env.SYNC_API_KEY
-
-function verifyApiKey(request: Request): boolean {
-  const apiKey = request.headers.get('x-api-key')
-  if (!apiKey || !SYNC_API_KEY) return false
-  if (apiKey.length !== SYNC_API_KEY.length) return false
-  return timingSafeEqual(Buffer.from(apiKey), Buffer.from(SYNC_API_KEY))
-}
+const SYNC_API_KEY = process.env.SYNC_API_KEY || ''
 
 export async function GET(request: Request) {
-  if (!verifyApiKey(request)) {
+  if (!verifyApiKey(request, SYNC_API_KEY)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

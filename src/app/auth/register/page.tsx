@@ -12,6 +12,7 @@ import {
 } from '@braintwopoint0/playback-commons/auth'
 import { createClient } from '@braintwopoint0/playback-commons/supabase'
 import { Button, Input, Label } from '@braintwopoint0/playback-commons/ui'
+import { sanitizeRedirect } from '@braintwopoint0/playback-commons/utils'
 import { LoadingSpinner } from '@/components/ui/loading'
 import {
   AlertCircle,
@@ -60,9 +61,7 @@ function RegisterForm() {
 
   useEffect(() => {
     if (user) {
-      const raw = searchParams.get('redirect') || '/'
-      const safe = raw.startsWith('/') && !raw.startsWith('//') && !raw.includes('@') && !raw.includes('\\') ? raw : '/'
-      router.push(safe)
+      router.push(sanitizeRedirect(searchParams.get('redirect')))
     }
   }, [user, router, searchParams])
 

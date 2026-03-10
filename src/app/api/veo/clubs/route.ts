@@ -1,15 +1,11 @@
 import { NextResponse } from 'next/server'
 import { listClubsAndTeams } from '@/lib/veo/client'
+import { verifyApiKey } from '@braintwopoint0/playback-commons/security'
 
-const SYNC_API_KEY = process.env.SYNC_API_KEY
-
-function verifyApiKey(request: Request): boolean {
-  const apiKey = request.headers.get('x-api-key')
-  return apiKey === SYNC_API_KEY && !!SYNC_API_KEY
-}
+const SYNC_API_KEY = process.env.SYNC_API_KEY || ''
 
 export async function GET(request: Request) {
-  if (!verifyApiKey(request)) {
+  if (!verifyApiKey(request, SYNC_API_KEY)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

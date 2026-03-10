@@ -21,18 +21,10 @@ import {
 } from '@/lib/s3/client'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendRecordingReadyEmail } from '@/lib/email'
-import { timingSafeEqual } from 'crypto'
+import { verifyApiKey } from '@braintwopoint0/playback-commons/security'
 
 const ACCOUNT_ID = process.env.SPIIDEO_ACCOUNT_ID!
-const SYNC_API_KEY = process.env.SYNC_API_KEY
-
-// Verify API key for protected endpoints (constant-time comparison)
-function verifyApiKey(request: Request): boolean {
-  const apiKey = request.headers.get('x-api-key')
-  if (!apiKey || !SYNC_API_KEY) return false
-  if (apiKey.length !== SYNC_API_KEY.length) return false
-  return timingSafeEqual(Buffer.from(apiKey), Buffer.from(SYNC_API_KEY))
-}
+const SYNC_API_KEY = process.env.SYNC_API_KEY || ''
 
 interface SyncResult {
   gameId: string
@@ -46,7 +38,7 @@ interface SyncResult {
 // GET - Check sync status
 export async function GET(request: Request) {
   // Verify API key
-  if (!verifyApiKey(request)) {
+  if (!verifyApiKey(request, SYNC_API_KEY)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -124,7 +116,7 @@ export async function GET(request: Request) {
 // POST - Run sync (optionally for a specific game)
 export async function POST(request: Request) {
   // Verify API key
-  if (!verifyApiKey(request)) {
+  if (!verifyApiKey(request, SYNC_API_KEY)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

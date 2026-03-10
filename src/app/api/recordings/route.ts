@@ -13,18 +13,10 @@ import {
   checkRecordingAccess,
   getAccessibleRecordings,
 } from '@/lib/recordings/access-control'
-import { timingSafeEqual } from 'crypto'
+import { verifyApiKey } from '@braintwopoint0/playback-commons/security'
 
 const ACCOUNT_ID = process.env.SPIIDEO_ACCOUNT_ID!
-const SYNC_API_KEY = process.env.SYNC_API_KEY
-
-// Verify API key for protected endpoints (timing-safe)
-function verifyApiKey(request: Request): boolean {
-  const apiKey = request.headers.get('x-api-key')
-  if (!apiKey || !SYNC_API_KEY) return false
-  if (apiKey.length !== SYNC_API_KEY.length) return false
-  return timingSafeEqual(Buffer.from(apiKey), Buffer.from(SYNC_API_KEY))
-}
+const SYNC_API_KEY = process.env.SYNC_API_KEY || ''
 
 // GET - List recordings or get playback URL
 export async function GET(request: Request) {
@@ -197,7 +189,7 @@ export async function GET(request: Request) {
 // POST - Backfill database from S3 files (protected)
 export async function POST(request: Request) {
   // Verify API key for admin operation
-  if (!verifyApiKey(request)) {
+  if (!verifyApiKey(request, SYNC_API_KEY)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

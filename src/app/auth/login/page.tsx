@@ -9,6 +9,7 @@ import {
   getAuthErrorMessage,
 } from '@braintwopoint0/playback-commons/auth'
 import { Button, Input, Label } from '@braintwopoint0/playback-commons/ui'
+import { sanitizeRedirect } from '@braintwopoint0/playback-commons/utils'
 import { LoadingSpinner } from '@/components/ui/loading'
 import { AlertCircle, Eye, EyeOff, Mail, Lock } from 'lucide-react'
 
@@ -34,10 +35,7 @@ function LoginForm() {
 
   useEffect(() => {
     if (user) {
-      const raw = searchParams.get('redirect') || '/'
-      // Validate redirect is a safe relative path (prevent open redirect)
-      const safe = raw.startsWith('/') && !raw.startsWith('//') && !raw.includes('@') && !raw.includes('\\') ? raw : '/'
-      router.push(safe)
+      router.push(sanitizeRedirect(searchParams.get('redirect')))
     }
   }, [user, router, searchParams])
 

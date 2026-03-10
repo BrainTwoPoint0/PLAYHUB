@@ -2,15 +2,9 @@ import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-const FROM_EMAIL = 'PLAYHUB <admin@playbacksports.ai>'
+import { escapeHtml } from '@braintwopoint0/playback-commons/utils'
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
+const FROM_EMAIL = 'PLAYHUB <admin@playbacksports.ai>'
 const APP_URL =
   process.env.NEXT_PUBLIC_APP_URL || 'https://playhub.playbacksports.ai'
 
