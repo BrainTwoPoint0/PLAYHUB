@@ -1,11 +1,12 @@
 """
 AWS Batch entrypoint for ball detection.
 
-Reads env vars, downloads video from S3, runs detect_ball(), uploads result JSON to S3.
+Reads env vars, downloads video from S3 or URL, runs detect_ball(), uploads result JSON to S3.
 
 Environment variables:
   S3_BUCKET      - S3 bucket name
   INPUT_S3_KEY   - S3 key of input video (e.g. recordings/cfa/clip.mp4)
+  INPUT_URL      - Direct URL to download video (e.g. Veo CDN). Used instead of INPUT_S3_KEY.
   OUTPUT_S3_KEY  - S3 key for output JSON (e.g. ball-detection/cfa/clip.json)
   OUTPUT_FPS     - Detection sample rate (default: 5)
   AWS_DEFAULT_REGION - AWS region (set by Batch)
@@ -14,6 +15,7 @@ Environment variables:
 import json
 import os
 import sys
+import urllib.request
 
 import boto3
 
@@ -21,23 +23,34 @@ import boto3
 def main():
     bucket = os.environ.get("S3_BUCKET")
     input_key = os.environ.get("INPUT_S3_KEY")
+    input_url = os.environ.get("INPUT_URL")
     output_key = os.environ.get("OUTPUT_S3_KEY")
     output_fps = float(os.environ.get("OUTPUT_FPS", "5"))
 
-    if not bucket or not input_key or not output_key:
-        print("ERROR: S3_BUCKET, INPUT_S3_KEY, and OUTPUT_S3_KEY are required", file=sys.stderr)
+    if not bucket or not output_key:
+        print("ERROR: S3_BUCKET and OUTPUT_S3_KEY are required", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Input:  s3://{bucket}/{input_key}", file=sys.stderr)
+    if not input_key and not input_url:
+        print("ERROR: Either INPUT_S3_KEY or INPUT_URL is required", file=sys.stderr)
+        sys.exit(1)
+
+    source = input_url if input_url else f"s3://{bucket}/{input_key}"
+    print(f"Input:  {source}", file=sys.stderr)
     print(f"Output: s3://{bucket}/{output_key}", file=sys.stderr)
     print(f"FPS:    {output_fps}", file=sys.stderr)
 
     s3 = boto3.client("s3")
-
-    # Download video
     input_path = "/tmp/input.mp4"
-    print("Downloading video from S3...", file=sys.stderr)
-    s3.download_file(bucket, input_key, input_path)
+
+    # Download video from URL or S3
+    if input_url:
+        print("Downloading video from URL...", file=sys.stderr)
+        urllib.request.urlretrieve(input_url, input_path)
+    else:
+        print("Downloading video from S3...", file=sys.stderr)
+        s3.download_file(bucket, input_key, input_path)
+
     file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
     print(f"Downloaded {file_size_mb:.1f} MB", file=sys.stderr)
 
