@@ -2,7 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button, Skeleton, EmptyState } from '@braintwopoint0/playback-commons/ui'
+import {
+  Button,
+  Skeleton,
+  EmptyState,
+} from '@braintwopoint0/playback-commons/ui'
 import { FadeIn } from '@/components/FadeIn'
 import { Building2 } from 'lucide-react'
 
@@ -58,7 +62,10 @@ export default function OrgSelectorPage() {
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           {[0, 1].map((i) => (
-            <div key={i} className="rounded-xl border border-border bg-card p-6">
+            <div
+              key={i}
+              className="rounded-xl border border-border bg-card p-6"
+            >
               <div className="flex items-center gap-4 mb-4">
                 <Skeleton className="w-12 h-12 rounded-full" />
                 <div className="space-y-2 flex-1">
@@ -79,7 +86,11 @@ export default function OrgSelectorPage() {
       <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
         <div className="rounded-xl border border-border bg-card p-6">
           <p className="text-red-400">{error}</p>
-          <Button className="mt-4" variant="outline" onClick={() => router.push('/')}>
+          <Button
+            className="mt-4"
+            variant="outline"
+            onClick={() => router.push('/')}
+          >
             Back to Home
           </Button>
         </div>

@@ -269,7 +269,8 @@ export default function AdminUsersPage() {
                         {user.email || '-'}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        @{user.username || '-'} · Joined {formatDate(user.created_at)}
+                        @{user.username || '-'} · Joined{' '}
+                        {formatDate(user.created_at)}
                       </p>
                     </div>
                   </div>

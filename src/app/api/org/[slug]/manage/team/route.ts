@@ -152,7 +152,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       )
 
     if (inviteError) {
-      return NextResponse.json({ error: 'Failed to send invitation' }, { status: 500 })
+      return NextResponse.json(
+        { error: 'Failed to send invitation' },
+        { status: 500 }
+      )
     }
 
     await sendAdminInviteEmail({
@@ -250,7 +253,10 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
   }
 
   if ((membership as any).profiles?.user_id === user.id) {
-    return NextResponse.json({ error: 'Cannot remove yourself' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Cannot remove yourself' },
+      { status: 400 }
+    )
   }
 
   await serviceClient

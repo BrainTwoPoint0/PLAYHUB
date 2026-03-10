@@ -2,7 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { Button, Skeleton, EmptyState } from '@braintwopoint0/playback-commons/ui'
+import {
+  Button,
+  Skeleton,
+  EmptyState,
+} from '@braintwopoint0/playback-commons/ui'
 import { FadeIn } from '@/components/FadeIn'
 import Image from 'next/image'
 import { Film } from 'lucide-react'
@@ -91,7 +95,10 @@ export default function OrgMarketplacePage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="rounded-xl border border-border bg-card overflow-hidden">
+            <div
+              key={i}
+              className="rounded-xl border border-border bg-card overflow-hidden"
+            >
               <Skeleton className="aspect-video w-full rounded-none" />
               <div className="p-4 space-y-2">
                 <Skeleton className="h-5 w-3/4" />

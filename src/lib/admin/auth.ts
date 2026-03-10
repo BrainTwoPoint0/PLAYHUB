@@ -232,14 +232,23 @@ export async function getAllOrganizations() {
 
   // Build parent name map and children map
   const orgMap: Record<string, any> = {}
-  orgs.forEach((o: any) => { orgMap[o.id] = o })
+  orgs.forEach((o: any) => {
+    orgMap[o.id] = o
+  })
 
   return orgs.map((o: any) => ({
     ...o,
-    parent_name: o.parent_organization_id ? orgMap[o.parent_organization_id]?.name || null : null,
-    children: orgs.filter((c: any) => c.parent_organization_id === o.id).map((c: any) => ({
-      id: c.id, name: c.name, slug: c.slug, type: c.type,
-    })),
+    parent_name: o.parent_organization_id
+      ? orgMap[o.parent_organization_id]?.name || null
+      : null,
+    children: orgs
+      .filter((c: any) => c.parent_organization_id === o.id)
+      .map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        slug: c.slug,
+        type: c.type,
+      })),
   }))
 }
 

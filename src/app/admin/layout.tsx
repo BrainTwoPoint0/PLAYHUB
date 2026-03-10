@@ -5,7 +5,16 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@braintwopoint0/playback-commons/auth'
 import { LoadingSpinner } from '@/components/ui/loading'
-import { BarChart3, Building2, Users, Film, Layers, ArrowLeft, Menu, X } from 'lucide-react'
+import {
+  BarChart3,
+  Building2,
+  Users,
+  Film,
+  Layers,
+  ArrowLeft,
+  Menu,
+  X,
+} from 'lucide-react'
 
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: BarChart3 },
@@ -161,7 +170,9 @@ export default function AdminLayout({
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 min-w-0 p-4 pt-16 lg:p-8 lg:pt-8">{children}</main>
+      <main className="flex-1 min-w-0 p-4 pt-16 lg:p-8 lg:pt-8">
+        {children}
+      </main>
     </div>
   )
 }

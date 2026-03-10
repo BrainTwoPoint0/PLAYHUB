@@ -57,7 +57,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
   // Validate by MIME type or file extension (file.type can be empty in some environments)
   const fileExt = file.name.split('.').pop()?.toLowerCase() || ''
-  if (!ALLOWED_MIME_TYPES.includes(file.type) && !ALLOWED_EXTENSIONS.includes(fileExt)) {
+  if (
+    !ALLOWED_MIME_TYPES.includes(file.type) &&
+    !ALLOWED_EXTENSIONS.includes(fileExt)
+  ) {
     return NextResponse.json(
       { error: 'File must be PNG, JPEG, or WebP' },
       { status: 400 }

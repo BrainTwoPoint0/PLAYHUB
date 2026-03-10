@@ -25,11 +25,7 @@ export async function GET() {
 
   // Get profile + platform admin check in parallel
   const [{ data: profile }, isAdmin] = await Promise.all([
-    serviceClient
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single(),
+    serviceClient.from('profiles').select('id').eq('user_id', user.id).single(),
     isPlatformAdmin(user.id),
   ])
 
@@ -79,7 +75,9 @@ export async function GET() {
     .map((m: any) => m.organizations)
     .filter(Boolean) as any[]
 
-  const hasVenues = orgs.some((o: any) => o.type === 'venue' || o.type === 'group')
+  const hasVenues = orgs.some(
+    (o: any) => o.type === 'venue' || o.type === 'group'
+  )
   const hasAcademy = orgs.some((o: any) => o.type === 'academy')
   const managedOrgs = orgs
     .filter((o: any) => o.type !== 'venue')

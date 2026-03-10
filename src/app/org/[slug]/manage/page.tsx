@@ -101,17 +101,31 @@ interface GraphicPackage {
 
 const inputClass =
   'bg-zinc-800 border-border text-[var(--timberwolf)] placeholder:text-muted-foreground/40'
-const outlineBtnClass =
-  'border-border text-[var(--timberwolf)] hover:bg-muted'
+const outlineBtnClass = 'border-border text-[var(--timberwolf)] hover:bg-muted'
 const primaryBtnClass =
   'bg-[var(--timberwolf)] text-[var(--night)] hover:bg-[var(--ash-grey)]'
 
 // ── Nav tabs ──────────────────────────────────────────────────────────
 
 const allTabs = [
-  { id: 'graphics' as const, label: 'Graphic Packages', icon: Layers, featureKey: 'featureGraphicPackages' as const },
-  { id: 'marketplace' as const, label: 'Marketplace', icon: ShoppingBag, featureKey: 'marketplaceEnabled' as const },
-  { id: 'recordings' as const, label: 'Recordings', icon: Film, featureKey: 'featureRecordings' as const },
+  {
+    id: 'graphics' as const,
+    label: 'Graphic Packages',
+    icon: Layers,
+    featureKey: 'featureGraphicPackages' as const,
+  },
+  {
+    id: 'marketplace' as const,
+    label: 'Marketplace',
+    icon: ShoppingBag,
+    featureKey: 'marketplaceEnabled' as const,
+  },
+  {
+    id: 'recordings' as const,
+    label: 'Recordings',
+    icon: Film,
+    featureKey: 'featureRecordings' as const,
+  },
   { id: 'team' as const, label: 'Team', icon: Users, featureKey: null },
 ]
 
@@ -613,7 +627,9 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
                     max="30"
                     step="0.5"
                     value={formLogoScale}
-                    onChange={(e) => setFormLogoScale(parseFloat(e.target.value))}
+                    onChange={(e) =>
+                      setFormLogoScale(parseFloat(e.target.value))
+                    }
                     className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[var(--timberwolf)]"
                   />
                 </div>
@@ -629,7 +645,9 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
                     max="30"
                     step="0.5"
                     value={formSponsorScale}
-                    onChange={(e) => setFormSponsorScale(parseFloat(e.target.value))}
+                    onChange={(e) =>
+                      setFormSponsorScale(parseFloat(e.target.value))
+                    }
                     className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[var(--timberwolf)]"
                   />
                 </div>
@@ -649,10 +667,21 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
                 onMouseMove={(e) => {
                   if (!dragging || !previewRef.current) return
                   const rect = previewRef.current.getBoundingClientRect()
-                  const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100))
-                  const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100))
-                  if (dragging === 'logo') { setFormLogoX(Math.round(x * 10) / 10); setFormLogoY(Math.round(y * 10) / 10) }
-                  else { setFormSponsorX(Math.round(x * 10) / 10); setFormSponsorY(Math.round(y * 10) / 10) }
+                  const x = Math.max(
+                    0,
+                    Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)
+                  )
+                  const y = Math.max(
+                    0,
+                    Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)
+                  )
+                  if (dragging === 'logo') {
+                    setFormLogoX(Math.round(x * 10) / 10)
+                    setFormLogoY(Math.round(y * 10) / 10)
+                  } else {
+                    setFormSponsorX(Math.round(x * 10) / 10)
+                    setFormSponsorY(Math.round(y * 10) / 10)
+                  }
                 }}
                 onMouseUp={() => setDragging(null)}
                 onMouseLeave={() => setDragging(null)}
@@ -661,10 +690,27 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
                   e.preventDefault()
                   const touch = e.touches[0]
                   const rect = previewRef.current.getBoundingClientRect()
-                  const x = Math.max(0, Math.min(100, ((touch.clientX - rect.left) / rect.width) * 100))
-                  const y = Math.max(0, Math.min(100, ((touch.clientY - rect.top) / rect.height) * 100))
-                  if (dragging === 'logo') { setFormLogoX(Math.round(x * 10) / 10); setFormLogoY(Math.round(y * 10) / 10) }
-                  else { setFormSponsorX(Math.round(x * 10) / 10); setFormSponsorY(Math.round(y * 10) / 10) }
+                  const x = Math.max(
+                    0,
+                    Math.min(
+                      100,
+                      ((touch.clientX - rect.left) / rect.width) * 100
+                    )
+                  )
+                  const y = Math.max(
+                    0,
+                    Math.min(
+                      100,
+                      ((touch.clientY - rect.top) / rect.height) * 100
+                    )
+                  )
+                  if (dragging === 'logo') {
+                    setFormLogoX(Math.round(x * 10) / 10)
+                    setFormLogoY(Math.round(y * 10) / 10)
+                  } else {
+                    setFormSponsorX(Math.round(x * 10) / 10)
+                    setFormSponsorY(Math.round(y * 10) / 10)
+                  }
                 }}
                 onTouchEnd={() => setDragging(null)}
               >
@@ -690,7 +736,10 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
                       width: `${formLogoScale}%`,
                       transform: 'translate(-50%, -50%)',
                     }}
-                    onMouseDown={(e) => { e.preventDefault(); setDragging('logo') }}
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      setDragging('logo')
+                    }}
                     onTouchStart={() => setDragging('logo')}
                   />
                 )}
@@ -706,7 +755,10 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
                       width: `${formSponsorScale}%`,
                       transform: 'translate(-50%, -50%)',
                     }}
-                    onMouseDown={(e) => { e.preventDefault(); setDragging('sponsor') }}
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      setDragging('sponsor')
+                    }}
                     onTouchStart={() => setDragging('sponsor')}
                   />
                 )}
@@ -1006,7 +1058,13 @@ function RecordingsTab({ slug }: { slug: string }) {
       {/* Filter + count */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{total} recordings</p>
-        <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v === 'all' ? '' : v); setPage(1) }}>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => {
+            setStatusFilter(v === 'all' ? '' : v)
+            setPage(1)
+          }}
+        >
           <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
@@ -1042,7 +1100,9 @@ function RecordingsTab({ slug }: { slug: string }) {
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${statusColor[rec.status] || 'bg-zinc-500/15 text-zinc-400'}`}>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${statusColor[rec.status] || 'bg-zinc-500/15 text-zinc-400'}`}
+                >
                   {rec.status}
                 </span>
                 {rec.marketplace_enabled && (
@@ -1107,7 +1167,10 @@ function TeamTab({ slug }: { slug: string }) {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('admin')
   const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const [message, setMessage] = useState<{
+    text: string
+    type: 'success' | 'error'
+  } | null>(null)
 
   useEffect(() => {
     fetchTeam()
@@ -1139,7 +1202,10 @@ function TeamTab({ slug }: { slug: string }) {
       })
       const data = await res.json()
       if (res.ok) {
-        setMessage({ text: data.message || 'Added successfully', type: 'success' })
+        setMessage({
+          text: data.message || 'Added successfully',
+          type: 'success',
+        })
         setInviteEmail('')
         fetchTeam()
       } else {
@@ -1156,9 +1222,12 @@ function TeamTab({ slug }: { slug: string }) {
   async function handleRemove(membershipId: string) {
     if (!confirm('Remove this team member?')) return
     try {
-      const res = await fetch(`/api/org/${slug}/manage/team?id=${membershipId}`, {
-        method: 'DELETE',
-      })
+      const res = await fetch(
+        `/api/org/${slug}/manage/team?id=${membershipId}`,
+        {
+          method: 'DELETE',
+        }
+      )
       if (res.ok) {
         setAdmins((prev) => prev.filter((a) => a.id !== membershipId))
         setMessage({ text: 'Removed', type: 'success' })
@@ -1180,7 +1249,9 @@ function TeamTab({ slug }: { slug: string }) {
   return (
     <div className="space-y-5">
       {message && (
-        <p className={`text-sm ${message.type === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>
+        <p
+          className={`text-sm ${message.type === 'success' ? 'text-emerald-400' : 'text-red-400'}`}
+        >
           {message.text}
         </p>
       )}
@@ -1229,11 +1300,15 @@ function TeamTab({ slug }: { slug: string }) {
                   {admin.role}
                 </span>
                 {admin.isCurrentUser && (
-                  <span className="text-[10px] text-muted-foreground">(you)</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    (you)
+                  </span>
                 )}
               </div>
               {admin.fullName && admin.email && (
-                <p className="text-xs text-muted-foreground mt-0.5">{admin.email}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {admin.email}
+                </p>
               )}
             </div>
             {!admin.isCurrentUser && (
@@ -1259,7 +1334,9 @@ function TeamTab({ slug }: { slug: string }) {
                 className="flex items-center justify-between p-2.5 rounded-lg border border-dashed border-border"
               >
                 <div className="flex items-center gap-2">
-                  <p className="text-sm text-muted-foreground">{inv.invited_email}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {inv.invited_email}
+                  </p>
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-medium">
                     Pending
                   </span>
@@ -1285,7 +1362,13 @@ const CHART_COLORS = [
 
 type GroupTab = 'overview' | 'graphics' | 'team'
 
-function GroupDashboardView({ slug, hasGraphicPackages }: { slug: string; hasGraphicPackages: boolean }) {
+function GroupDashboardView({
+  slug,
+  hasGraphicPackages,
+}: {
+  slug: string
+  hasGraphicPackages: boolean
+}) {
   const router = useRouter()
   const [data, setData] = useState<GroupDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -1295,7 +1378,8 @@ function GroupDashboardView({ slug, hasGraphicPackages }: { slug: string; hasGra
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [year, setYear] = useState(now.getFullYear())
 
-  const isCurrentMonth = month === now.getMonth() + 1 && year === now.getFullYear()
+  const isCurrentMonth =
+    month === now.getMonth() + 1 && year === now.getFullYear()
 
   useEffect(() => {
     fetchGroupData()
@@ -1355,7 +1439,9 @@ function GroupDashboardView({ slug, hasGraphicPackages }: { slug: string; hasGra
 
   const groupTabs: Array<{ id: GroupTab; label: string }> = [
     { id: 'overview', label: 'Overview' },
-    ...(hasGraphicPackages ? [{ id: 'graphics' as GroupTab, label: 'Graphic Packages' }] : []),
+    ...(hasGraphicPackages
+      ? [{ id: 'graphics' as GroupTab, label: 'Graphic Packages' }]
+      : []),
     { id: 'team', label: 'Team' },
   ]
 
@@ -1397,208 +1483,217 @@ function GroupDashboardView({ slug, hasGraphicPackages }: { slug: string; hasGra
         </div>
       )}
 
-      {activeTab === 'overview' && data && <>
-      {/* Month selector */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={prevMonth}
-          className="p-1.5 rounded-md text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted transition-colors"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <span className="text-sm font-medium text-[var(--timberwolf)] min-w-[140px] text-center">
-          {monthLabel}
-        </span>
-        <button
-          onClick={nextMonth}
-          disabled={isCurrentMonth}
-          className="p-1.5 rounded-md text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* Portfolio Overview */}
-      <div className="rounded-xl border border-border bg-card">
-        <div className="p-5">
-          <h2 className="text-base font-semibold text-[var(--timberwolf)] mb-4">
-            Portfolio Overview
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted">
-            {[
-              {
-                label: 'Total Recordings',
-                value: String(data.totals.totalRecordings),
-                sub: `${data.totals.publishedRecordings} published`,
-              },
-              {
-                label: 'This Month',
-                value: String(data.totals.monthRecordings),
-                sub: 'recordings',
-              },
-              {
-                label: 'Monthly Revenue',
-                value: data.totals.monthRevenue > 0
-                  ? formatCurrency(data.totals.monthRevenue, currency)
-                  : '0',
-                sub: 'billable',
-              },
-              {
-                label: 'Today',
-                value: String(data.totals.todayCount),
-                sub: 'recordings',
-              },
-            ].map((card) => (
-              <div key={card.label} className="bg-[var(--night)] p-3.5">
-                <p className="text-xs text-muted-foreground mb-1">
-                  {card.label}
-                </p>
-                <p className="text-lg font-semibold text-[var(--timberwolf)]">
-                  {card.value}
-                </p>
-                <p className="text-xs text-muted-foreground">{card.sub}</p>
-              </div>
-            ))}
+      {activeTab === 'overview' && data && (
+        <>
+          {/* Month selector */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={prevMonth}
+              className="p-1.5 rounded-md text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-sm font-medium text-[var(--timberwolf)] min-w-[140px] text-center">
+              {monthLabel}
+            </span>
+            <button
+              onClick={nextMonth}
+              disabled={isCurrentMonth}
+              className="p-1.5 rounded-md text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
-        </div>
-      </div>
 
-      {/* Daily Performance Chart */}
-      {data.dailyChart.length > 0 && (
-        <div className="rounded-xl border border-border bg-card">
-          <div className="p-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-              <div>
-                <h2 className="text-base font-semibold text-[var(--timberwolf)]">
-                  Daily Performance
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  Avg {data.averagePerDay}/day
-                  {data.totalDailyTarget > 0 && ` · Target: ${data.totalDailyTarget}/day`}
-                </p>
+          {/* Portfolio Overview */}
+          <div className="rounded-xl border border-border bg-card">
+            <div className="p-5">
+              <h2 className="text-base font-semibold text-[var(--timberwolf)] mb-4">
+                Portfolio Overview
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted">
+                {[
+                  {
+                    label: 'Total Recordings',
+                    value: String(data.totals.totalRecordings),
+                    sub: `${data.totals.publishedRecordings} published`,
+                  },
+                  {
+                    label: 'This Month',
+                    value: String(data.totals.monthRecordings),
+                    sub: 'recordings',
+                  },
+                  {
+                    label: 'Monthly Revenue',
+                    value:
+                      data.totals.monthRevenue > 0
+                        ? formatCurrency(data.totals.monthRevenue, currency)
+                        : '0',
+                    sub: 'billable',
+                  },
+                  {
+                    label: 'Today',
+                    value: String(data.totals.todayCount),
+                    sub: 'recordings',
+                  },
+                ].map((card) => (
+                  <div key={card.label} className="bg-[var(--night)] p-3.5">
+                    <p className="text-xs text-muted-foreground mb-1">
+                      {card.label}
+                    </p>
+                    <p className="text-lg font-semibold text-[var(--timberwolf)]">
+                      {card.value}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{card.sub}</p>
+                  </div>
+                ))}
               </div>
             </div>
-            <ChartContainer
-              config={Object.fromEntries(
-                data.venueNames.map((name, i) => [
-                  name,
-                  { label: name, color: CHART_COLORS[i % 5] },
-                ])
-              ) as ChartConfig}
-              className="h-[220px] w-full"
-            >
-              <AreaChart data={data.dailyChart}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={(d: string) => {
-                    const day = parseInt(d.split('-')[2], 10)
-                    return day % 5 === 1 || day === 1 ? String(day) : ''
-                  }}
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={11}
-                />
-                <YAxis
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={11}
-                  allowDecimals={false}
-                />
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent
-                      labelFormatter={(label: string) => {
-                        const d = new Date(label + 'T00:00:00')
-                        return d.toLocaleDateString('en-GB', {
-                          day: 'numeric',
-                          month: 'short',
-                        })
-                      }}
-                    />
-                  }
-                />
-                {data.totalDailyTarget > 0 && (
-                  <ReferenceLine
-                    y={data.totalDailyTarget}
-                    stroke="hsl(var(--muted-foreground))"
-                    strokeDasharray="6 4"
-                    strokeOpacity={0.5}
-                  />
-                )}
-                {data.venueNames.map((name, i) => (
-                  <Area
-                    key={name}
-                    type="monotone"
-                    dataKey={name}
-                    stackId="1"
-                    fill={CHART_COLORS[i % 5]}
-                    fillOpacity={0.4}
-                    stroke={CHART_COLORS[i % 5]}
-                    strokeWidth={1.5}
-                  />
-                ))}
-              </AreaChart>
-            </ChartContainer>
           </div>
-        </div>
-      )}
 
-      {/* Child Venues */}
-      <div className="rounded-xl border border-border bg-card">
-        <div className="p-5">
-          <h2 className="text-base font-semibold text-[var(--timberwolf)] mb-4">
-            Venues ({data.childVenues.length})
-          </h2>
-          <div className="space-y-3">
-            {data.childVenues.map((child) => (
-              <div
-                key={child.id}
-                className="p-4 rounded-lg bg-muted/50 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-[var(--timberwolf)] truncate">
-                      {child.name}
+          {/* Daily Performance Chart */}
+          {data.dailyChart.length > 0 && (
+            <div className="rounded-xl border border-border bg-card">
+              <div className="p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                  <div>
+                    <h2 className="text-base font-semibold text-[var(--timberwolf)]">
+                      Daily Performance
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      Avg {data.averagePerDay}/day
+                      {data.totalDailyTarget > 0 &&
+                        ` · Target: ${data.totalDailyTarget}/day`}
                     </p>
-                    <span className="text-xs px-2 py-0.5 rounded bg-zinc-700 text-muted-foreground flex-shrink-0">
-                      {child.type}
-                    </span>
                   </div>
-                  <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                    <span>{child.totalRecordings} recordings</span>
-                    <span>{child.monthRecordings} this month</span>
-                    {child.dailyTarget > 0 && (
-                      <span>
-                        Today: {child.todayCount}/{child.dailyTarget}
-                      </span>
+                </div>
+                <ChartContainer
+                  config={
+                    Object.fromEntries(
+                      data.venueNames.map((name, i) => [
+                        name,
+                        { label: name, color: CHART_COLORS[i % 5] },
+                      ])
+                    ) as ChartConfig
+                  }
+                  className="h-[220px] w-full"
+                >
+                  <AreaChart data={data.dailyChart}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="hsl(var(--border))"
+                    />
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={(d: string) => {
+                        const day = parseInt(d.split('-')[2], 10)
+                        return day % 5 === 1 || day === 1 ? String(day) : ''
+                      }}
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={11}
+                    />
+                    <YAxis
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={11}
+                      allowDecimals={false}
+                    />
+                    <ChartTooltip
+                      content={
+                        <ChartTooltipContent
+                          labelFormatter={(label: string) => {
+                            const d = new Date(label + 'T00:00:00')
+                            return d.toLocaleDateString('en-GB', {
+                              day: 'numeric',
+                              month: 'short',
+                            })
+                          }}
+                        />
+                      }
+                    />
+                    {data.totalDailyTarget > 0 && (
+                      <ReferenceLine
+                        y={data.totalDailyTarget}
+                        stroke="hsl(var(--muted-foreground))"
+                        strokeDasharray="6 4"
+                        strokeOpacity={0.5}
+                      />
                     )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  {child.monthRevenue > 0 && (
-                    <span className="text-sm font-semibold text-[var(--timberwolf)]">
-                      {formatCurrency(child.monthRevenue, child.currency)}
-                    </span>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={outlineBtnClass}
-                    onClick={() => router.push(`/venue/${child.id}`)}
-                  >
-                    Manage
-                  </Button>
-                </div>
+                    {data.venueNames.map((name, i) => (
+                      <Area
+                        key={name}
+                        type="monotone"
+                        dataKey={name}
+                        stackId="1"
+                        fill={CHART_COLORS[i % 5]}
+                        fillOpacity={0.4}
+                        stroke={CHART_COLORS[i % 5]}
+                        strokeWidth={1.5}
+                      />
+                    ))}
+                  </AreaChart>
+                </ChartContainer>
               </div>
-            ))}
-            {data.childVenues.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No child venues found
-              </p>
-            )}
+            </div>
+          )}
+
+          {/* Child Venues */}
+          <div className="rounded-xl border border-border bg-card">
+            <div className="p-5">
+              <h2 className="text-base font-semibold text-[var(--timberwolf)] mb-4">
+                Venues ({data.childVenues.length})
+              </h2>
+              <div className="space-y-3">
+                {data.childVenues.map((child) => (
+                  <div
+                    key={child.id}
+                    className="p-4 rounded-lg bg-muted/50 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-[var(--timberwolf)] truncate">
+                          {child.name}
+                        </p>
+                        <span className="text-xs px-2 py-0.5 rounded bg-zinc-700 text-muted-foreground flex-shrink-0">
+                          {child.type}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                        <span>{child.totalRecordings} recordings</span>
+                        <span>{child.monthRecordings} this month</span>
+                        {child.dailyTarget > 0 && (
+                          <span>
+                            Today: {child.todayCount}/{child.dailyTarget}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      {child.monthRevenue > 0 && (
+                        <span className="text-sm font-semibold text-[var(--timberwolf)]">
+                          {formatCurrency(child.monthRevenue, child.currency)}
+                        </span>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={outlineBtnClass}
+                        onClick={() => router.push(`/venue/${child.id}`)}
+                      >
+                        Manage
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {data.childVenues.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No child venues found
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-      </>}
+        </>
+      )}
     </div>
   )
 }
@@ -1709,7 +1804,10 @@ export default function OrgManagePage() {
       </div>
 
       {org.type === 'group' ? (
-        <GroupDashboardView slug={slug} hasGraphicPackages={org.featureGraphicPackages} />
+        <GroupDashboardView
+          slug={slug}
+          hasGraphicPackages={org.featureGraphicPackages}
+        />
       ) : (
         <>
           {/* Tab navigation */}

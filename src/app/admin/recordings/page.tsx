@@ -123,9 +123,11 @@ export default function AdminRecordingsPage() {
       {filteredRecordings.length === 0 ? (
         <EmptyState
           icon={<Film className="h-10 w-10" />}
-          title={search || statusFilter !== 'all'
-            ? 'No recordings match your filters'
-            : 'No recordings found'}
+          title={
+            search || statusFilter !== 'all'
+              ? 'No recordings match your filters'
+              : 'No recordings found'
+          }
         />
       ) : (
         <div className="space-y-2">

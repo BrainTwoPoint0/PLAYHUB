@@ -114,10 +114,7 @@ export async function POST(request: NextRequest) {
       }
       const orgResult = await updateOrgFeatures(orgId, features)
       if (!orgResult.success) {
-        return NextResponse.json(
-          { error: orgResult.error },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: orgResult.error }, { status: 400 })
       }
       return NextResponse.json(orgResult)
     }
@@ -140,7 +137,10 @@ export async function POST(request: NextRequest) {
     case 'setParentOrg': {
       const { childOrgId, parentOrgId } = body
       if (!childOrgId) {
-        return NextResponse.json({ error: 'childOrgId required' }, { status: 400 })
+        return NextResponse.json(
+          { error: 'childOrgId required' },
+          { status: 400 }
+        )
       }
       const parentResult = await setParentOrg(childOrgId, parentOrgId || null)
       if (!parentResult.success) {
@@ -151,8 +151,14 @@ export async function POST(request: NextRequest) {
 
     case 'upsertVenueAccess': {
       const { venueAccessData } = body
-      if (!venueAccessData?.organization_id || !venueAccessData?.venue_organization_id) {
-        return NextResponse.json({ error: 'organization_id and venue_organization_id required' }, { status: 400 })
+      if (
+        !venueAccessData?.organization_id ||
+        !venueAccessData?.venue_organization_id
+      ) {
+        return NextResponse.json(
+          { error: 'organization_id and venue_organization_id required' },
+          { status: 400 }
+        )
       }
       const accessResult = await upsertVenueAccess(venueAccessData)
       if (!accessResult.success) {
@@ -164,7 +170,10 @@ export async function POST(request: NextRequest) {
     case 'deleteVenueAccess': {
       const { venueAccessId } = body
       if (!venueAccessId) {
-        return NextResponse.json({ error: 'venueAccessId required' }, { status: 400 })
+        return NextResponse.json(
+          { error: 'venueAccessId required' },
+          { status: 400 }
+        )
       }
       const deleteResult = await deleteVenueAccess(venueAccessId)
       if (!deleteResult.success) {

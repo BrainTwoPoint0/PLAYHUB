@@ -22,7 +22,9 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
   const serviceClient = createServiceClient() as any
   const { data: org } = await serviceClient
     .from('organizations')
-    .select('id, name, slug, type, logo_url, feature_recordings, feature_streaming, feature_graphic_packages, marketplace_enabled')
+    .select(
+      'id, name, slug, type, logo_url, feature_recordings, feature_streaming, feature_graphic_packages, marketplace_enabled'
+    )
     .eq('slug', slug)
     .maybeSingle()
 

@@ -61,18 +61,43 @@ interface VenueAccess {
 
 // ── Constants ──────────────────────────────────────────────────────
 
-const TYPE_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
-  group: { label: 'Group', icon: Crown, color: 'text-amber-400 bg-amber-400/15 border-amber-400/30' },
-  venue: { label: 'Venue', icon: MapPin, color: 'text-emerald-400 bg-emerald-400/15 border-emerald-400/30' },
-  league: { label: 'League', icon: Trophy, color: 'text-sky-400 bg-sky-400/15 border-sky-400/30' },
-  academy: { label: 'Academy', icon: GraduationCap, color: 'text-violet-400 bg-violet-400/15 border-violet-400/30' },
-}
+const TYPE_CONFIG: Record<string, { label: string; icon: any; color: string }> =
+  {
+    group: {
+      label: 'Group',
+      icon: Crown,
+      color: 'text-amber-400 bg-amber-400/15 border-amber-400/30',
+    },
+    venue: {
+      label: 'Venue',
+      icon: MapPin,
+      color: 'text-emerald-400 bg-emerald-400/15 border-emerald-400/30',
+    },
+    league: {
+      label: 'League',
+      icon: Trophy,
+      color: 'text-sky-400 bg-sky-400/15 border-sky-400/30',
+    },
+    academy: {
+      label: 'Academy',
+      icon: GraduationCap,
+      color: 'text-violet-400 bg-violet-400/15 border-violet-400/30',
+    },
+  }
 
 const featureFlags = [
   { key: 'feature_recordings' as const, label: 'Recordings', icon: Video },
   { key: 'feature_streaming' as const, label: 'Streaming', icon: Radio },
-  { key: 'feature_graphic_packages' as const, label: 'Graphics', icon: Palette },
-  { key: 'marketplace_enabled' as const, label: 'Marketplace', icon: ShoppingBag },
+  {
+    key: 'feature_graphic_packages' as const,
+    label: 'Graphics',
+    icon: Palette,
+  },
+  {
+    key: 'marketplace_enabled' as const,
+    label: 'Marketplace',
+    icon: ShoppingBag,
+  },
 ]
 
 const BILLING_LABELS: Record<string, string> = {
@@ -90,7 +115,9 @@ export default function AdminOrganizationsPage() {
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
   const [expandedOrg, setExpandedOrg] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'hierarchy' | 'access'>('hierarchy')
+  const [activeTab, setActiveTab] = useState<'hierarchy' | 'access'>(
+    'hierarchy'
+  )
 
   // New venue access form state
   const [showAccessForm, setShowAccessForm] = useState(false)
@@ -119,20 +146,34 @@ export default function AdminOrganizationsPage() {
     }
   }, [])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   // ── Actions ────────────────────────────────────────────────────
 
-  async function toggleFeature(orgId: string, featureKey: string, currentValue: boolean) {
+  async function toggleFeature(
+    orgId: string,
+    featureKey: string,
+    currentValue: boolean
+  ) {
     setUpdating(`${orgId}-${featureKey}`)
     try {
       const res = await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'updateOrgFeatures', orgId, features: { [featureKey]: !currentValue } }),
+        body: JSON.stringify({
+          action: 'updateOrgFeatures',
+          orgId,
+          features: { [featureKey]: !currentValue },
+        }),
       })
       if (res.ok) {
-        setOrgs((prev) => prev.map((o) => o.id === orgId ? { ...o, [featureKey]: !currentValue } : o))
+        setOrgs((prev) =>
+          prev.map((o) =>
+            o.id === orgId ? { ...o, [featureKey]: !currentValue } : o
+          )
+        )
       }
     } catch (err) {
       console.error('Failed to update feature:', err)
@@ -141,13 +182,20 @@ export default function AdminOrganizationsPage() {
     }
   }
 
-  async function handleSetParent(childOrgId: string, parentOrgId: string | null) {
+  async function handleSetParent(
+    childOrgId: string,
+    parentOrgId: string | null
+  ) {
     setUpdating(`parent-${childOrgId}`)
     try {
       const res = await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'setParentOrg', childOrgId, parentOrgId }),
+        body: JSON.stringify({
+          action: 'setParentOrg',
+          childOrgId,
+          parentOrgId,
+        }),
       })
       if (res.ok) {
         await fetchData()
@@ -169,11 +217,20 @@ export default function AdminOrganizationsPage() {
       const res = await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'upsertVenueAccess', venueAccessData: accessForm }),
+        body: JSON.stringify({
+          action: 'upsertVenueAccess',
+          venueAccessData: accessForm,
+        }),
       })
       if (res.ok) {
         setShowAccessForm(false)
-        setAccessForm({ organization_id: '', venue_organization_id: '', can_record: true, can_stream: false, billing_responsibility: 'venue' })
+        setAccessForm({
+          organization_id: '',
+          venue_organization_id: '',
+          can_record: true,
+          can_stream: false,
+          billing_responsibility: 'venue',
+        })
         await fetchData()
       } else {
         const err = await res.json()
@@ -193,7 +250,10 @@ export default function AdminOrganizationsPage() {
       const res = await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'deleteVenueAccess', venueAccessId: id }),
+        body: JSON.stringify({
+          action: 'deleteVenueAccess',
+          venueAccessId: id,
+        }),
       })
       if (res.ok) await fetchData()
     } catch (err) {
@@ -207,10 +267,14 @@ export default function AdminOrganizationsPage() {
 
   const orgById = (id: string) => orgs.find((o) => o.id === id)
   const groupOrgs = orgs.filter((o) => o.type === 'group')
-  const childOrgIds = new Set(orgs.filter((o) => o.parent_organization_id).map((o) => o.id))
+  const childOrgIds = new Set(
+    orgs.filter((o) => o.parent_organization_id).map((o) => o.id)
+  )
   const topLevelOrgs = orgs.filter((o) => !o.parent_organization_id)
   const venueOrgs = orgs.filter((o) => o.type === 'venue')
-  const nonVenueOrgs = orgs.filter((o) => o.type !== 'venue' && o.type !== 'group')
+  const nonVenueOrgs = orgs.filter(
+    (o) => o.type !== 'venue' && o.type !== 'group'
+  )
 
   // ── Render ─────────────────────────────────────────────────────
 
@@ -219,9 +283,13 @@ export default function AdminOrganizationsPage() {
       <div className="space-y-4">
         <Skeleton className="h-8 w-64" />
         <div className="grid grid-cols-2 gap-3">
-          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-24 rounded-lg" />
+          ))}
         </div>
-        {[0, 1, 2].map((i) => <Skeleton key={i} className="h-48 rounded-lg" />)}
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-48 rounded-lg" />
+        ))}
       </div>
     )
   }
@@ -233,7 +301,8 @@ export default function AdminOrganizationsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Organizations</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {orgs.length} organizations &middot; {groupOrgs.length} groups &middot; {venueAccess.length} venue access entries
+            {orgs.length} organizations &middot; {groupOrgs.length} groups
+            &middot; {venueAccess.length} venue access entries
           </p>
         </div>
       </div>
@@ -251,7 +320,9 @@ export default function AdminOrganizationsPage() {
               <Icon className="h-4 w-4 shrink-0" />
               <div>
                 <p className="text-xs opacity-70">{config.label}</p>
-                <p className="text-lg font-semibold leading-none mt-0.5">{count}</p>
+                <p className="text-lg font-semibold leading-none mt-0.5">
+                  {count}
+                </p>
               </div>
             </div>
           )
@@ -288,7 +359,10 @@ export default function AdminOrganizationsPage() {
       {activeTab === 'hierarchy' && (
         <div className="space-y-3">
           {orgs.length === 0 ? (
-            <EmptyState icon={<Layers className="h-10 w-10" />} title="No organizations found" />
+            <EmptyState
+              icon={<Layers className="h-10 w-10" />}
+              title="No organizations found"
+            />
           ) : (
             topLevelOrgs.map((org) => (
               <div key={org.id}>
@@ -298,32 +372,39 @@ export default function AdminOrganizationsPage() {
                   groupOrgs={groupOrgs}
                   updating={updating}
                   expandedOrg={expandedOrg}
-                  onToggleExpand={() => setExpandedOrg(expandedOrg === org.id ? null : org.id)}
+                  onToggleExpand={() =>
+                    setExpandedOrg(expandedOrg === org.id ? null : org.id)
+                  }
                   onToggleFeature={toggleFeature}
                   onSetParent={handleSetParent}
                   isChild={false}
                 />
                 {/* Child orgs (indented) */}
-                {org.children?.length > 0 && org.children.map((child) => {
-                  const childOrg = orgById(child.id)
-                  if (!childOrg) return null
-                  return (
-                    <div key={child.id} className="ml-8 mt-2 relative">
-                      <div className="absolute -left-4 top-5 w-4 border-b border-l border-muted-foreground/20 h-6 rounded-bl-md" />
-                      <OrgCard
-                        org={childOrg}
-                        orgs={orgs}
-                        groupOrgs={groupOrgs}
-                        updating={updating}
-                        expandedOrg={expandedOrg}
-                        onToggleExpand={() => setExpandedOrg(expandedOrg === childOrg.id ? null : childOrg.id)}
-                        onToggleFeature={toggleFeature}
-                        onSetParent={handleSetParent}
-                        isChild={true}
-                      />
-                    </div>
-                  )
-                })}
+                {org.children?.length > 0 &&
+                  org.children.map((child) => {
+                    const childOrg = orgById(child.id)
+                    if (!childOrg) return null
+                    return (
+                      <div key={child.id} className="ml-8 mt-2 relative">
+                        <div className="absolute -left-4 top-5 w-4 border-b border-l border-muted-foreground/20 h-6 rounded-bl-md" />
+                        <OrgCard
+                          org={childOrg}
+                          orgs={orgs}
+                          groupOrgs={groupOrgs}
+                          updating={updating}
+                          expandedOrg={expandedOrg}
+                          onToggleExpand={() =>
+                            setExpandedOrg(
+                              expandedOrg === childOrg.id ? null : childOrg.id
+                            )
+                          }
+                          onToggleFeature={toggleFeature}
+                          onSetParent={handleSetParent}
+                          isChild={true}
+                        />
+                      </div>
+                    )
+                  })}
               </div>
             ))
           )}
@@ -348,28 +429,46 @@ export default function AdminOrganizationsPage() {
                 <h3 className="font-semibold text-sm">New Venue Access</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-muted-foreground block mb-1.5">Tenant Organization</label>
+                    <label className="text-xs text-muted-foreground block mb-1.5">
+                      Tenant Organization
+                    </label>
                     <select
                       value={accessForm.organization_id}
-                      onChange={(e) => setAccessForm((f) => ({ ...f, organization_id: e.target.value }))}
+                      onChange={(e) =>
+                        setAccessForm((f) => ({
+                          ...f,
+                          organization_id: e.target.value,
+                        }))
+                      }
                       className="w-full bg-muted/50 border border-border rounded-md px-3 py-2 text-sm"
                     >
                       <option value="">Select tenant org...</option>
                       {nonVenueOrgs.map((o) => (
-                        <option key={o.id} value={o.id}>{o.name} ({TYPE_CONFIG[o.type]?.label})</option>
+                        <option key={o.id} value={o.id}>
+                          {o.name} ({TYPE_CONFIG[o.type]?.label})
+                        </option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground block mb-1.5">Venue</label>
+                    <label className="text-xs text-muted-foreground block mb-1.5">
+                      Venue
+                    </label>
                     <select
                       value={accessForm.venue_organization_id}
-                      onChange={(e) => setAccessForm((f) => ({ ...f, venue_organization_id: e.target.value }))}
+                      onChange={(e) =>
+                        setAccessForm((f) => ({
+                          ...f,
+                          venue_organization_id: e.target.value,
+                        }))
+                      }
                       className="w-full bg-muted/50 border border-border rounded-md px-3 py-2 text-sm"
                     >
                       <option value="">Select venue...</option>
                       {venueOrgs.map((o) => (
-                        <option key={o.id} value={o.id}>{o.name}</option>
+                        <option key={o.id} value={o.id}>
+                          {o.name}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -379,7 +478,12 @@ export default function AdminOrganizationsPage() {
                     <input
                       type="checkbox"
                       checked={accessForm.can_record}
-                      onChange={(e) => setAccessForm((f) => ({ ...f, can_record: e.target.checked }))}
+                      onChange={(e) =>
+                        setAccessForm((f) => ({
+                          ...f,
+                          can_record: e.target.checked,
+                        }))
+                      }
                       className="rounded"
                     />
                     Can Record
@@ -388,7 +492,12 @@ export default function AdminOrganizationsPage() {
                     <input
                       type="checkbox"
                       checked={accessForm.can_stream}
-                      onChange={(e) => setAccessForm((f) => ({ ...f, can_stream: e.target.checked }))}
+                      onChange={(e) =>
+                        setAccessForm((f) => ({
+                          ...f,
+                          can_stream: e.target.checked,
+                        }))
+                      }
                       className="rounded"
                     />
                     Can Stream
@@ -396,7 +505,12 @@ export default function AdminOrganizationsPage() {
                   <div>
                     <select
                       value={accessForm.billing_responsibility}
-                      onChange={(e) => setAccessForm((f) => ({ ...f, billing_responsibility: e.target.value }))}
+                      onChange={(e) =>
+                        setAccessForm((f) => ({
+                          ...f,
+                          billing_responsibility: e.target.value,
+                        }))
+                      }
                       className="w-full bg-muted/50 border border-border rounded-md px-3 py-2 text-sm"
                     >
                       <option value="venue">Venue pays</option>
@@ -415,10 +529,16 @@ export default function AdminOrganizationsPage() {
                   </button>
                   <button
                     onClick={handleCreateAccess}
-                    disabled={updating === 'create-access' || !accessForm.organization_id || !accessForm.venue_organization_id}
+                    disabled={
+                      updating === 'create-access' ||
+                      !accessForm.organization_id ||
+                      !accessForm.venue_organization_id
+                    }
                     className="px-4 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-500 text-white rounded-md transition-colors disabled:opacity-40"
                   >
-                    {updating === 'create-access' ? 'Creating...' : 'Create Access'}
+                    {updating === 'create-access'
+                      ? 'Creating...'
+                      : 'Create Access'}
                   </button>
                 </div>
               </CardContent>
@@ -427,7 +547,10 @@ export default function AdminOrganizationsPage() {
 
           {/* Existing access entries */}
           {venueAccess.length === 0 ? (
-            <EmptyState icon={<Link2 className="h-10 w-10" />} title="No venue access entries" />
+            <EmptyState
+              icon={<Link2 className="h-10 w-10" />}
+              title="No venue access entries"
+            />
           ) : (
             venueAccess.map((access) => {
               const tenantOrg = orgById(access.organization_id)
@@ -439,14 +562,21 @@ export default function AdminOrganizationsPage() {
                       <div className="flex items-center gap-3 min-w-0">
                         {/* Tenant org */}
                         <div className="flex items-center gap-2">
-                          <TypeBadge type={tenantOrg?.type || 'league'} size="sm" />
-                          <span className="font-medium text-sm">{tenantOrg?.name || 'Unknown'}</span>
+                          <TypeBadge
+                            type={tenantOrg?.type || 'league'}
+                            size="sm"
+                          />
+                          <span className="font-medium text-sm">
+                            {tenantOrg?.name || 'Unknown'}
+                          </span>
                         </div>
                         <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                         {/* Venue */}
                         <div className="flex items-center gap-2">
                           <TypeBadge type="venue" size="sm" />
-                          <span className="font-medium text-sm">{venueOrg?.name || 'Unknown'}</span>
+                          <span className="font-medium text-sm">
+                            {venueOrg?.name || 'Unknown'}
+                          </span>
                         </div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
@@ -463,10 +593,13 @@ export default function AdminOrganizationsPage() {
                             </span>
                           )}
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                            {BILLING_LABELS[access.billing_responsibility] || access.billing_responsibility}
+                            {BILLING_LABELS[access.billing_responsibility] ||
+                              access.billing_responsibility}
                           </span>
                         </div>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${access.is_active ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded ${access.is_active ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}
+                        >
                           {access.is_active ? 'Active' : 'Inactive'}
                         </span>
                         <button
@@ -492,14 +625,25 @@ export default function AdminOrganizationsPage() {
 
 // ── Subcomponents ────────────────────────────────────────────────
 
-function TypeBadge({ type, size = 'md' }: { type: string; size?: 'sm' | 'md' }) {
+function TypeBadge({
+  type,
+  size = 'md',
+}: {
+  type: string
+  size?: 'sm' | 'md'
+}) {
   const config = TYPE_CONFIG[type] || TYPE_CONFIG.venue
   const Icon = config.icon
-  const sizeClasses = size === 'sm' ? 'text-[10px] px-1.5 py-0.5 gap-1' : 'text-xs px-2 py-0.5 gap-1.5'
+  const sizeClasses =
+    size === 'sm'
+      ? 'text-[10px] px-1.5 py-0.5 gap-1'
+      : 'text-xs px-2 py-0.5 gap-1.5'
   const iconSize = size === 'sm' ? 'h-2.5 w-2.5' : 'h-3 w-3'
 
   return (
-    <span className={`inline-flex items-center rounded-full border font-medium ${sizeClasses} ${config.color}`}>
+    <span
+      className={`inline-flex items-center rounded-full border font-medium ${sizeClasses} ${config.color}`}
+    >
       <Icon className={iconSize} />
       {config.label}
     </span>
@@ -535,12 +679,23 @@ function OrgCard({
       <CardContent className="p-4">
         {/* Header row */}
         <div className="flex items-center gap-3">
-          <button onClick={onToggleExpand} className="text-muted-foreground hover:text-[var(--timberwolf)] transition-colors">
-            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          <button
+            onClick={onToggleExpand}
+            className="text-muted-foreground hover:text-[var(--timberwolf)] transition-colors"
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
           </button>
 
           {org.logo_url ? (
-            <img src={org.logo_url} alt={org.name} className="w-8 h-8 rounded-md object-cover" />
+            <img
+              src={org.logo_url}
+              alt={org.name}
+              className="w-8 h-8 rounded-md object-cover"
+            />
           ) : (
             <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center">
               <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -557,13 +712,16 @@ function OrgCard({
                 </span>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">{org.slug ? `/${org.slug}` : 'No slug'}</p>
+            <p className="text-xs text-muted-foreground">
+              {org.slug ? `/${org.slug}` : 'No slug'}
+            </p>
           </div>
 
           <div className="flex items-center gap-2">
             {hasChildren && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-400/15 text-amber-400 border border-amber-400/20">
-                {org.children.length} child{org.children.length > 1 ? 'ren' : ''}
+                {org.children.length} child
+                {org.children.length > 1 ? 'ren' : ''}
               </span>
             )}
             {org.is_verified && (
@@ -571,7 +729,9 @@ function OrgCard({
                 Verified
               </span>
             )}
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${org.is_active ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded-full ${org.is_active ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}
+            >
               {org.is_active ? 'Active' : 'Inactive'}
             </span>
           </div>
@@ -582,7 +742,9 @@ function OrgCard({
           <div className="mt-4 space-y-4 pt-4 border-t border-border/50">
             {/* Feature toggles */}
             <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Features</p>
+              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
+                Features
+              </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {featureFlags.map((feature) => {
                   const isEnabled = org[feature.key]
@@ -591,7 +753,9 @@ function OrgCard({
                   return (
                     <button
                       key={feature.key}
-                      onClick={() => onToggleFeature(org.id, feature.key, isEnabled)}
+                      onClick={() =>
+                        onToggleFeature(org.id, feature.key, isEnabled)
+                      }
                       disabled={isUpdating}
                       className={`flex items-center gap-2 px-3 py-2 rounded-md border text-xs font-medium transition-all ${
                         isEnabled
@@ -610,21 +774,29 @@ function OrgCard({
             {/* Parent org assignment (only for non-group orgs) */}
             {org.type !== 'group' && (
               <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Parent Organization</p>
+                <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
+                  Parent Organization
+                </p>
                 <div className="flex items-center gap-3">
                   <select
                     value={org.parent_organization_id || ''}
-                    onChange={(e) => onSetParent(org.id, e.target.value || null)}
+                    onChange={(e) =>
+                      onSetParent(org.id, e.target.value || null)
+                    }
                     disabled={updating === `parent-${org.id}`}
                     className="bg-muted/50 border border-border rounded-md px-3 py-1.5 text-sm max-w-xs"
                   >
                     <option value="">No parent (independent)</option>
                     {groupOrgs.map((g) => (
-                      <option key={g.id} value={g.id}>{g.name}</option>
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
                     ))}
                   </select>
                   {updating === `parent-${org.id}` && (
-                    <span className="text-xs text-muted-foreground animate-pulse">Updating...</span>
+                    <span className="text-xs text-muted-foreground animate-pulse">
+                      Updating...
+                    </span>
                   )}
                 </div>
               </div>

@@ -52,7 +52,9 @@ export default function NavBar() {
   const [hasVenues, setHasVenues] = useState(false)
   const [hasAcademy, setHasAcademy] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
-  const [managedOrgs, setManagedOrgs] = useState<Array<{ slug: string; name: string; type: string }>>([])
+  const [managedOrgs, setManagedOrgs] = useState<
+    Array<{ slug: string; name: string; type: string }>
+  >([])
   const [navReady, setNavReady] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [popoverOpen, setPopoverOpen] = useState(false)
@@ -95,13 +97,16 @@ export default function NavBar() {
       ? [{ href: '/academy', label: 'Academy', icon: GraduationCap }]
       : []),
     ...(navReady && managedOrgs.length > 0
-      ? [{
-          href: managedOrgs.length === 1
-            ? `/org/${managedOrgs[0].slug}/manage`
-            : '/org',
-          label: 'Manage Org',
-          icon: Building2,
-        }]
+      ? [
+          {
+            href:
+              managedOrgs.length === 1
+                ? `/org/${managedOrgs[0].slug}/manage`
+                : '/org',
+            label: 'Manage Org',
+            icon: Building2,
+          },
+        ]
       : []),
     ...(navReady && isAdmin
       ? [{ href: '/admin', label: 'Admin', icon: ShieldCheck }]
@@ -237,10 +242,7 @@ export default function NavBar() {
                     <div className="px-5 pt-12 pb-4">
                       <div className="flex items-center gap-3">
                         <div className="h-9 w-9 shrink-0 rounded-full bg-secondary flex items-center justify-center text-xs font-medium text-[var(--timberwolf)] ring-1 ring-border">
-                          {getUserInitials(
-                            profile.data?.full_name,
-                            user.email
-                          )}
+                          {getUserInitials(profile.data?.full_name, user.email)}
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-[var(--timberwolf)] truncate">

@@ -84,7 +84,11 @@ export default function AdminDashboard() {
           { label: 'Total Users', value: stats?.users || 0 },
           { label: 'Venues', value: stats?.venues || 0 },
           { label: 'Recordings', value: stats?.recordings || 0 },
-          { label: 'Pending Invites', value: stats?.pendingInvites || 0, color: stats?.pendingInvites ? 'yellow' : 'default' },
+          {
+            label: 'Pending Invites',
+            value: stats?.pendingInvites || 0,
+            color: stats?.pendingInvites ? 'yellow' : 'default',
+          },
         ]}
       />
 
