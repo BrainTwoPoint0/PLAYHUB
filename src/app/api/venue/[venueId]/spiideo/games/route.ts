@@ -142,7 +142,7 @@ export async function POST(
           .from('organization_members')
           .select('organization_id')
           .eq('profile_id', userProfile.id)
-          .in('role', ['admin', 'club_admin', 'league_admin'])
+          .in('role', ['admin', 'manager', 'club_admin', 'league_admin'])
           .eq('is_active', true)
 
         if (userOrgs && userOrgs.length > 0) {

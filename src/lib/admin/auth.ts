@@ -92,7 +92,7 @@ export async function getAllVenues() {
     .from('organization_members')
     .select('organization_id')
     .in('organization_id', venueIds)
-    .in('role', ['admin', 'club_admin', 'league_admin'])
+    .in('role', ['admin', 'manager', 'club_admin', 'league_admin'])
     .eq('is_active', true)
 
   const { data: recordingCounts } = await supabase

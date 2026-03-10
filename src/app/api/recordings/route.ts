@@ -13,14 +13,17 @@ import {
   checkRecordingAccess,
   getAccessibleRecordings,
 } from '@/lib/recordings/access-control'
+import { timingSafeEqual } from 'crypto'
 
 const ACCOUNT_ID = process.env.SPIIDEO_ACCOUNT_ID!
 const SYNC_API_KEY = process.env.SYNC_API_KEY
 
-// Verify API key for protected endpoints
+// Verify API key for protected endpoints (timing-safe)
 function verifyApiKey(request: Request): boolean {
   const apiKey = request.headers.get('x-api-key')
-  return apiKey === SYNC_API_KEY && !!SYNC_API_KEY
+  if (!apiKey || !SYNC_API_KEY) return false
+  if (apiKey.length !== SYNC_API_KEY.length) return false
+  return timingSafeEqual(Buffer.from(apiKey), Buffer.from(SYNC_API_KEY))
 }
 
 // GET - List recordings or get playback URL
@@ -43,7 +46,8 @@ export async function GET(request: Request) {
         )
       }
 
-      const { data: recording, error } = await (supabase as any)
+      const serviceClient = createServiceClient() as any
+      const { data: recording, error } = await serviceClient
         .from('playhub_match_recordings')
         .select('*')
         .eq('id', id)
@@ -84,7 +88,8 @@ export async function GET(request: Request) {
         )
       }
 
-      const { data: recording, error } = await (supabase as any)
+      const dlServiceClient = createServiceClient() as any
+      const { data: recording, error } = await dlServiceClient
         .from('playhub_match_recordings')
         .select('*')
         .eq('id', id)

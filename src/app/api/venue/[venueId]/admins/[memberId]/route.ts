@@ -36,6 +36,7 @@ export async function DELETE(
       profile_id,
       profiles:profile_id (
         user_id,
+        email,
         is_platform_admin
       )
     `
@@ -87,6 +88,19 @@ export async function DELETE(
       { error: 'Failed to remove admin' },
       { status: 500 }
     )
+  }
+
+  // Clean up any pending invites for this member's email
+  const memberEmail = (membership.profiles as any)?.email
+  if (memberEmail) {
+    const { error: cleanupError } = await (serviceClient as any)
+      .from('playhub_pending_admin_invites')
+      .delete()
+      .eq('invited_email', memberEmail.toLowerCase())
+      .eq('organization_id', venueId)
+    if (cleanupError) {
+      console.error('Failed to clean up pending invites:', cleanupError)
+    }
   }
 
   return NextResponse.json({ success: true })

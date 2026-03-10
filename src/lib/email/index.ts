@@ -3,6 +3,14 @@ import { Resend } from 'resend'
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 const FROM_EMAIL = 'PLAYHUB <admin@playbacksports.ai>'
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
 const APP_URL =
   process.env.NEXT_PUBLIC_APP_URL || 'https://playhub.playbacksports.ai'
 
@@ -18,8 +26,11 @@ export async function sendAdminInviteEmail(params: {
   toEmail: string
   venueName: string
   inviterName?: string
+  orgType?: 'venue' | 'academy' | 'organization'
 }): Promise<SendEmailResult> {
-  const { toEmail, venueName, inviterName } = params
+  const { toEmail, orgType } = params
+  const venueName = escapeHtml(params.venueName)
+  const inviterName = params.inviterName ? escapeHtml(params.inviterName) : undefined
 
   try {
     const { error } = await resend.emails.send({
@@ -42,16 +53,16 @@ export async function sendAdminInviteEmail(params: {
             </p>
 
             <p style="font-size: 16px; line-height: 1.6; margin-bottom: 24px;">
-              As a venue admin, you'll be able to schedule recordings, manage access, and invite other admins.
+              As an admin, you'll be able to manage recordings, access, and invite other admins.
             </p>
 
-            <a href="${APP_URL}/auth/register"
+            <a href="${APP_URL}/auth/register?redirect=%2F${orgType === 'academy' ? 'academy' : 'venue'}"
                style="display: inline-block; background-color: #d6d5c9; color: #0a100d; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">
               Create your account
             </a>
 
             <p style="font-size: 14px; color: #b9baa3; margin-top: 32px;">
-              Already have an account? <a href="${APP_URL}/auth/login" style="color: #d6d5c9;">Sign in here</a>
+              Already have an account? <a href="${APP_URL}/auth/login?redirect=%2F${orgType === 'academy' ? 'academy' : 'venue'}" style="color: #d6d5c9;">Sign in here</a>
             </p>
 
             <hr style="border: none; border-top: 1px solid #333; margin: 32px 0;">
@@ -87,9 +98,12 @@ export async function sendRecordingAccessEmail(params: {
   inviterName?: string
   shareUrl?: string
 }): Promise<SendEmailResult> {
-  const { toEmail, recordingTitle, venueName, inviterName, shareUrl } = params
+  const { toEmail, shareUrl } = params
+  const recordingTitle = escapeHtml(params.recordingTitle)
+  const venueName = params.venueName ? escapeHtml(params.venueName) : undefined
+  const inviterName = params.inviterName ? escapeHtml(params.inviterName) : undefined
 
-  const actionUrl = shareUrl || `${APP_URL}/auth/register`
+  const actionUrl = shareUrl || `${APP_URL}/auth/register?redirect=%2Frecordings`
   const actionText = shareUrl ? 'Watch recording' : 'Create your account'
 
   try {
@@ -126,7 +140,7 @@ export async function sendRecordingAccessEmail(params: {
               !shareUrl
                 ? `
             <p style="font-size: 14px; color: #b9baa3; margin-top: 32px;">
-              Already have an account? <a href="${APP_URL}/auth/login" style="color: #d6d5c9;">Sign in here</a> to view your recordings.
+              Already have an account? <a href="${APP_URL}/auth/login?redirect=%2Frecordings" style="color: #d6d5c9;">Sign in here</a> to view your recordings.
             </p>
             `
                 : ''
@@ -166,8 +180,11 @@ export async function sendRecordingAssignedEmail(params: {
   assignedBy?: string
   isReady?: boolean
 }): Promise<SendEmailResult> {
-  const { toEmail, recordingTitle, matchDate, venueName, assignedBy, isReady } =
-    params
+  const { toEmail, isReady } = params
+  const recordingTitle = escapeHtml(params.recordingTitle)
+  const matchDate = params.matchDate ? escapeHtml(params.matchDate) : undefined
+  const venueName = params.venueName ? escapeHtml(params.venueName) : undefined
+  const assignedBy = params.assignedBy ? escapeHtml(params.assignedBy) : undefined
 
   try {
     const { error } = await resend.emails.send({
@@ -249,7 +266,9 @@ export async function sendAdminAddedEmail(params: {
   dashboardUrl: string
   inviterName?: string
 }): Promise<SendEmailResult> {
-  const { toEmail, entityName, dashboardUrl, inviterName } = params
+  const { toEmail, dashboardUrl } = params
+  const entityName = escapeHtml(params.entityName)
+  const inviterName = params.inviterName ? escapeHtml(params.inviterName) : undefined
 
   const fullDashboardUrl = `${APP_URL}${dashboardUrl}`
 
@@ -329,7 +348,6 @@ export interface InvoiceEmailParams {
  */
 export function renderInvoiceEmailHtml(params: InvoiceEmailParams): string {
   const {
-    venueName,
     periodLabel,
     currency,
     stripeInvoiceUrl,
@@ -344,6 +362,7 @@ export function renderInvoiceEmailHtml(params: InvoiceEmailParams): string {
     venueProfitSharePct,
     netAmount,
   } = params
+  const venueName = escapeHtml(params.venueName)
 
   const fmt = (n: number) =>
     new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(n)
@@ -543,7 +562,10 @@ export async function sendRecordingReadyEmail(params: {
   venueName?: string
   watchUrl?: string
 }): Promise<SendEmailResult> {
-  const { toEmail, recordingTitle, matchDate, venueName, watchUrl } = params
+  const { toEmail, watchUrl } = params
+  const recordingTitle = escapeHtml(params.recordingTitle)
+  const matchDate = params.matchDate ? escapeHtml(params.matchDate) : undefined
+  const venueName = params.venueName ? escapeHtml(params.venueName) : undefined
 
   const actionUrl = watchUrl || `${APP_URL}/recordings`
 

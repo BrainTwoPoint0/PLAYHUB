@@ -18,8 +18,10 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [consecutiveErrors, setConsecutiveErrors] = useState(0)
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null)
 
-  const { signIn, user } = useAuth()
+  const { signIn, user, loading: authLoading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -43,6 +45,13 @@ function LoginForm() {
     e.preventDefault()
     setError('')
 
+    // Client-side cooldown to prevent Supabase rate limiting
+    if (cooldownUntil && Date.now() < cooldownUntil) {
+      const secondsLeft = Math.ceil((cooldownUntil - Date.now()) / 1000)
+      setError(`Too many attempts. Please wait ${secondsLeft} seconds.`)
+      return
+    }
+
     if (!email || !password) {
       setError('Please fill in all fields')
       return
@@ -59,8 +68,19 @@ function LoginForm() {
       const { error } = await signIn(email, password)
 
       if (error) {
-        setError(getAuthErrorMessage(error))
+        const msg = getAuthErrorMessage(error)
+        setError(msg)
+        const newCount = consecutiveErrors + 1
+        setConsecutiveErrors(newCount)
+
+        // After 3 consecutive errors, enforce a 30-second cooldown
+        if (newCount >= 3) {
+          setCooldownUntil(Date.now() + 30_000)
+          setConsecutiveErrors(0)
+        }
       } else {
+        setConsecutiveErrors(0)
+        setCooldownUntil(null)
         const raw = searchParams.get('redirect') || '/'
         const safe = raw.startsWith('/') && !raw.startsWith('//') && !raw.includes('@') && !raw.includes('\\') ? raw : '/'
         router.push(safe)
@@ -70,6 +90,15 @@ function LoginForm() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Don't show login form while auth is initializing or if already authenticated
+  if (authLoading || user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    )
   }
 
   return (
@@ -167,7 +196,7 @@ function LoginForm() {
             <p className="text-muted-foreground">
               Don&apos;t have an account?{' '}
               <Link
-                href="/auth/register"
+                href={searchParams.get('redirect') ? `/auth/register?redirect=${encodeURIComponent(searchParams.get('redirect')!)}` : '/auth/register'}
                 className="text-[var(--timberwolf)] hover:underline"
               >
                 Sign up

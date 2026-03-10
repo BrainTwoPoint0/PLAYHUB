@@ -154,6 +154,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       toEmail: email.toLowerCase(),
       venueName: org.name,
       inviterName: inviterProfile?.full_name || undefined,
+      orgType: 'organization',
     })
 
     return NextResponse.json({

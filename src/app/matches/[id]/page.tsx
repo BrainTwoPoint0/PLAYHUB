@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import MatchDetailClient from './MatchDetailClient'
 
@@ -8,10 +8,10 @@ export default async function MatchDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const supabase = await createClient()
+  const serviceClient = createServiceClient()
 
   // Fetch match with all details (type assertion for PLAYHUB tables)
-  const { data: match, error } = await (supabase as any)
+  const { data: match, error } = await (serviceClient as any)
     .from('playhub_match_recordings')
     .select(
       `
@@ -31,34 +31,39 @@ export default async function MatchDetailPage({
 
   const product = match.products?.[0]
 
-  // Check if user has access
+  // Check if user has access (use getAuthUser for JWT verification)
   let hasAccess = false
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  const user = session?.user ?? null
+  const { user } = await getAuthUser()
 
   if (user) {
-    // Get user's profile (type assertion)
-    const { data: profile } = await supabase
-      .from('profiles')
+    // Check access by both user_id and profile_id to cover all grant types
+    const { data: accessByUser } = await (serviceClient as any)
+      .from('playhub_access_rights')
       .select('id')
       .eq('user_id', user.id)
-      .single()
+      .eq('match_recording_id', id)
+      .maybeSingle()
 
-    const profileData = profile as any
-
-    if (profileData) {
-      // Check if user has purchased this match (type assertion for PLAYHUB tables)
-      const { data: access } = await (supabase as any)
-        .from('playhub_access_rights')
+    if (accessByUser) {
+      hasAccess = true
+    } else {
+      // Fallback: check by profile_id for older grants
+      const { data: profile } = await (serviceClient as any)
+        .from('profiles')
         .select('id')
-        .eq('profile_id', profileData.id)
-        .eq('match_recording_id', id)
-        .single()
+        .eq('user_id', user.id)
+        .maybeSingle()
 
-      hasAccess = !!access
+      if (profile) {
+        const { data: accessByProfile } = await (serviceClient as any)
+          .from('playhub_access_rights')
+          .select('id')
+          .eq('profile_id', profile.id)
+          .eq('match_recording_id', id)
+          .maybeSingle()
+
+        hasAccess = !!accessByProfile
+      }
     }
   }
 

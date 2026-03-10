@@ -17,6 +17,7 @@ import {
   getBucketName,
   moveFile,
   fileExists,
+  deleteFile,
 } from '@/lib/s3/client'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendRecordingReadyEmail } from '@/lib/email'
@@ -362,6 +363,13 @@ async function transferGame(
     .single()
 
   if (dbError) {
+    // Clean up orphaned S3 object
+    try {
+      await deleteFile(uploadResult.s3Key)
+      console.log('Cleaned up orphaned S3 object:', uploadResult.s3Key)
+    } catch (cleanupErr) {
+      console.error('Failed to clean up S3 object:', uploadResult.s3Key, cleanupErr)
+    }
     return {
       gameId: game.id,
       title: game.title || game.description || 'Unknown',

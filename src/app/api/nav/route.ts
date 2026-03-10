@@ -63,7 +63,7 @@ export async function GET() {
     `
     )
     .eq('profile_id', profile.id)
-    .in('role', ['admin', 'club_admin', 'league_admin'])
+    .in('role', ['admin', 'manager', 'club_admin', 'league_admin'])
     .eq('is_active', true)
 
   const orgs = (memberships || [])

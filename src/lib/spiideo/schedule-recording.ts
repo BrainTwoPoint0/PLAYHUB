@@ -160,6 +160,7 @@ export async function scheduleRecording(
 
   if (recordingError) {
     console.error('Failed to create recording for booking:', recordingError)
+    throw new Error(`Failed to create recording in database: ${recordingError.message}`)
   }
 
   // 4b. If marketplace-enabled, create a product row for purchasing

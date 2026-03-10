@@ -116,13 +116,15 @@ export default function PublicWatchPage() {
       setSaving(true)
       const res = await fetch(`/api/recordings/${recording.id}/save`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
       })
 
       if (res.ok) {
         setSaved(true)
       }
     } catch {
-      // Silently fail - user can try again
+      // User can try again
     } finally {
       setSaving(false)
     }

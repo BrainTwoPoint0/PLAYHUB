@@ -17,10 +17,12 @@ export default async function PurchaseSuccessPage({
 
   // Verify payment with Stripe
   let verified = false
+  let matchRecordingId: string | null = null
   if (sessionId) {
     try {
       const session = await stripe.checkout.sessions.retrieve(sessionId)
       verified = session.payment_status === 'paid'
+      matchRecordingId = session.metadata?.match_recording_id || null
     } catch {
       // Invalid or expired session
     }
@@ -73,7 +75,12 @@ export default async function PurchaseSuccessPage({
         </div>
 
         <div className="flex flex-col gap-3 pt-2">
-          <Button asChild>
+          {matchRecordingId && (
+            <Button asChild>
+              <Link href={`/matches/${matchRecordingId}`}>Watch Now</Link>
+            </Button>
+          )}
+          <Button variant={matchRecordingId ? 'outline' : 'default'} asChild>
             <Link href="/matches">Browse More Matches</Link>
           </Button>
           <Button variant="outline" asChild>

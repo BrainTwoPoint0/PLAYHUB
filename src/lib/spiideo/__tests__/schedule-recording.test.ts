@@ -192,17 +192,15 @@ describe('scheduleRecording', () => {
     await expect(scheduleRecording(baseInput)).rejects.toThrow('Spiideo 500')
   })
 
-  it('returns null recordingId on DB insert failure', async () => {
+  it('throws on DB insert failure', async () => {
     mockRecordingChain.single.mockResolvedValue({
       data: null,
       error: { message: 'DB error' },
     })
 
-    const result = await scheduleRecording(baseInput)
-
-    expect(result.gameId).toBe('game-1')
-    expect(result.productionId).toBe('prod-1')
-    expect(result.recordingId).toBeNull()
+    await expect(scheduleRecording(baseInput)).rejects.toThrow(
+      'Failed to create recording in database: DB error'
+    )
   })
 
   it('uses default billing config when billableAmount not provided', async () => {

@@ -33,6 +33,13 @@ export async function GET(request: NextRequest) {
       .eq('user_id', user.id)
       .single()
 
+    if (!profile?.id) {
+      return NextResponse.json(
+        { error: 'Profile not found. Please try again.' },
+        { status: 400 }
+      )
+    }
+
     // Get product and match details
     const { data: product, error: productError } = await supabase
       .from('playhub_products')
@@ -83,7 +90,7 @@ export async function GET(request: NextRequest) {
         product_id: productData.id,
         match_recording_id: match.id,
         user_id: user.id,
-        profile_id: profile?.id || '',
+        profile_id: profile.id,
       },
       success_url: `${request.nextUrl.origin}/purchase/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${request.nextUrl.origin}/matches/${match.id}?canceled=true`,

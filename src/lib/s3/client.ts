@@ -245,6 +245,18 @@ export async function moveFile(
 }
 
 /**
+ * Delete a file from S3
+ */
+export async function deleteFile(s3Key: string): Promise<void> {
+  await s3Client.send(
+    new DeleteObjectCommand({
+      Bucket: S3_BUCKET,
+      Key: s3Key,
+    })
+  )
+}
+
+/**
  * Get bucket name
  */
 export function getBucketName(): string {

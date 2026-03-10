@@ -48,7 +48,7 @@ export async function GET(
     `
     )
     .eq('organization_id', club.organizationId)
-    .in('role', ['admin', 'club_admin', 'league_admin'])
+    .in('role', ['admin', 'manager', 'club_admin', 'league_admin'])
     .eq('is_active', true)
     .order('created_at', { ascending: true })
 
@@ -71,7 +71,22 @@ export async function GET(
       email: m.profiles?.email,
     }))
 
-  return NextResponse.json({ admins })
+  // Fetch pending invites for this academy
+  const { data: pendingInvites } = await (serviceClient as any)
+    .from('playhub_pending_admin_invites')
+    .select('id, invited_email, role, invited_at')
+    .eq('organization_id', club.organizationId)
+    .order('invited_at', { ascending: true })
+
+  return NextResponse.json({
+    admins,
+    pendingInvites: (pendingInvites || []).map((inv: any) => ({
+      id: inv.id,
+      email: inv.invited_email,
+      role: inv.role,
+      invitedAt: inv.invited_at,
+    })),
+  })
 }
 
 export async function POST(
@@ -154,6 +169,7 @@ export async function POST(
       toEmail: email.toLowerCase(),
       venueName: club.name,
       inviterName: inviterProfile?.full_name || undefined,
+      orgType: 'academy',
     })
 
     return NextResponse.json({

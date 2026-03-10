@@ -36,7 +36,7 @@ type Role = Database['public']['Enums']['profile_variant_type']
 // Only 'admin' is used going forward. club_admin/league_admin exist in the enum
 // but all data has been migrated to 'admin'. Keep them here temporarily until
 // all RLS policies are migrated to use is_org_member().
-const ADMIN_ROLES: Role[] = ['admin', 'club_admin', 'league_admin']
+const ADMIN_ROLES: Role[] = ['admin', 'manager', 'club_admin', 'league_admin']
 
 /**
  * Check if a user is an admin for a specific venue/organization.

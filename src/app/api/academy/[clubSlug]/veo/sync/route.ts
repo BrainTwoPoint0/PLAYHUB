@@ -13,13 +13,17 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { findRemovableMembers } from '@/lib/veo/sync'
 import { getCachedClubData } from '@/lib/veo/cache'
 
+import { timingSafeEqual } from 'crypto'
+
 const SYNC_API_KEY = process.env.SYNC_API_KEY
 
 type RouteContext = { params: Promise<{ clubSlug: string }> }
 
 function verifyApiKey(request: Request): boolean {
   const apiKey = request.headers.get('x-api-key')
-  return apiKey === SYNC_API_KEY && !!SYNC_API_KEY
+  if (!apiKey || !SYNC_API_KEY) return false
+  if (apiKey.length !== SYNC_API_KEY.length) return false
+  return timingSafeEqual(Buffer.from(apiKey), Buffer.from(SYNC_API_KEY))
 }
 
 export async function POST(request: NextRequest, { params }: RouteContext) {

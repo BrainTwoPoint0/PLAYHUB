@@ -143,7 +143,7 @@ describe('POST /api/webhooks/stripe', () => {
     expect(input.email).toBe('test@example.com')
   })
 
-  it('returns 400 for camera_booking with missing metadata', async () => {
+  it('returns 200 for camera_booking with missing metadata (unrecoverable)', async () => {
     mockConstructEvent.mockReturnValue(
       stripeEvent('payment_intent.succeeded', {
         id: 'pi_456',
@@ -156,7 +156,9 @@ describe('POST /api/webhooks/stripe', () => {
     )
 
     const res = await POST(makeRequest())
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.received).toBe(true)
   })
 
   it('handles venue_booking via checkout.session.completed', async () => {

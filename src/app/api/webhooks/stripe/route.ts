@@ -91,8 +91,8 @@ async function handleStreamAccessPurchase(
   const { stream_id, access_type, user_id } = metadata
 
   if (!stream_id || !user_id) {
-    console.error('Missing stream_id or user_id in metadata:', session.id)
-    return NextResponse.json({ error: 'Missing metadata' }, { status: 400 })
+    console.error('Missing stream_id or user_id in metadata (unrecoverable):', session.id)
+    return NextResponse.json({ received: true, error: 'Missing metadata' })
   }
 
   const supabase = createServiceClient()
@@ -170,10 +170,10 @@ async function handleMatchRecordingPurchase(
 
   if (!product_id || !match_recording_id) {
     console.error(
-      'Missing required metadata (product_id or match_recording_id) in session:',
+      'Missing required metadata (product_id or match_recording_id) in session (unrecoverable):',
       session.id
     )
-    return NextResponse.json({ error: 'Missing metadata' }, { status: 400 })
+    return NextResponse.json({ received: true, error: 'Missing metadata' })
   }
 
   // Skip if guest purchase (no user/profile)
@@ -244,6 +244,7 @@ async function handleMatchRecordingPurchase(
   const { error: accessError } = await (supabase as any)
     .from('playhub_access_rights')
     .insert({
+      user_id,
       profile_id,
       match_recording_id,
       purchase_id: purchase.id,
@@ -265,6 +266,30 @@ async function handleMatchRecordingPurchase(
     profile_id,
   })
 
+  // Send purchase confirmation email
+  const customerEmail = session.customer_details?.email
+  if (customerEmail && match_recording_id) {
+    // Look up recording title for the email
+    const { data: rec } = await (supabase as any)
+      .from('playhub_match_recordings')
+      .select('title, match_date, organizations:organization_id(name)')
+      .eq('id', match_recording_id)
+      .maybeSingle()
+
+    if (rec) {
+      const { sendRecordingAssignedEmail } = await import('@/lib/email')
+      sendRecordingAssignedEmail({
+        toEmail: customerEmail,
+        recordingTitle: rec.title || 'Match Recording',
+        matchDate: rec.match_date
+          ? new Date(rec.match_date).toLocaleDateString('en-GB')
+          : undefined,
+        venueName: rec.organizations?.name,
+        isReady: true,
+      }).catch((err) => console.error('Failed to send purchase confirmation email:', err))
+    }
+  }
+
   return NextResponse.json({ received: true })
 }
 
@@ -276,8 +301,8 @@ async function handleVenueBooking(
   const { venueId, sceneId, durationMinutes, email, sceneName } = metadata
 
   if (!venueId || !sceneId || !durationMinutes || !email) {
-    console.error('Missing venue booking metadata:', event.id)
-    return NextResponse.json({ error: 'Missing metadata' }, { status: 400 })
+    console.error('Missing venue booking metadata (unrecoverable):', event.id)
+    return NextResponse.json({ received: true, error: 'Missing metadata' })
   }
 
   // Idempotency: check if we already processed this payment
@@ -352,11 +377,10 @@ async function handleVenueBooking(
 
     return NextResponse.json({ received: true })
   } catch (error) {
-    console.error('Venue booking webhook error:', error)
-    return NextResponse.json(
-      { error: 'Failed to process venue booking' },
-      { status: 500 }
-    )
+    // Return 200 to prevent Stripe retries — Spiideo game may already be created,
+    // and retrying would schedule duplicates
+    console.error('Venue booking webhook error (acknowledged):', error)
+    return NextResponse.json({ received: true, error: 'Failed to process venue booking' })
   }
 }
 

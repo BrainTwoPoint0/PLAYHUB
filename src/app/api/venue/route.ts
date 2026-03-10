@@ -40,10 +40,7 @@ export async function GET() {
     return NextResponse.json({ venues: allOrgs || [] })
   }
 
-  // Process any pending admin invites for this user's email
-  if (profile.email) {
-    await processPendingAdminInvites(serviceClient, profile.id, profile.email)
-  }
+  // Pending admin invites are processed by the handle_new_user DB trigger on signup
 
   // Get organizations where user is admin
   const { data: memberships, error } = await serviceClient
@@ -65,7 +62,7 @@ export async function GET() {
     `
     )
     .eq('profile_id', profile.id)
-    .in('role', ['admin', 'club_admin', 'league_admin'])
+    .in('role', ['admin', 'manager', 'club_admin', 'league_admin'])
     .eq('is_active', true)
 
   if (error) {
@@ -109,54 +106,4 @@ export async function GET() {
   }
 
   return NextResponse.json({ venues })
-}
-
-// Process pending admin invites for a user who just logged in
-async function processPendingAdminInvites(
-  supabase: any,
-  profileId: string,
-  userEmail: string
-) {
-  try {
-    // Find pending invites for this email
-    const { data: pendingInvites } = await supabase
-      .from('playhub_pending_admin_invites')
-      .select('id, organization_id, role')
-      .eq('invited_email', userEmail.toLowerCase())
-
-    if (!pendingInvites || pendingInvites.length === 0) return
-
-    // Process each pending invite
-    for (const invite of pendingInvites) {
-      // Check if already a member
-      const { data: existingMember } = await supabase
-        .from('organization_members')
-        .select('id')
-        .eq('organization_id', invite.organization_id)
-        .eq('profile_id', profileId)
-        .single()
-
-      if (!existingMember) {
-        // Create membership
-        await supabase.from('organization_members').insert({
-          organization_id: invite.organization_id,
-          profile_id: profileId,
-          role: invite.role,
-          is_active: true,
-        })
-      }
-
-      // Delete the pending invite
-      await supabase
-        .from('playhub_pending_admin_invites')
-        .delete()
-        .eq('id', invite.id)
-    }
-
-    console.log(
-      `Processed ${pendingInvites.length} pending admin invites for ${userEmail}`
-    )
-  } catch (error) {
-    console.error('Error processing pending admin invites:', error)
-  }
 }

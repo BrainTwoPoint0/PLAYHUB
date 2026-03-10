@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   useAuth,
@@ -24,7 +24,7 @@ import {
   Loader2,
 } from 'lucide-react'
 
-export default function RegisterPage() {
+function RegisterForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -36,8 +36,9 @@ export default function RegisterPage() {
     'idle' | 'checking' | 'available' | 'taken' | 'invalid'
   >('idle')
 
-  const { signUp, user } = useAuth()
+  const { signUp, user, loading: authLoading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   // Check username availability
   const checkUsernameAvailability = async (username: string) => {
@@ -59,9 +60,11 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (user) {
-      router.push('/')
+      const raw = searchParams.get('redirect') || '/'
+      const safe = raw.startsWith('/') && !raw.startsWith('//') && !raw.includes('@') && !raw.includes('\\') ? raw : '/'
+      router.push(safe)
     }
-  }, [user, router])
+  }, [user, router, searchParams])
 
   // Username availability check with debounce
   useEffect(() => {
@@ -150,7 +153,9 @@ export default function RegisterPage() {
             'An account with this email already exists. Please sign in instead.'
           )
         } else {
-          router.push('/')
+          const raw = searchParams.get('redirect') || '/'
+          const safe = raw.startsWith('/') && !raw.startsWith('//') && !raw.includes('@') && !raw.includes('\\') ? raw : '/'
+          router.push(safe)
         }
       } else {
         setError('Failed to create account. Please try again.')
@@ -160,6 +165,15 @@ export default function RegisterPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Don't show register form while auth is initializing or if already authenticated
+  if (authLoading || user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    )
   }
 
   return (
@@ -337,7 +351,7 @@ export default function RegisterPage() {
             <p className="text-muted-foreground">
               Already have an account?{' '}
               <Link
-                href="/auth/login"
+                href={searchParams.get('redirect') ? `/auth/login?redirect=${encodeURIComponent(searchParams.get('redirect')!)}` : '/auth/login'}
                 className="text-[var(--timberwolf)] hover:underline"
               >
                 Sign in
@@ -347,5 +361,19 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <LoadingSpinner size="lg" />
+        </div>
+      }
+    >
+      <RegisterForm />
+    </Suspense>
   )
 }
