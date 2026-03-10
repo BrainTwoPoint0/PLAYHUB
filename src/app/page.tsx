@@ -164,23 +164,14 @@ export default function HomePage() {
             </p>
           </FadeIn>
 
-          <FadeIn delay={600} className="flex flex-col sm:flex-row gap-3">
+          <FadeIn delay={600}>
             <Link href="/matches">
               <Button
                 size="lg"
                 className="w-full sm:w-auto bg-[var(--timberwolf)] text-[var(--night)] hover:bg-[var(--ash-grey)] font-bold px-8 text-base"
               >
-                Browse Matches
+                Browse Recordings
                 <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-            <Link href="/auth/register">
-              <Button
-                size="lg"
-                variant="outline"
-                className="w-full sm:w-auto border-[var(--timberwolf)]/20 text-[var(--timberwolf)] hover:bg-[var(--timberwolf)]/5 px-8 text-base"
-              >
-                Create Account
               </Button>
             </Link>
           </FadeIn>
