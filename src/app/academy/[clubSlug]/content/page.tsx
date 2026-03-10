@@ -242,8 +242,21 @@ function StatBar({ stats }: { stats: Record<string, unknown> }) {
   )
 }
 
-function teamAssocLabel(assoc: unknown, homeTeam: unknown, awayTeam: unknown): string | null {
-  const val = typeof assoc === 'string' ? assoc : typeof assoc === 'object' && assoc !== null ? String((assoc as Record<string, unknown>).name || (assoc as Record<string, unknown>).slug || '') : ''
+function teamAssocLabel(
+  assoc: unknown,
+  homeTeam: unknown,
+  awayTeam: unknown
+): string | null {
+  const val =
+    typeof assoc === 'string'
+      ? assoc
+      : typeof assoc === 'object' && assoc !== null
+        ? String(
+            (assoc as Record<string, unknown>).name ||
+              (assoc as Record<string, unknown>).slug ||
+              ''
+          )
+        : ''
   if (!val) return null
   const v = val.toLowerCase()
   if (v === 'home') return teamName(homeTeam) || 'Home'
@@ -457,9 +470,7 @@ function ExpandedRecording({
       )}
 
       {/* Full match videos */}
-      {content.videos.length > 0 && (
-        <FullMatchVideos videos={content.videos} />
-      )}
+      {content.videos.length > 0 && <FullMatchVideos videos={content.videos} />}
 
       {/* Highlights */}
       {content.highlights.length > 0 ? (
@@ -467,7 +478,11 @@ function ExpandedRecording({
           <div className="flex items-center gap-2 mb-2">
             <Film className="h-3 w-3 text-muted-foreground/30" />
             <span className="text-[11px] text-muted-foreground/50 uppercase tracking-wider">
-              Highlights ({filteredHighlights.length}{filteredHighlights.length !== content.highlights.length ? ` of ${content.highlights.length}` : ''})
+              Highlights ({filteredHighlights.length}
+              {filteredHighlights.length !== content.highlights.length
+                ? ` of ${content.highlights.length}`
+                : ''}
+              )
             </span>
           </div>
 
@@ -503,9 +518,16 @@ function ExpandedRecording({
           {/* Team filter — only show if team_association data exists */}
           {hasTeamData && (
             <div className="flex flex-wrap items-center gap-1.5 mb-3">
-              <span className="text-[10px] text-muted-foreground/30 mr-1">Team:</span>
+              <span className="text-[10px] text-muted-foreground/30 mr-1">
+                Team:
+              </span>
               {(['all', 'home', 'away'] as const).map((opt) => {
-                const label = opt === 'all' ? 'Both' : opt === 'home' ? (teamName(recording.home_team) || 'Home') : (teamName(recording.away_team) || 'Away')
+                const label =
+                  opt === 'all'
+                    ? 'Both'
+                    : opt === 'home'
+                      ? teamName(recording.home_team) || 'Home'
+                      : teamName(recording.away_team) || 'Away'
                 return (
                   <button
                     key={opt}
@@ -588,7 +610,9 @@ export default function AcademyContentPage() {
         }
 
         setRecordings(json.recordings || [])
-        setClubName(typeof json.clubName === 'string' ? json.clubName : clubSlug)
+        setClubName(
+          typeof json.clubName === 'string' ? json.clubName : clubSlug
+        )
       } catch {
         setError('Failed to load recordings')
       } finally {
@@ -623,7 +647,8 @@ export default function AcademyContentPage() {
       const title = String(rec.title || '').toLowerCase()
       const home = teamName(rec.home_team).toLowerCase()
       const away = teamName(rec.away_team).toLowerCase()
-      if (!title.includes(q) && !home.includes(q) && !away.includes(q)) return false
+      if (!title.includes(q) && !home.includes(q) && !away.includes(q))
+        return false
     }
 
     return true
@@ -737,7 +762,10 @@ export default function AcademyContentPage() {
         </div>
         {(dateFrom || dateTo) && (
           <button
-            onClick={() => { setDateFrom(''); setDateTo('') }}
+            onClick={() => {
+              setDateFrom('')
+              setDateTo('')
+            }}
             className="text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors"
           >
             <X className="h-3.5 w-3.5" />
@@ -770,7 +798,12 @@ export default function AcademyContentPage() {
           </p>
           {(search || privacyFilter !== 'all' || dateFrom || dateTo) && (
             <button
-              onClick={() => { setSearch(''); setPrivacyFilter('all'); setDateFrom(''); setDateTo('') }}
+              onClick={() => {
+                setSearch('')
+                setPrivacyFilter('all')
+                setDateFrom('')
+                setDateTo('')
+              }}
               className="mt-3 text-[11px] text-muted-foreground/40 hover:text-muted-foreground/70 underline underline-offset-2 transition-colors"
             >
               Clear filters
@@ -782,9 +815,9 @@ export default function AcademyContentPage() {
           <div className="space-y-1.5">
             {pageRecordings.map((rec) => {
               const isExpanded = expandedSlug === rec.slug
-              const hasScore =
-                rec.home_score != null && rec.away_score != null
-              const hasTeams = teamName(rec.home_team) || teamName(rec.away_team)
+              const hasScore = rec.home_score != null && rec.away_score != null
+              const hasTeams =
+                teamName(rec.home_team) || teamName(rec.away_team)
 
               return (
                 <div
@@ -826,7 +859,9 @@ export default function AcademyContentPage() {
                         )}
                         {hasTeams && hasScore && (
                           <span className="text-[11px] text-muted-foreground/50 font-medium tabular-nums">
-                            {teamName(rec.home_team)} {String(rec.home_score ?? '')} – {String(rec.away_score ?? '')}{' '}
+                            {teamName(rec.home_team)}{' '}
+                            {String(rec.home_score ?? '')} –{' '}
+                            {String(rec.away_score ?? '')}{' '}
                             {teamName(rec.away_team)}
                           </span>
                         )}
@@ -878,10 +913,7 @@ export default function AcademyContentPage() {
                   {/* Expanded content */}
                   {isExpanded && (
                     <div className="border-t border-white/[0.04]">
-                      <ExpandedRecording
-                        recording={rec}
-                        clubSlug={clubSlug}
-                      />
+                      <ExpandedRecording recording={rec} clubSlug={clubSlug} />
                     </div>
                   )}
                 </div>

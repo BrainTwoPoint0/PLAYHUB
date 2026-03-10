@@ -705,10 +705,17 @@ export async function probeMatchBrowser(
   const password = process.env.VEO_PASSWORD!
 
   const browser = await chromium.launch({ headless: true })
-  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+  })
   const page = await context.newPage()
 
-  const capturedRequests: { method: string; url: string; status?: number; body?: string }[] = []
+  const capturedRequests: {
+    method: string
+    url: string
+    status?: number
+    body?: string
+  }[] = []
 
   // Intercept all API responses
   page.on('response', async (response) => {
@@ -718,7 +725,9 @@ export async function probeMatchBrowser(
       try {
         const text = await response.text()
         body = text.substring(0, 5000)
-      } catch { /* stream responses */ }
+      } catch {
+        /* stream responses */
+      }
       capturedRequests.push({
         method: response.request().method(),
         url,
@@ -730,21 +739,28 @@ export async function probeMatchBrowser(
 
   try {
     // Step 1: Login
-    await page.goto('https://app.veo.co', { waitUntil: 'commit', timeout: 30000 })
+    await page.goto('https://app.veo.co', {
+      waitUntil: 'commit',
+      timeout: 30000,
+    })
     await page.waitForURL('**/auth.veo.co/**', { timeout: 20000 })
 
     const emailInput = await page.waitForSelector(
       'input[type="email"], input[name="email"], input[type="text"]',
       { timeout: 15000 }
     )
-    const passwordInput = await page.waitForSelector('input[type="password"]', { timeout: 5000 })
+    const passwordInput = await page.waitForSelector('input[type="password"]', {
+      timeout: 5000,
+    })
 
     await emailInput!.fill(email)
     await passwordInput!.fill(password)
     await (await page.$('button[type="submit"]'))?.click()
 
     // Wait for login redirect
-    await page.waitForURL('**/app.veo.co/**', { timeout: 15000 }).catch(() => {})
+    await page
+      .waitForURL('**/app.veo.co/**', { timeout: 15000 })
+      .catch(() => {})
     await page.waitForTimeout(3000)
 
     // Step 2: Navigate to the match page (now authenticated)
@@ -785,7 +801,11 @@ export async function probeMatchBrowser(
     // Step 4: Also grab page text to see what UI elements exist
     const pageButtons = await page.$$eval(
       'button, a, [role="tab"], [role="button"]',
-      (els) => els.map((e) => e.textContent?.trim()).filter(Boolean).slice(0, 50)
+      (els) =>
+        els
+          .map((e) => e.textContent?.trim())
+          .filter(Boolean)
+          .slice(0, 50)
     )
 
     await browser.close()

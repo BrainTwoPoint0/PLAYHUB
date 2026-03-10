@@ -169,18 +169,14 @@ export default function AcademySelectorPage() {
                   <Button
                     variant="outline"
                     className="flex-1"
-                    onClick={() =>
-                      router.push(`/academy/${club.slug}/content`)
-                    }
+                    onClick={() => router.push(`/academy/${club.slug}/content`)}
                   >
                     Content
                   </Button>
                   <Button
                     variant="outline"
                     className="flex-1"
-                    onClick={() =>
-                      router.push(`/academy/${club.slug}/access`)
-                    }
+                    onClick={() => router.push(`/academy/${club.slug}/access`)}
                   >
                     Access Audit
                   </Button>

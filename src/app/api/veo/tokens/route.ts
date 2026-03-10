@@ -47,7 +47,12 @@ export async function POST(request: NextRequest) {
   const body = await request.json()
   const { bearer, csrf } = body
 
-  if (typeof bearer !== 'string' || typeof csrf !== 'string' || !bearer || !csrf) {
+  if (
+    typeof bearer !== 'string' ||
+    typeof csrf !== 'string' ||
+    !bearer ||
+    !csrf
+  ) {
     return NextResponse.json(
       { error: 'Missing bearer or csrf token' },
       { status: 400 }
@@ -55,10 +60,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (bearer.length > 4096 || csrf.length > 512) {
-    return NextResponse.json(
-      { error: 'Token too long' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: 'Token too long' }, { status: 400 })
   }
 
   await storeTokens(bearer, csrf, 'manual')

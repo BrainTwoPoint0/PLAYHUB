@@ -26,7 +26,10 @@ export async function GET(request: NextRequest) {
   // Validate URL
   const targetUrl = request.nextUrl.searchParams.get('url')
   if (!targetUrl) {
-    return NextResponse.json({ error: 'Missing url parameter' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Missing url parameter' },
+      { status: 400 }
+    )
   }
 
   let parsed: URL
@@ -37,18 +40,21 @@ export async function GET(request: NextRequest) {
   }
 
   if (parsed.protocol !== 'https:') {
-    return NextResponse.json({ error: 'Only HTTPS URLs allowed' }, { status: 403 })
+    return NextResponse.json(
+      { error: 'Only HTTPS URLs allowed' },
+      { status: 403 }
+    )
   }
 
   if (parsed.port && parsed.port !== '443') {
-    return NextResponse.json({ error: 'Non-standard ports not allowed' }, { status: 403 })
+    return NextResponse.json(
+      { error: 'Non-standard ports not allowed' },
+      { status: 403 }
+    )
   }
 
   if (!ALLOWED_HOSTS.includes(parsed.hostname)) {
-    return NextResponse.json(
-      { error: 'URL host not allowed' },
-      { status: 403 }
-    )
+    return NextResponse.json({ error: 'URL host not allowed' }, { status: 403 })
   }
 
   try {
@@ -90,9 +96,6 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.error('CDN proxy error:', message)
-    return NextResponse.json(
-      { error: 'Proxy request failed' },
-      { status: 502 }
-    )
+    return NextResponse.json({ error: 'Proxy request failed' }, { status: 502 })
   }
 }

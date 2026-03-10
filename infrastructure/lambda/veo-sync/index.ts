@@ -10,7 +10,11 @@ import {
   setMatchPrivacy,
   removeMembersFromClub,
 } from './veo-scraper'
-import { writeCachedClubData, setSyncStatus, storeAuthTokens } from './cache-writer'
+import {
+  writeCachedClubData,
+  setSyncStatus,
+  storeAuthTokens,
+} from './cache-writer'
 import { CLUB_VEO_SLUGS, PUBLIC_RECORDING_TEAMS } from './config'
 
 const PLAYHUB_URL = process.env.PLAYHUB_URL!
