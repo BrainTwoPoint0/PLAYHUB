@@ -1,11 +1,16 @@
 // GET /api/academy/[clubSlug]/content/[matchSlug]
-// Returns full match content (videos, highlights, stats) via direct HTTP
+// Returns full match content (videos, highlights, stats)
+// Cache-first: reads from Supabase cache, falls back to live Veo API if tokens available
 
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
 import { getClubBySlug } from '@/lib/academy/config'
+import {
+  getCachedMatchContent,
+  writeCachedMatchContent,
+} from '@/lib/veo/cache'
 import { getMatchContentDirect } from '@/lib/veo/direct-client'
 
 export async function GET(
@@ -44,8 +49,42 @@ export async function GET(
   }
 
   try {
-    const content = await getMatchContentDirect(matchSlug)
-    return NextResponse.json(content)
+    // Try cache first
+    const cached = await getCachedMatchContent(matchSlug)
+    if (cached) {
+      return NextResponse.json({
+        videos: cached.videos,
+        highlights: cached.highlights,
+        stats: cached.stats,
+        fromCache: true,
+        lastFetchedAt: cached.lastFetchedAt,
+      })
+    }
+
+    // Cache miss — try live Veo API (only works if tokens are valid)
+    try {
+      const content = await getMatchContentDirect(matchSlug)
+
+      // Cache the result for next time
+      await writeCachedMatchContent(matchSlug, content).catch((e) =>
+        console.warn(`Failed to cache match content (${matchSlug}):`, e)
+      )
+
+      return NextResponse.json({
+        ...content,
+        fromCache: false,
+      })
+    } catch (liveError) {
+      const msg = liveError instanceof Error ? liveError.message : String(liveError)
+      // If tokens expired, tell the user to wait for next sync
+      if (msg.includes('expired') || msg.includes('No valid Veo auth tokens')) {
+        return NextResponse.json(
+          { error: 'Match content not yet cached. It will be available after the next sync.' },
+          { status: 503 }
+        )
+      }
+      throw liveError
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.error(`Match content API error (${matchSlug}):`, message)

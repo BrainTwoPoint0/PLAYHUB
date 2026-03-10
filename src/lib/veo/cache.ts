@@ -202,6 +202,108 @@ export async function getClubSyncStatus(
 }
 
 // ============================================================================
+// Read: get cached recordings for a club
+// ============================================================================
+
+export interface CachedRecording {
+  slug: string
+  title: string
+  duration: number
+  privacy: string
+  thumbnail: string
+  uuid?: string
+  match_date?: string
+  home_team?: string | null
+  away_team?: string | null
+  home_score?: number | null
+  away_score?: number | null
+  processing_status?: string
+}
+
+export async function getCachedRecordings(
+  clubSlug: string
+): Promise<{ recordings: CachedRecording[]; lastSyncedAt: string | null } | null> {
+  const supabase = createServiceClient() as any
+
+  const { data, error } = await supabase
+    .from('playhub_veo_recordings_cache')
+    .select('*')
+    .eq('club_slug', clubSlug)
+    .order('match_date', { ascending: false, nullsFirst: false })
+
+  if (error) throw new Error(`Failed to read recordings cache: ${error.message}`)
+  if (!data || data.length === 0) return null
+
+  return {
+    recordings: data.map((r: any) => ({
+      slug: r.match_slug,
+      title: r.title || '',
+      duration: r.duration || 0,
+      privacy: r.privacy || 'unknown',
+      thumbnail: r.thumbnail || '',
+      uuid: r.uuid || undefined,
+      match_date: r.match_date || undefined,
+      home_team: r.home_team,
+      away_team: r.away_team,
+      home_score: r.home_score,
+      away_score: r.away_score,
+      processing_status: r.processing_status || undefined,
+    })),
+    lastSyncedAt: data[0]?.last_synced_at || null,
+  }
+}
+
+// ============================================================================
+// Read/Write: cached match content (highlights, stats, videos)
+// ============================================================================
+
+export interface CachedMatchContent {
+  videos: any[]
+  highlights: any[]
+  stats: Record<string, unknown> | null
+  lastFetchedAt: string
+}
+
+export async function getCachedMatchContent(
+  matchSlug: string
+): Promise<CachedMatchContent | null> {
+  const supabase = createServiceClient() as any
+
+  const { data, error } = await supabase
+    .from('playhub_veo_match_content_cache')
+    .select('*')
+    .eq('match_slug', matchSlug)
+    .single()
+
+  if (error || !data) return null
+
+  return {
+    videos: data.videos || [],
+    highlights: data.highlights || [],
+    stats: data.stats || null,
+    lastFetchedAt: data.last_fetched_at,
+  }
+}
+
+export async function writeCachedMatchContent(
+  matchSlug: string,
+  content: { videos: any[]; highlights: any[]; stats: Record<string, unknown> | null }
+): Promise<void> {
+  const supabase = createServiceClient() as any
+
+  await supabase.from('playhub_veo_match_content_cache').upsert(
+    {
+      match_slug: matchSlug,
+      videos: content.videos,
+      highlights: content.highlights,
+      stats: content.stats,
+      last_fetched_at: new Date().toISOString(),
+    },
+    { onConflict: 'match_slug' }
+  )
+}
+
+// ============================================================================
 // Helpers: update sync status (used by cache-sync endpoint)
 // ============================================================================
 

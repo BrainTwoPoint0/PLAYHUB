@@ -43,6 +43,15 @@ export interface VeoRecording {
   title: string
   privacy: string
   team: string
+  duration?: number
+  thumbnail?: string
+  uuid?: string
+  match_date?: string
+  home_team?: string | null
+  away_team?: string | null
+  home_score?: number | null
+  away_score?: number | null
+  processing_status?: string
 }
 
 // ============================================================================
@@ -265,7 +274,7 @@ export async function listClubRecordings(
   while (true) {
     const res = await session.api(
       'GET',
-      `/api/app/clubs/${clubSlug}/recordings/?filter=own&page_size=100&page=${page}`
+      `/api/app/clubs/${clubSlug}/recordings/?filter=own&fields=privacy&fields=title&fields=slug&fields=duration&fields=thumbnail&fields=uuid&fields=match_date&fields=home_team&fields=away_team&fields=home_score&fields=away_score&fields=processing_status&page_size=100&page=${page}`
     )
 
     if (res.status !== 200) {

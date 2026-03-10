@@ -1,12 +1,12 @@
 // GET /api/academy/[clubSlug]/content
-// Returns Veo recordings list for the club (uses direct HTTP, no Playwright)
+// Returns Veo recordings list for the club (from Supabase cache)
 
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
 import { getClubBySlug } from '@/lib/academy/config'
-import { listRecordingsDirect } from '@/lib/veo/direct-client'
+import { getCachedRecordings } from '@/lib/veo/cache'
 
 export async function GET(
   request: NextRequest,
@@ -51,11 +51,19 @@ export async function GET(
   }
 
   try {
-    const { recordings } = await listRecordingsDirect(club.veoClubSlug)
+    const cached = await getCachedRecordings(clubSlug)
+
+    if (!cached) {
+      return NextResponse.json(
+        { error: 'No cached recordings. Wait for the next sync cycle.' },
+        { status: 404 }
+      )
+    }
 
     return NextResponse.json({
       clubName: club.name,
-      recordings,
+      recordings: cached.recordings,
+      lastSyncedAt: cached.lastSyncedAt,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

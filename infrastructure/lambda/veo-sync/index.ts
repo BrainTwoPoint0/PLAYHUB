@@ -12,6 +12,7 @@ import {
 } from './veo-scraper'
 import {
   writeCachedClubData,
+  writeCachedRecordings,
   setSyncStatus,
   storeAuthTokens,
 } from './cache-writer'
@@ -89,10 +90,13 @@ async function runCacheSync(onlyClub?: string): Promise<ClubResult[]> {
         (e) => console.warn('Token store failed (non-critical):', e)
       )
 
+      // Fetch teams+members then recordings (sequential — same Playwright page)
       const data = await listClubTeamsWithMembers(session, veoClubSlug)
+      const recordings = await listClubRecordings(session, veoClubSlug)
 
       // Write to Supabase
       await writeCachedClubData(clubSlug, veoClubSlug, data)
+      await writeCachedRecordings(clubSlug, veoClubSlug, recordings)
 
       const totalMembers = data.teams.reduce(
         (sum, t) => sum + t.members.length,
@@ -110,7 +114,7 @@ async function runCacheSync(onlyClub?: string): Promise<ClubResult[]> {
       })
 
       console.log(
-        `${clubSlug} cache-sync: ${data.teams.length} teams, ${totalMembers} members (${elapsed})`
+        `${clubSlug} cache-sync: ${data.teams.length} teams, ${totalMembers} members, ${recordings.length} recordings (${elapsed})`
       )
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'

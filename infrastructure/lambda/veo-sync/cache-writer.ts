@@ -3,7 +3,7 @@
 // Adapted from src/lib/veo/cache.ts
 
 import { createClient } from '@supabase/supabase-js'
-import type { VeoTeam, VeoMember } from './veo-scraper'
+import type { VeoTeam, VeoMember, VeoRecording } from './veo-scraper'
 
 // ============================================================================
 // Supabase client (service role — bypasses RLS)
@@ -99,6 +99,57 @@ export async function writeCachedClubData(
       .insert(allMembers)
     if (membersError)
       throw new Error(`Failed to insert members: ${membersError.message}`)
+  }
+}
+
+// ============================================================================
+// Recordings cache: delete+insert fresh recordings for a club
+// ============================================================================
+
+export async function writeCachedRecordings(
+  clubSlug: string,
+  veoClubSlug: string,
+  recordings: VeoRecording[]
+): Promise<void> {
+  const supabase = getSupabase()
+
+  // Delete old recordings for this club
+  const { error: delError } = await supabase
+    .from('playhub_veo_recordings_cache')
+    .delete()
+    .eq('veo_club_slug', veoClubSlug)
+  if (delError)
+    throw new Error(`Failed to delete old recordings: ${delError.message}`)
+
+  if (recordings.length === 0) return
+
+  // Insert in batches of 100 (Supabase insert limit)
+  const BATCH_SIZE = 100
+  for (let i = 0; i < recordings.length; i += BATCH_SIZE) {
+    const batch = recordings.slice(i, i + BATCH_SIZE).map((r) => ({
+      club_slug: clubSlug,
+      veo_club_slug: veoClubSlug,
+      match_slug: r.slug,
+      title: r.title || null,
+      duration: r.duration != null ? Math.round(r.duration) : null,
+      privacy: r.privacy || null,
+      thumbnail: r.thumbnail || null,
+      uuid: r.uuid || null,
+      match_date: r.match_date || null,
+      home_team: r.home_team || null,
+      away_team: r.away_team || null,
+      home_score: r.home_score ?? null,
+      away_score: r.away_score ?? null,
+      processing_status: r.processing_status || null,
+      team: r.team || null,
+      last_synced_at: new Date().toISOString(),
+    }))
+
+    const { error } = await supabase
+      .from('playhub_veo_recordings_cache')
+      .insert(batch)
+    if (error)
+      throw new Error(`Failed to insert recordings batch: ${error.message}`)
   }
 }
 
