@@ -87,6 +87,18 @@ function formatDate(dateStr: string): string {
   }
 }
 
+/** Parse processing_status which may be JSON like {"status":"uploading","label":"Uploading"} or a plain string */
+function parseProcessingStatus(raw?: string): string | null {
+  if (!raw || raw === 'done' || raw === '{}') return null
+  try {
+    const parsed = JSON.parse(raw)
+    if (parsed.status === 'done') return null
+    return parsed.label || parsed.status || null
+  } catch {
+    return raw === 'done' ? null : raw
+  }
+}
+
 function teamName(team: unknown): string {
   if (!team) return ''
   if (typeof team === 'string') return team
@@ -893,14 +905,15 @@ export default function AcademyContentPage() {
                         {privacyIcon(rec.privacy)}
                         {String(rec.privacy || '')}
                       </span>
-                      {typeof rec.processing_status === 'string' &&
-                        rec.processing_status &&
-                        rec.processing_status !== 'done' && (
+                      {(() => {
+                        const status = parseProcessingStatus(rec.processing_status)
+                        return status ? (
                           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-400/80 flex items-center gap-1">
                             <Loader2 className="h-3 w-3 animate-spin" />
-                            {rec.processing_status}
+                            {status}
                           </span>
-                        )}
+                        ) : null
+                      })()}
                     </div>
 
                     <ChevronDown

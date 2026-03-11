@@ -106,6 +106,12 @@ export async function writeCachedClubData(
 // Recordings cache: delete+insert fresh recordings for a club
 // ============================================================================
 
+/** Parse date from slug, e.g. "20260307-..." or "club-name-20260307-..." → "2026-03-07T00:00:00Z" */
+function parseDateFromSlug(slug: string): string | null {
+  const m = slug.match(/(\d{4})(\d{2})(\d{2})-/)
+  return m ? `${m[1]}-${m[2]}-${m[3]}T00:00:00Z` : null
+}
+
 export async function writeCachedRecordings(
   clubSlug: string,
   veoClubSlug: string,
@@ -135,7 +141,7 @@ export async function writeCachedRecordings(
       privacy: r.privacy || null,
       thumbnail: r.thumbnail || null,
       uuid: r.uuid || null,
-      match_date: r.match_date || null,
+      match_date: r.match_date || parseDateFromSlug(r.slug) || null,
       home_team: r.home_team || null,
       away_team: r.away_team || null,
       home_score: r.home_score ?? null,
