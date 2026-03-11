@@ -282,6 +282,7 @@ async function saveRecording(
       spiideo_game_id: game.id,
       spiideo_production_id: productionId,
       organization_id: organizationId,
+      venue_organization_id: organizationId,
       title: game.title || game.description || 'Untitled',
       description: game.description,
       match_date: game.scheduledStartTime,
@@ -355,6 +356,7 @@ async function upsertProcessingRecording(
       spiideo_game_id: game.id,
       spiideo_production_id: productionId,
       organization_id: organizationId,
+      venue_organization_id: organizationId,
       title: game.title || game.description || 'Untitled',
       description: game.description,
       match_date: game.scheduledStartTime,
@@ -673,6 +675,8 @@ async function syncGame(
         organizationId,
         pitchName
       )
+      // Send "recording ready" emails (may have been missed if DB record was created without S3)
+      await sendRecordingReadyEmails(game.id, title, game.scheduledStartTime, organizationId)
       return {
         gameId: game.id,
         title,

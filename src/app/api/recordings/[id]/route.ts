@@ -234,7 +234,7 @@ export async function DELETE(
   const serviceClient = createServiceClient()
   const { data: recording } = await (serviceClient as any)
     .from('playhub_match_recordings')
-    .select('organization_id, s3_key, s3_bucket')
+    .select('organization_id, s3_key, s3_bucket, spiideo_game_id')
     .eq('id', id)
     .single()
 
@@ -245,6 +245,19 @@ export async function DELETE(
   const isAdmin = await isVenueAdmin(user.id, recording.organization_id)
   if (!isAdmin) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+  }
+
+  // Delete Spiideo game if it exists (prevents sync lambda from re-creating it)
+  if (recording.spiideo_game_id) {
+    try {
+      const { deleteGame } = await import('@/lib/spiideo/client')
+      await deleteGame(recording.spiideo_game_id)
+    } catch (spiideoErr) {
+      console.error(
+        'Failed to delete Spiideo game (continuing with S3/DB delete):',
+        spiideoErr
+      )
+    }
   }
 
   // Delete S3 object if it exists
