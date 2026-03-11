@@ -68,26 +68,23 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
     )
   }
 
-  const price = Number(config.default_billable_amount) || 5
+  const pricePerHour = Number(config.default_billable_amount) || 5
   const currency = config.currency || 'KWD'
+  const durations: number[] = config.booking_durations || [60]
 
-  // If venue currency isn't supported by Stripe UK, convert to GBP
-  let chargePrice = price
-  let chargeCurrency = currency
+  // If venue currency isn't supported by Stripe UK, get conversion rate
+  let kwdToGbpRate: number | null = null
   if (currency.toUpperCase() === 'KWD') {
-    const rate = await getKwdToGbpRate()
-    chargePrice = Math.round(price * rate * 100) / 100 // round to 2 decimals
-    chargeCurrency = 'GBP'
+    kwdToGbpRate = await getKwdToGbpRate()
   }
 
   return NextResponse.json({
     venueName: venue.name,
     sceneName: mapping.scene_name || 'Pitch',
-    durations: config.booking_durations || [60],
-    price,
+    durations,
+    pricePerHour,
     currency,
-    chargePrice,
-    chargeCurrency,
+    ...(kwdToGbpRate ? { kwdToGbpRate } : {}),
   })
 }
 
@@ -146,8 +143,9 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     )
   }
 
-  // Calculate price (flat rate per recording regardless of duration)
-  const price = Number(config.default_billable_amount) || 5
+  // Calculate price based on duration (priced per hour, prorated)
+  const pricePerHour = Number(config.default_billable_amount) || 5
+  const price = pricePerHour * (durationMinutes / 60)
   const venueCurrency = (config.currency || 'KWD').toUpperCase()
 
   // Convert to GBP if venue currency not supported by Stripe UK

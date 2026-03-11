@@ -31,10 +31,9 @@ interface BookingConfig {
   venueName: string
   sceneName: string
   durations: number[]
-  price: number
+  pricePerHour: number
   currency: string
-  chargePrice: number
-  chargeCurrency: string
+  kwdToGbpRate?: number
 }
 
 // Inner component that uses Stripe hooks (must be inside <Elements>)
@@ -218,14 +217,20 @@ export default function StartRecordingPage() {
 
   if (!config) return null
 
+  // Calculate price based on selected duration
+  const currentPrice = config.pricePerHour * ((selectedDuration || 60) / 60)
+
   // Format price: 3 decimal places for KWD, 2 for everything else
   const formattedPrice =
     config.currency === 'KWD'
-      ? config.price.toFixed(3)
-      : config.price.toFixed(2)
+      ? currentPrice.toFixed(3)
+      : currentPrice.toFixed(2)
 
-  const showConversion = config.currency !== config.chargeCurrency
-  const formattedChargePrice = config.chargePrice.toFixed(2)
+  const showConversion = !!config.kwdToGbpRate
+  const chargePrice = showConversion
+    ? currentPrice * config.kwdToGbpRate!
+    : currentPrice
+  const formattedChargePrice = chargePrice.toFixed(2)
 
   // --- Success phase ---
   if (paymentSuccess) {
@@ -331,8 +336,7 @@ export default function StartRecordingPage() {
                       </p>
                       {showConversion && (
                         <p className="text-xs text-[var(--ash-grey)]/50">
-                          ≈ {formattedChargePrice}{' '}
-                          {config.chargeCurrency.toUpperCase()}
+                          ≈ {formattedChargePrice} GBP
                         </p>
                       )}
                     </div>
@@ -359,12 +363,11 @@ export default function StartRecordingPage() {
                   </p>
                   {showConversion && (
                     <p className="text-sm text-[var(--ash-grey)]/70 mt-1">
-                      ≈ {formattedChargePrice}{' '}
-                      {config.chargeCurrency.toUpperCase()}
+                      ≈ {formattedChargePrice} GBP
                     </p>
                   )}
                   <p className="text-[10px] text-[var(--ash-grey)]/50 mt-1.5 tracking-wide uppercase">
-                    Flat rate per recording
+                    {selectedDuration} min recording
                   </p>
                 </CardContent>
               </Card>
