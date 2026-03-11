@@ -5,6 +5,7 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 import { escapeHtml } from '@braintwopoint0/playback-commons/utils'
 
 const FROM_EMAIL = 'PLAYHUB <admin@playbacksports.ai>'
+const FROM_ALERT_EMAIL = 'PLAYHUB Alerts <admin@playbacksports.ai>'
 const APP_URL =
   process.env.NEXT_PUBLIC_APP_URL || 'https://playhub.playbacksports.ai'
 
@@ -536,6 +537,134 @@ export async function sendInvoiceEmail(
 
     if (error) {
       console.error('Failed to send invoice email:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (err) {
+    console.error('Email send error:', err)
+    return { success: false, error: 'Failed to send email' }
+  }
+}
+
+/**
+ * Send booking confirmation email after successful QR code payment
+ */
+export async function sendBookingConfirmationEmail(params: {
+  toEmail: string
+  venueName: string
+  pitchName: string
+  durationMinutes: number
+}): Promise<SendEmailResult> {
+  const { toEmail, durationMinutes } = params
+  const venueName = escapeHtml(params.venueName)
+  const pitchName = escapeHtml(params.pitchName)
+
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: toEmail,
+      subject: `Your recording is scheduled at ${params.venueName}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0a100d; color: #d6d5c9; padding: 40px 20px; margin: 0;">
+          <div style="max-width: 500px; margin: 0 auto;">
+            <h1 style="color: #d6d5c9; font-size: 24px; margin-bottom: 24px;">PLAYHUB</h1>
+
+            <p style="font-size: 16px; line-height: 1.6; margin-bottom: 16px;">
+              Your recording has been scheduled! Here are the details:
+            </p>
+
+            <div style="background-color: #1a1f1c; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+              <p style="font-size: 18px; font-weight: 500; margin: 0 0 8px 0;">${venueName}</p>
+              <p style="font-size: 14px; color: #b9baa3; margin: 0 0 4px 0;">Pitch: ${pitchName}</p>
+              <p style="font-size: 14px; color: #b9baa3; margin: 0;">Duration: ${durationMinutes} minutes</p>
+            </div>
+
+            <p style="font-size: 16px; line-height: 1.6; margin-bottom: 24px;">
+              You'll receive another email when your recording is ready to watch.
+            </p>
+
+            <a href="${APP_URL}/recordings"
+               style="display: inline-block; background-color: #d6d5c9; color: #0a100d; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">
+              View your library
+            </a>
+
+            <hr style="border: none; border-top: 1px solid #333; margin: 32px 0;">
+
+            <p style="font-size: 12px; color: #b9baa3;">
+              This email was sent by PLAYHUB. If you didn't expect this, you can ignore this email.
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
+    })
+
+    if (error) {
+      console.error('Failed to send booking confirmation email:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (err) {
+    console.error('Email send error:', err)
+    return { success: false, error: 'Failed to send email' }
+  }
+}
+
+/**
+ * Send alert email when Spiideo scheduling fails after payment
+ */
+export async function sendSchedulingFailureAlert(params: {
+  toEmail: string
+  venueId: string
+  sceneName: string
+  customerEmail: string
+  durationMinutes: number
+  errorMessage: string
+}): Promise<SendEmailResult> {
+  const { toEmail, venueId, sceneName, customerEmail, durationMinutes, errorMessage } = params
+
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_ALERT_EMAIL,
+      to: toEmail,
+      subject: `ALERT: Recording scheduling failed after payment`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px 20px; margin: 0;">
+          <div style="max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #dc2626;">ALERT: Recording Failed to Schedule</h2>
+            <p>A customer has paid but their recording was NOT scheduled on Spiideo. Immediate action required.</p>
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+              <tr><td style="padding: 8px; font-weight: bold;">Customer Email</td><td style="padding: 8px;">${escapeHtml(customerEmail)}</td></tr>
+              <tr><td style="padding: 8px; font-weight: bold;">Venue ID</td><td style="padding: 8px; font-family: monospace;">${escapeHtml(venueId)}</td></tr>
+              <tr><td style="padding: 8px; font-weight: bold;">Pitch</td><td style="padding: 8px;">${escapeHtml(sceneName)}</td></tr>
+              <tr><td style="padding: 8px; font-weight: bold;">Duration</td><td style="padding: 8px;">${durationMinutes} minutes</td></tr>
+              <tr><td style="padding: 8px; font-weight: bold;">Error</td><td style="padding: 8px; color: #dc2626;">${escapeHtml(errorMessage)}</td></tr>
+            </table>
+            <p style="margin-top: 16px; color: #6b7280;">
+              The customer was charged but the recording never started. You need to either manually schedule the recording or issue a refund.
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
+    })
+
+    if (error) {
+      console.error('Failed to send scheduling failure alert:', error)
       return { success: false, error: error.message }
     }
 

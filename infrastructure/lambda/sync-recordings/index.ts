@@ -21,6 +21,16 @@ const SPIIDEO_USER_ID = process.env.SPIIDEO_USER_ID!
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || ''
 const ALERT_EMAIL = process.env.ALERT_EMAIL || ''
+const APP_URL = process.env.APP_URL || 'https://playhub.playbacksports.ai'
+
+// Simple HTML escaping for email templates
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
 
 const SPIIDEO_API_BASE = 'https://api-public.spiideo.com'
 const SPIIDEO_TOKEN_URL = 'https://auth-play.spiideo.net/oauth2/token'
@@ -416,7 +426,7 @@ async function sendSyncAlertEmail(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'PLAYHUB Alerts <alerts@playbacksports.ai>',
+        from: 'PLAYHUB Alerts <admin@playbacksports.ai>',
         to: [ALERT_EMAIL],
         subject,
         html,
@@ -431,6 +441,191 @@ async function sendSyncAlertEmail(
     }
   } catch (error) {
     console.error('Failed to send alert email:', error)
+  }
+}
+
+// Send "recording ready" emails to all users with access to a recording
+async function sendRecordingReadyEmails(
+  spiideoGameId: string,
+  recordingTitle: string,
+  matchDate: string,
+  organizationId: string | null
+): Promise<void> {
+  if (!RESEND_API_KEY) return
+
+  try {
+    // Get the recording ID from the game ID
+    const { data: recording } = await supabase
+      .from('playhub_match_recordings')
+      .select('id')
+      .eq('spiideo_game_id', spiideoGameId)
+      .single()
+
+    if (!recording) return
+
+    // Get venue name
+    let venueName: string | undefined
+    if (organizationId) {
+      const { data: venue } = await supabase
+        .from('organizations')
+        .select('name')
+        .eq('id', organizationId)
+        .single()
+      venueName = venue?.name
+    }
+
+    // Get all users with access to this recording
+    const { data: accessRights } = await supabase
+      .from('playhub_access_rights')
+      .select('user_id, invited_email')
+      .eq('match_recording_id', recording.id)
+      .eq('is_active', true)
+
+    if (!accessRights || accessRights.length === 0) return
+
+    // Get emails for users with user_id
+    const userIds = accessRights
+      .map((a: any) => a.user_id)
+      .filter((id: string | null) => id !== null)
+
+    let userEmails: string[] = []
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('email')
+        .in('user_id', userIds)
+
+      userEmails = profiles?.map((p: any) => p.email).filter(Boolean) || []
+    }
+
+    // Also include invited emails
+    const invitedEmails = accessRights
+      .map((a: any) => a.invited_email)
+      .filter((email: string | null) => email !== null)
+
+    const allEmails = Array.from(new Set([...userEmails, ...invitedEmails]))
+    if (allEmails.length === 0) return
+
+    const formattedDate = new Date(matchDate).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    })
+
+    const safeTitle = escapeHtml(recordingTitle)
+    const safeVenueName = venueName ? escapeHtml(venueName) : undefined
+
+    // Send emails via Resend
+    for (const email of allEmails) {
+      try {
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: 'PLAYHUB <admin@playbacksports.ai>',
+            to: [email],
+            subject: `Your recording is ready: "${recordingTitle}"`,
+            html: `
+              <!DOCTYPE html>
+              <html>
+              <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+              <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0a100d; color: #d6d5c9; padding: 40px 20px; margin: 0;">
+                <div style="max-width: 500px; margin: 0 auto;">
+                  <h1 style="color: #d6d5c9; font-size: 24px; margin-bottom: 24px;">PLAYHUB</h1>
+                  <p style="font-size: 16px; line-height: 1.6; margin-bottom: 16px;">Great news! Your recording is now ready to watch:</p>
+                  <div style="background-color: #1a1f1c; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                    <p style="font-size: 18px; font-weight: 500; margin: 0 0 4px 0;">${safeTitle}</p>
+                    ${safeVenueName ? `<p style="font-size: 14px; color: #b9baa3; margin: 0;">${safeVenueName}</p>` : ''}
+                    <p style="font-size: 14px; color: #b9baa3; margin: 4px 0 0 0;">${formattedDate}</p>
+                  </div>
+                  <a href="${APP_URL}/recordings" style="display: inline-block; background-color: #d6d5c9; color: #0a100d; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">Watch now</a>
+                  <hr style="border: none; border-top: 1px solid #333; margin: 32px 0;">
+                  <p style="font-size: 12px; color: #b9baa3;">This email was sent by PLAYHUB.</p>
+                </div>
+              </body>
+              </html>
+            `,
+          }),
+        })
+
+        if (!response.ok) {
+          const text = await response.text()
+          console.error(`Resend API error for ${email}: ${response.status} ${text}`)
+        }
+      } catch (emailErr) {
+        console.error(`Failed to send recording ready email to ${email}:`, emailErr)
+      }
+    }
+
+    console.log(`Sent recording ready emails to ${allEmails.length} users for game ${spiideoGameId}`)
+  } catch (error) {
+    console.error('Failed to send recording ready emails:', error)
+  }
+}
+
+// Detect stale bookings: recordings stuck in "scheduled" status long after expected finish
+async function detectStaleBookings(): Promise<void> {
+  if (!RESEND_API_KEY || !ALERT_EMAIL) return
+
+  try {
+    // Find recordings where:
+    // - status is 'scheduled'
+    // - match_date + assumed max duration (3 hours) is more than 2 hours ago
+    // - no s3_key (never synced)
+    // - last_sync_error does not contain 'stale_alerted' (not already alerted)
+    const fiveHoursAgo = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString()
+
+    const { data: staleRecordings } = await supabase
+      .from('playhub_match_recordings')
+      .select('id, title, match_date, pitch_name, organization_id, spiideo_game_id, last_sync_error')
+      .eq('status', 'scheduled')
+      .is('s3_key', null)
+      .lt('match_date', fiveHoursAgo)
+
+    if (!staleRecordings || staleRecordings.length === 0) return
+
+    // Filter out already-alerted recordings
+    const toAlert = staleRecordings.filter(
+      (r) => !r.last_sync_error?.includes('stale_alerted')
+    )
+
+    if (toAlert.length === 0) return
+
+    console.log(`Found ${toAlert.length} stale bookings`)
+
+    for (const recording of toAlert) {
+      await sendSyncAlertEmail(
+        `⚠️ Stale booking: ${recording.title}`,
+        {
+          gameId: recording.spiideo_game_id || recording.id,
+          title: recording.title || 'Untitled',
+          matchDate: recording.match_date,
+          pitchName: recording.pitch_name,
+          attempts: 0,
+          lastError: 'Recording stuck in "scheduled" status — never started or synced',
+          isRetryExhausted: true,
+        }
+      )
+
+      // Mark as alerted to avoid duplicate alerts
+      const existingError = recording.last_sync_error || ''
+      await supabase
+        .from('playhub_match_recordings')
+        .update({
+          last_sync_error: existingError
+            ? `${existingError}; stale_alerted`
+            : 'stale_alerted',
+        })
+        .eq('id', recording.id)
+    }
+
+    console.log(`Sent stale booking alerts for ${toAlert.length} recordings`)
+  } catch (error) {
+    console.error('Failed to detect stale bookings:', error)
   }
 }
 
@@ -613,6 +808,9 @@ async function syncGame(
       await updateSyncAttempts(game.id, 0, null)
     }
 
+    // Send "recording ready" emails to users with access
+    await sendRecordingReadyEmails(game.id, title, game.scheduledStartTime, organizationId)
+
     return {
       gameId: game.id,
       title,
@@ -661,6 +859,9 @@ export const handler = async (): Promise<{
     console.log(`${gamesToSync.length} games need syncing`)
 
     if (gamesToSync.length === 0) {
+      // Still check for stale bookings even when nothing to sync
+      await detectStaleBookings()
+
       return {
         statusCode: 200,
         body: JSON.stringify({
@@ -679,6 +880,9 @@ export const handler = async (): Promise<{
 
     const result = await syncGame(gameToSync, sceneMappings, scenes)
     console.log(`Result: ${result.status} - ${result.message}`)
+
+    // Detect stale bookings (runs every invocation, lightweight query)
+    await detectStaleBookings()
 
     return {
       statusCode: 200,

@@ -350,14 +350,17 @@ async function handleVenueBooking(
     return NextResponse.json({ received: true })
   }
 
+  const resolvedSceneName = sceneName || 'Pitch'
+  const duration = parseInt(durationMinutes)
+
   try {
     const now = new Date()
     const result = await scheduleRecording({
       venueId,
       sceneId,
-      sceneName: sceneName || 'Pitch',
-      durationMinutes: parseInt(durationMinutes),
-      title: `Self-service: ${sceneName || 'Pitch'} — ${now.toLocaleDateString('en-GB')}`,
+      sceneName: resolvedSceneName,
+      durationMinutes: duration,
+      title: `Self-service: ${resolvedSceneName} — ${now.toLocaleDateString('en-GB')}`,
       description: `Booked by ${email}`,
       email,
       collectedBy: 'playhub',
@@ -375,11 +378,51 @@ async function handleVenueBooking(
       collected_by: 'playhub',
     })
 
+    // Fire-and-forget: look up venue name and send booking confirmation email
+    ;(async () => {
+      let venueName = 'your venue'
+      try {
+        const { data: venue } = await supabase
+          .from('organizations')
+          .select('name')
+          .eq('id', venueId)
+          .single()
+        if (venue?.name) venueName = venue.name
+      } catch {
+        // Use fallback name
+      }
+
+      const { sendBookingConfirmationEmail } = await import('@/lib/email')
+      await sendBookingConfirmationEmail({
+        toEmail: email,
+        venueName,
+        pitchName: resolvedSceneName,
+        durationMinutes: duration,
+      })
+    })().catch((err) => console.error('Failed to send booking confirmation email:', err))
+
     return NextResponse.json({ received: true })
   } catch (error) {
     // Return 200 to prevent Stripe retries — Spiideo game may already be created,
     // and retrying would schedule duplicates
     console.error('Venue booking webhook error (acknowledged):', error)
+
+    // Fire-and-forget: alert that customer paid but recording didn't schedule
+    const alertEmail = process.env.ALERT_EMAIL
+    if (alertEmail) {
+      const { sendSchedulingFailureAlert } = await import('@/lib/email')
+      sendSchedulingFailureAlert({
+        toEmail: alertEmail,
+        venueId,
+        sceneName: resolvedSceneName,
+        customerEmail: email,
+        durationMinutes: duration,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      }).catch((err) => console.error('Failed to send scheduling failure alert:', err))
+    } else {
+      console.error('ALERT_EMAIL not configured — cannot send scheduling failure alert')
+    }
+
     return NextResponse.json({ received: true, error: 'Failed to process venue booking' })
   }
 }
