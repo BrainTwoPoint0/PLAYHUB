@@ -2,7 +2,7 @@ import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-import { escapeHtml } from '@braintwopoint0/playback-commons/utils'
+import { escapeHtml } from '@braintwopoint0/playback-commons/security'
 
 const FROM_EMAIL = 'PLAYHUB <admin@playbacksports.ai>'
 const FROM_ALERT_EMAIL = 'PLAYHUB Alerts <admin@playbacksports.ai>'
