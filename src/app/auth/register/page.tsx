@@ -11,7 +11,7 @@ import {
   getAuthErrorMessage,
 } from '@braintwopoint0/playback-commons/auth'
 import { createClient } from '@braintwopoint0/playback-commons/supabase'
-import { Button, Input, Label } from '@braintwopoint0/playback-commons/ui'
+import { Button, Input, Label, LumaSpin } from '@braintwopoint0/playback-commons/ui'
 import { sanitizeRedirect } from '@braintwopoint0/playback-commons/utils'
 import { LoadingSpinner } from '@/components/ui/loading'
 import {
@@ -170,7 +170,7 @@ function RegisterForm() {
   if (authLoading || user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner size="lg" />
+        <LumaSpin />
       </div>
     )
   }
@@ -368,7 +368,7 @@ export default function RegisterPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center">
-          <LoadingSpinner size="lg" />
+          <LumaSpin />
         </div>
       }
     >

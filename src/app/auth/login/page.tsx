@@ -8,7 +8,7 @@ import {
   validateEmail,
   getAuthErrorMessage,
 } from '@braintwopoint0/playback-commons/auth'
-import { Button, Input, Label } from '@braintwopoint0/playback-commons/ui'
+import { Button, Input, Label, LumaSpin } from '@braintwopoint0/playback-commons/ui'
 import { sanitizeRedirect } from '@braintwopoint0/playback-commons/utils'
 import { LoadingSpinner } from '@/components/ui/loading'
 import { AlertCircle, Eye, EyeOff, Mail, Lock } from 'lucide-react'
@@ -94,7 +94,7 @@ function LoginForm() {
   if (authLoading || user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner size="lg" />
+        <LumaSpin />
       </div>
     )
   }
@@ -212,7 +212,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center">
-          <LoadingSpinner size="lg" />
+          <LumaSpin />
         </div>
       }
     >

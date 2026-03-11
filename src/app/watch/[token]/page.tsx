@@ -8,10 +8,10 @@ import {
   CardHeader,
   CardTitle,
   Button,
+  LumaSpin,
 } from '@braintwopoint0/playback-commons/ui'
 import { useAuth } from '@braintwopoint0/playback-commons/auth'
 import { Bookmark, BookmarkCheck, Loader2 } from 'lucide-react'
-import { LoadingSpinner } from '@/components/ui/loading'
 import {
   VideoPlayer,
   type MediaPack,
@@ -142,7 +142,7 @@ export default function PublicWatchPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner size="lg" className="text-muted-foreground" />
+        <LumaSpin />
       </div>
     )
   }
