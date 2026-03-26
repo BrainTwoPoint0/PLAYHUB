@@ -556,14 +556,21 @@ async function sendRecordingReadyEmails(
 
         if (!response.ok) {
           const text = await response.text()
-          console.error(`Resend API error for ${email}: ${response.status} ${text}`)
+          console.error(
+            `Resend API error for ${email}: ${response.status} ${text}`
+          )
         }
       } catch (emailErr) {
-        console.error(`Failed to send recording ready email to ${email}:`, emailErr)
+        console.error(
+          `Failed to send recording ready email to ${email}:`,
+          emailErr
+        )
       }
     }
 
-    console.log(`Sent recording ready emails to ${allEmails.length} users for game ${spiideoGameId}`)
+    console.log(
+      `Sent recording ready emails to ${allEmails.length} users for game ${spiideoGameId}`
+    )
   } catch (error) {
     console.error('Failed to send recording ready emails:', error)
   }
@@ -583,7 +590,9 @@ async function detectStaleBookings(): Promise<void> {
 
     const { data: staleRecordings } = await supabase
       .from('playhub_match_recordings')
-      .select('id, title, match_date, pitch_name, organization_id, spiideo_game_id, last_sync_error')
+      .select(
+        'id, title, match_date, pitch_name, organization_id, spiideo_game_id, last_sync_error'
+      )
       .eq('status', 'scheduled')
       .is('s3_key', null)
       .lt('match_date', fiveHoursAgo)
@@ -600,18 +609,16 @@ async function detectStaleBookings(): Promise<void> {
     console.log(`Found ${toAlert.length} stale bookings`)
 
     for (const recording of toAlert) {
-      await sendSyncAlertEmail(
-        `⚠️ Stale booking: ${recording.title}`,
-        {
-          gameId: recording.spiideo_game_id || recording.id,
-          title: recording.title || 'Untitled',
-          matchDate: recording.match_date,
-          pitchName: recording.pitch_name,
-          attempts: 0,
-          lastError: 'Recording stuck in "scheduled" status — never started or synced',
-          isRetryExhausted: true,
-        }
-      )
+      await sendSyncAlertEmail(`⚠️ Stale booking: ${recording.title}`, {
+        gameId: recording.spiideo_game_id || recording.id,
+        title: recording.title || 'Untitled',
+        matchDate: recording.match_date,
+        pitchName: recording.pitch_name,
+        attempts: 0,
+        lastError:
+          'Recording stuck in "scheduled" status — never started or synced',
+        isRetryExhausted: true,
+      })
 
       // Mark as alerted to avoid duplicate alerts
       const existingError = recording.last_sync_error || ''
@@ -676,7 +683,12 @@ async function syncGame(
         pitchName
       )
       // Send "recording ready" emails (may have been missed if DB record was created without S3)
-      await sendRecordingReadyEmails(game.id, title, game.scheduledStartTime, organizationId)
+      await sendRecordingReadyEmails(
+        game.id,
+        title,
+        game.scheduledStartTime,
+        organizationId
+      )
       return {
         gameId: game.id,
         title,
@@ -813,7 +825,12 @@ async function syncGame(
     }
 
     // Send "recording ready" emails to users with access
-    await sendRecordingReadyEmails(game.id, title, game.scheduledStartTime, organizationId)
+    await sendRecordingReadyEmails(
+      game.id,
+      title,
+      game.scheduledStartTime,
+      organizationId
+    )
 
     return {
       gameId: game.id,

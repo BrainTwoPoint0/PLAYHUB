@@ -360,7 +360,11 @@ async function transferGame(
       await deleteFile(uploadResult.s3Key)
       console.log('Cleaned up orphaned S3 object:', uploadResult.s3Key)
     } catch (cleanupErr) {
-      console.error('Failed to clean up S3 object:', uploadResult.s3Key, cleanupErr)
+      console.error(
+        'Failed to clean up S3 object:',
+        uploadResult.s3Key,
+        cleanupErr
+      )
     }
     return {
       gameId: game.id,

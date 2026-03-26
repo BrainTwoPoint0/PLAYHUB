@@ -25,7 +25,9 @@ export async function sendAdminInviteEmail(params: {
 }): Promise<SendEmailResult> {
   const { toEmail, orgType } = params
   const venueName = escapeHtml(params.venueName)
-  const inviterName = params.inviterName ? escapeHtml(params.inviterName) : undefined
+  const inviterName = params.inviterName
+    ? escapeHtml(params.inviterName)
+    : undefined
 
   try {
     const { error } = await resend.emails.send({
@@ -96,9 +98,12 @@ export async function sendRecordingAccessEmail(params: {
   const { toEmail, shareUrl } = params
   const recordingTitle = escapeHtml(params.recordingTitle)
   const venueName = params.venueName ? escapeHtml(params.venueName) : undefined
-  const inviterName = params.inviterName ? escapeHtml(params.inviterName) : undefined
+  const inviterName = params.inviterName
+    ? escapeHtml(params.inviterName)
+    : undefined
 
-  const actionUrl = shareUrl || `${APP_URL}/auth/register?redirect=%2Frecordings`
+  const actionUrl =
+    shareUrl || `${APP_URL}/auth/register?redirect=%2Frecordings`
   const actionText = shareUrl ? 'Watch recording' : 'Create your account'
 
   try {
@@ -179,7 +184,9 @@ export async function sendRecordingAssignedEmail(params: {
   const recordingTitle = escapeHtml(params.recordingTitle)
   const matchDate = params.matchDate ? escapeHtml(params.matchDate) : undefined
   const venueName = params.venueName ? escapeHtml(params.venueName) : undefined
-  const assignedBy = params.assignedBy ? escapeHtml(params.assignedBy) : undefined
+  const assignedBy = params.assignedBy
+    ? escapeHtml(params.assignedBy)
+    : undefined
 
   try {
     const { error } = await resend.emails.send({
@@ -263,7 +270,9 @@ export async function sendAdminAddedEmail(params: {
 }): Promise<SendEmailResult> {
   const { toEmail, dashboardUrl } = params
   const entityName = escapeHtml(params.entityName)
-  const inviterName = params.inviterName ? escapeHtml(params.inviterName) : undefined
+  const inviterName = params.inviterName
+    ? escapeHtml(params.inviterName)
+    : undefined
 
   const fullDashboardUrl = `${APP_URL}${dashboardUrl}`
 
@@ -629,7 +638,14 @@ export async function sendSchedulingFailureAlert(params: {
   durationMinutes: number
   errorMessage: string
 }): Promise<SendEmailResult> {
-  const { toEmail, venueId, sceneName, customerEmail, durationMinutes, errorMessage } = params
+  const {
+    toEmail,
+    venueId,
+    sceneName,
+    customerEmail,
+    durationMinutes,
+    errorMessage,
+  } = params
 
   try {
     const { error } = await resend.emails.send({

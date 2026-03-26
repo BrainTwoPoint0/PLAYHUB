@@ -93,7 +93,10 @@ export async function POST(
   const isReady = !!recording.s3_key
 
   // Only venue admins can grant access to recordings
-  if (!recording.organization_id || !await isVenueAdmin(user.id, recording.organization_id)) {
+  if (
+    !recording.organization_id ||
+    !(await isVenueAdmin(user.id, recording.organization_id))
+  ) {
     return NextResponse.json(
       { error: 'Not authorized to grant access for this recording' },
       { status: 403 }

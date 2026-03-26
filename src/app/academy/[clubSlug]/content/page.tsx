@@ -906,7 +906,9 @@ export default function AcademyContentPage() {
                         {String(rec.privacy || '')}
                       </span>
                       {(() => {
-                        const status = parseProcessingStatus(rec.processing_status)
+                        const status = parseProcessingStatus(
+                          rec.processing_status
+                        )
                         return status ? (
                           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-400/80 flex items-center gap-1">
                             <Loader2 className="h-3 w-3 animate-spin" />

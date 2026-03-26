@@ -30,7 +30,10 @@ export async function DELETE(
   }
 
   // Only venue admins can revoke access
-  if (!recording.organization_id || !await isVenueAdmin(user.id, recording.organization_id)) {
+  if (
+    !recording.organization_id ||
+    !(await isVenueAdmin(user.id, recording.organization_id))
+  ) {
     return NextResponse.json(
       { error: 'Not authorized to revoke access for this recording' },
       { status: 403 }

@@ -29,7 +29,10 @@ export async function POST(
   }
 
   // Only venue admins can generate share tokens
-  if (!recording.organization_id || !await isVenueAdmin(user.id, recording.organization_id)) {
+  if (
+    !recording.organization_id ||
+    !(await isVenueAdmin(user.id, recording.organization_id))
+  ) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
@@ -86,7 +89,10 @@ export async function DELETE(
     return NextResponse.json({ error: 'Recording not found' }, { status: 404 })
   }
 
-  if (!recording.organization_id || !await isVenueAdmin(user.id, recording.organization_id)) {
+  if (
+    !recording.organization_id ||
+    !(await isVenueAdmin(user.id, recording.organization_id))
+  ) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 

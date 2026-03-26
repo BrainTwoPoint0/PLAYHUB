@@ -75,8 +75,17 @@ export async function GET(request: NextRequest) {
 
     // Validate upstream content-type is media (prevent serving HTML/JS through our domain)
     const contentType = upstream.headers.get('content-type') || ''
-    if (!contentType || (!contentType.startsWith('video/') && !contentType.startsWith('image/') && !contentType.startsWith('audio/') && !contentType.startsWith('application/octet-stream'))) {
-      return NextResponse.json({ error: 'Unexpected content type from upstream' }, { status: 502 })
+    if (
+      !contentType ||
+      (!contentType.startsWith('video/') &&
+        !contentType.startsWith('image/') &&
+        !contentType.startsWith('audio/') &&
+        !contentType.startsWith('application/octet-stream'))
+    ) {
+      return NextResponse.json(
+        { error: 'Unexpected content type from upstream' },
+        { status: 502 }
+      )
     }
 
     // Stream the response through, preserving range response headers

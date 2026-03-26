@@ -8,7 +8,12 @@ import {
   validateEmail,
   getAuthErrorMessage,
 } from '@braintwopoint0/playback-commons/auth'
-import { Button, Input, Label, LumaSpin } from '@braintwopoint0/playback-commons/ui'
+import {
+  Button,
+  Input,
+  Label,
+  LumaSpin,
+} from '@braintwopoint0/playback-commons/ui'
 import { sanitizeRedirect } from '@braintwopoint0/playback-commons/utils'
 import { LoadingSpinner } from '@/components/ui/loading'
 import { AlertCircle, Eye, EyeOff, Mail, Lock } from 'lucide-react'
@@ -80,7 +85,13 @@ function LoginForm() {
         setConsecutiveErrors(0)
         setCooldownUntil(null)
         const raw = searchParams.get('redirect') || '/'
-        const safe = raw.startsWith('/') && !raw.startsWith('//') && !raw.includes('@') && !raw.includes('\\') ? raw : '/'
+        const safe =
+          raw.startsWith('/') &&
+          !raw.startsWith('//') &&
+          !raw.includes('@') &&
+          !raw.includes('\\')
+            ? raw
+            : '/'
         router.push(safe)
       }
     } catch {
@@ -194,7 +205,11 @@ function LoginForm() {
             <p className="text-muted-foreground">
               Don&apos;t have an account?{' '}
               <Link
-                href={searchParams.get('redirect') ? `/auth/register?redirect=${encodeURIComponent(searchParams.get('redirect')!)}` : '/auth/register'}
+                href={
+                  searchParams.get('redirect')
+                    ? `/auth/register?redirect=${encodeURIComponent(searchParams.get('redirect')!)}`
+                    : '/auth/register'
+                }
                 className="text-[var(--timberwolf)] hover:underline"
               >
                 Sign up

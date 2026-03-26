@@ -25,7 +25,10 @@ export async function POST(
   }
 
   if (!token) {
-    return NextResponse.json({ error: 'Share token is required' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Share token is required' },
+      { status: 400 }
+    )
   }
 
   const serviceClient = createServiceClient()
@@ -51,10 +54,7 @@ export async function POST(
   }
 
   if (!recording.share_token || recording.share_token !== token) {
-    return NextResponse.json(
-      { error: 'Invalid share token' },
-      { status: 403 }
-    )
+    return NextResponse.json({ error: 'Invalid share token' }, { status: 403 })
   }
 
   // Self-grant access (share token validated above)

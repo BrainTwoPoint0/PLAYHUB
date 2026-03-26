@@ -11,7 +11,12 @@ import {
   getAuthErrorMessage,
 } from '@braintwopoint0/playback-commons/auth'
 import { createClient } from '@braintwopoint0/playback-commons/supabase'
-import { Button, Input, Label, LumaSpin } from '@braintwopoint0/playback-commons/ui'
+import {
+  Button,
+  Input,
+  Label,
+  LumaSpin,
+} from '@braintwopoint0/playback-commons/ui'
 import { sanitizeRedirect } from '@braintwopoint0/playback-commons/utils'
 import { LoadingSpinner } from '@/components/ui/loading'
 import {
@@ -153,7 +158,13 @@ function RegisterForm() {
           )
         } else {
           const raw = searchParams.get('redirect') || '/'
-          const safe = raw.startsWith('/') && !raw.startsWith('//') && !raw.includes('@') && !raw.includes('\\') ? raw : '/'
+          const safe =
+            raw.startsWith('/') &&
+            !raw.startsWith('//') &&
+            !raw.includes('@') &&
+            !raw.includes('\\')
+              ? raw
+              : '/'
           router.push(safe)
         }
       } else {
@@ -350,7 +361,11 @@ function RegisterForm() {
             <p className="text-muted-foreground">
               Already have an account?{' '}
               <Link
-                href={searchParams.get('redirect') ? `/auth/login?redirect=${encodeURIComponent(searchParams.get('redirect')!)}` : '/auth/login'}
+                href={
+                  searchParams.get('redirect')
+                    ? `/auth/login?redirect=${encodeURIComponent(searchParams.get('redirect')!)}`
+                    : '/auth/login'
+                }
                 className="text-[var(--timberwolf)] hover:underline"
               >
                 Sign in

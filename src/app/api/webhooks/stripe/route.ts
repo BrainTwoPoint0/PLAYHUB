@@ -91,7 +91,10 @@ async function handleStreamAccessPurchase(
   const { stream_id, access_type, user_id } = metadata
 
   if (!stream_id || !user_id) {
-    console.error('Missing stream_id or user_id in metadata (unrecoverable):', session.id)
+    console.error(
+      'Missing stream_id or user_id in metadata (unrecoverable):',
+      session.id
+    )
     return NextResponse.json({ received: true, error: 'Missing metadata' })
   }
 
@@ -286,7 +289,9 @@ async function handleMatchRecordingPurchase(
           : undefined,
         venueName: rec.organizations?.name,
         isReady: true,
-      }).catch((err) => console.error('Failed to send purchase confirmation email:', err))
+      }).catch((err) =>
+        console.error('Failed to send purchase confirmation email:', err)
+      )
     }
   }
 
@@ -420,16 +425,22 @@ async function handleVenueBooking(
           sceneName: resolvedSceneName,
           customerEmail: email,
           durationMinutes: duration,
-          errorMessage: error instanceof Error ? error.message : 'Unknown error',
+          errorMessage:
+            error instanceof Error ? error.message : 'Unknown error',
         })
       } catch (err) {
         console.error('Failed to send scheduling failure alert:', err)
       }
     } else {
-      console.error('ALERT_EMAIL not configured — cannot send scheduling failure alert')
+      console.error(
+        'ALERT_EMAIL not configured — cannot send scheduling failure alert'
+      )
     }
 
-    return NextResponse.json({ received: true, error: 'Failed to process venue booking' })
+    return NextResponse.json({
+      received: true,
+      error: 'Failed to process venue booking',
+    })
   }
 }
 

@@ -10,7 +10,10 @@ export async function GET(request: Request) {
   const rawNext = searchParams.get('next') ?? '/'
   // Validate redirect is a safe relative path (prevent open redirect)
   const next =
-    rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.includes('@') && !rawNext.includes('\\')
+    rawNext.startsWith('/') &&
+    !rawNext.startsWith('//') &&
+    !rawNext.includes('@') &&
+    !rawNext.includes('\\')
       ? rawNext
       : '/'
 
