@@ -396,6 +396,19 @@ async function runContentPrecache(): Promise<ClubResult[]> {
     await storeAuthTokens(tokens.bearer, tokens.csrf).catch((e) =>
       console.warn('Token store failed (non-critical):', e)
     )
+  } catch (loginError) {
+    const msg =
+      loginError instanceof Error ? loginError.message : String(loginError)
+    console.error(`Content precache: login failed — ${msg}`)
+    return [
+      {
+        clubSlug: 'all',
+        action: 'content-precache',
+        status: 'error' as const,
+        elapsed: `${((Date.now() - start) / 1000).toFixed(1)}s`,
+        error: `Login failed: ${msg}`,
+      },
+    ]
   } finally {
     // Close browser immediately — we only need the tokens
     await session?.close().catch(() => {})
