@@ -186,6 +186,97 @@ export async function storeAuthTokens(
 }
 
 // ============================================================================
+// Content precache: read/write match content cache
+// ============================================================================
+
+/**
+ * Get all match slugs already in the content cache.
+ * Entries marked is_processing that are older than 24h are excluded
+ * so they get re-fetched on the next run.
+ */
+export async function getAlreadyCachedSlugs(): Promise<Set<string>> {
+  const supabase = getSupabase()
+
+  const { data, error } = await supabase
+    .from('playhub_veo_match_content_cache')
+    .select('match_slug, is_processing, last_fetched_at')
+    .limit(5000)
+
+  if (error) {
+    console.warn(`Failed to read cached slugs: ${error.message}`)
+    return new Set()
+  }
+
+  const now = Date.now()
+  const RECHECK_MS = 24 * 60 * 60 * 1000 // 24 hours
+
+  return new Set(
+    (data || [])
+      .filter((r: any) => {
+        // Keep in cache set (skip) if fully cached
+        if (!r.is_processing) return true
+        // Re-fetch processing entries older than 24h
+        const age = now - new Date(r.last_fetched_at).getTime()
+        return age < RECHECK_MS
+      })
+      .map((r: any) => r.match_slug)
+  )
+}
+
+/**
+ * Get all recording slugs for the given clubs, ordered by date descending (recent first).
+ */
+export async function getRecordingSlugsForClubs(
+  clubSlugs: string[]
+): Promise<string[]> {
+  const supabase = getSupabase()
+
+  const { data, error } = await supabase
+    .from('playhub_veo_recordings_cache')
+    .select('match_slug, match_date')
+    .in('club_slug', clubSlugs)
+    .order('match_date', { ascending: false, nullsFirst: false })
+    .limit(5000)
+
+  if (error) {
+    throw new Error(`Failed to read recording slugs: ${error.message}`)
+  }
+
+  return (data || []).map((r: any) => r.match_slug)
+}
+
+/**
+ * Write match content to the content cache.
+ */
+export async function writeMatchContentCache(
+  matchSlug: string,
+  content: { videos: any[]; highlights: any[]; stats: any },
+  isProcessing: boolean = false
+): Promise<void> {
+  const supabase = getSupabase()
+
+  const { error } = await supabase
+    .from('playhub_veo_match_content_cache')
+    .upsert(
+      {
+        match_slug: matchSlug,
+        videos: content.videos,
+        highlights: content.highlights,
+        stats: content.stats,
+        is_processing: isProcessing,
+        last_fetched_at: new Date().toISOString(),
+      },
+      { onConflict: 'match_slug' }
+    )
+
+  if (error) {
+    throw new Error(
+      `Failed to write content cache for ${matchSlug}: ${error.message}`
+    )
+  }
+}
+
+// ============================================================================
 // Status: update sync status (syncing / error)
 // ============================================================================
 

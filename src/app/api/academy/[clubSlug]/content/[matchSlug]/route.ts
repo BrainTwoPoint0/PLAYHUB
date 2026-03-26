@@ -74,7 +74,7 @@ export async function GET(
         return NextResponse.json(
           {
             error:
-              'Match content not yet cached. It will be available after the next sync.',
+              'Match content is being processed and will be available shortly.',
           },
           { status: 503 }
         )

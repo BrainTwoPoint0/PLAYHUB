@@ -1,7 +1,8 @@
 // Lambda function for Veo Clubhouse operations
-// Routes between two actions based on EventBridge event payload:
-//   - "cache-sync"   → Scrape Veo directly via Playwright and write to Supabase
-//   - "cleanup-sync" → Remove canceled subscribers from Veo (calls PLAYHUB API)
+// Routes between actions based on EventBridge event payload:
+//   - "cache-sync"       → Scrape Veo directly via Playwright and write to Supabase
+//   - "cleanup-sync"     → Remove canceled subscribers from Veo (calls PLAYHUB API)
+//   - "content-precache" → Pre-cache match content (videos/highlights/stats) via direct HTTP
 
 import {
   getVeoSession,
@@ -9,12 +10,16 @@ import {
   listClubRecordings,
   setMatchPrivacy,
   removeMembersFromClub,
+  fetchMatchContent,
 } from './veo-scraper'
 import {
   writeCachedClubData,
   writeCachedRecordings,
   setSyncStatus,
   storeAuthTokens,
+  getAlreadyCachedSlugs,
+  getRecordingSlugsForClubs,
+  writeMatchContentCache,
 } from './cache-writer'
 import { CLUB_VEO_SLUGS, PUBLIC_RECORDING_TEAMS } from './config'
 
@@ -26,7 +31,7 @@ const CLUB_SLUGS = (process.env.CLUB_SLUGS || 'cfa,sefa')
 const SYNC_MODE = (process.env.SYNC_MODE || 'dry-run') as 'dry-run' | 'execute'
 
 interface EventPayload {
-  action?: 'cache-sync' | 'cleanup-sync' | 'privacy-sync'
+  action?: 'cache-sync' | 'cleanup-sync' | 'privacy-sync' | 'content-precache'
   clubSlug?: string // Optional: sync only this club (for manual triggers)
 }
 
@@ -369,6 +374,133 @@ async function runPrivacySync(onlyClub?: string): Promise<ClubResult[]> {
 }
 
 // ============================================================================
+// Content Precache — fetch videos/highlights/stats via direct HTTP
+// ============================================================================
+
+const LAMBDA_TIMEOUT_S = parseInt(process.env.LAMBDA_TIMEOUT || '600', 10)
+const DEADLINE_BUFFER_S = 15
+const RATE_LIMIT_MS = 500
+
+async function runContentPrecache(): Promise<ClubResult[]> {
+  const start = Date.now()
+  const deadlineMs = (LAMBDA_TIMEOUT_S - DEADLINE_BUFFER_S) * 1000
+
+  // Step 1: Login via Playwright to capture fresh tokens, then close browser
+  let session: Awaited<ReturnType<typeof getVeoSession>> | null = null
+  let tokens: { bearer: string; csrf: string }
+  try {
+    session = await getVeoSession()
+    tokens = session.tokens
+
+    // Store tokens for Next.js direct client too
+    await storeAuthTokens(tokens.bearer, tokens.csrf).catch((e) =>
+      console.warn('Token store failed (non-critical):', e)
+    )
+  } finally {
+    // Close browser immediately — we only need the tokens
+    await session?.close().catch(() => {})
+  }
+
+  const loginElapsed = ((Date.now() - start) / 1000).toFixed(1)
+  console.log(`Content precache: login complete (${loginElapsed}s)`)
+
+  // Step 2: Read cached state from Supabase
+  const [cachedSlugs, allSlugs] = await Promise.all([
+    getAlreadyCachedSlugs(),
+    getRecordingSlugsForClubs(CLUB_SLUGS),
+  ])
+
+  const uncached = allSlugs.filter((slug) => !cachedSlugs.has(slug))
+  console.log(
+    `Content precache: ${allSlugs.length} total recordings, ${cachedSlugs.size} cached, ${uncached.length} to fetch`
+  )
+
+  if (uncached.length === 0) {
+    return [
+      {
+        clubSlug: 'all',
+        action: 'content-precache',
+        status: 'success',
+        elapsed: `${((Date.now() - start) / 1000).toFixed(1)}s`,
+      },
+    ]
+  }
+
+  // Step 3: Fetch content for each uncached recording
+  let attempted = 0
+  let succeeded = 0
+  let failed = 0
+  let stoppedAuth = false
+  let stoppedDeadline = false
+
+  for (const matchSlug of uncached) {
+    // Check time budget
+    if (Date.now() - start > deadlineMs) {
+      stoppedDeadline = true
+      console.log(
+        `Content precache: stopping at deadline (${attempted} attempted)`
+      )
+      break
+    }
+
+    attempted++
+    try {
+      const content = await fetchMatchContent(matchSlug, tokens)
+
+      if (content.authExpired) {
+        stoppedAuth = true
+        console.log(
+          `Content precache: 401 received, stopping (${attempted} attempted)`
+        )
+        break
+      }
+
+      // Mark as processing if Veo returned no content (match still being processed)
+      const isProcessing =
+        content.videos.length === 0 && content.highlights.length === 0
+      await writeMatchContentCache(matchSlug, content, isProcessing)
+      succeeded++
+
+      if (isProcessing) {
+        console.log(`  ${matchSlug}: cached (processing — no content yet)`)
+      }
+    } catch (err) {
+      failed++
+      const msg = err instanceof Error ? err.message : String(err)
+      console.warn(`  ${matchSlug}: fetch failed — ${msg}`)
+    }
+
+    // Rate limit between recordings
+    if (!stoppedAuth && !stoppedDeadline) {
+      await new Promise((r) => setTimeout(r, RATE_LIMIT_MS))
+    }
+  }
+
+  const elapsed = `${((Date.now() - start) / 1000).toFixed(1)}s`
+  const remaining = uncached.length - attempted
+  console.log(
+    `Content precache complete: ${succeeded} cached, ${failed} failed, ${remaining} remaining (${elapsed})`
+  )
+
+  return [
+    {
+      clubSlug: 'all',
+      action: 'content-precache',
+      status: stoppedAuth ? 'error' : 'success',
+      succeededCount: succeeded,
+      failedCount: failed,
+      executedCount: attempted,
+      elapsed,
+      error: stoppedAuth
+        ? 'Auth tokens expired during precache'
+        : stoppedDeadline
+          ? `Stopped at deadline — ${remaining} recordings remaining`
+          : undefined,
+    },
+  ]
+}
+
+// ============================================================================
 // Handler — route based on event.action
 // ============================================================================
 
@@ -434,6 +566,8 @@ export const handler = async (
     results = await runCacheSync(targetClub)
   } else if (action === 'privacy-sync') {
     results = await runPrivacySync(targetClub)
+  } else if (action === 'content-precache') {
+    results = await runContentPrecache()
   } else {
     results = await runCleanupSync()
   }

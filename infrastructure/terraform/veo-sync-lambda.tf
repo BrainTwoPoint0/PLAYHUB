@@ -97,7 +97,7 @@ resource "aws_lambda_function" "veo_sync" {
   role          = aws_iam_role.veo_sync_lambda.arn
   handler       = "index.handler"
   runtime       = "nodejs20.x"
-  timeout       = 300
+  timeout       = 600
   memory_size   = 2048
 
   filename         = "${path.module}/../lambda/veo-sync/dist.zip"
@@ -114,6 +114,7 @@ resource "aws_lambda_function" "veo_sync" {
       VEO_PASSWORD             = var.veo_password
       SUPABASE_URL             = var.supabase_url
       SUPABASE_SERVICE_ROLE_KEY = var.supabase_service_key
+      LAMBDA_TIMEOUT           = "600"
     }
   }
 
@@ -186,6 +187,35 @@ resource "aws_lambda_permission" "eventbridge_veo_cache_sync" {
   source_arn    = aws_cloudwatch_event_rule.veo_cache_sync_schedule.arn
 }
 
+# EventBridge Rule — content precache every 2 hours (offset from cache-sync)
+resource "aws_cloudwatch_event_rule" "veo_content_precache_schedule" {
+  name                = "${var.project_name}-veo-content-precache-schedule"
+  description         = "Pre-cache Veo match content (videos/highlights/stats) every 2 hours"
+  schedule_expression = "cron(30 */2 * * ? *)"
+
+  tags = {
+    Name        = "PLAYHUB Veo Content Precache Schedule"
+    Environment = var.environment
+  }
+}
+
+# EventBridge Target — content precache (every 2 hours at :30)
+resource "aws_cloudwatch_event_target" "veo_content_precache_lambda" {
+  rule      = aws_cloudwatch_event_rule.veo_content_precache_schedule.name
+  target_id = "veo-content-precache"
+  arn       = aws_lambda_function.veo_sync.arn
+  input     = jsonencode({ action = "content-precache" })
+}
+
+# Permission for EventBridge to invoke Lambda (content precache)
+resource "aws_lambda_permission" "eventbridge_veo_content_precache" {
+  statement_id  = "AllowEventBridgeContentPrecache"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.veo_sync.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.veo_content_precache_schedule.arn
+}
+
 # Reuse existing SNS topic for alerts
 resource "aws_cloudwatch_metric_alarm" "veo_sync_lambda_errors" {
   alarm_name          = "${var.project_name}-veo-sync-lambda-errors"
@@ -234,6 +264,11 @@ output "veo_sync_schedule_arn" {
 output "veo_cache_sync_schedule_arn" {
   value       = aws_cloudwatch_event_rule.veo_cache_sync_schedule.arn
   description = "Veo cache sync EventBridge schedule rule ARN"
+}
+
+output "veo_content_precache_schedule_arn" {
+  value       = aws_cloudwatch_event_rule.veo_content_precache_schedule.arn
+  description = "Veo content precache EventBridge schedule rule ARN"
 }
 
 

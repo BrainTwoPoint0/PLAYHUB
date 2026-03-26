@@ -336,6 +336,112 @@ export interface RemovalResult {
   message: string
 }
 
+// ============================================================================
+// Direct fetch: HTTP calls using tokens (no Playwright needed)
+// ============================================================================
+
+export interface VeoVideo {
+  id: string
+  url: string
+  type?: string
+  width?: number
+  height?: number
+}
+
+export interface VeoHighlight {
+  id: string
+  start: number
+  duration: number
+  tags: string[]
+  team_association?: string
+  thumbnail?: string
+  videos?: VeoVideo[]
+  is_ai_generated?: boolean
+}
+
+export interface MatchContent {
+  videos: VeoVideo[]
+  highlights: VeoHighlight[]
+  stats: Record<string, unknown> | null
+  authExpired: boolean
+}
+
+const SLUG_PATTERN = /^[a-zA-Z0-9_-]+$/
+
+async function veoDirectFetch(
+  method: string,
+  path: string,
+  tokens: { bearer: string; csrf: string }
+): Promise<VeoApiResult> {
+  const url = `${VEO_BASE}${path}`
+  const res = await fetch(url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${tokens.bearer}`,
+      'X-CSRFToken': tokens.csrf,
+      Accept: 'application/json',
+    },
+  })
+  const text = (await res.text()).substring(0, 500_000)
+  return { status: res.status, body: text }
+}
+
+/**
+ * Fetch match content (videos, highlights, stats) using direct HTTP.
+ * No Playwright dependency — just bearer + CSRF tokens.
+ */
+export async function fetchMatchContent(
+  matchSlug: string,
+  tokens: { bearer: string; csrf: string }
+): Promise<MatchContent> {
+  if (!matchSlug || !SLUG_PATTERN.test(matchSlug)) {
+    return { videos: [], highlights: [], stats: null, authExpired: false }
+  }
+
+  const [videosRes, highlightsRes, statsRes] = await Promise.all([
+    veoDirectFetch('GET', `/api/app/matches/${matchSlug}/videos/`, tokens),
+    veoDirectFetch(
+      'GET',
+      `/api/app/matches/${matchSlug}/highlights/?include_ai=true&fields=id&fields=start&fields=duration&fields=tags&fields=team_association&fields=thumbnail&fields=videos&fields=is_ai_generated`,
+      tokens
+    ),
+    veoDirectFetch('GET', `/api/app/matches/${matchSlug}/stats/`, tokens),
+  ])
+
+  // Circuit breaker: if any endpoint returns 401, tokens are expired
+  if (
+    videosRes.status === 401 ||
+    highlightsRes.status === 401 ||
+    statsRes.status === 401
+  ) {
+    return { videos: [], highlights: [], stats: null, authExpired: true }
+  }
+
+  // Log and skip server errors (don't cache them as "processing")
+  const hasServerError = [videosRes, highlightsRes, statsRes].some(
+    (r) => r.status >= 500
+  )
+  if (hasServerError) {
+    console.warn(
+      `  ${matchSlug}: Veo server error (videos=${videosRes.status}, highlights=${highlightsRes.status}, stats=${statsRes.status})`
+    )
+    throw new Error(`Veo server error for ${matchSlug}`)
+  }
+
+  const videos: VeoVideo[] =
+    videosRes.status === 200 ? parseBody(videosRes.body) || [] : []
+  const highlights: VeoHighlight[] =
+    highlightsRes.status === 200 ? parseBody(highlightsRes.body) || [] : []
+  const stats: Record<string, unknown> | null =
+    statsRes.status === 200 ? parseBody(statsRes.body) : null
+
+  return { videos, highlights, stats, authExpired: false }
+}
+
+// ============================================================================
+// Cleanup: remove members from Veo teams (single session)
+// ============================================================================
+
 export async function removeMembersFromClub(
   session: VeoSession,
   clubSlug: string,
