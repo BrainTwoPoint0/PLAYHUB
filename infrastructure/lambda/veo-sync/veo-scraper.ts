@@ -142,6 +142,19 @@ async function attemptLogin(): Promise<{
   }
   await page.waitForTimeout(3000)
 
+  // CSRF fallback: extract from cookies if request interception missed it.
+  // Django/Veo sets a 'csrftoken' cookie that the SPA reads and sends as X-CSRFToken.
+  if (!csrf) {
+    const cookies = await context.cookies()
+    const csrfCookie = cookies.find(
+      (c) => c.name === 'csrftoken' || c.name === 'csrf_token'
+    )
+    if (csrfCookie) {
+      csrf = csrfCookie.value
+      console.log('CSRF captured from cookie (request interception missed it)')
+    }
+  }
+
   if (!bearer || !csrf) {
     console.warn(
       `Token capture failed (bearer: ${bearer ? 'yes' : 'no'}, csrf: ${csrf ? 'yes' : 'no'})`
@@ -176,6 +189,8 @@ async function login(): Promise<{
 export async function getVeoSession(): Promise<VeoSession> {
   const { browser, page, bearer, csrf } = await login()
 
+  const API_TIMEOUT_MS = 30_000 // 30s per API call — prevents indefinite hangs
+
   const api = async (
     method: string,
     path: string,
@@ -183,27 +198,35 @@ export async function getVeoSession(): Promise<VeoSession> {
   ): Promise<VeoApiResult> => {
     const fullUrl = `${VEO_BASE}${path}`
 
-    const result = await page.evaluate(
-      async ({ url, method, body, bearer, csrf }) => {
-        const opts: RequestInit = {
-          method,
-          credentials: 'include',
-          headers: {
-            Authorization: `Bearer ${bearer}`,
-            'X-CSRFToken': csrf,
-          },
-        }
-        if (body) {
-          ;(opts.headers as Record<string, string>)['Content-Type'] =
-            'application/json'
-          opts.body = JSON.stringify(body)
-        }
-        const res = await fetch(url, opts)
-        const text = await res.text()
-        return { status: res.status, body: text.substring(0, 500000) }
-      },
-      { url: fullUrl, method, body, bearer, csrf }
-    )
+    const result = await Promise.race([
+      page.evaluate(
+        async ({ url, method, body, bearer, csrf }) => {
+          const opts: RequestInit = {
+            method,
+            credentials: 'include',
+            headers: {
+              Authorization: `Bearer ${bearer}`,
+              'X-CSRFToken': csrf,
+            },
+          }
+          if (body) {
+            ;(opts.headers as Record<string, string>)['Content-Type'] =
+              'application/json'
+            opts.body = JSON.stringify(body)
+          }
+          const res = await fetch(url, opts)
+          const text = await res.text()
+          return { status: res.status, body: text.substring(0, 500000) }
+        },
+        { url: fullUrl, method, body, bearer, csrf }
+      ),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`Veo API call timed out after 30s: ${path}`)),
+          API_TIMEOUT_MS
+        )
+      ),
+    ])
 
     return result
   }

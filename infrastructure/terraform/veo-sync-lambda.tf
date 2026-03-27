@@ -147,6 +147,11 @@ resource "aws_cloudwatch_event_target" "veo_sync_lambda" {
   target_id = "veo-cleanup-sync"
   arn       = aws_lambda_function.veo_sync.arn
   input     = jsonencode({ action = "cleanup-sync" })
+
+  retry_policy {
+    maximum_retry_attempts       = 0
+    maximum_event_age_in_seconds = 60
+  }
 }
 
 # Permission for EventBridge to invoke Lambda (cleanup)
@@ -176,6 +181,11 @@ resource "aws_cloudwatch_event_target" "veo_cache_sync_lambda" {
   target_id = "veo-cache-sync"
   arn       = aws_lambda_function.veo_sync.arn
   input     = jsonencode({ action = "cache-sync" })
+
+  retry_policy {
+    maximum_retry_attempts       = 0
+    maximum_event_age_in_seconds = 60
+  }
 }
 
 # Permission for EventBridge to invoke Lambda (cache sync)
@@ -205,6 +215,11 @@ resource "aws_cloudwatch_event_target" "veo_content_precache_lambda" {
   target_id = "veo-content-precache"
   arn       = aws_lambda_function.veo_sync.arn
   input     = jsonencode({ action = "content-precache" })
+
+  retry_policy {
+    maximum_retry_attempts       = 0
+    maximum_event_age_in_seconds = 60
+  }
 }
 
 # Permission for EventBridge to invoke Lambda (content precache)
@@ -214,6 +229,13 @@ resource "aws_lambda_permission" "eventbridge_veo_content_precache" {
   function_name = aws_lambda_function.veo_sync.function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.veo_content_precache_schedule.arn
+}
+
+# Disable Lambda's own async invocation retries (EventBridge retry_policy handles
+# EventBridge-triggered retries, but this covers manual async invocations too)
+resource "aws_lambda_function_event_invoke_config" "veo_sync" {
+  function_name          = aws_lambda_function.veo_sync.function_name
+  maximum_retry_attempts = 0
 }
 
 # Reuse existing SNS topic for alerts
