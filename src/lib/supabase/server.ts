@@ -48,18 +48,24 @@ export async function createClient() {
 // providing signature verification (unlike getSession() which does no verification).
 export async function getAuthUser() {
   const supabase = await createClient()
-  const { data, error } = await supabase.auth.getClaims()
-  if (error || !data) return { user: null, supabase }
-  const { claims } = data
-  // getClaims() returns JWT claims — reconstruct a User-like object
-  // with the fields our routes use (id, email)
-  const user = {
-    id: claims.sub as string,
-    email: (claims.email as string) ?? undefined,
-    // Spread remaining claims for any code that accesses other fields
-    ...claims,
+  try {
+    const { data, error } = await supabase.auth.getClaims()
+    if (error || !data) return { user: null, supabase }
+    const { claims } = data
+    // getClaims() returns JWT claims — reconstruct a User-like object
+    // with the fields our routes use (id, email)
+    const user = {
+      id: claims.sub as string,
+      email: (claims.email as string) ?? undefined,
+      // Spread remaining claims for any code that accesses other fields
+      ...claims,
+    }
+    return { user, supabase }
+  } catch {
+    // getClaims() throws plain Error (not AuthError) for expired JWTs.
+    // Treat as unauthenticated rather than crashing the route with 500.
+    return { user: null, supabase }
   }
-  return { user, supabase }
 }
 
 // Strict auth — validates the session with a full round-trip to Supabase Auth.
