@@ -63,7 +63,19 @@ export async function getAuthUser() {
     return { user, supabase }
   } catch {
     // getClaims() throws plain Error (not AuthError) for expired JWTs.
-    // Treat as unauthenticated rather than crashing the route with 500.
+    // Try refreshing the session before giving up — this handles the
+    // Netlify race condition where middleware cookies don't propagate.
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        return {
+          user: { id: user.id, email: user.email ?? undefined },
+          supabase,
+        }
+      }
+    } catch {
+      // Refresh also failed — truly unauthenticated
+    }
     return { user: null, supabase }
   }
 }
