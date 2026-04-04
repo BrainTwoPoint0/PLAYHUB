@@ -63,3 +63,4 @@ public/editor-test/
 
 # Validation output
 scripts/gemini-validation/validation-review.json
+infrastructure/keys/

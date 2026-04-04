@@ -1,16 +1,7 @@
 // GET /api/watch/[token] - Get recording by public share token (no auth required)
 import { createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-
-const s3Client = new S3Client({
-  region: process.env.PLAYHUB_AWS_REGION || 'eu-west-2',
-  credentials: {
-    accessKeyId: process.env.PLAYHUB_AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.PLAYHUB_AWS_SECRET_ACCESS_KEY!,
-  },
-})
+import { getPlaybackUrl } from '@/lib/s3/client'
 
 export async function GET(
   request: Request,
@@ -45,13 +36,9 @@ export async function GET(
 
   // Generate signed URL for video
   let videoUrl = null
-  if (recording.s3_key && recording.s3_bucket) {
+  if (recording.s3_key) {
     try {
-      const command = new GetObjectCommand({
-        Bucket: recording.s3_bucket,
-        Key: recording.s3_key,
-      })
-      videoUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 })
+      videoUrl = await getPlaybackUrl(recording.s3_key, 3600)
     } catch (err) {
       console.error('Failed to generate signed URL:', err)
     }

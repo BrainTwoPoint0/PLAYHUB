@@ -143,20 +143,18 @@ describe('GET /api/start/[cameraId]', () => {
     const res = await GET(makeRequest('GET'), makeRouteContext())
     const json = await res.json()
 
-    // 2 KWD * 2.35 GBP fallback = 4.7
-    expect(json.chargePrice).toBe(4.7)
-    expect(json.chargeCurrency).toBe('GBP')
+    // Fallback rate when FX API is down
+    expect(json.kwdToGbpRate).toBe(2.35)
+    expect(json.currency).toBe('KWD')
   })
 
-  it('returns chargePrice in GBP when venue currency is KWD', async () => {
+  it('returns KWD price with GBP conversion rate', async () => {
     const res = await GET(makeRequest('GET'), makeRouteContext())
     const json = await res.json()
 
-    expect(json.chargeCurrency).toBe('GBP')
-    // 2 KWD * 2.5 rate = 5.0 GBP
-    expect(json.chargePrice).toBe(5)
-    expect(json.price).toBe(2)
     expect(json.currency).toBe('KWD')
+    expect(json.pricePerHour).toBe(2)
+    expect(json.kwdToGbpRate).toBe(2.5)
   })
 
   it('uses cached rate within TTL', async () => {
@@ -171,10 +169,10 @@ describe('GET /api/start/[cameraId]', () => {
     const json = await res.json()
 
     // Still uses cached 2.5, not 999
-    expect(json.chargePrice).toBe(5) // 2 * 2.5
+    expect(json.kwdToGbpRate).toBe(2.5)
   })
 
-  it('returns same currency when venue is GBP', async () => {
+  it('returns same currency when venue is GBP (no conversion)', async () => {
     billingChain.maybeSingle.mockResolvedValue({
       data: {
         default_billable_amount: 10,
@@ -188,8 +186,9 @@ describe('GET /api/start/[cameraId]', () => {
     const res = await GET(makeRequest('GET'), makeRouteContext())
     const json = await res.json()
 
-    expect(json.chargePrice).toBe(10)
-    expect(json.chargeCurrency).toBe('GBP')
+    expect(json.pricePerHour).toBe(10)
+    expect(json.currency).toBe('GBP')
+    expect(json.kwdToGbpRate).toBeUndefined()
   })
 
   it('returns 404 when camera not found', async () => {

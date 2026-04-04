@@ -66,7 +66,9 @@ export async function getAuthUser() {
     // Try refreshing the session before giving up — this handles the
     // Netlify race condition where middleware cookies don't propagate.
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       if (user) {
         return {
           user: { id: user.id, email: user.email ?? undefined },

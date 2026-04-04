@@ -160,14 +160,19 @@ export async function getFileMetadata(s3Key: string): Promise<{
 // ============================================================================
 
 /**
- * Generate a signed URL for video playback
- * @param s3Key - The S3 key of the video
- * @param expiresInSeconds - URL validity (default 4 hours)
+ * Generate a signed URL for video playback.
+ * Uses CloudFront when configured (saves ~$80/mo in S3 egress),
+ * falls back to S3 presigned URLs for local dev.
  */
 export async function getPlaybackUrl(
   s3Key: string,
   expiresInSeconds: number = 4 * 60 * 60
 ): Promise<string> {
+  if (process.env.CLOUDFRONT_DOMAIN) {
+    const { getPlaybackUrl: getCfUrl } = await import('@/lib/cloudfront/signer')
+    return getCfUrl(s3Key, expiresInSeconds)
+  }
+
   const command = new GetObjectCommand({
     Bucket: S3_BUCKET,
     Key: s3Key,
