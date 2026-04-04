@@ -67,7 +67,7 @@ async function checkS3(): Promise<ServiceStatus> {
         client.send(
           new HeadObjectCommand({
             Bucket: process.env.S3_RECORDINGS_BUCKET!,
-            Key: '_health',
+            Key: 'recordings/_health',
           })
         ),
         CHECK_TIMEOUT
