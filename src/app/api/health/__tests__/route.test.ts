@@ -41,6 +41,7 @@ vi.mock('stripe', () => ({
 }))
 
 import { GET } from '@/app/api/health/route'
+import { spiideoHealthCache } from '@/app/api/health/spiideo-cache'
 import { testConnection } from '@/lib/spiideo/client'
 import { createServiceClient } from '@/lib/supabase/server'
 
@@ -74,6 +75,7 @@ describe('GET /api/health', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.RESEND_API_KEY = 'rk_test_fake'
+    spiideoHealthCache.reset()
   })
 
   it('returns 200 and healthy when all services are up', async () => {

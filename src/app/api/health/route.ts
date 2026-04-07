@@ -28,26 +28,37 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([promise, timeout])
 }
 
+// Cache Spiideo health result for 5 minutes to avoid hitting their rate limit
+import { spiideoHealthCache } from './spiideo-cache'
+
 async function checkSpiideo(): Promise<ServiceStatus> {
+  const cached = spiideoHealthCache.get()
+  if (cached) return { ...cached, latencyMs: 0 }
+
   const start = Date.now()
   try {
     const { testConnection } = await import('@/lib/spiideo/client')
     const result = await withTimeout(testConnection(), CHECK_TIMEOUT)
     if (!result.success) throw new Error(result.error || 'Connection failed')
-    return {
+    const status: ServiceStatus = {
       name: 'spiideo',
       status: 'healthy',
       latencyMs: Date.now() - start,
       critical: true,
     }
+    spiideoHealthCache.set(status, 5 * 60 * 1000)
+    return status
   } catch (err) {
-    return {
+    const status: ServiceStatus = {
       name: 'spiideo',
       status: 'unhealthy',
       latencyMs: Date.now() - start,
       error: err instanceof Error ? err.message : 'Unknown error',
       critical: true,
     }
+    // Cache unhealthy for 5 minutes to avoid compounding rate limits
+    spiideoHealthCache.set(status, 5 * 60 * 1000)
+    return status
   }
 }
 
