@@ -44,7 +44,7 @@ async function checkSpiideo(): Promise<ServiceStatus> {
       name: 'spiideo',
       status: 'healthy',
       latencyMs: Date.now() - start,
-      critical: true,
+      critical: false,
     }
     spiideoHealthCache.set(status, 5 * 60 * 1000)
     return status
@@ -54,7 +54,7 @@ async function checkSpiideo(): Promise<ServiceStatus> {
       status: 'unhealthy',
       latencyMs: Date.now() - start,
       error: err instanceof Error ? err.message : 'Unknown error',
-      critical: true,
+      critical: false,
     }
     // Cache unhealthy for 5 minutes to avoid compounding rate limits
     spiideoHealthCache.set(status, 5 * 60 * 1000)

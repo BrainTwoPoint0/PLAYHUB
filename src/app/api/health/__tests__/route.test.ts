@@ -89,7 +89,7 @@ describe('GET /api/health', () => {
     expect(body.uptime).toBeGreaterThanOrEqual(0)
   })
 
-  it('returns 503 when a critical service (spiideo) is down', async () => {
+  it('returns 200 degraded when spiideo is down (non-critical)', async () => {
     mockAllHealthy()
     vi.mocked(testConnection).mockResolvedValue({
       success: false,
@@ -99,8 +99,8 @@ describe('GET /api/health', () => {
 
     const { status, body } = await parseResponse(await GET())
 
-    expect(status).toBe(503)
-    expect(body.status).toBe('unhealthy')
+    expect(status).toBe(200)
+    expect(body.status).toBe('degraded')
     const spiideo = body.services.find((s: any) => s.name === 'spiideo')
     expect(spiideo.status).toBe('unhealthy')
   })
