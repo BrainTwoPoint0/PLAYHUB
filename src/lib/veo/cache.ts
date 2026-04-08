@@ -105,6 +105,7 @@ export async function writeCachedClubData(
   data: { clubName: string; teams: (VeoTeam & { members: VeoMember[] })[] }
 ): Promise<void> {
   const supabase = createServiceClient() as any
+  const now = new Date().toISOString()
 
   // Upsert club record
   const { error: clubError } = await supabase.from('playhub_veo_clubs').upsert(
@@ -113,48 +114,58 @@ export async function writeCachedClubData(
       club_slug: clubSlug,
       name: data.clubName,
       team_count: data.teams.length,
-      last_synced_at: new Date().toISOString(),
+      last_synced_at: now,
       sync_status: 'success',
       sync_error: null,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     },
     { onConflict: 'club_slug' }
   )
   if (clubError) throw new Error(`Failed to upsert club: ${clubError.message}`)
 
-  // Delete old members then teams for this club
-  const { error: delMembersError } = await supabase
-    .from('playhub_veo_members')
-    .delete()
-    .eq('veo_club_slug', veoClubSlug)
-  if (delMembersError)
-    throw new Error(`Failed to delete members: ${delMembersError.message}`)
-
-  const { error: delTeamsError } = await supabase
-    .from('playhub_veo_teams')
-    .delete()
-    .eq('veo_club_slug', veoClubSlug)
-  if (delTeamsError)
-    throw new Error(`Failed to delete teams: ${delTeamsError.message}`)
-
-  // Insert fresh teams
+  // Upsert teams (uses unique constraint: veo_club_slug, veo_team_slug)
   if (data.teams.length > 0) {
     const { error: teamsError } = await supabase
       .from('playhub_veo_teams')
-      .insert(
+      .upsert(
         data.teams.map((t) => ({
           veo_team_id: t.id,
           veo_team_slug: t.slug,
           veo_club_slug: veoClubSlug,
           name: t.name,
           member_count: t.members.length,
-        }))
+        })),
+        { onConflict: 'veo_club_slug,veo_team_slug' }
       )
     if (teamsError)
-      throw new Error(`Failed to insert teams: ${teamsError.message}`)
+      throw new Error(`Failed to upsert teams: ${teamsError.message}`)
   }
 
-  // Insert fresh members
+  // Delete stale teams no longer in Veo
+  const incomingTeamSlugs = data.teams.map((t) => t.slug)
+  const { data: existingTeams } = await supabase
+    .from('playhub_veo_teams')
+    .select('veo_team_slug')
+    .eq('veo_club_slug', veoClubSlug)
+
+  const staleTeams = (existingTeams || [])
+    .map((t: any) => t.veo_team_slug)
+    .filter((slug: string) => !incomingTeamSlugs.includes(slug))
+
+  if (staleTeams.length > 0) {
+    await supabase
+      .from('playhub_veo_members')
+      .delete()
+      .eq('veo_club_slug', veoClubSlug)
+      .in('veo_team_slug', staleTeams)
+    await supabase
+      .from('playhub_veo_teams')
+      .delete()
+      .eq('veo_club_slug', veoClubSlug)
+      .in('veo_team_slug', staleTeams)
+  }
+
+  // Upsert members (uses unique constraint: veo_club_slug, veo_team_slug, veo_member_id)
   const allMembers = data.teams.flatMap((t) =>
     t.members.map((m) => ({
       veo_member_id: m.id,
@@ -164,16 +175,46 @@ export async function writeCachedClubData(
       name: m.name || null,
       status: m.status || null,
       permission_role: m.permission_role || null,
-      last_seen_at: new Date().toISOString(),
+      last_seen_at: now,
     }))
   )
 
   if (allMembers.length > 0) {
-    const { error: membersError } = await supabase
-      .from('playhub_veo_members')
-      .insert(allMembers)
-    if (membersError)
-      throw new Error(`Failed to insert members: ${membersError.message}`)
+    const BATCH_SIZE = 100
+    for (let i = 0; i < allMembers.length; i += BATCH_SIZE) {
+      const batch = allMembers.slice(i, i + BATCH_SIZE)
+      const { error: membersError } = await supabase
+        .from('playhub_veo_members')
+        .upsert(batch, {
+          onConflict: 'veo_club_slug,veo_team_slug,veo_member_id',
+        })
+      if (membersError)
+        throw new Error(`Failed to upsert members: ${membersError.message}`)
+    }
+  }
+
+  // Delete stale members no longer in Veo
+  const incomingMemberKeys = new Set(
+    allMembers.map(
+      (m) => `${m.veo_club_slug}:${m.veo_team_slug}:${m.veo_member_id}`
+    )
+  )
+  const { data: existingMembers } = await supabase
+    .from('playhub_veo_members')
+    .select('id, veo_club_slug, veo_team_slug, veo_member_id')
+    .eq('veo_club_slug', veoClubSlug)
+
+  const staleMemberIds = (existingMembers || [])
+    .filter(
+      (m: any) =>
+        !incomingMemberKeys.has(
+          `${m.veo_club_slug}:${m.veo_team_slug}:${m.veo_member_id}`
+        )
+    )
+    .map((m: any) => m.id)
+
+  if (staleMemberIds.length > 0) {
+    await supabase.from('playhub_veo_members').delete().in('id', staleMemberIds)
   }
 }
 
