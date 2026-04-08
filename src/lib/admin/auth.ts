@@ -1,6 +1,11 @@
-// Admin authentication utilities
+// Admin authentication and management utilities
 
 import { createServiceClient } from '@/lib/supabase/server'
+
+/** Slug must be lowercase alphanumeric with hyphens, no leading/trailing hyphens */
+export const SLUG_REGEX = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/
+
+export const VALID_ORG_TYPES = ['venue', 'league', 'academy', 'group'] as const
 
 /**
  * Check if a user is a platform admin
@@ -215,6 +220,8 @@ export async function getAllOrganizations() {
       slug,
       type,
       logo_url,
+      description,
+      location,
       is_active,
       is_verified,
       marketplace_enabled,
@@ -275,12 +282,38 @@ export async function setParentOrg(
 ) {
   const supabase = createServiceClient() as any
 
+  // Prevent self-reference
+  if (parentOrgId && childOrgId === parentOrgId) {
+    return { success: false, error: 'An organization cannot be its own parent' }
+  }
+
+  // Validate parent is a group (if setting a parent)
+  if (parentOrgId) {
+    const { data: parent } = await supabase
+      .from('organizations')
+      .select('id, type')
+      .eq('id', parentOrgId)
+      .single()
+
+    if (!parent) {
+      return { success: false, error: 'Parent organization not found' }
+    }
+    if (parent.type !== 'group') {
+      return { success: false, error: 'Parent organization must be a group' }
+    }
+  }
+
   const { error } = await supabase
     .from('organizations')
     .update({ parent_organization_id: parentOrgId })
     .eq('id', childOrgId)
 
-  return { success: !error, error: error?.message }
+  if (error) {
+    console.error('Failed to set parent org:', error)
+    return { success: false, error: 'Failed to update parent organization' }
+  }
+
+  return { success: true }
 }
 
 /**
@@ -355,6 +388,241 @@ export async function togglePlatformAdmin(profileId: string, isAdmin: boolean) {
 }
 
 /**
+ * Create a new organization
+ */
+export async function createOrganization(data: {
+  name: string
+  slug: string
+  type: string
+  description?: string | null
+  location?: string | null
+  logo_url?: string | null
+  parent_organization_id?: string | null
+  feature_recordings?: boolean
+  feature_streaming?: boolean
+  feature_graphic_packages?: boolean
+  marketplace_enabled?: boolean
+}): Promise<{ success: boolean; organization?: any; error?: string }> {
+  const supabase = createServiceClient() as any
+
+  // Check slug uniqueness
+  const { data: existing } = await supabase
+    .from('organizations')
+    .select('id')
+    .eq('slug', data.slug)
+    .maybeSingle()
+
+  if (existing) {
+    return { success: false, error: 'Slug already in use' }
+  }
+
+  // If parent provided, verify it exists and is a group
+  if (data.parent_organization_id) {
+    const { data: parent } = await supabase
+      .from('organizations')
+      .select('id, type')
+      .eq('id', data.parent_organization_id)
+      .single()
+
+    if (!parent) {
+      return { success: false, error: 'Parent organization not found' }
+    }
+    if (parent.type !== 'group') {
+      return { success: false, error: 'Parent organization must be a group' }
+    }
+  }
+
+  const { data: org, error } = await supabase
+    .from('organizations')
+    .insert({
+      name: data.name.trim(),
+      slug: data.slug,
+      type: data.type,
+      description: data.description || null,
+      location: data.location || null,
+      logo_url: data.logo_url || null,
+      parent_organization_id: data.parent_organization_id || null,
+      feature_recordings: data.feature_recordings ?? false,
+      feature_streaming: data.feature_streaming ?? false,
+      feature_graphic_packages: data.feature_graphic_packages ?? false,
+      marketplace_enabled: data.marketplace_enabled ?? false,
+      is_active: true,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Failed to create organization:', error)
+    // Check for unique constraint violation on slug
+    if (error.code === '23505') {
+      return { success: false, error: 'Slug already in use' }
+    }
+    return { success: false, error: 'Failed to create organization' }
+  }
+
+  return { success: true, organization: org }
+}
+
+/**
+ * Update an existing organization
+ */
+export async function updateOrganization(
+  orgId: string,
+  data: {
+    name?: string
+    slug?: string
+    type?: string
+    description?: string | null
+    location?: string | null
+    logo_url?: string | null
+    is_active?: boolean
+    is_verified?: boolean
+  }
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = createServiceClient() as any
+
+  // If slug is changing, check uniqueness
+  if (data.slug) {
+    const { data: existing } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('slug', data.slug)
+      .neq('id', orgId)
+      .maybeSingle()
+
+    if (existing) {
+      return { success: false, error: 'Slug already in use' }
+    }
+  }
+
+  // If changing type away from 'group', check for existing children
+  if (data.type && data.type !== 'group') {
+    const { data: children } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('parent_organization_id', orgId)
+      .limit(1)
+
+    if (children && children.length > 0) {
+      return {
+        success: false,
+        error: 'Cannot change type from group while child organizations exist',
+      }
+    }
+  }
+
+  // Build update object, only include defined fields
+  const updates: Record<string, any> = {}
+  if (data.name !== undefined) updates.name = data.name.trim()
+  if (data.slug !== undefined) updates.slug = data.slug
+  if (data.type !== undefined) updates.type = data.type
+  if (data.description !== undefined) updates.description = data.description
+  if (data.location !== undefined) updates.location = data.location
+  if (data.logo_url !== undefined) updates.logo_url = data.logo_url
+  if (data.is_active !== undefined) updates.is_active = data.is_active
+  if (data.is_verified !== undefined) updates.is_verified = data.is_verified
+
+  if (Object.keys(updates).length === 0) {
+    return { success: true }
+  }
+
+  const { error } = await supabase
+    .from('organizations')
+    .update(updates)
+    .eq('id', orgId)
+
+  if (error) {
+    console.error('Failed to update organization:', error)
+    if (error.code === '23505') {
+      return { success: false, error: 'Slug already in use' }
+    }
+    return { success: false, error: 'Failed to update organization' }
+  }
+
+  return { success: true }
+}
+
+/**
+ * Get all scene-to-venue mappings
+ */
+export async function getAllSceneMappings() {
+  const supabase = createServiceClient() as any
+
+  const { data } = await supabase
+    .from('playhub_scene_venue_mapping')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  return data || []
+}
+
+/**
+ * Assign or unassign a Spiideo scene to a venue
+ */
+export async function upsertSceneMapping(data: {
+  scene_id: string
+  organization_id: string | null
+  scene_name?: string | null
+}): Promise<{ success: boolean; error?: string }> {
+  const supabase = createServiceClient() as any
+
+  if (!data.organization_id) {
+    // Unassign: delete the mapping
+    const { error } = await supabase
+      .from('playhub_scene_venue_mapping')
+      .delete()
+      .eq('scene_id', data.scene_id)
+
+    if (error) {
+      console.error('Failed to unassign scene:', error)
+      return { success: false, error: 'Failed to unassign scene' }
+    }
+    return { success: true }
+  }
+
+  // Assign or reassign
+  const { error } = await supabase
+    .from('playhub_scene_venue_mapping')
+    .upsert(
+      {
+        scene_id: data.scene_id,
+        organization_id: data.organization_id,
+        scene_name: data.scene_name || null,
+      },
+      { onConflict: 'scene_id' }
+    )
+
+  if (error) {
+    console.error('Failed to assign scene:', error)
+    return { success: false, error: 'Failed to assign scene' }
+  }
+  return { success: true }
+}
+
+/**
+ * Fetch all scenes from Spiideo API
+ */
+export async function fetchSpiideoScenes(): Promise<{
+  scenes: { id: string; name: string; accountId: string }[]
+  error?: string
+}> {
+  try {
+    const { getScenes, getAccountConfig } = await import(
+      '@/lib/spiideo/client'
+    )
+    const config = getAccountConfig()
+    if (!config.accountId) {
+      return { scenes: [], error: 'Spiideo account not configured' }
+    }
+    const response = await getScenes(config.accountId)
+    return { scenes: response.content || [] }
+  } catch (err: any) {
+    console.error('Failed to fetch Spiideo scenes:', err)
+    return { scenes: [], error: 'Failed to connect to Spiideo' }
+  }
+}
+
+/**
  * Delete a user (auth account and profile)
  * - Prevents deleting platform admins (must remove admin status first)
  * - Prevents self-deletion
@@ -403,7 +671,7 @@ export async function deleteUser(
       console.error('Error deleting profile:', profileDeleteError)
       return {
         success: false,
-        error: profileDeleteError.message || 'Failed to delete profile',
+        error: 'Failed to delete profile',
       }
     }
 
@@ -427,7 +695,7 @@ export async function deleteUser(
     console.error('Exception deleting user:', err)
     return {
       success: false,
-      error: err?.message || 'Unexpected error deleting user',
+      error: 'Failed to delete user',
     }
   }
 }

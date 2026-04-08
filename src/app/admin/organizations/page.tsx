@@ -6,6 +6,13 @@ import {
   CardContent,
   Skeleton,
   EmptyState,
+  Input,
+  Label,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
 } from '@braintwopoint0/playback-commons/ui'
 import {
   Layers,
@@ -25,6 +32,9 @@ import {
   Trophy,
   GraduationCap,
   ArrowRight,
+  Pencil,
+  Check,
+  X,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -35,6 +45,8 @@ interface Organization {
   slug: string | null
   type: string
   logo_url: string | null
+  description: string | null
+  location: string | null
   is_active: boolean
   is_verified: boolean
   marketplace_enabled: boolean
@@ -118,6 +130,38 @@ export default function AdminOrganizationsPage() {
   const [activeTab, setActiveTab] = useState<'hierarchy' | 'access'>(
     'hierarchy'
   )
+
+  // Create organization form state
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    slug: '',
+    type: 'venue' as string,
+    description: '',
+    location: '',
+    logo_url: '',
+    parent_organization_id: '' as string,
+    feature_recordings: false,
+    feature_streaming: false,
+    feature_graphic_packages: false,
+    marketplace_enabled: false,
+  })
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
+
+  // Edit organization state
+  const [editingOrgId, setEditingOrgId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({
+    name: '',
+    slug: '',
+    type: '' as string,
+    description: '',
+    location: '',
+    logo_url: '',
+    is_active: true,
+    is_verified: false,
+  })
+  const [editError, setEditError] = useState<string | null>(null)
 
   // New venue access form state
   const [showAccessForm, setShowAccessForm] = useState(false)
@@ -263,6 +307,122 @@ export default function AdminOrganizationsPage() {
     }
   }
 
+  // ── Create / Edit Org ──────────────────────────────────────────
+
+  function slugify(name: string) {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+  }
+
+  function handleCreateNameChange(name: string) {
+    setCreateForm((f) => ({
+      ...f,
+      name,
+      ...(slugManuallyEdited ? {} : { slug: slugify(name) }),
+    }))
+  }
+
+  async function handleCreateOrg() {
+    setCreateError(null)
+    if (!createForm.name.trim()) {
+      setCreateError('Name is required')
+      return
+    }
+    if (!createForm.slug) {
+      setCreateError('Slug is required')
+      return
+    }
+    setUpdating('create-org')
+    try {
+      const res = await fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'createOrganization', orgData: createForm }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        setCreateError(data.error || 'Failed to create organization')
+        return
+      }
+      // Reset form and refetch
+      setShowCreateForm(false)
+      setSlugManuallyEdited(false)
+      setCreateForm({
+        name: '',
+        slug: '',
+        type: 'venue',
+        description: '',
+        location: '',
+        logo_url: '',
+        parent_organization_id: '',
+        feature_recordings: false,
+        feature_streaming: false,
+        feature_graphic_packages: false,
+        marketplace_enabled: false,
+      })
+      await fetchData()
+    } catch (err) {
+      setCreateError('Network error')
+    } finally {
+      setUpdating(null)
+    }
+  }
+
+  function startEditOrg(org: Organization) {
+    setEditingOrgId(org.id)
+    setEditError(null)
+    setEditForm({
+      name: org.name,
+      slug: org.slug || '',
+      type: org.type,
+      description: org.description || '',
+      location: org.location || '',
+      logo_url: org.logo_url || '',
+      is_active: org.is_active,
+      is_verified: org.is_verified,
+    })
+    // Expand the card so the edit form is visible
+    setExpandedOrg(org.id)
+  }
+
+  async function handleUpdateOrg() {
+    if (!editingOrgId) return
+    setEditError(null)
+    if (!editForm.name.trim()) {
+      setEditError('Name is required')
+      return
+    }
+    if (!editForm.slug) {
+      setEditError('Slug is required')
+      return
+    }
+    setUpdating(`edit-${editingOrgId}`)
+    try {
+      const res = await fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'updateOrganization',
+          orgId: editingOrgId,
+          updates: editForm,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        setEditError(data.error || 'Failed to update organization')
+        return
+      }
+      setEditingOrgId(null)
+      await fetchData()
+    } catch (err) {
+      setEditError('Network error')
+    } finally {
+      setUpdating(null)
+    }
+  }
+
   // ── Helpers ────────────────────────────────────────────────────
 
   const orgById = (id: string) => orgs.find((o) => o.id === id)
@@ -305,7 +465,209 @@ export default function AdminOrganizationsPage() {
             &middot; {venueAccess.length} venue access entries
           </p>
         </div>
+        {!showCreateForm && (
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-muted-foreground/30 text-sm text-muted-foreground hover:border-[var(--timberwolf)]/40 hover:text-[var(--timberwolf)] transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Create Organization
+          </button>
+        )}
       </div>
+
+      {/* Create Organization Form */}
+      {showCreateForm && (
+        <Card className="mb-6">
+          <CardContent className="p-4 space-y-4">
+            <h3 className="font-semibold text-sm">New Organization</h3>
+
+            {createError && (
+              <div className="px-3 py-2 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                {createError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground font-medium">
+                  Name *
+                </Label>
+                <Input
+                  value={createForm.name}
+                  onChange={(e) => handleCreateNameChange(e.target.value)}
+                  placeholder="e.g. The Sevens"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground font-medium">
+                  Slug *
+                </Label>
+                <Input
+                  value={createForm.slug}
+                  onChange={(e) => {
+                    setSlugManuallyEdited(true)
+                    setCreateForm((f) => ({ ...f, slug: e.target.value }))
+                  }}
+                  placeholder="the-sevens"
+                  className="font-mono"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground font-medium">
+                  Type *
+                </Label>
+                <Select
+                  value={createForm.type}
+                  onValueChange={(val) =>
+                    setCreateForm((f) => ({ ...f, type: val }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(TYPE_CONFIG).map(([type, config]) => (
+                      <SelectItem key={type} value={type}>
+                        {config.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground font-medium">
+                  Location
+                </Label>
+                <Input
+                  value={createForm.location}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({ ...f, location: e.target.value }))
+                  }
+                  placeholder="e.g. Dubai, UAE"
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-xs text-muted-foreground font-medium">
+                  Description
+                </Label>
+                <Input
+                  value={createForm.description}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({
+                      ...f,
+                      description: e.target.value,
+                    }))
+                  }
+                  placeholder="Brief description..."
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground font-medium">
+                  Logo URL
+                </Label>
+                <Input
+                  value={createForm.logo_url}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({ ...f, logo_url: e.target.value }))
+                  }
+                  placeholder="https://..."
+                />
+              </div>
+              {createForm.type !== 'group' && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground font-medium">
+                    Parent Organization
+                  </Label>
+                  <Select
+                    value={createForm.parent_organization_id || '_none'}
+                    onValueChange={(val) =>
+                      setCreateForm((f) => ({
+                        ...f,
+                        parent_organization_id: val === '_none' ? '' : val,
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none">
+                        No parent (independent)
+                      </SelectItem>
+                      {groupOrgs.map((g) => (
+                        <SelectItem key={g.id} value={g.id}>
+                          {g.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+
+            {/* Feature toggles */}
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
+                Features
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {featureFlags.map((feature) => {
+                  const isEnabled =
+                    createForm[feature.key as keyof typeof createForm] as boolean
+                  const Icon = feature.icon
+                  return (
+                    <button
+                      key={feature.key}
+                      type="button"
+                      onClick={() =>
+                        setCreateForm((f) => ({
+                          ...f,
+                          [feature.key]: !isEnabled,
+                        }))
+                      }
+                      className={`flex items-center gap-2 px-3 py-2 rounded-md border text-xs font-medium transition-all ${
+                        isEnabled
+                          ? 'border-green-500/30 bg-green-500/10 text-green-400'
+                          : 'border-border bg-muted/20 text-muted-foreground opacity-60'
+                      } hover:opacity-100 cursor-pointer`}
+                    >
+                      <Icon className="h-3 w-3 shrink-0" />
+                      {feature.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setShowCreateForm(false)
+                  setCreateError(null)
+                  setSlugManuallyEdited(false)
+                }}
+                className="px-3 py-1.5 text-sm text-muted-foreground hover:text-[var(--timberwolf)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateOrg}
+                disabled={
+                  updating === 'create-org' ||
+                  !createForm.name.trim() ||
+                  !createForm.slug
+                }
+                className="px-4 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-500 text-white rounded-md transition-colors disabled:opacity-40"
+              >
+                {updating === 'create-org'
+                  ? 'Creating...'
+                  : 'Create Organization'}
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Type breakdown */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
@@ -378,6 +740,16 @@ export default function AdminOrganizationsPage() {
                   onToggleFeature={toggleFeature}
                   onSetParent={handleSetParent}
                   isChild={false}
+                  editingOrgId={editingOrgId}
+                  editForm={editForm}
+                  editError={editError}
+                  onStartEdit={() => startEditOrg(org)}
+                  onCancelEdit={() => {
+                    setEditingOrgId(null)
+                    setEditError(null)
+                  }}
+                  onSaveEdit={handleUpdateOrg}
+                  onEditFormChange={setEditForm}
                 />
                 {/* Child orgs (indented) */}
                 {org.children?.length > 0 &&
@@ -401,6 +773,16 @@ export default function AdminOrganizationsPage() {
                           onToggleFeature={toggleFeature}
                           onSetParent={handleSetParent}
                           isChild={true}
+                          editingOrgId={editingOrgId}
+                          editForm={editForm}
+                          editError={editError}
+                          onStartEdit={() => startEditOrg(childOrg)}
+                          onCancelEdit={() => {
+                            setEditingOrgId(null)
+                            setEditError(null)
+                          }}
+                          onSaveEdit={handleUpdateOrg}
+                          onEditFormChange={setEditForm}
                         />
                       </div>
                     )
@@ -660,6 +1042,13 @@ function OrgCard({
   onToggleFeature,
   onSetParent,
   isChild,
+  editingOrgId,
+  editForm,
+  editError,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onEditFormChange,
 }: {
   org: Organization
   orgs: Organization[]
@@ -670,9 +1059,26 @@ function OrgCard({
   onToggleFeature: (orgId: string, key: string, val: boolean) => void
   onSetParent: (childId: string, parentId: string | null) => void
   isChild: boolean
+  editingOrgId: string | null
+  editForm: {
+    name: string
+    slug: string
+    type: string
+    description: string
+    location: string
+    logo_url: string
+    is_active: boolean
+    is_verified: boolean
+  }
+  editError: string | null
+  onStartEdit: () => void
+  onCancelEdit: () => void
+  onSaveEdit: () => void
+  onEditFormChange: (fn: any) => void
 }) {
   const isExpanded = expandedOrg === org.id
   const hasChildren = org.children?.length > 0
+  const isEditing = editingOrgId === org.id
 
   return (
     <Card className={isChild ? 'border-muted-foreground/15' : ''}>
@@ -734,11 +1140,18 @@ function OrgCard({
             >
               {org.is_active ? 'Active' : 'Inactive'}
             </span>
+            <button
+              onClick={onStartEdit}
+              className="p-1.5 text-muted-foreground hover:text-[var(--timberwolf)] transition-colors"
+              title="Edit organization"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
 
         {/* Expanded content */}
-        {isExpanded && (
+        {isExpanded && !isEditing && (
           <div className="mt-4 space-y-4 pt-4 border-t border-border/50">
             {/* Feature toggles */}
             <div>
@@ -801,6 +1214,169 @@ function OrgCard({
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Edit mode */}
+        {isExpanded && isEditing && (
+          <div className="mt-4 space-y-4 pt-4 border-t border-border/50">
+            {editError && (
+              <div className="px-3 py-2 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                {editError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground font-medium">
+                  Name
+                </Label>
+                <Input
+                  value={editForm.name}
+                  onChange={(e) =>
+                    onEditFormChange((f: any) => ({
+                      ...f,
+                      name: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground font-medium">
+                  Slug
+                </Label>
+                <Input
+                  value={editForm.slug}
+                  onChange={(e) =>
+                    onEditFormChange((f: any) => ({
+                      ...f,
+                      slug: e.target.value,
+                    }))
+                  }
+                  className="font-mono"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground font-medium">
+                  Type
+                </Label>
+                <Select
+                  value={editForm.type}
+                  onValueChange={(val) =>
+                    onEditFormChange((f: any) => ({ ...f, type: val }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(TYPE_CONFIG).map(([type, config]) => (
+                      <SelectItem key={type} value={type}>
+                        {config.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground font-medium">
+                  Location
+                </Label>
+                <Input
+                  value={editForm.location}
+                  onChange={(e) =>
+                    onEditFormChange((f: any) => ({
+                      ...f,
+                      location: e.target.value,
+                    }))
+                  }
+                  placeholder="e.g. Dubai, UAE"
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-xs text-muted-foreground font-medium">
+                  Description
+                </Label>
+                <Input
+                  value={editForm.description}
+                  onChange={(e) =>
+                    onEditFormChange((f: any) => ({
+                      ...f,
+                      description: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground font-medium">
+                  Logo URL
+                </Label>
+                <Input
+                  value={editForm.logo_url}
+                  onChange={(e) =>
+                    onEditFormChange((f: any) => ({
+                      ...f,
+                      logo_url: e.target.value,
+                    }))
+                  }
+                  placeholder="https://..."
+                />
+              </div>
+            </div>
+
+            {/* Status toggles */}
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editForm.is_active}
+                  onChange={(e) =>
+                    onEditFormChange((f: any) => ({
+                      ...f,
+                      is_active: e.target.checked,
+                    }))
+                  }
+                  className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
+                />
+                <span className="text-[var(--timberwolf)]">Active</span>
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editForm.is_verified}
+                  onChange={(e) =>
+                    onEditFormChange((f: any) => ({
+                      ...f,
+                      is_verified: e.target.checked,
+                    }))
+                  }
+                  className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
+                />
+                <span className="text-[var(--timberwolf)]">Verified</span>
+              </label>
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={onCancelEdit}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-[var(--timberwolf)] transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+                Cancel
+              </button>
+              <button
+                onClick={onSaveEdit}
+                disabled={
+                  updating === `edit-${org.id}` ||
+                  !editForm.name.trim() ||
+                  !editForm.slug
+                }
+                className="flex items-center gap-1.5 px-4 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-500 text-white rounded-md transition-colors disabled:opacity-40"
+              >
+                <Check className="h-3.5 w-3.5" />
+                {updating === `edit-${org.id}` ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
           </div>
         )}
       </CardContent>

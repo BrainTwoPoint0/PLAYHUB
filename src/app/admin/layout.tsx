@@ -11,6 +11,7 @@ import {
   Users,
   Film,
   Layers,
+  Camera,
   ArrowLeft,
   Menu,
   X,
@@ -20,6 +21,7 @@ const navItems = [
   { href: '/admin', label: 'Dashboard', icon: BarChart3 },
   { href: '/admin/venues', label: 'Venues', icon: Building2 },
   { href: '/admin/organizations', label: 'Organizations', icon: Layers },
+  { href: '/admin/scenes', label: 'Scenes', icon: Camera },
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/recordings', label: 'Recordings', icon: Film },
 ]
