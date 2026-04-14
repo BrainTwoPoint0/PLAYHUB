@@ -5,6 +5,7 @@ import NavBar from '@/components/NavBar'
 import { Footer } from '@braintwopoint0/playback-commons/ui'
 import { AuthProvider } from '@braintwopoint0/playback-commons/auth'
 import { GotchaProvider } from '@/components/GotchaProvider'
+import { PostHogProvider } from '@/components/PostHogProvider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -28,11 +29,13 @@ export default function RootLayout({
       <body className={inter.className}>
         <GotchaProvider>
           <AuthProvider>
-            <div className="flex min-h-screen flex-col">
-              <NavBar />
-              <main className="flex-1">{children}</main>
-              <Footer />
-            </div>
+            <PostHogProvider>
+              <div className="flex min-h-screen flex-col">
+                <NavBar />
+                <main className="flex-1">{children}</main>
+                <Footer />
+              </div>
+            </PostHogProvider>
           </AuthProvider>
         </GotchaProvider>
       </body>
