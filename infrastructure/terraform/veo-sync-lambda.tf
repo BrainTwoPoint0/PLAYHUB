@@ -98,7 +98,7 @@ resource "aws_lambda_function" "veo_sync" {
   handler       = "index.handler"
   runtime       = "nodejs20.x"
   timeout       = 600
-  memory_size   = 2048
+  memory_size   = 1536
 
   filename         = "${path.module}/../lambda/veo-sync/dist.zip"
   source_code_hash = filebase64sha256("${path.module}/../lambda/veo-sync/dist.zip")
@@ -200,8 +200,8 @@ resource "aws_lambda_permission" "eventbridge_veo_cache_sync" {
 # EventBridge Rule — content precache every 2 hours (offset from cache-sync)
 resource "aws_cloudwatch_event_rule" "veo_content_precache_schedule" {
   name                = "${var.project_name}-veo-content-precache-schedule"
-  description         = "Pre-cache Veo match content (videos/highlights/stats) every 2 hours"
-  schedule_expression = "cron(30 */2 * * ? *)"
+  description         = "Pre-cache Veo match content (videos/highlights/stats) every 4 hours"
+  schedule_expression = "rate(4 hours)"
 
   tags = {
     Name        = "PLAYHUB Veo Content Precache Schedule"
