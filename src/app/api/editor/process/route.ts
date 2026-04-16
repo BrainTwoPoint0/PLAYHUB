@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 180 // 3 min timeout for GPU processing
 
 const MODAL_URL = process.env.NEXT_PUBLIC_MODAL_CROP_URL || ''
+const MODAL_SHARED_SECRET = process.env.MODAL_SHARED_SECRET || ''
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,11 +28,19 @@ export async function POST(request: NextRequest) {
 
     const contentLength = request.headers.get('content-length')
 
+    if (!MODAL_SHARED_SECRET) {
+      return NextResponse.json(
+        { error: 'Processing endpoint not configured' },
+        { status: 500 }
+      )
+    }
+
     const res = await fetch(MODAL_URL, {
       method: 'POST',
       body: body,
       headers: {
         'Content-Type': 'application/octet-stream',
+        'X-Modal-Auth': MODAL_SHARED_SECRET,
         ...(contentLength && { 'Content-Length': contentLength }),
       },
       // @ts-expect-error -- Node fetch supports duplex for streaming request bodies

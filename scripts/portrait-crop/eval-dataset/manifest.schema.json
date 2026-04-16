@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Portrait Crop Eval Dataset Manifest",
+  "type": "object",
+  "required": ["version", "clips"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "frozen_holdout": {
+      "type": "array",
+      "description": "Clip IDs locked as regression pin. Degrading these blocks the branch.",
+      "items": { "type": "string" }
+    },
+    "clips": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "file", "category", "leak_audit"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable identifier, e.g. veo_012958_goal"
+          },
+          "file": {
+            "type": "string",
+            "description": "Path relative to clips/ directory"
+          },
+          "category": {
+            "enum": ["goal", "passage", "edge", "cursed"],
+            "description": "Stratification bucket"
+          },
+          "subcategory": {
+            "type": "string",
+            "description": "e.g. keeper_long_ball, set_piece, corner_crowd, lens_flare, two_ball"
+          },
+          "hero": {
+            "type": "boolean",
+            "default": false,
+            "description": "If true, densely labeled every frame"
+          },
+          "label_fps": {
+            "type": "number",
+            "description": "Sampling rate of labels (usually 5, or source_fps for hero)"
+          },
+          "source": {
+            "type": "string",
+            "description": "Origin: veo_academy_cfa, veo_academy_sefa, spiideo_venue, etc."
+          },
+          "duration_seconds": { "type": "number" },
+          "leak_audit": {
+            "type": "object",
+            "required": ["forzasys_soccer", "veo_finetuned"],
+            "properties": {
+              "forzasys_soccer": {
+                "enum": ["clean", "unknown", "contaminated"],
+                "description": "Was this clip in the Forzasys training set? SoccerNet + Eliteserien ⇒ contaminated."
+              },
+              "veo_finetuned": {
+                "enum": ["clean", "unknown", "contaminated"],
+                "description": "Was this clip in the Veo fine-tune set? Cross-check against finetune_colab.py logs."
+              },
+              "notes": { "type": "string" }
+            }
+          },
+          "notes": { "type": "string" }
+        }
+      }
+    }
+  }
+}

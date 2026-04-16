@@ -10,7 +10,14 @@
 
 import { resolve, dirname, basename, extname } from 'path'
 import { fileURLToPath } from 'url'
-import { existsSync, statSync, writeFileSync, readdirSync, mkdirSync } from 'fs'
+import {
+  existsSync,
+  statSync,
+  writeFileSync,
+  readdirSync,
+  mkdirSync,
+  unlinkSync,
+} from 'fs'
 import { execSync } from 'child_process'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -29,8 +36,10 @@ const CROP_MAX_X = SRC_W - CROP_W // 1312 — max x offset
 const OUT_W = 1080
 const OUT_H = 1920
 
-// Detection
-const DETECT_FPS = 5
+// Detection — sample at video fps to avoid quantizing the smoothed signal
+// before FFmpeg sees it. Previously 5, which caused the crop filter's
+// per-second expression to throw away most of the smoothing work.
+const DETECT_FPS = 25
 
 // ── Validation ──────────────────────────────────────────────────────
 
@@ -156,8 +165,16 @@ const CENTER_CROP_X = Math.round(CROP_MAX_X / 2)
 const SG_POLY_ORDER = 2
 
 /**
- * Savitzky-Golay smoothing filter (symmetric).
- * Applied as post-processing to complete trajectory segments.
+ * Savitzky-Golay smoothing with boundary-adaptive (asymmetric) windows.
+ *
+ * At segment/clip edges the full symmetric window isn't available. The prior
+ * implementation mirror-reflected the data past the boundary, which creates a
+ * ghost-velocity artefact (the filter averages the real trailing samples with
+ * a time-reversed copy of them, introducing lag at every right edge).
+ *
+ * This version uses `computeAsymmetricSGCoefficients` with the window actually
+ * available at each index, so no synthetic samples are introduced. Interior
+ * frames keep the symmetric coefficients (cached).
  */
 function savitzkyGolaySmooth(
   data: number[],
@@ -168,28 +185,41 @@ function savitzkyGolaySmooth(
   const n = data.length
   if (n <= 1) return [...data]
 
-  // Clamp window to data size
   if (lookback + lookahead + 1 > n) {
     lookback = Math.floor((n - 1) * 0.8)
     lookahead = Math.floor((n - 1) * 0.2)
     if (lookback + lookahead < 1) return [...data]
   }
 
-  // Precompute SG coefficients for asymmetric window
-  // Window goes from -lookback to +lookahead, we evaluate at index 0 (current frame)
-  const coeffs = computeAsymmetricSGCoefficients(lookback, lookahead, polyOrder)
+  const symCoeffs = computeAsymmetricSGCoefficients(
+    lookback,
+    lookahead,
+    polyOrder
+  )
+
+  // Cache boundary coefficients by (lb,la) — each unique pair is recomputed
+  // at most once per call.
+  const boundaryCache = new Map<string, number[]>()
+  const getCoeffs = (lb: number, la: number): number[] => {
+    if (lb === lookback && la === lookahead) return symCoeffs
+    const key = `${lb},${la}`
+    const cached = boundaryCache.get(key)
+    if (cached) return cached
+    // Poly order must fit the (shrunken) window degrees of freedom.
+    const effectivePoly = Math.min(polyOrder, lb + la)
+    const coeffs = computeAsymmetricSGCoefficients(lb, la, effectivePoly)
+    boundaryCache.set(key, coeffs)
+    return coeffs
+  }
 
   const result: number[] = new Array(n)
-
   for (let i = 0; i < n; i++) {
+    const lb = Math.min(lookback, i)
+    const la = Math.min(lookahead, n - 1 - i)
+    const coeffs = getCoeffs(lb, la)
     let sum = 0
-    for (let j = -lookback; j <= lookahead; j++) {
-      let idx = i + j
-      // Mirror at boundaries
-      if (idx < 0) idx = -idx
-      if (idx >= n) idx = 2 * (n - 1) - idx
-      idx = Math.max(0, Math.min(n - 1, idx))
-      sum += coeffs[j + lookback] * data[idx]
+    for (let j = -lb; j <= la; j++) {
+      sum += coeffs[j + lb] * data[i + j]
     }
     result[i] = sum
   }
@@ -292,20 +322,32 @@ function invertMatrix(matrix: number[][]): number[][] {
 const DISCONTINUITY_THRESHOLD = 150 // px jump between adjacent detections = segment boundary
 const SG_WINDOW_HALF = 15 // symmetric window: 15 frames each side = 31 total (~1s at 30fps)
 
-/** Find segment boundaries where the crop target jumps sharply */
-function findSegmentBoundaries(perFrameTarget: number[]): number[] {
+/**
+ * Find segment boundaries from RAW detection deltas, not the interpolated
+ * per-frame target. The interpolation smooths real jumps into linear ramps,
+ * so discontinuity detection on the interpolated signal misses the actual
+ * signal it was meant to catch.
+ */
+function findSegmentBoundariesFromRaw(
+  rawPositions: { time: number; cropX: number }[],
+  fps: number,
+  totalFrames: number
+): number[] {
   const boundaries: number[] = [0]
 
-  for (let i = 1; i < perFrameTarget.length; i++) {
-    if (
-      Math.abs(perFrameTarget[i] - perFrameTarget[i - 1]) >
-      DISCONTINUITY_THRESHOLD
-    ) {
-      boundaries.push(i)
+  for (let i = 1; i < rawPositions.length; i++) {
+    const delta = Math.abs(rawPositions[i].cropX - rawPositions[i - 1].cropX)
+    if (delta > DISCONTINUITY_THRESHOLD) {
+      // Place the boundary at the frame containing the "after" detection —
+      // that's the frame the jump lands on.
+      const frameIdx = Math.round(rawPositions[i].time * fps)
+      if (frameIdx > 0 && frameIdx < totalFrames) {
+        boundaries.push(frameIdx)
+      }
     }
   }
 
-  boundaries.push(perFrameTarget.length)
+  boundaries.push(totalFrames)
   return boundaries
 }
 
@@ -378,7 +420,11 @@ function smoothPositions(
   const sceneFrames = new Set(sceneChanges.map((t) => Math.round(t * fps)))
 
   // ── Step 3: Segment at discontinuities + scene changes ──
-  const boundaries = findSegmentBoundaries(perFrameTarget)
+  const boundaries = findSegmentBoundariesFromRaw(
+    rawPositions,
+    fps,
+    totalFrames
+  )
 
   // Add scene change frames as boundaries too
   for (const sf of sceneFrames) {
@@ -468,13 +514,41 @@ function smoothPositions(
 
 // ── FFmpeg Crop ─────────────────────────────────────────────────────
 
-// timeVar: 't' for crop filter (time), 'T' for drawbox filter (where 't' = thickness)
+/**
+ * Write a per-frame FFmpeg sendcmd file driving the crop filter's `x` param.
+ * This replaces the old per-second nested if() expression, which quantized
+ * the smoothed signal at 1Hz regardless of video fps — destroying up to 95%
+ * of the SG filter's work before FFmpeg ever saw it.
+ *
+ * One command per frame. File is emitted at the timestamp boundary of the
+ * next frame so the crop value is the one chosen by smoothing for that frame.
+ */
+function writeSendcmdFile(
+  cropXPerFrame: number[],
+  fps: number,
+  filePath: string,
+  filterTarget: string
+): void {
+  const lines: string[] = []
+  let lastX = -1
+  for (let i = 0; i < cropXPerFrame.length; i++) {
+    const x = cropXPerFrame[i]
+    if (x === lastX) continue // Dedupe identical consecutive frames — smaller file
+    const t = i / fps
+    // Format: TIMESTAMP TARGET COMMAND ARG;
+    // sendcmd default flag is "enter" — fires when the timeline crosses TIMESTAMP.
+    lines.push(`${t.toFixed(6)} ${filterTarget} x ${x};`)
+    lastX = x
+  }
+  writeFileSync(filePath, lines.join('\n') + '\n')
+}
+
+// Kept only for the debug preview (visualization; quantization is acceptable).
 function buildCropExpression(
   cropXPerFrame: number[],
   fps: number,
   timeVar = 't'
 ): string {
-  // Group frames by second for a cleaner expression
   const secondPositions: number[] = []
   for (let sec = 0; sec * fps < cropXPerFrame.length; sec++) {
     const frameIdx = Math.round(sec * fps)
@@ -508,13 +582,23 @@ function runCrop(
   console.log('  Cropping to portrait...')
   const start = Date.now()
 
-  const cropExpr = buildCropExpression(cropXPerFrame, fps)
-  const filter = `crop=${CROP_W}:${SRC_H}:'${cropExpr}':0,scale=${OUT_W}:${OUT_H}`
+  // Initial x is the first smoothed position; sendcmd updates it per frame.
+  const initialX = cropXPerFrame[0] ?? Math.round(CROP_MAX_X / 2)
+  const cmdFile = `${outputPath}.sendcmd.txt`
+  writeSendcmdFile(cropXPerFrame, fps, cmdFile, 'crop')
 
-  execSync(
-    `ffmpeg -y -i "${inputPath}" -vf "${filter}" -c:v libx264 -preset fast -crf 20 -c:a aac -b:a 128k "${outputPath}"`,
-    { stdio: 'inherit', timeout: 5 * 60 * 1000 }
-  )
+  // sendcmd must come before the target filter in the chain. Target by
+  // filter name ("crop") — only one crop filter in this chain, so unambiguous.
+  const filter = `sendcmd=f='${cmdFile}',crop=${CROP_W}:${SRC_H}:${initialX}:0,scale=${OUT_W}:${OUT_H}`
+
+  try {
+    execSync(
+      `ffmpeg -y -i "${inputPath}" -vf "${filter}" -c:v libx264 -preset fast -crf 20 -c:a aac -b:a 128k "${outputPath}"`,
+      { stdio: 'inherit', timeout: 5 * 60 * 1000 }
+    )
+  } finally {
+    if (existsSync(cmdFile)) unlinkSync(cmdFile)
+  }
 
   const size = statSync(outputPath).size
   const elapsed = ((Date.now() - start) / 1000).toFixed(0)

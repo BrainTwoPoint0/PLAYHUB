@@ -37,6 +37,9 @@ import {
   X,
   GripVertical,
   Scissors,
+  Save,
+  Check,
+  AlertTriangle,
 } from 'lucide-react'
 
 /* ───────── constants ───────── */
@@ -72,6 +75,35 @@ export default function EditorPage() {
   const [trimEnd, setTrimEnd] = useState(0) // 0 = use full duration
   const [outroFile, setOutroFile] = useState<File | null>(null)
   const [outroThumb, setOutroThumb] = useState<string | null>(null)
+
+  /* ───────── Phase 3: portrait-crop persistence state ───────── */
+  // recordingId is the stable anchor for save/load; when present the job
+  // becomes a recording-linked row visible to org teammates (read-only).
+  const recordingId = searchParams.get('recordingId')
+  const [jobId, setJobId] = useState<string | null>(null)
+  // null = still checking the kill-switch; false = banner + disable CTAs.
+  const [portraitCropEnabled, setPortraitCropEnabled] = useState<
+    boolean | null
+  >(null)
+  // Metadata captured from the Modal detect response — fed through to save
+  // so the DB has codec fingerprints for the Veo-encoder-drift canary.
+  const lastDetectionMetaRef = useRef<{
+    codecFingerprint: Record<string, unknown> | null
+    modalInferenceMs: number | null
+    modalAppVersion: string | null
+  }>({ codecFingerprint: null, modalInferenceMs: null, modalAppVersion: null })
+  // Snapshot of the keyframes at the moment the AI produced them. Kept even
+  // across saves so the feedback log distinguishes "original detection vs
+  // current state" rather than "last save vs current state" — matters because
+  // resuming a saved edited job would otherwise record `accepted` on re-save.
+  const originallyDetectedRef = useRef<CropKeyframe[] | null>(null)
+  // Per-session dirty bit — flips true on any user-driven edit. Reset on
+  // detect / resume / successful save. Guards against the case where a user
+  // reopens a previously-edited job and re-saves without touching anything.
+  const sessionDirtyRef = useRef<boolean>(false)
+  const [saving, setSaving] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const videoFileRef = useRef<File | null>(null)
   const videoUrlRef = useRef<string | null>(null) // for cleanup on unmount
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -119,6 +151,82 @@ export default function EditorPage() {
     }
   }, [searchParams])
 
+  /* ───────── Phase 3: feature-flag gate + resume existing job ───────── */
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const statusRes = await fetch('/api/editor/status', {
+          cache: 'no-store',
+        })
+        if (!statusRes.ok) {
+          if (!cancelled) setPortraitCropEnabled(false)
+          return
+        }
+        const statusBody = await statusRes.json()
+        const enabled = Boolean(statusBody.portraitCropEnabled)
+        if (cancelled) return
+        setPortraitCropEnabled(enabled)
+
+        // Only attempt to resume a job when the editor is gated ON and a
+        // recording anchor is present. Ad-hoc local-file sessions have no
+        // stable identity and aren't persisted in Phase 3.
+        if (!enabled || !recordingId) return
+        const loadRes = await fetch(
+          `/api/editor/load?recordingId=${encodeURIComponent(recordingId)}`,
+          { cache: 'no-store' }
+        )
+        if (loadRes.status === 404) return
+        if (!loadRes.ok) return
+        const loadBody = (await loadRes.json()) as {
+          job: {
+            id: string
+            scene_changes: number[]
+            codec_fingerprint: Record<string, unknown> | null
+            modal_inference_ms: number | null
+            modal_app_version: string | null
+            updated_at: string
+          }
+          keyframes: Array<{
+            time_seconds: number
+            x_pixels: number
+            source: CropKeyframe['source']
+            confidence: number
+            edited_by_user: boolean
+            edited_at: string | null
+          }>
+        }
+        if (cancelled) return
+        setJobId(loadBody.job.id)
+        setSceneChanges(loadBody.job.scene_changes ?? [])
+        lastDetectionMetaRef.current = {
+          codecFingerprint: loadBody.job.codec_fingerprint,
+          modalInferenceMs: loadBody.job.modal_inference_ms,
+          modalAppVersion: loadBody.job.modal_app_version,
+        }
+        const restoredKfs: CropKeyframe[] = loadBody.keyframes.map((kf) => ({
+          time: kf.time_seconds,
+          x: kf.x_pixels,
+          source: kf.source,
+          confidence: kf.confidence,
+        }))
+        if (cancelled) return
+        setKeyframes(restoredKfs)
+        // Don't treat resumed keyframes as "originally detected" — we don't
+        // know the pre-edit baseline for a job created in a prior session.
+        // Leave the ref null; session-dirty bit decides the feedback action.
+        sessionDirtyRef.current = false
+        setLastSavedAt(new Date(loadBody.job.updated_at).getTime())
+      } catch {
+        if (!cancelled) setPortraitCropEnabled(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordingId])
+
   /* ───────── beforeunload warning ───────── */
   useEffect(() => {
     if (keyframes.length === 0) return
@@ -135,6 +243,9 @@ export default function EditorPage() {
       setKeyframes((prev) => {
         const next = updater(prev)
         if (next === prev) return prev
+        // Any real change in this session counts as a dirty edit for
+        // feedback-action reporting.
+        sessionDirtyRef.current = true
         // Store prev snapshot for history — applied outside the updater
         // to avoid React strict mode double-invocation pushing duplicates
         pendingHistoryRef.current = prev
@@ -320,6 +431,12 @@ export default function EditorPage() {
 
       const positions = detection.positions || []
       const sceneChangesData = detection.scene_changes || []
+      // Capture metadata so save() can persist it alongside the keyframes.
+      lastDetectionMetaRef.current = {
+        codecFingerprint: detection.codec_fingerprint ?? null,
+        modalInferenceMs: detection.modal_inference_ms ?? null,
+        modalAppVersion: detection.modal_app_version ?? null,
+      }
       const cropKfs = detectionsToCropKeyframes({
         positions,
         scene_changes: sceneChangesData,
@@ -328,6 +445,10 @@ export default function EditorPage() {
       const simplified = simplifyCropKeyframes(cropKfs, sceneChangesData)
 
       setKeyframes(simplified)
+      // Snapshot the pristine AI output — kept for feedback.keyframes_before
+      // across the whole session, even after saves.
+      originallyDetectedRef.current = simplified
+      sessionDirtyRef.current = false
       setSceneChanges(sceneChangesData)
       setHistory([])
       setFuture([])
@@ -510,6 +631,93 @@ export default function EditorPage() {
     a.click()
     URL.revokeObjectURL(url)
   }, [keyframes, videoFilename])
+
+  /* ───────── Phase 3: save keyframes to Supabase via /api/editor/save ───────── */
+  const canPersist = portraitCropEnabled === true && Boolean(recordingId)
+
+  const handleSave = useCallback(async () => {
+    if (!canPersist) return
+    if (keyframes.length === 0) return
+    setSaving(true)
+    setSaveError(null)
+    try {
+      // Session-dirty bit is the authoritative signal — a user who reopened
+      // a previously-edited job and hasn't touched it writes `accepted`; any
+      // edit in this session writes `edited`.
+      const hasEdits = sessionDirtyRef.current
+      const pristine = originallyDetectedRef.current
+      // Normalise keyframes to the DB schema shape expected by save_crop_job.
+      const normalised = keyframes.map((kf) => ({
+        time_seconds: kf.time,
+        x_pixels: kf.x,
+        source: kf.source,
+        confidence: kf.confidence ?? 0.5,
+        edited_by_user: kf.source === 'user' || hasEdits,
+        edited_at:
+          kf.source === 'user' || hasEdits ? new Date().toISOString() : null,
+      }))
+
+      const meta = lastDetectionMetaRef.current
+      const payload = {
+        recordingId,
+        keyframes: normalised,
+        sceneChanges,
+        status: hasEdits ? 'edited' : 'detected',
+        codecFingerprint: meta.codecFingerprint,
+        modalInferenceMs: meta.modalInferenceMs,
+        modalAppVersion: meta.modalAppVersion,
+        feedback: hasEdits
+          ? {
+              action: 'edited' as const,
+              note: null,
+              keyframesBefore: pristine,
+              keyframesAfter: keyframes,
+            }
+          : { action: 'accepted' as const, note: null },
+      }
+
+      const res = await fetch('/api/editor/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (res.status === 503) {
+        throw new Error('Portrait crop editor is disabled')
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Save failed')
+      }
+      const body = (await res.json()) as {
+        jobId: string
+        status: string
+        updatedAt: string
+      }
+      setJobId(body.jobId)
+      setLastSavedAt(new Date(body.updatedAt).getTime())
+      // Clear session dirty — subsequent saves without further edits count
+      // as `accepted` (confirming the AI's output) rather than repeat edits.
+      sessionDirtyRef.current = false
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+    // Refs intentionally omitted — they carry session state that's read on
+    // each invocation but shouldn't retrigger the memo.
+  }, [canPersist, keyframes, recordingId, sceneChanges])
+
+  // Relative-time label for the Save button tooltip / aria. Frozen between
+  // saves — re-runs only when a new save completes. Label drifts slightly
+  // stale until the next save, which is fine for this surface.
+  const savedAgo = useMemo(() => {
+    if (!lastSavedAt) return null
+    const s = Math.round((Date.now() - lastSavedAt) / 1000)
+    if (s < 10) return 'just now'
+    if (s < 60) return `${s}s ago`
+    if (s < 3600) return `${Math.round(s / 60)}m ago`
+    return `${Math.round(s / 3600)}h ago`
+  }, [lastSavedAt])
 
   /* ───────── drag & drop ───────── */
   const handleDrop = useCallback(
@@ -997,11 +1205,54 @@ export default function EditorPage() {
             </button>
           )}
 
+          {/* Save (only when recording-linked and feature gate allows it) */}
+          {canPersist && (
+            <button
+              onClick={handleSave}
+              disabled={saving || keyframes.length === 0}
+              aria-busy={saving}
+              aria-label={
+                saving
+                  ? 'Saving keyframes'
+                  : saveError
+                    ? `Save failed: ${saveError}`
+                    : lastSavedAt
+                      ? `Saved ${savedAgo}`
+                      : 'Save keyframes'
+              }
+              className="flex items-center gap-1.5 rounded px-2 py-2 min-h-[36px] transition-colors hover:bg-white/5 disabled:opacity-30"
+              title={
+                saveError
+                  ? `Save failed: ${saveError}`
+                  : lastSavedAt
+                    ? `Saved ${savedAgo}`
+                    : 'Save keyframes'
+              }
+            >
+              {saving ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : saveError ? (
+                <AlertTriangle size={13} className="text-red-400" />
+              ) : lastSavedAt ? (
+                <Check size={13} className="text-emerald-400" />
+              ) : (
+                <Save size={13} />
+              )}
+              <span className="hidden sm:inline">
+                {saving
+                  ? 'Saving…'
+                  : lastSavedAt
+                    ? 'Saved'
+                    : 'Save'}
+              </span>
+            </button>
+          )}
+
           {/* Export */}
           <button
             onClick={handleExport}
             disabled={keyframes.length === 0}
-            className="flex items-center gap-1.5 rounded px-2 py-2 min-h-[36px] transition-colors hover:bg-white/5 disabled:opacity-20"
+            className="flex items-center gap-1.5 rounded px-2 py-2 min-h-[36px] transition-colors hover:bg-white/5 disabled:opacity-30"
             title="Export keyframes"
           >
             <Download size={13} />
@@ -1018,6 +1269,31 @@ export default function EditorPage() {
           </button>
         </div>
       </div>
+
+      {/* ── PORTRAIT-CROP KILL SWITCH BANNER ── */}
+      <AnimatePresence>
+        {portraitCropEnabled === false && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="flex items-center gap-2 px-3 py-2 text-xs overflow-hidden border-l-2"
+            style={{
+              background: 'rgba(245,158,11,0.08)',
+              color: '#f59e0b',
+              borderLeftColor: 'rgba(245,158,11,0.6)',
+              borderBottom:
+                '1px solid var(--editor-border, rgba(185,186,163,0.08))',
+            }}
+          >
+            <AlertTriangle size={12} className="flex-shrink-0" />
+            <span>
+              Assisted editor paused. Local edits won&apos;t sync — export to
+              keep your work.
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── ERROR MESSAGE ── */}
       <AnimatePresence>

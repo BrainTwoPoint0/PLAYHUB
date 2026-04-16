@@ -78,13 +78,20 @@ def run_sahi_fallback(model, frame, frame_h):
             confidence_threshold=0.1,
         )
 
+    # 640x640 matches YOLOv8 training resolution — per v5 analysis, 320x320
+    # slices pushed ball-to-slice ratios below the model's confidence calibration
+    # range. NMS params made explicit so cross-slice duplicate merging on seam
+    # overlaps is visible in the diff, not dependent on SAHI defaults.
     result = get_sliced_prediction(
         image=frame,
         detection_model=run_sahi_fallback._sahi_model,
-        slice_height=320,
-        slice_width=320,
+        slice_height=640,
+        slice_width=640,
         overlap_height_ratio=0.2,
         overlap_width_ratio=0.2,
+        postprocess_type="GREEDYNMM",
+        postprocess_match_metric="IOS",
+        postprocess_match_threshold=0.5,
         verbose=0,
     )
 
@@ -106,7 +113,7 @@ def run_sahi_fallback(model, frame, frame_h):
     return candidates
 
 
-def detect_ball(video_path: str, output_fps: float = 5.0) -> dict:
+def detect_ball(video_path: str, output_fps: float = 25.0) -> dict:
     """Detect ball using Forzasys YOLO + Norfair Kalman tracker.
 
     Two-phase approach:
@@ -491,24 +498,22 @@ def bidirectional_interpolate(positions: list) -> list:
 
             gap_len = j - i - 1
             if gap_len > 0 and j < len(result):
-                # Confidence-weighted blend: instead of binary skip, use ratio
-                # of tracked frames to decide. High ratio = Kalman had good
-                # momentum data, keep it. Low ratio = mostly hold/cluster,
-                # bidirectional interpolation is better.
+                # Kalman is the sole authority for its output. If ANY frame
+                # in this gap was filled by the tracker ("tracked" source),
+                # the Kalman filter had momentum data — leave the gap alone.
+                # Mixing bidirectional smoothstep with tracked frames yields a
+                # hybrid trajectory worse than either on its own.
                 tracked_count = sum(
                     1 for k in range(i + 1, j)
                     if result[k]["source"] == "tracked"
                 )
-                kalman_ratio = tracked_count / gap_len
-                gap_dist_raw = abs(result[j]["x"] - result[i]["x"])
-
-                # Skip if Kalman dominated this gap OR gap has no meaningful movement
-                # (near-static gaps: Kalman and bidir produce ~same result, but
-                # changing positions subtly alters downstream simplification)
-                if kalman_ratio > KALMAN_RATIO_THRESHOLD or (tracked_count > 0 and gap_dist_raw < MIN_GAP_DIST_FOR_BLEND):
+                if tracked_count > 0:
                     i = j
                     continue
 
+                # Pure cluster/hold gap — Kalman failed to span it. Use
+                # bidirectional smoothstep if both anchor detections are
+                # confident enough.
                 gap_time = result[j]["time"] - result[i]["time"]
                 gap_dist = abs(result[j]["x"] - result[i]["x"])
                 both_confident = result[i]["conf"] >= MIN_CONFIDENCE and result[j]["conf"] >= MIN_CONFIDENCE
@@ -519,8 +524,6 @@ def bidirectional_interpolate(positions: list) -> list:
 
                     for k in range(i + 1, j):
                         t = (result[k]["time"] - result[i]["time"]) / gap_time
-                        # Smoothstep (ease-in-out): avoids abrupt velocity changes
-                        # at gap boundaries. Used by Forzasys SmartCrop.
                         t_smooth = t * t * (3.0 - 2.0 * t)
                         conf = round(0.4 + 0.1 * min(t, 1 - t) * 4, 3)
                         result[k] = {
@@ -532,8 +535,7 @@ def bidirectional_interpolate(positions: list) -> list:
                             "source": "tracked"
                         }
 
-                    mode = "blend" if tracked_count > 0 else "pure"
-                    print(f"  Bidir interp ({mode}): {gap_len} frames ({result[i]['time']:.1f}s → {result[j]['time']:.1f}s, Δ{gap_dist:.0f}px, kalman={kalman_ratio:.0%})", file=sys.stderr)
+                    print(f"  Bidir interp: {gap_len} frames ({result[i]['time']:.1f}s → {result[j]['time']:.1f}s, Δ{gap_dist:.0f}px, pure cluster/hold gap)", file=sys.stderr)
 
                 i = j
             else:
@@ -559,10 +561,19 @@ def filter_false_locks(positions: list) -> list:
     MAX_STDDEV = 50      # px — static threshold
     MIN_STATIC_TIME = 2.0  # seconds — must be static for at least this long
 
+    # Tracked positions downstream of a false lock are just Kalman absorbing
+    # the bad measurement and extrapolating from it — they carry the same
+    # false-lock signal as the ball detections themselves. Treat ball and
+    # tracked as a single trajectory for this check.
+    VALID_SOURCES = ("ball", "tracked")
+
     result = list(positions)
     i = 1
     while i < len(result):
-        if result[i]["source"] != "ball" or result[i - 1]["source"] != "ball":
+        if (
+            result[i]["source"] not in VALID_SOURCES
+            or result[i - 1]["source"] not in VALID_SOURCES
+        ):
             i += 1
             continue
 
@@ -571,12 +582,12 @@ def filter_false_locks(positions: list) -> list:
             i += 1
             continue
 
-        # Found a big jump — check if post-jump detections are static
+        # Found a big jump — check if post-jump positions stay static
         static_xs = [result[i]["x"]]
         static_end = i
 
         for j in range(i + 1, len(result)):
-            if result[j]["source"] != "ball":
+            if result[j]["source"] not in VALID_SOURCES:
                 break
             static_xs.append(result[j]["x"])
             static_end = j
@@ -690,7 +701,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     video_path = sys.argv[1]
-    fps = 5.0
+    fps = 25.0
     param_overrides = {}
 
     for i, arg in enumerate(sys.argv):

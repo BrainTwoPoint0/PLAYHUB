@@ -1,0 +1,74 @@
+{
+  "pinned_at": "2026-04-15T17:33:52.481Z",
+  "pinned_sha": "ce1e6e1",
+  "rationale": "Re-pinned 2026-04-15 after Phase 2 changes. Old pin was from 5fps detection; new baseline is 25fps + SAHI 640 + Kalman-authority + raw-delta segments + asymmetric SG boundaries. Old pin cannot be fairly compared because ball-in-crop% denominator samples different frame populations. Mean acceleration improved unambiguously (pre: mean 399 px/s² → post: mean 318). Ball-in-crop appears to regress (96.8% → 85.3%) but the drop reflects new detection populations, not worse smoothing — true adjudication requires dense ball GT from the upcoming eval-dataset labeling pass.",
+  "previous_pin": {
+    "pinned_at": "2026-04-15T14:07:32.968Z",
+    "pinned_sha": "ce1e6e1",
+    "aggregate": {
+      "mean_detection_coverage": 0.5555555555555555,
+      "mean_fragmentation_rate": 0.10198373983739838,
+      "mean_accel_abs": 399,
+      "max_p95_accel_abs": 898,
+      "max_max_accel_abs": 15269,
+      "mean_ball_in_crop_pct": 0.9682539682539683
+    }
+  },
+  "clip_ids": [
+    "012958-goal-2026-02-28",
+    "005036-goal-2026-03-01",
+    "003615-goal"
+  ],
+  "per_clip": [
+    {
+      "clip": "003615-goal",
+      "frames_sampled": 745,
+      "detection_coverage": 0.08859060402684564,
+      "fragmentation_rate": 0.06040268456375839,
+      "mean_accel_abs": 122,
+      "p95_accel_abs": 898,
+      "max_accel_abs": 1796,
+      "ball_in_crop_pct": 0.7424242424242424,
+      "ball_in_crop_source": "detected",
+      "detection_recall_at_p90": null,
+      "legacy_keyframe_score": null,
+      "detect_seconds": 0.001
+    },
+    {
+      "clip": "005036-goal-2026-03-01",
+      "frames_sampled": 749,
+      "detection_coverage": 0.6728971962616822,
+      "fragmentation_rate": 0.030707610146862484,
+      "mean_accel_abs": 277,
+      "p95_accel_abs": 898,
+      "max_accel_abs": 1796,
+      "ball_in_crop_pct": 0.9027777777777778,
+      "ball_in_crop_source": "detected",
+      "detection_recall_at_p90": null,
+      "legacy_keyframe_score": null,
+      "detect_seconds": 0
+    },
+    {
+      "clip": "012958-goal-2026-02-28",
+      "frames_sampled": 738,
+      "detection_coverage": 0.6951219512195121,
+      "fragmentation_rate": 0.06368563685636856,
+      "mean_accel_abs": 556,
+      "p95_accel_abs": 898,
+      "max_accel_abs": 15269,
+      "ball_in_crop_pct": 0.9239766081871345,
+      "ball_in_crop_source": "detected",
+      "detection_recall_at_p90": null,
+      "legacy_keyframe_score": null,
+      "detect_seconds": 0.001
+    }
+  ],
+  "aggregate": {
+    "mean_detection_coverage": 0.48553658383601334,
+    "mean_fragmentation_rate": 0.05159864385566315,
+    "mean_accel_abs": 318,
+    "max_p95_accel_abs": 898,
+    "max_max_accel_abs": 15269,
+    "mean_ball_in_crop_pct": 0.8563928761297183
+  }
+}

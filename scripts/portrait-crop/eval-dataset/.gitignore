@@ -1,0 +1,3 @@
+results/*
+!results/pin.json
+!results/README.md
