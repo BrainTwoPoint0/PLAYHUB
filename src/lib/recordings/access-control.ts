@@ -2,6 +2,7 @@
 // Handles checking and granting access to match recordings
 
 import { createServiceClient } from '@/lib/supabase/server'
+import { isPlatformAdmin } from '@/lib/admin/auth'
 
 // Types
 export interface AccessCheckResult {
@@ -41,11 +42,14 @@ const ADMIN_ROLES: Role[] = ['admin', 'manager', 'club_admin', 'league_admin']
 /**
  * Check if a user is an admin for a specific venue/organization.
  * Also checks parent org membership (one level up only).
+ * Platform admins short-circuit to true.
  */
 export async function isVenueAdmin(
   userId: string,
   organizationId: string
 ): Promise<boolean> {
+  if (await isPlatformAdmin(userId)) return true
+
   const supabase = createServiceClient()
 
   const { data: profile } = await supabase
@@ -103,11 +107,22 @@ type ManagedVenue = {
 /**
  * Get venues (organizations) that a user can manage.
  * Includes child venues of parent orgs the user is admin of.
+ * Platform admins can manage every active venue.
  */
 export async function getManagedVenues(
   userId: string
 ): Promise<ManagedVenue[]> {
   const supabase = createServiceClient()
+
+  if (await isPlatformAdmin(userId)) {
+    const { data: allVenues } = await (supabase as any)
+      .from('organizations')
+      .select('id, name, slug, logo_url')
+      .eq('type', 'venue')
+      .eq('is_active', true)
+
+    return (allVenues || []) as ManagedVenue[]
+  }
 
   const { data: profile } = await supabase
     .from('profiles')
