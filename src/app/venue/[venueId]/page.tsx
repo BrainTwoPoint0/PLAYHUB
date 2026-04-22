@@ -118,6 +118,13 @@ interface Admin {
   isCurrentUser: boolean
 }
 
+interface PendingInvite {
+  id: string
+  email: string
+  role: string
+  invitedAt: string
+}
+
 interface StreamChannel {
   id: string
   name: string
@@ -553,6 +560,9 @@ export default function VenueManagementPage() {
 
   // Admin management state
   const [admins, setAdmins] = useState<Admin[]>([])
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([])
+  const [adminsLoading, setAdminsLoading] = useState(false)
+  const [adminsLoaded, setAdminsLoaded] = useState(false)
   const [showAdminSection, setShowAdminSection] = useState(false)
   const [newAdminEmail, setNewAdminEmail] = useState('')
   const [addingAdmin, setAddingAdmin] = useState(false)
@@ -1056,13 +1066,18 @@ export default function VenueManagementPage() {
 
   async function fetchAdmins() {
     try {
+      setAdminsLoading(true)
       const res = await fetch(`/api/venue/${venueId}/admins`)
       const data = await res.json()
-      if (data.admins) {
-        setAdmins(data.admins)
-      }
+      setAdmins(Array.isArray(data.admins) ? data.admins : [])
+      setPendingInvites(
+        Array.isArray(data.pendingInvites) ? data.pendingInvites : []
+      )
     } catch (err) {
       console.error('Failed to fetch admins:', err)
+    } finally {
+      setAdminsLoading(false)
+      setAdminsLoaded(true)
     }
   }
 
@@ -1090,8 +1105,8 @@ export default function VenueManagementPage() {
         )
       } else {
         setSuccess('Admin added successfully!')
-        fetchAdmins()
       }
+      fetchAdmins()
       setNewAdminEmail('')
       setTimeout(() => setSuccess(null), 5000)
     } catch (err) {
@@ -3457,7 +3472,7 @@ export default function VenueManagementPage() {
                     className={`w-full md:w-auto ${outlineBtnClass}`}
                     onClick={() => {
                       setShowAdminSection(!showAdminSection)
-                      if (!showAdminSection && admins.length === 0) {
+                      if (!showAdminSection && !adminsLoaded) {
                         fetchAdmins()
                       }
                     }}
@@ -3506,49 +3521,87 @@ export default function VenueManagementPage() {
 
                   {/* Admin list */}
                   <div className="space-y-2">
-                    {admins.length === 0 ? (
+                    {adminsLoading && !adminsLoaded ? (
                       <p className="text-sm text-muted-foreground">
                         Loading admins...
                       </p>
+                    ) : admins.length === 0 && pendingInvites.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        No admins yet. Add one above to get started.
+                      </p>
                     ) : (
-                      admins.map((admin) => (
-                        <div
-                          key={admin.id}
-                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-muted/50 rounded-lg border border-border"
-                        >
-                          <div className="min-w-0">
-                            <p className="font-medium truncate text-[var(--timberwolf)]">
-                              {admin.fullName || admin.email || 'Unknown'}
-                              {admin.isCurrentUser && (
-                                <span className="ml-2 text-xs text-muted-foreground">
-                                  (you)
-                                </span>
+                      <>
+                        {admins.map((admin) => (
+                          <div
+                            key={admin.id}
+                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-muted/50 rounded-lg border border-border"
+                          >
+                            <div className="min-w-0">
+                              <p className="font-medium truncate text-[var(--timberwolf)]">
+                                {admin.fullName || admin.email || 'Unknown'}
+                                {admin.isCurrentUser && (
+                                  <span className="ml-2 text-xs text-muted-foreground">
+                                    (you)
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-sm text-muted-foreground truncate">
+                                {admin.email}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                                {admin.role.replace('_', ' ')}
+                              </span>
+                              {!admin.isCurrentUser && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveAdmin(admin.id)}
+                                  disabled={removingAdminId === admin.id}
+                                  className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                >
+                                  {removingAdminId === admin.id
+                                    ? 'Removing...'
+                                    : 'Remove'}
+                                </Button>
                               )}
-                            </p>
-                            <p className="text-sm text-muted-foreground truncate">
-                              {admin.email}
-                            </p>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
-                              {admin.role.replace('_', ' ')}
-                            </span>
-                            {!admin.isCurrentUser && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveAdmin(admin.id)}
-                                disabled={removingAdminId === admin.id}
-                                className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                              >
-                                {removingAdminId === admin.id
-                                  ? 'Removing...'
-                                  : 'Remove'}
-                              </Button>
-                            )}
+                        ))}
+
+                        {pendingInvites.length > 0 && (
+                          <div className="pt-2">
+                            <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase mb-2">
+                              Pending invites
+                            </p>
+                            <div className="space-y-2">
+                              {pendingInvites.map((invite) => (
+                                <div
+                                  key={invite.id}
+                                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-muted/30 rounded-lg border border-dashed border-border"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="font-medium truncate text-[var(--timberwolf)]">
+                                      {invite.email}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                      Invited{' '}
+                                      {new Date(
+                                        invite.invitedAt
+                                      ).toLocaleDateString()}{' '}
+                                      — waiting for account creation
+                                    </p>
+                                  </div>
+                                  <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 flex-shrink-0 w-fit">
+                                    {invite.role.replace('_', ' ')}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
