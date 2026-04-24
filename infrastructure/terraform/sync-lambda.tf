@@ -117,6 +117,18 @@ resource "aws_lambda_function" "sync_recordings" {
   timeout       = 900  # 15 minutes (max for Lambda)
   memory_size   = 1024 # 1GB for streaming large video files
 
+  # TODO: Uncomment once AWS account Lambda concurrency quota is raised
+  # above 10. Service Quotas request drafted in the 2026-04-20 session
+  # log; once approved, flip this line on and `terraform apply`.
+  # reserved_concurrent_executions = 1
+  #
+  # The sync handler reconciles shared state (Spiideo games, S3 objects,
+  # playhub_match_recordings rows); overlapping runs theoretically race
+  # on the oldest game. At account quota = 10, reserving 1 would drop
+  # unreserved below AWS's 10-minimum floor and the apply fails. Until
+  # approved, overlap is mitigated by cron spacing + sync duration
+  # historically staying well under 15 min.
+
   # Note: You need to build and zip the Lambda code first
   # See deployment instructions in README
   filename         = "${path.module}/../lambda/sync-recordings/dist.zip"
@@ -205,7 +217,7 @@ resource "aws_cloudwatch_metric_alarm" "sync_lambda_errors" {
   evaluation_periods  = 1
   metric_name         = "Errors"
   namespace           = "AWS/Lambda"
-  period              = 900  # 15 minutes (matches Lambda schedule)
+  period              = 900 # 15 minutes (matches Lambda schedule)
   statistic           = "Sum"
   threshold           = 0
   alarm_description   = "Sync Lambda function failed"
@@ -233,7 +245,7 @@ resource "aws_cloudwatch_metric_alarm" "sync_lambda_timeout" {
   namespace           = "AWS/Lambda"
   period              = 900
   statistic           = "Maximum"
-  threshold           = 840000  # 14 minutes in ms (warning before 15 min timeout)
+  threshold           = 840000 # 14 minutes in ms (warning before 15 min timeout)
   alarm_description   = "Sync Lambda approaching timeout limit"
   treat_missing_data  = "notBreaching"
 
@@ -245,6 +257,97 @@ resource "aws_cloudwatch_metric_alarm" "sync_lambda_timeout" {
 
   tags = {
     Name        = "PLAYHUB Sync Timeout Alarm"
+    Environment = var.environment
+  }
+}
+
+# ----------------------------------------------------------------------------
+# Zero-invocations alarm — catches EventBridge rule being deleted,
+# disabled, or silently drifting. If nothing invokes the Lambda for
+# 30 min (two 15-min cron windows), something's wrong with the schedule.
+#
+# `treat_missing_data = "missing"` (not "breaching") so a freshly
+# deployed alarm doesn't phantom-page before the first cron tick has
+# populated any datapoints. Once the Lambda has been invoked at least
+# once the alarm behaves as intended — a zero-invocations window
+# registers as a breaching datapoint, not a missing one.
+# ----------------------------------------------------------------------------
+resource "aws_cloudwatch_metric_alarm" "sync_lambda_no_invocations" {
+  alarm_name          = "${var.project_name}-sync-lambda-no-invocations"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "Invocations"
+  namespace           = "AWS/Lambda"
+  period              = 900 # 15 minutes (matches cron cadence)
+  statistic           = "Sum"
+  threshold           = 1
+  alarm_description   = "Sync Lambda has not been invoked for 30 minutes — EventBridge rule may be disabled or deleted"
+  treat_missing_data  = "missing"
+
+  dimensions = {
+    FunctionName = aws_lambda_function.sync_recordings.function_name
+  }
+
+  alarm_actions = [aws_sns_topic.sync_alerts.arn]
+  ok_actions    = [aws_sns_topic.sync_alerts.arn]
+
+  tags = {
+    Name        = "PLAYHUB Sync No-Invocations Alarm"
+    Environment = var.environment
+  }
+}
+
+# ----------------------------------------------------------------------------
+# Backlog-size alarm — custom metric emitted by the Lambda via EMF.
+# A persistent backlog of >10 finished-but-unsynced games for 2
+# consecutive runs signals Spiideo slowdown, a download-readiness
+# bottleneck, or a bug in the exclusion logic. Ten is loose enough to
+# ignore a transient burst but tight enough to catch a real pileup.
+# ----------------------------------------------------------------------------
+resource "aws_cloudwatch_metric_alarm" "sync_backlog_size" {
+  alarm_name          = "${var.project_name}-sync-backlog-size"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "BacklogSize"
+  namespace           = "PLAYHUB/SyncRecordings"
+  period              = 900
+  statistic           = "Maximum"
+  threshold           = 10
+  alarm_description   = "Sync backlog > 10 games for 30 min — Spiideo may be slow or download-readiness is stalling"
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = [aws_sns_topic.sync_alerts.arn]
+  ok_actions    = [aws_sns_topic.sync_alerts.arn]
+
+  tags = {
+    Name        = "PLAYHUB Sync Backlog Alarm"
+    Environment = var.environment
+  }
+}
+
+# ----------------------------------------------------------------------------
+# Sync-lag alarm — custom metric emitted by the Lambda via EMF.
+# Measures the age of the oldest unsynced finished game at the top of
+# each run. 3 hours is well past any legitimate end-of-match processing
+# window, so crossing it means a game is genuinely stuck.
+# ----------------------------------------------------------------------------
+resource "aws_cloudwatch_metric_alarm" "sync_lag" {
+  alarm_name          = "${var.project_name}-sync-lag"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "SyncLagSeconds"
+  namespace           = "PLAYHUB/SyncRecordings"
+  period              = 900
+  statistic           = "Maximum"
+  threshold           = 10800 # 3 hours
+  alarm_description   = "A finished Spiideo game has been unsynced for >3 hours — investigate manually"
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = [aws_sns_topic.sync_alerts.arn]
+  ok_actions    = [aws_sns_topic.sync_alerts.arn]
+
+  tags = {
+    Name        = "PLAYHUB Sync Lag Alarm"
     Environment = var.environment
   }
 }

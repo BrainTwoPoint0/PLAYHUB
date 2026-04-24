@@ -69,7 +69,11 @@ resource "aws_s3_bucket_lifecycle_configuration" "recordings" {
     }
   }
 
-  # Clean up incomplete multipart uploads after 7 days
+  # Clean up incomplete multipart uploads after 1 day.
+  # The sync Lambda is the only writer; a MPU still in-flight after
+  # Lambda has timed out will never resume — the next invocation
+  # creates a fresh MPU with a new UploadId. Keeping dead parts around
+  # longer just burns storage cost.
   rule {
     id     = "cleanup-incomplete-uploads"
     status = "Enabled"
@@ -77,7 +81,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "recordings" {
     filter {}
 
     abort_incomplete_multipart_upload {
-      days_after_initiation = 7
+      days_after_initiation = 1
     }
   }
 }
