@@ -1478,8 +1478,6 @@ export type Database = {
           stripe_customer_id: string | null
           updated_at: string | null
           venue_profit_share_pct: number | null
-          youtube_rtmp_url: string | null
-          youtube_stream_key: string | null
         }
         Insert: {
           ambassador_pct?: number | null
@@ -1503,8 +1501,6 @@ export type Database = {
           stripe_customer_id?: string | null
           updated_at?: string | null
           venue_profit_share_pct?: number | null
-          youtube_rtmp_url?: string | null
-          youtube_stream_key?: string | null
         }
         Update: {
           ambassador_pct?: number | null
@@ -1528,8 +1524,6 @@ export type Database = {
           stripe_customer_id?: string | null
           updated_at?: string | null
           venue_profit_share_pct?: number | null
-          youtube_rtmp_url?: string | null
-          youtube_stream_key?: string | null
         }
         Relationships: [
           {

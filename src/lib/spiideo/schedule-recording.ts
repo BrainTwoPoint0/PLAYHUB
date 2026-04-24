@@ -4,7 +4,6 @@
 import {
   createGame,
   createProduction,
-  createPushStreamOutput,
   getAccountConfig,
 } from '@/lib/spiideo/client'
 import { createServiceClient } from '@/lib/supabase/server'
@@ -34,8 +33,6 @@ export interface ScheduleRecordingInput {
   scheduledStopTime?: string
   /** Stripe payment intent ID for idempotency on webhook retries. */
   stripePaymentIntentId?: string
-  /** Full RTMP URL (with stream key) — when provided, creates a push stream output for YouTube broadcasting. */
-  youtubeRtmpUrl?: string
   /** When true, the recording will be listed on the org's marketplace page. */
   marketplaceEnabled?: boolean
   /** Price for marketplace purchase (requires marketplaceEnabled). */
@@ -111,15 +108,6 @@ export async function scheduleRecording(
     productionType: 'single_game',
     type: 'live',
   })
-
-  // 2b. If YouTube RTMP URL is provided, add a push stream output
-  if (input.youtubeRtmpUrl) {
-    await createPushStreamOutput(
-      production.id,
-      input.youtubeRtmpUrl,
-      'YouTube Live'
-    )
-  }
 
   // 3. Fetch billing config from DB
   const serviceClient = createServiceClient() as any

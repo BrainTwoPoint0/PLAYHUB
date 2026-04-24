@@ -39,7 +39,6 @@ export async function POST(
     accessEmails,
     isBillable,
     billableAmount,
-    broadcastToYoutube,
     marketplaceEnabled,
     priceAmount,
     priceCurrency,
@@ -79,21 +78,6 @@ export async function POST(
   const startMs = new Date(scheduledStartTime).getTime()
   const stopMs = new Date(scheduledStopTime).getTime()
   const durationMinutes = Math.round((stopMs - startMs) / 60_000)
-
-  // Look up YouTube RTMP URL if broadcasting requested
-  let youtubeRtmpUrl: string | undefined
-  if (broadcastToYoutube) {
-    const { data: billingCfg } = await (serviceClient as any)
-      .from('playhub_venue_billing_config')
-      .select('youtube_rtmp_url, youtube_stream_key')
-      .eq('organization_id', venueId)
-      .maybeSingle()
-
-    if (billingCfg?.youtube_rtmp_url && billingCfg?.youtube_stream_key) {
-      const base = billingCfg.youtube_rtmp_url.replace(/\/$/, '')
-      youtubeRtmpUrl = `${base}/${billingCfg.youtube_stream_key}`
-    }
-  }
 
   // Determine if user is a tenant (schedules at venue via organization_venue_access)
   // Check if user is a direct member or parent admin of this venue
@@ -199,7 +183,6 @@ export async function POST(
       startBufferMs: 0,
       scheduledStartTime,
       scheduledStopTime,
-      youtubeRtmpUrl,
       marketplaceEnabled,
       priceAmount: priceAmount ? Number(priceAmount) : undefined,
       priceCurrency,

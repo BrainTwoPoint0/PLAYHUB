@@ -13,14 +13,11 @@ vi.hoisted(() => {
 
 const mockCreateGame = vi.fn()
 const mockCreateProduction = vi.fn()
-const mockCreatePushStreamOutput = vi.fn()
 const mockGetAccountConfig = vi.fn()
 
 vi.mock('@/lib/spiideo/client', () => ({
   createGame: (...args: any[]) => mockCreateGame(...args),
   createProduction: (...args: any[]) => mockCreateProduction(...args),
-  createPushStreamOutput: (...args: any[]) =>
-    mockCreatePushStreamOutput(...args),
   getAccountConfig: (...args: any[]) => mockGetAccountConfig(...args),
 }))
 
@@ -216,27 +213,6 @@ describe('scheduleRecording', () => {
 
     const insertCall = mockRecordingChain.insert.mock.calls[0][0]
     expect(insertCall.billable_amount).toBe(10)
-  })
-
-  it('creates push stream output when youtubeRtmpUrl provided', async () => {
-    mockCreatePushStreamOutput.mockResolvedValue({ id: 'output-1' })
-
-    await scheduleRecording({
-      ...baseInput,
-      youtubeRtmpUrl: 'rtmp://a.rtmp.youtube.com/live2/xxxx-xxxx',
-    })
-
-    expect(mockCreatePushStreamOutput).toHaveBeenCalledWith(
-      'prod-1',
-      'rtmp://a.rtmp.youtube.com/live2/xxxx-xxxx',
-      'YouTube Live'
-    )
-  })
-
-  it('does not create push stream output when youtubeRtmpUrl is absent', async () => {
-    await scheduleRecording(baseInput)
-
-    expect(mockCreatePushStreamOutput).not.toHaveBeenCalled()
   })
 
   it('creates marketplace product when marketplaceEnabled', async () => {

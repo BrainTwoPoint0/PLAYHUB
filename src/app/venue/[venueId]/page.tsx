@@ -172,8 +172,6 @@ interface BillingConfig {
   currency: string
   daily_recording_target: number
   is_active: boolean
-  youtube_rtmp_url?: string | null
-  youtube_stream_key?: string | null
   marketplace_revenue_split_pct?: number
 }
 
@@ -341,139 +339,6 @@ function MarketplaceRevenue({
   )
 }
 
-// ── Venue Settings (YouTube, Marketplace, Media Pack) ─────────────
-function VenueSettings({
-  venueId,
-  billingConfig,
-  onSaved,
-  inputClass,
-  outlineBtnClass,
-  primaryBtnClass,
-}: {
-  venueId: string
-  billingConfig: BillingConfig | null
-  onSaved: (config: BillingConfig) => void
-  inputClass: string
-  outlineBtnClass: string
-  primaryBtnClass: string
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [savedMsg, setSavedMsg] = useState<string | null>(null)
-
-  // Local form state
-  const [youtubeRtmpUrl, setYoutubeRtmpUrl] = useState(
-    billingConfig?.youtube_rtmp_url || ''
-  )
-  const [youtubeStreamKey, setYoutubeStreamKey] = useState(
-    billingConfig?.youtube_stream_key || ''
-  )
-
-  // Sync when billingConfig loads/changes
-  useEffect(() => {
-    if (!billingConfig) return
-    setYoutubeRtmpUrl(billingConfig.youtube_rtmp_url || '')
-    setYoutubeStreamKey(billingConfig.youtube_stream_key || '')
-  }, [billingConfig])
-
-  async function handleSave() {
-    setSaving(true)
-    setSavedMsg(null)
-    try {
-      const res = await fetch(`/api/venue/${venueId}/billing`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...billingConfig,
-          youtube_rtmp_url: youtubeRtmpUrl || null,
-          youtube_stream_key: youtubeStreamKey || null,
-        }),
-      })
-      const data = await res.json()
-      if (data.config) {
-        onSaved(data.config)
-        setSavedMsg('Settings saved')
-        setTimeout(() => setSavedMsg(null), 3000)
-      }
-    } catch {
-      setSavedMsg('Failed to save')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="mt-6 rounded-xl border border-border bg-card">
-      <div className="p-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-            Venue Settings
-          </h2>
-          <Button
-            variant="outline"
-            className={`w-full md:w-auto ${outlineBtnClass}`}
-            onClick={() => setExpanded(!expanded)}
-          >
-            {expanded ? 'Hide' : 'Configure'}
-          </Button>
-        </div>
-      </div>
-      {expanded && (
-        <div className="px-6 pb-6 space-y-6">
-          {/* YouTube Settings */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-[var(--timberwolf)] uppercase tracking-wider">
-              YouTube Broadcasting
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Configure RTMP to broadcast recordings live to YouTube
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">
-                  RTMP URL
-                </label>
-                <Input
-                  value={youtubeRtmpUrl}
-                  onChange={(e) => setYoutubeRtmpUrl(e.target.value)}
-                  placeholder="rtmp://a.rtmp.youtube.com/live2"
-                  className={inputClass}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">
-                  Stream Key
-                </label>
-                <Input
-                  type="password"
-                  value={youtubeStreamKey}
-                  onChange={(e) => setYoutubeStreamKey(e.target.value)}
-                  placeholder="xxxx-xxxx-xxxx-xxxx"
-                  className={inputClass}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Save button */}
-          <div className="flex items-center gap-3">
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              className={primaryBtnClass}
-            >
-              {saving ? 'Saving...' : 'Save Settings'}
-            </Button>
-            {savedMsg && (
-              <span className="text-sm text-emerald-400">{savedMsg}</span>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 interface GraphicPackage {
   id: string
   name: string
@@ -609,8 +474,7 @@ export default function VenueManagementPage() {
   const [streamEndTime, setStreamEndTime] = useState('')
   const [schedulingStream, setSchedulingStream] = useState(false)
 
-  // YouTube state (for schedule form)
-  const [broadcastToYoutube, setBroadcastToYoutube] = useState(false)
+  // Marketplace state (for schedule form)
   const [marketplaceEnabled, setMarketplaceEnabled] = useState(false)
   const [marketplacePrice, setMarketplacePrice] = useState('')
 
@@ -1397,7 +1261,6 @@ export default function VenueManagementPage() {
           isBillable,
           billableAmount:
             isBillable && billableAmount ? Number(billableAmount) : undefined,
-          broadcastToYoutube,
           marketplaceEnabled,
           priceAmount:
             marketplaceEnabled && marketplacePrice
@@ -1426,7 +1289,6 @@ export default function VenueManagementPage() {
         setHomeTeam('Home')
         setAwayTeam('Away')
         setAccessEmails('')
-        setBroadcastToYoutube(false)
         setMarketplaceEnabled(false)
         setMarketplacePrice('')
         setSelectedGraphicPackageId('default')
@@ -2630,30 +2492,6 @@ export default function VenueManagementPage() {
                             </div>
                           )}
 
-                          {/* Broadcast to YouTube */}
-                          {billingConfig?.youtube_rtmp_url &&
-                            billingConfig?.youtube_stream_key && (
-                              <div className="space-y-2">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={broadcastToYoutube}
-                                    onChange={(e) =>
-                                      setBroadcastToYoutube(e.target.checked)
-                                    }
-                                    className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
-                                  />
-                                  <span className="text-sm font-medium text-[var(--timberwolf)]">
-                                    Broadcast to YouTube
-                                  </span>
-                                </label>
-                                <p className="text-xs text-muted-foreground">
-                                  Stream will be pushed to the configured
-                                  YouTube channel via RTMP
-                                </p>
-                              </div>
-                            )}
-
                           {/* List on marketplace */}
                           {orgMarketplace?.marketplace_enabled && (
                             <div className="space-y-2">
@@ -3448,18 +3286,9 @@ export default function VenueManagementPage() {
           </div>
         </div>
 
-        {/* Venue Settings & Admins — hidden for group orgs */}
+        {/* Venue Admins — hidden for group orgs */}
         {venue?.type !== 'group' && (
           <>
-            <VenueSettings
-              venueId={venueId}
-              billingConfig={billingConfig}
-              onSaved={(updated) => setBillingConfig(updated)}
-              inputClass={inputClass}
-              outlineBtnClass={outlineBtnClass}
-              primaryBtnClass={primaryBtnClass}
-            />
-
             {/* Venue Admins Section */}
             <div className="mt-6 rounded-xl border border-border bg-card">
               <div className="p-6">

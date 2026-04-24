@@ -50,8 +50,6 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       currency: 'KWD',
       daily_recording_target: 0,
       is_active: false,
-      youtube_rtmp_url: null,
-      youtube_stream_key: null,
       marketplace_revenue_split_pct: 20.0,
     },
     exists: !!data,
@@ -88,8 +86,6 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     stripe_customer_id,
     daily_recording_target,
     is_active,
-    youtube_rtmp_url,
-    youtube_stream_key,
     marketplace_revenue_split_pct,
   } = body
 
@@ -109,10 +105,6 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   }
 
   // Only include new fields if they were sent (avoids overwriting on older PUT calls)
-  if (youtube_rtmp_url !== undefined)
-    upsertData.youtube_rtmp_url = youtube_rtmp_url || null
-  if (youtube_stream_key !== undefined)
-    upsertData.youtube_stream_key = youtube_stream_key || null
   if (marketplace_revenue_split_pct !== undefined)
     upsertData.marketplace_revenue_split_pct = marketplace_revenue_split_pct
 
