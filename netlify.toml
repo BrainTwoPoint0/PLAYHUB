@@ -3,7 +3,11 @@
   publish = ".next"
 
 [build.environment]
-  NETLIFY_NEXT_SKEW_PROTECTION = "true"
+  # Temporarily disabled — skew protection was holding old prerender output
+  # alive past the d191bd6 deploy, so the SiteFooter swap wasn't reaching
+  # production. Flip back to "true" once the latest deploy has fully taken
+  # over and we want chunk-version stickiness back.
+  NETLIFY_NEXT_SKEW_PROTECTION = "false"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
