@@ -58,7 +58,12 @@ export async function middleware(request: NextRequest) {
     // there's simply no session (user never logged in).
     if (error && error.status !== 429) {
       const allCookies = request.cookies.getAll()
-      const authCookies = allCookies.filter((c) => c.name.startsWith('sb-'))
+      // Clear stale session cookies but preserve in-flight auth flow state:
+      // the `code-verifier` cookie is part of the PKCE password-reset /
+      // magic-link flow and wiping it breaks exchangeCodeForSession.
+      const authCookies = allCookies.filter(
+        (c) => c.name.startsWith('sb-') && !c.name.includes('code-verifier')
+      )
       if (authCookies.length > 0) {
         supabaseResponse = NextResponse.next({ request })
         for (const cookie of authCookies) {
