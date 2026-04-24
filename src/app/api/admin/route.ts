@@ -199,10 +199,7 @@ export async function POST(request: NextRequest) {
     case 'createOrganization': {
       const { orgData } = body
       if (!orgData?.name?.trim()) {
-        return NextResponse.json(
-          { error: 'Name is required' },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: 'Name is required' }, { status: 400 })
       }
       if (!orgData?.slug || !SLUG_REGEX.test(orgData.slug)) {
         return NextResponse.json(
@@ -230,10 +227,7 @@ export async function POST(request: NextRequest) {
       }
       const createResult = await createOrganization(orgData)
       if (!createResult.success) {
-        return NextResponse.json(
-          { error: createResult.error },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: createResult.error }, { status: 400 })
       }
       return NextResponse.json(createResult)
     }
@@ -274,10 +268,7 @@ export async function POST(request: NextRequest) {
       }
       const updateResult = await updateOrganization(updateOrgId, updates)
       if (!updateResult.success) {
-        return NextResponse.json(
-          { error: updateResult.error },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: updateResult.error }, { status: 400 })
       }
       return NextResponse.json(updateResult)
     }
@@ -296,10 +287,7 @@ export async function POST(request: NextRequest) {
         scene_name: sceneName || null,
       })
       if (!sceneResult.success) {
-        return NextResponse.json(
-          { error: sceneResult.error },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: sceneResult.error }, { status: 400 })
       }
       return NextResponse.json(sceneResult)
     }

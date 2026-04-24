@@ -59,8 +59,7 @@ const args = process.argv.slice(2)
 const useModal = args.includes('--modal')
 const skipDetect = args.includes('--skip-detect')
 const datasetIdx = args.indexOf('--dataset')
-const datasetDir =
-  datasetIdx >= 0 ? args[datasetIdx + 1] : 'eval-dataset'
+const datasetDir = datasetIdx >= 0 ? args[datasetIdx + 1] : 'eval-dataset'
 const paramsIdx = args.indexOf('--params')
 const paramOverrides: Record<string, number> | undefined =
   paramsIdx >= 0 ? JSON.parse(args[paramsIdx + 1]) : undefined
@@ -246,7 +245,8 @@ function accelStats(perFrameCropX: number[], fps: number) {
   }
   accels.sort((x, y) => x - y)
   const mean = accels.reduce((s, x) => s + x, 0) / accels.length
-  const p95 = accels[Math.min(accels.length - 1, Math.floor(accels.length * 0.95))]
+  const p95 =
+    accels[Math.min(accels.length - 1, Math.floor(accels.length * 0.95))]
   const max = accels[accels.length - 1]
   return { mean, p95, max }
 }
@@ -408,7 +408,8 @@ function legacyKeyframeMatch(
       if (bestErr <= POSITION_TOLERANCE) correct++
     }
   }
-  const denom = correct + (truth.length - correct) + (generated.length - correct)
+  const denom =
+    correct + (truth.length - correct) + (generated.length - correct)
   return denom > 0 ? correct / denom : 0
 }
 
@@ -606,7 +607,9 @@ async function main() {
   // ── Write JSON ────────────────────────────────────────────────────
   let gitSha = 'unknown'
   try {
-    gitSha = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim()
+    gitSha = execSync('git rev-parse --short HEAD', {
+      encoding: 'utf-8',
+    }).trim()
   } catch {
     /* not in a git repo */
   }

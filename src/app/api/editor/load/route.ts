@@ -22,7 +22,8 @@ import type { CropClient } from '@/lib/editor/db-types'
 
 export const dynamic = 'force-dynamic'
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,8 +35,7 @@ export async function GET(request: NextRequest) {
     await requirePortraitCropEnabled(supabase)
 
     const jobIdParam = request.nextUrl.searchParams.get('jobId')
-    const recordingIdParam =
-      request.nextUrl.searchParams.get('recordingId')
+    const recordingIdParam = request.nextUrl.searchParams.get('recordingId')
 
     if (!jobIdParam && !recordingIdParam) {
       return NextResponse.json(

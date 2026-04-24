@@ -581,16 +581,14 @@ export async function upsertSceneMapping(data: {
   }
 
   // Assign or reassign
-  const { error } = await supabase
-    .from('playhub_scene_venue_mapping')
-    .upsert(
-      {
-        scene_id: data.scene_id,
-        organization_id: data.organization_id,
-        scene_name: data.scene_name || null,
-      },
-      { onConflict: 'scene_id' }
-    )
+  const { error } = await supabase.from('playhub_scene_venue_mapping').upsert(
+    {
+      scene_id: data.scene_id,
+      organization_id: data.organization_id,
+      scene_name: data.scene_name || null,
+    },
+    { onConflict: 'scene_id' }
+  )
 
   if (error) {
     console.error('Failed to assign scene:', error)
@@ -607,9 +605,7 @@ export async function fetchSpiideoScenes(): Promise<{
   error?: string
 }> {
   try {
-    const { getScenes, getAccountConfig } = await import(
-      '@/lib/spiideo/client'
-    )
+    const { getScenes, getAccountConfig } = await import('@/lib/spiideo/client')
     const config = getAccountConfig()
     if (!config.accountId) {
       return { scenes: [], error: 'Spiideo account not configured' }

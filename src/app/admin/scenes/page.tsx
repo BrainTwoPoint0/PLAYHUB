@@ -89,15 +89,11 @@ export default function AdminScenesPage() {
 
   // ── Helpers ────────────────────────────────────────────────────
 
-  const mappingBySceneId = new Map(
-    mappings.map((m) => [m.scene_id, m])
-  )
+  const mappingBySceneId = new Map(mappings.map((m) => [m.scene_id, m]))
   const venueOrgs = orgs.filter((o) => o.type === 'venue')
   const orgById = (id: string) => orgs.find((o) => o.id === id)
 
-  const assignedCount = scenes.filter((s) =>
-    mappingBySceneId.has(s.id)
-  ).length
+  const assignedCount = scenes.filter((s) => mappingBySceneId.has(s.id)).length
   const unassignedCount = scenes.length - assignedCount
 
   // Count scenes per venue
@@ -127,8 +123,7 @@ export default function AdminScenesPage() {
     const currentOrgId = mapping?.organization_id ?? ''
     const currentName = mapping?.scene_name ?? ''
     return (
-      edit.organizationId !== currentOrgId ||
-      edit.sceneName !== currentName
+      edit.organizationId !== currentOrgId || edit.sceneName !== currentName
     )
   }
 
@@ -238,7 +233,8 @@ export default function AdminScenesPage() {
         <h1 className="text-2xl font-bold tracking-tight">Scene Management</h1>
         <p className="text-sm text-muted-foreground mt-1">
           {scenes.length} scene{scenes.length !== 1 ? 's' : ''} from Spiideo
-          &middot; {assignedCount} assigned &middot; {unassignedCount} unassigned
+          &middot; {assignedCount} assigned &middot; {unassignedCount}{' '}
+          unassigned
         </p>
       </div>
 
@@ -323,9 +319,7 @@ export default function AdminScenesPage() {
             const state = getSceneState(scene.id)
             const mapping = mappingBySceneId.get(scene.id)
             const isAssigned = !!mapping?.organization_id
-            const venue = isAssigned
-              ? orgById(mapping!.organization_id!)
-              : null
+            const venue = isAssigned ? orgById(mapping!.organization_id!) : null
             const isUpdating = updating === scene.id
             const hasChanges = hasUnsavedChanges(scene.id)
 

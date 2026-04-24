@@ -51,7 +51,10 @@ export async function GET() {
       }
     )
   } catch (err: unknown) {
-    console.error('Status route error:', err instanceof Error ? err.message : err)
+    console.error(
+      'Status route error:',
+      err instanceof Error ? err.message : err
+    )
     return NextResponse.json({ error: 'Status check failed' }, { status: 500 })
   }
 }

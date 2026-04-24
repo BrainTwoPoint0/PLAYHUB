@@ -14,12 +14,12 @@ eval-dataset/
 
 ## Target composition (15 clips total)
 
-| Type | Count | Notes |
-|---|---|---|
-| Goals | 6 | The primary use case — fast transitions, ball often airborne |
-| Passage of play | 4 | Sustained attacking build-up, moderate ball speed |
-| Edge cases | 3 | 1 keeper long ball, 1 set piece, 1 corner with crowd in front of ball |
-| "Cursed" | 2 | 1 lens-flare / low-light, 1 two-ball scenario (warm-up ball visible) |
+| Type            | Count | Notes                                                                 |
+| --------------- | ----- | --------------------------------------------------------------------- |
+| Goals           | 6     | The primary use case — fast transitions, ball often airborne          |
+| Passage of play | 4     | Sustained attacking build-up, moderate ball speed                     |
+| Edge cases      | 3     | 1 keeper long ball, 1 set piece, 1 corner with crowd in front of ball |
+| "Cursed"        | 2     | 1 lens-flare / low-light, 1 two-ball scenario (warm-up ball visible)  |
 
 Of these, **1 clip is the "hero"**: densely labeled every frame. The other 14 are labeled every 5th frame.
 
@@ -44,9 +44,9 @@ Add the training provenance to each manifest entry's `leak_audit` field.
   "label_fps": 5,
   "source_fps": 30,
   "frames": [
-    { "frame": 0,  "t": 0.000, "ball": { "x": 850, "y": 420, "visible": true } },
-    { "frame": 6,  "t": 0.200, "ball": { "x": 870, "y": 430, "visible": true } },
-    { "frame": 12, "t": 0.400, "ball": { "visible": false } }
+    { "frame": 0, "t": 0.0, "ball": { "x": 850, "y": 420, "visible": true } },
+    { "frame": 6, "t": 0.2, "ball": { "x": 870, "y": 430, "visible": true } },
+    { "frame": 12, "t": 0.4, "ball": { "visible": false } }
   ]
 }
 ```
@@ -71,6 +71,7 @@ docker exec -it cvat_server bash -ic "python3 ~/manage.py createsuperuser"
 ```
 
 Workflow per clip:
+
 1. Upload clip to CVAT (Task → Create → add video → Label: `ball`, type: `rectangle`)
 2. Step through at 5fps (or full fps for hero clip): draw bbox around ball, tag `visible=false` for occluded frames
 3. Export as "CVAT for video 1.1" → convert to our schema with `scripts/portrait-crop/eval-dataset/cvat-to-labels.ts` (TBD — will scaffold on first use)

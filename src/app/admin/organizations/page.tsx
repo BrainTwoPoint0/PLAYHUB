@@ -339,7 +339,10 @@ export default function AdminOrganizationsPage() {
       const res = await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'createOrganization', orgData: createForm }),
+        body: JSON.stringify({
+          action: 'createOrganization',
+          orgData: createForm,
+        }),
       })
       const data = await res.json()
       if (!res.ok || !data.success) {
@@ -613,8 +616,9 @@ export default function AdminOrganizationsPage() {
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {featureFlags.map((feature) => {
-                  const isEnabled =
-                    createForm[feature.key as keyof typeof createForm] as boolean
+                  const isEnabled = createForm[
+                    feature.key as keyof typeof createForm
+                  ] as boolean
                   const Icon = feature.icon
                   return (
                     <button

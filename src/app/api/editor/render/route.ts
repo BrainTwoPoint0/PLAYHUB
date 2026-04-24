@@ -58,9 +58,7 @@ export async function POST(request: NextRequest) {
     // 1. Load job + keyframes (RLS scopes to caller's own rows).
     const { data: job, error: jobErr } = await sb
       .from('playhub_crop_jobs')
-      .select(
-        'id, recording_id, video_url, user_id, scene_changes, status'
-      )
+      .select('id, recording_id, video_url, user_id, scene_changes, status')
       .eq('id', jobId)
       .eq('user_id', user.id)
       .maybeSingle()
@@ -99,10 +97,7 @@ export async function POST(request: NextRequest) {
         .eq('id', job.recording_id)
         .maybeSingle()
       if (recErr || !recording) {
-        console.error(
-          '[editor/render] recording fetch error:',
-          recErr?.message
-        )
+        console.error('[editor/render] recording fetch error:', recErr?.message)
         return NextResponse.json(
           { error: 'Source recording not accessible' },
           { status: 403 }
@@ -184,10 +179,7 @@ export async function POST(request: NextRequest) {
         }))
       )
     )
-    form.append(
-      'scene_changes',
-      JSON.stringify(job.scene_changes ?? [])
-    )
+    form.append('scene_changes', JSON.stringify(job.scene_changes ?? []))
 
     const modalRes = await fetch(modalUrl, {
       method: 'POST',
@@ -256,14 +248,12 @@ export async function POST(request: NextRequest) {
 
     // 8. Feedback audit: exported action, no keyframes snapshot (that already
     //    exists on the last save). Failures here are log-only.
-    const { error: fbErr } = await sb
-      .from('playhub_crop_feedback')
-      .insert({
-        job_id: job.id,
-        user_id: user.id,
-        action: 'exported',
-        note: null,
-      })
+    const { error: fbErr } = await sb.from('playhub_crop_feedback').insert({
+      job_id: job.id,
+      user_id: user.id,
+      action: 'exported',
+      note: null,
+    })
     if (fbErr) {
       console.warn('[editor/render] feedback insert failed:', fbErr.message)
     }

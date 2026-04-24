@@ -12,10 +12,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import {
-  createClient,
-  getAuthUserStrict,
-} from '@/lib/supabase/server'
+import { createClient, getAuthUserStrict } from '@/lib/supabase/server'
 import {
   validateSavePayload,
   requirePortraitCropEnabled,
@@ -55,18 +52,21 @@ export async function POST(request: NextRequest) {
     // save_crop_job wraps job upsert + keyframe delete/insert + feedback
     // append in a single transaction. RLS applies per-caller, so a user
     // cannot touch another user's job even via this RPC.
-    const { data, error } = await sb.rpc('save_crop_job' as never, {
-      p_job_id: null,
-      p_recording_id: payload.recording_id,
-      p_video_url: payload.video_url,
-      p_status: payload.status,
-      p_scene_changes: payload.scene_changes,
-      p_codec_fingerprint: payload.codec_fingerprint,
-      p_modal_inference_ms: payload.modal_inference_ms,
-      p_modal_app_version: payload.modal_app_version,
-      p_keyframes: payload.keyframes,
-      p_feedback: payload.feedback,
-    } as never)
+    const { data, error } = await sb.rpc(
+      'save_crop_job' as never,
+      {
+        p_job_id: null,
+        p_recording_id: payload.recording_id,
+        p_video_url: payload.video_url,
+        p_status: payload.status,
+        p_scene_changes: payload.scene_changes,
+        p_codec_fingerprint: payload.codec_fingerprint,
+        p_modal_inference_ms: payload.modal_inference_ms,
+        p_modal_app_version: payload.modal_app_version,
+        p_keyframes: payload.keyframes,
+        p_feedback: payload.feedback,
+      } as never
+    )
 
     if (error) {
       // 42501 = not-owned / RLS denial. 28000 = unauthenticated.
@@ -77,13 +77,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Save failed' }, { status: 500 })
     }
 
-    const result = data as
-      | { jobId: string; status: string; updatedAt: string }
-      | null
+    const result = data as {
+      jobId: string
+      status: string
+      updatedAt: string
+    } | null
     if (!result) {
-      return NextResponse.json({ error: 'Save returned no result' }, {
-        status: 500,
-      })
+      return NextResponse.json(
+        { error: 'Save returned no result' },
+        {
+          status: 500,
+        }
+      )
     }
     return NextResponse.json(result)
   } catch (err: unknown) {

@@ -132,8 +132,7 @@ function validateKeyframe(raw: unknown, i: number): ValidatedKeyframe {
         ? r.x_pixels
         : NaN
   const source = r.source
-  const confidence =
-    typeof r.confidence === 'number' ? r.confidence : 0.5
+  const confidence = typeof r.confidence === 'number' ? r.confidence : 0.5
   const editedByUser =
     typeof r.editedByUser === 'boolean'
       ? r.editedByUser
@@ -143,10 +142,14 @@ function validateKeyframe(raw: unknown, i: number): ValidatedKeyframe {
   const editedAtRaw = r.editedAt ?? r.edited_at ?? null
 
   if (!isFinite(time) || time < 0) {
-    throw new ValidationError(`keyframes[${i}].time must be a non-negative number`)
+    throw new ValidationError(
+      `keyframes[${i}].time must be a non-negative number`
+    )
   }
   if (!isFinite(x) || x < 0 || x > SOURCE_WIDTH) {
-    throw new ValidationError(`keyframes[${i}].x out of range [0,${SOURCE_WIDTH}]`)
+    throw new ValidationError(
+      `keyframes[${i}].x out of range [0,${SOURCE_WIDTH}]`
+    )
   }
   if (
     typeof source !== 'string' ||
@@ -181,17 +184,18 @@ export function validateSavePayload(raw: unknown): ValidatedSavePayload {
   }
   const r = raw as Record<string, unknown>
 
-  const recordingIdProvided = r.recordingId !== null && r.recordingId !== undefined
+  const recordingIdProvided =
+    r.recordingId !== null && r.recordingId !== undefined
   const videoUrlProvided = r.videoUrl !== null && r.videoUrl !== undefined
   if (recordingIdProvided === videoUrlProvided) {
     throw new ValidationError('Provide exactly one of recordingId or videoUrl')
   }
   const recordingId = recordingIdProvided
-    ? (isUuid(r.recordingId)
-        ? (r.recordingId as string)
-        : (() => {
-            throw new ValidationError('recordingId must be a UUID')
-          })())
+    ? isUuid(r.recordingId)
+      ? (r.recordingId as string)
+      : (() => {
+          throw new ValidationError('recordingId must be a UUID')
+        })()
     : null
   const videoUrl = videoUrlProvided ? validateVideoUrl(r.videoUrl) : null
 
@@ -220,7 +224,9 @@ export function validateSavePayload(raw: unknown): ValidatedSavePayload {
   }
   const sceneChanges = sceneChangesRaw.map((v, i) => {
     if (typeof v !== 'number' || !isFinite(v) || v < 0) {
-      throw new ValidationError(`sceneChanges[${i}] must be a non-negative number`)
+      throw new ValidationError(
+        `sceneChanges[${i}] must be a non-negative number`
+      )
     }
     return Number(v.toFixed(3))
   })
@@ -235,7 +241,9 @@ export function validateSavePayload(raw: unknown): ValidatedSavePayload {
     codec === null || (typeof codec === 'object' && !Array.isArray(codec))
       ? (codec as Record<string, unknown> | null)
       : (() => {
-          throw new ValidationError('codecFingerprint must be an object or null')
+          throw new ValidationError(
+            'codecFingerprint must be an object or null'
+          )
         })()
 
   const msRaw = r.modalInferenceMs ?? r.modal_inference_ms ?? null
@@ -245,7 +253,9 @@ export function validateSavePayload(raw: unknown): ValidatedSavePayload {
       : typeof msRaw === 'number' && isFinite(msRaw) && msRaw >= 0
         ? Math.round(msRaw)
         : (() => {
-            throw new ValidationError('modalInferenceMs must be a non-negative number')
+            throw new ValidationError(
+              'modalInferenceMs must be a non-negative number'
+            )
           })()
 
   const verRaw = r.modalAppVersion ?? r.modal_app_version ?? null
@@ -255,7 +265,9 @@ export function validateSavePayload(raw: unknown): ValidatedSavePayload {
       : typeof verRaw === 'string' && verRaw.length <= 100
         ? verRaw
         : (() => {
-            throw new ValidationError('modalAppVersion must be a string ≤100 chars')
+            throw new ValidationError(
+              'modalAppVersion must be a string ≤100 chars'
+            )
           })()
 
   let feedback: ValidatedSavePayload['feedback'] = null
