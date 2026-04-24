@@ -160,7 +160,12 @@ export default function NavBar() {
               ) : user ? (
                 <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                   <PopoverTrigger asChild>
-                    <button className="h-8 w-8 items-center justify-center rounded-full bg-secondary text-xs font-medium text-[var(--timberwolf)] hover:bg-secondary/80 transition-colors ring-1 ring-border flex">
+                    <button
+                      aria-label="Account menu"
+                      aria-haspopup="menu"
+                      aria-expanded={popoverOpen}
+                      className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-secondary text-xs font-medium text-[var(--timberwolf)] hover:bg-secondary/80 transition-colors ring-1 ring-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--timberwolf)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--night)]"
+                    >
                       {getUserInitials(profile.data?.full_name, user.email)}
                     </button>
                   </PopoverTrigger>
@@ -195,7 +200,7 @@ export default function NavBar() {
                         onClick={() =>
                           (window.location.href = '/api/auth/signout')
                         }
-                        className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-red-400 hover:text-red-300 hover:bg-muted/50 transition-colors"
+                        className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted/50 transition-colors"
                       >
                         <LogOut className="h-3.5 w-3.5" />
                         Sign out
@@ -224,8 +229,11 @@ export default function NavBar() {
             {/* Mobile menu — always visible on mobile */}
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
-                <button className="md:hidden flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-accent transition-colors">
-                  <Menu className="h-4 w-4" />
+                <button
+                  aria-label="Open menu"
+                  className="md:hidden inline-flex h-11 w-11 -mr-1 items-center justify-center rounded-md text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--timberwolf)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--night)]"
+                >
+                  <Menu className="h-5 w-5" />
                 </button>
               </SheetTrigger>
               <SheetContent
