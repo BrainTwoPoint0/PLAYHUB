@@ -1,5 +1,13 @@
 [build]
-  command = "npm run build"
+  # Wipe node_modules and .next before every build. Local `netlify build`
+  # produces the correct output for the SiteFooter / commons 0.2.5 swap
+  # but the cloud build environment was producing identical-to-old output
+  # — strong signal of a sticky cached node_modules or .next/cache that
+  # survived "Clear cache and deploy site". Forcing a clean install via
+  # the build command itself bypasses every cache layer Netlify can hold
+  # onto. Switch back to plain `npm run build` after one clean deploy
+  # confirms SiteFooter is in production.
+  command = "rm -rf node_modules .next && npm ci && npm run build"
   publish = ".next"
 
 [build.environment]
