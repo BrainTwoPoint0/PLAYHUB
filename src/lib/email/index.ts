@@ -1,18 +1,25 @@
-import { Resend } from 'resend'
-
-const resend = new Resend(process.env.RESEND_API_KEY)
-
+import {
+  createResendClient,
+  type SendEmailResult,
+} from '@braintwopoint0/playback-commons/email'
 import { escapeHtml } from '@braintwopoint0/playback-commons/security'
+
+// Lazy client - module-scope `new Resend(process.env.RESEND_API_KEY)` breaks
+// `next build` during page-data collection when the env var isn't set.
+function getResend() {
+  const client = createResendClient(process.env.RESEND_API_KEY)
+  if (!client) {
+    throw new Error('[email] RESEND_API_KEY is not set')
+  }
+  return client
+}
 
 const FROM_EMAIL = 'PLAYHUB <admin@playbacksports.ai>'
 const FROM_ALERT_EMAIL = 'PLAYHUB Alerts <admin@playbacksports.ai>'
 const APP_URL =
   process.env.NEXT_PUBLIC_APP_URL || 'https://playhub.playbacksports.ai'
 
-interface SendEmailResult {
-  success: boolean
-  error?: string
-}
+export type { SendEmailResult }
 
 /**
  * Send venue admin invitation email
@@ -30,7 +37,7 @@ export async function sendAdminInviteEmail(params: {
     : undefined
 
   try {
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from: FROM_EMAIL,
       to: toEmail,
       subject: `You've been invited to manage ${venueName} on PLAYHUB`,
@@ -107,7 +114,7 @@ export async function sendRecordingAccessEmail(params: {
   const actionText = shareUrl ? 'Watch recording' : 'Create your account'
 
   try {
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from: FROM_EMAIL,
       to: toEmail,
       subject: `You've been given access to "${recordingTitle}" on PLAYHUB`,
@@ -189,7 +196,7 @@ export async function sendRecordingAssignedEmail(params: {
     : undefined
 
   try {
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from: FROM_EMAIL,
       to: toEmail,
       subject: `New recording added to your library: "${recordingTitle}"`,
@@ -277,7 +284,7 @@ export async function sendAdminAddedEmail(params: {
   const fullDashboardUrl = `${APP_URL}${dashboardUrl}`
 
   try {
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from: FROM_EMAIL,
       to: toEmail,
       subject: `You've been added as an admin on PLAYHUB`,
@@ -537,7 +544,7 @@ export async function sendInvoiceEmail(
   const html = renderInvoiceEmailHtml({ periodLabel, ...rest })
 
   try {
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from: FROM_EMAIL,
       to: toEmail,
       subject: `Your PLAYHUB invoice for ${periodLabel}`,
@@ -570,7 +577,7 @@ export async function sendBookingConfirmationEmail(params: {
   const pitchName = escapeHtml(params.pitchName)
 
   try {
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from: FROM_EMAIL,
       to: toEmail,
       subject: `Your recording is scheduled at ${params.venueName}`,
@@ -648,7 +655,7 @@ export async function sendSchedulingFailureAlert(params: {
   } = params
 
   try {
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from: FROM_ALERT_EMAIL,
       to: toEmail,
       subject: `ALERT: Recording scheduling failed after payment`,
@@ -709,7 +716,7 @@ export async function sendRecordingReadyEmail(params: {
   const actionUrl = watchUrl || `${APP_URL}/recordings`
 
   try {
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from: FROM_EMAIL,
       to: toEmail,
       subject: `Your recording is ready: "${recordingTitle}"`,
