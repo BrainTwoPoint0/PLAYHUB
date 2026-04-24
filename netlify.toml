@@ -1,30 +1,9 @@
 [build]
-  # Wipe node_modules and .next before every build. Local `netlify build`
-  # produces the correct output for the SiteFooter / commons 0.2.5 swap
-  # but the cloud build environment was producing identical-to-old output
-  # — strong signal of a sticky cached node_modules or .next/cache that
-  # survived "Clear cache and deploy site". Forcing a clean install via
-  # the build command itself bypasses every cache layer Netlify can hold
-  # onto. Switch back to plain `npm run build` after one clean deploy
-  # confirms SiteFooter is in production.
-  command = "rm -rf node_modules .next && npm ci && npm run build"
+  command = "npm run build"
   publish = ".next"
 
 [build.environment]
-  # Temporarily disabled — skew protection was holding old prerender output
-  # alive past the d191bd6 deploy, so the SiteFooter swap wasn't reaching
-  # production. Flip back to "true" once the latest deploy has fully taken
-  # over and we want chunk-version stickiness back.
-  NETLIFY_NEXT_SKEW_PROTECTION = "false"
-
-  # Temporarily disabled — the documented escape hatch when `.next/cache`
-  # holds stale prerender entries across builds and "Clear cache and
-  # deploy site" from the dashboard does not flush them. Forcing this off
-  # makes the next build regenerate every prerendered page from scratch.
-  # Flip back to default (unset / "true") once a clean deploy is live so
-  # subsequent builds can use the cache for speed again.
-  # See: https://gist.github.com/hcastro/1d8489eb164fba4c3276c50461715ece
-  NETLIFY_NEXT_PLUGIN_CACHE = "false"
+  NETLIFY_NEXT_SKEW_PROTECTION = "true"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
