@@ -9,5 +9,14 @@
   # over and we want chunk-version stickiness back.
   NETLIFY_NEXT_SKEW_PROTECTION = "false"
 
+  # Temporarily disabled — the documented escape hatch when `.next/cache`
+  # holds stale prerender entries across builds and "Clear cache and
+  # deploy site" from the dashboard does not flush them. Forcing this off
+  # makes the next build regenerate every prerendered page from scratch.
+  # Flip back to default (unset / "true") once a clean deploy is live so
+  # subsequent builds can use the cache for speed again.
+  # See: https://gist.github.com/hcastro/1d8489eb164fba4c3276c50461715ece
+  NETLIFY_NEXT_PLUGIN_CACHE = "false"
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"
