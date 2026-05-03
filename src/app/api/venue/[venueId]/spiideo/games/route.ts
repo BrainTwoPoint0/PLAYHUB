@@ -74,10 +74,30 @@ export async function POST(
     }
   }
 
-  // Calculate duration from start/stop for the helper
+  // Calculate duration from start/stop for the helper.
+  // Validate timestamps parse cleanly, the window is positive, and the cap
+  // (4 hours) blocks accidental admin entries from invoicing thousands of hours.
   const startMs = new Date(scheduledStartTime).getTime()
   const stopMs = new Date(scheduledStopTime).getTime()
+  if (!Number.isFinite(startMs) || !Number.isFinite(stopMs)) {
+    return NextResponse.json(
+      {
+        error:
+          'scheduledStartTime and scheduledStopTime must be valid ISO 8601 timestamps',
+      },
+      { status: 400 }
+    )
+  }
   const durationMinutes = Math.round((stopMs - startMs) / 60_000)
+  const MAX_DURATION_MINUTES = 240
+  if (durationMinutes <= 0 || durationMinutes > MAX_DURATION_MINUTES) {
+    return NextResponse.json(
+      {
+        error: `Recording duration must be between 1 and ${MAX_DURATION_MINUTES} minutes (got ${durationMinutes}).`,
+      },
+      { status: 400 }
+    )
+  }
 
   // Determine if user is a tenant (schedules at venue via organization_venue_access)
   // Check if user is a direct member or parent admin of this venue
@@ -173,7 +193,10 @@ export async function POST(
       title,
       description: description || '',
       createdBy: user.id,
-      collectedBy: ownerOrgId ? 'venue' : 'venue',
+      // Admin-scheduled recordings are always venue-collected. The QR/Stripe
+      // self-service flow (`/api/start/[cameraId]`) is the only path that
+      // sets collected_by = 'playhub'.
+      collectedBy: 'venue',
       isBillable: isBillable ?? true,
       billableAmount,
       accessEmails,

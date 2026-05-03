@@ -5,7 +5,7 @@ import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
 import { isPlatformAdmin } from '@/lib/admin/auth'
-import { getKwdToEurRate } from '@/lib/fx/rates'
+import { getKwdToEurRate, getEurToAedRate } from '@/lib/fx/rates'
 
 type RouteContext = { params: Promise<{ venueId: string }> }
 
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   // Query billable recordings for this month
   const { data: monthRecordings } = await serviceClient
     .from('playhub_match_recordings')
-    .select('id, billable_amount, collected_by, created_at')
+    .select('id, billable_amount, collected_by, created_at, duration_seconds')
     .eq('organization_id', venueId)
     .eq('is_billable', true)
     .eq('status', 'published')
@@ -98,13 +98,37 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   }
 
   const recordings = monthRecordings || []
-  const fixedCostEur = Number(config?.fixed_cost_eur) || 0
+  const fixedCostEurPerHour = Number(config?.fixed_cost_eur) || 0
   const ambassadorPct = Number(config?.ambassador_pct) || 0
   const venuePct = Number(config?.venue_profit_share_pct) || 0
+  const venueCurrency = (config?.currency || 'KWD').toUpperCase()
 
-  // Convert EUR fixed cost to KWD using live FX rate
-  const kwdToEurRate = await getKwdToEurRate()
-  const fixedCostKwd = fixedCostEur > 0 ? fixedCostEur / kwdToEurRate : 0
+  // Convert per-hour EUR fixed cost into venue's local currency.
+  // Only KWD and AED have FX paths today; unknown currencies return 400 rather
+  // than silently equate EUR to local.
+  let perHourFixedCostLocal = 0
+  let fxRate = 0
+  if (fixedCostEurPerHour > 0) {
+    if (venueCurrency === 'KWD') {
+      const kwdToEur = await getKwdToEurRate()
+      perHourFixedCostLocal = fixedCostEurPerHour / kwdToEur
+      fxRate = kwdToEur
+    } else if (venueCurrency === 'AED') {
+      const eurToAed = await getEurToAedRate()
+      perHourFixedCostLocal = fixedCostEurPerHour * eurToAed
+      fxRate = eurToAed
+    } else if (venueCurrency === 'EUR') {
+      perHourFixedCostLocal = fixedCostEurPerHour
+      fxRate = 1
+    } else {
+      return NextResponse.json(
+        {
+          error: `Unsupported venue currency for cost conversion: ${venueCurrency}. Supported: KWD, AED, EUR.`,
+        },
+        { status: 400 }
+      )
+    }
+  }
 
   // Revenue: use billable_amount if set, otherwise default from config (5 KWD)
   const totalRevenue = recordings.reduce(
@@ -133,17 +157,19 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     0
   )
 
-  // Profit share calculation (per agreement Section 6.3):
-  // cost_per_recording = fixed_cost_eur (in KWD) + ambassador_pct% of price
+  // Profit share calculation:
+  // fixed_cost_eur is stored as a per-hour figure; cost scales by recording duration.
+  // cost_per_recording = perHourFixedCostLocal * hours + ambassador_pct% of price
   // profit = revenue - total_costs
   // venue_keeps = profit * venue_pct%
-
-  // Helper: calculate cost for a set of recordings
+  // Recordings missing duration_seconds (legacy rows) fall back to 1 hour.
   function totalCost(recs: any[]) {
     return recs.reduce((sum: number, r: any) => {
+      const seconds = r.duration_seconds ?? 3600
+      const hours = (Number(seconds) || 3600) / 3600
       const price = Number(r.billable_amount) || defaultAmount
       const ambassadorFee = price * (ambassadorPct / 100)
-      return sum + fixedCostKwd + ambassadorFee
+      return sum + perHourFixedCostLocal * hours + ambassadorFee
     }, 0)
   }
 
@@ -177,10 +203,10 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     playhubCollectedRevenue: Number(playhubCollectedRevenue.toFixed(3)),
     playhubOwesVenue: Number(playhubOwesVenue.toFixed(3)),
     netBalance: Number(netBalance.toFixed(3)),
-    fixedCostEur: fixedCostEur,
+    fixedCostEur: fixedCostEurPerHour,
     ambassadorPct: ambassadorPct,
     venueProfitSharePct: venuePct,
-    fxRate: Number(kwdToEurRate.toFixed(4)),
+    fxRate: Number(fxRate.toFixed(4)),
     dailyTarget: config?.daily_recording_target || 0,
     todayCount: todayRecordings?.length || 0,
     monthStart,

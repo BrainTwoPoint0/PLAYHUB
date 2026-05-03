@@ -185,23 +185,36 @@ describe('generateMonthlyInvoice', () => {
     expect(result).not.toBeNull()
     expect(result!.recordingCount).toBe(2)
 
-    // Stripe should be called: 30 total revenue, 30% venue keeps = 9, venue owes 21
+    // 30 total revenue, 30% venue keeps = 9, venue owes 21. Stripe is invoked
+    // with idempotency keys derived from (venueId, year, month).
     expect(stripe.invoices.create).toHaveBeenCalledWith(
       expect.objectContaining({
         customer: 'cus_123',
         collection_method: 'send_invoice',
         days_until_due: 30,
+      }),
+      expect.objectContaining({
+        idempotencyKey: 'invoice:venue-1:2026:02:create',
       })
     )
-
-    // Invoice should be finalized
-    expect(stripe.invoices.finalizeInvoice).toHaveBeenCalledWith('inv_123')
 
     // Line item amount: 21 * 1000 = 21000 (KWD 3 decimals)
     expect(stripe.invoiceItems.create).toHaveBeenCalledWith(
       expect.objectContaining({
         amount: 21000,
         currency: 'kwd',
+      }),
+      expect.objectContaining({
+        idempotencyKey: 'invoice:venue-1:2026:02:item',
+      })
+    )
+
+    // Invoice should be finalized with its own idempotency key
+    expect(stripe.invoices.finalizeInvoice).toHaveBeenCalledWith(
+      'inv_123',
+      undefined,
+      expect.objectContaining({
+        idempotencyKey: 'invoice:venue-1:2026:02:finalize',
       })
     )
   })
@@ -275,5 +288,151 @@ describe('generateMonthlyInvoice', () => {
     await expect(
       generateMonthlyInvoice('venue-1', 2026, 2, { supabase, stripe })
     ).rejects.toThrow('Failed to insert invoice')
+  })
+
+  it('writes per-recording line items with cost-basis snapshot', async () => {
+    supabase = createSupabaseMock()
+
+    let singleCallCount = 0
+    supabase.single.mockImplementation(() => {
+      singleCallCount++
+      if (singleCallCount === 1) {
+        return Promise.resolve({
+          data: {
+            organization_id: 'venue-1',
+            stripe_customer_id: null,
+            currency: 'KWD',
+            fixed_cost_eur: 9.71,
+            venue_profit_share_pct: 25,
+            ambassador_pct: 10,
+          },
+          error: null,
+        })
+      }
+      return Promise.resolve({
+        data: { id: 'invoice-1', status: 'draft' },
+        error: null,
+      })
+    })
+
+    supabase.maybeSingle.mockResolvedValue({ data: null, error: null })
+    supabase.lte.mockResolvedValueOnce({
+      data: [
+        {
+          id: 'r-90',
+          title: '90-min match',
+          match_date: '2026-02-15T10:00:00Z',
+          billable_amount: 7.5,
+          collected_by: 'venue',
+          duration_seconds: 5400,
+        },
+      ],
+      error: null,
+    })
+
+    // Capture inserts to confirm the line item snapshot
+    const inserts: any[] = []
+    supabase.insert.mockImplementation((payload: any) => {
+      inserts.push(payload)
+      return supabase
+    })
+
+    await generateMonthlyInvoice('venue-1', 2026, 2, { supabase, stripe })
+
+    const lineItemInsert = inserts.find(
+      (p) => Array.isArray(p) && p[0]?.recording_id
+    )
+    expect(lineItemInsert).toBeDefined()
+    expect(lineItemInsert).toHaveLength(1)
+    expect(lineItemInsert[0]).toMatchObject({
+      recording_id: 'r-90',
+      duration_seconds: 5400,
+      billable_amount: 7.5,
+      currency: 'KWD',
+      collected_by: 'venue',
+      fixed_cost_eur_per_hour: 9.71,
+    })
+    // 9.71 EUR/hr ÷ ~2.85 KWD-EUR (live or fallback) × 1.5 hr — sanity-check
+    // that the snapshot stored a positive scaled cost rather than zero.
+    expect(lineItemInsert[0].fixed_cost_local).toBeGreaterThan(0)
+    // ambassador fee = 10% of 7.5 = 0.75
+    expect(lineItemInsert[0].ambassador_fee).toBeCloseTo(0.75, 3)
+  })
+
+  it('uses correct minor-unit factor for AED (2-decimal)', async () => {
+    supabase = createSupabaseMock()
+
+    let singleCallCount = 0
+    supabase.single.mockImplementation(() => {
+      singleCallCount++
+      if (singleCallCount === 1) {
+        return Promise.resolve({
+          data: {
+            organization_id: 'venue-1',
+            stripe_customer_id: 'cus_aed',
+            currency: 'AED',
+            fixed_cost_eur: 0,
+            venue_profit_share_pct: 30,
+          },
+          error: null,
+        })
+      }
+      return Promise.resolve({
+        data: { id: 'inv-aed', status: 'draft' },
+        error: null,
+      })
+    })
+
+    supabase.maybeSingle.mockResolvedValue({ data: null, error: null })
+    supabase.lte.mockResolvedValueOnce({
+      data: [
+        {
+          id: 'r-aed',
+          title: 'AED match',
+          match_date: '2026-02-10T10:00:00Z',
+          billable_amount: 100,
+          collected_by: 'venue',
+          duration_seconds: 3600,
+        },
+      ],
+      error: null,
+    })
+
+    await generateMonthlyInvoice('venue-1', 2026, 2, { supabase, stripe })
+
+    // Net = 100 - (0 fixed - 0% ambassador) = 100; venue keeps 30% = 30; owes 70.
+    // AED uses 100x minor-unit factor (fils), so 70 AED = 7000 fils.
+    expect(stripe.invoiceItems.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 7000,
+        currency: 'aed',
+      }),
+      expect.objectContaining({
+        idempotencyKey: expect.stringContaining('item'),
+      })
+    )
+  })
+
+  it('rejects unsupported currencies before any Stripe or DB writes', async () => {
+    supabase = createSupabaseMock()
+
+    supabase.single.mockResolvedValueOnce({
+      data: {
+        organization_id: 'venue-1',
+        stripe_customer_id: 'cus_x',
+        currency: 'XYZ',
+        fixed_cost_eur: 5,
+        venue_profit_share_pct: 30,
+      },
+      error: null,
+    })
+
+    supabase.maybeSingle.mockResolvedValue({ data: null, error: null })
+    supabase.lte.mockResolvedValueOnce({ data: [], error: null })
+
+    await expect(
+      generateMonthlyInvoice('venue-1', 2026, 2, { supabase, stripe })
+    ).rejects.toThrow(/Unsupported venue currency/)
+    expect(stripe.invoices.create).not.toHaveBeenCalled()
   })
 })

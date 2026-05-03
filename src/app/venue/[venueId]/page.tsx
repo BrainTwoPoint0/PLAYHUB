@@ -152,6 +152,8 @@ interface BillingSummary {
   netBalance: number // positive = venue owes PLAYHUB, negative = PLAYHUB owes venue
   dailyTarget: number
   todayCount: number
+  venueProfitSharePct?: number
+  ambassadorPct?: number
 }
 
 interface DailyStats {
@@ -1870,112 +1872,141 @@ export default function VenueManagementPage() {
                       )}
                     </div>
 
-                    {/* Financial summary — 3 columns with 1px gap borders */}
-                    {billingSummary && (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted mb-4">
-                        {/* Venue-collected revenue */}
-                        <div className="bg-[var(--night)] p-3.5">
-                          <div className="flex items-center gap-1.5 mb-1.5">
-                            <div className="h-1.5 w-1.5 rounded-full bg-amber-400/60" />
-                            <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
-                              At venue
-                            </p>
-                          </div>
-                          <p
-                            className="text-lg font-semibold text-[var(--timberwolf)]"
-                            style={{ fontVariantNumeric: 'tabular-nums' }}
+                    {/* Financial summary — hide profit/settlement cards when no profit-share or ambassador relationship */}
+                    {billingSummary &&
+                      (() => {
+                        const hasProfitShare =
+                          (billingSummary.venueProfitSharePct ?? 0) > 0 ||
+                          (billingSummary.ambassadorPct ?? 0) > 0
+                        const gridCols = hasProfitShare
+                          ? 'md:grid-cols-4'
+                          : 'md:grid-cols-2'
+                        return (
+                          <div
+                            className={`grid grid-cols-2 ${gridCols} gap-px rounded-lg overflow-hidden bg-muted mb-4`}
                           >
-                            {billingSummary.venueCollectedRevenue.toFixed(3)}
-                            <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
-                              {billingSummary.currency}
-                            </span>
-                          </p>
-                          <p className="text-[10px] text-muted-foreground/40 mt-1">
-                            {billingSummary.venueCollectedCount} recording
-                            {billingSummary.venueCollectedCount === 1
-                              ? ''
-                              : 's'}
-                          </p>
-                        </div>
-                        {/* QR Code-collected revenue */}
-                        <div className="bg-[var(--night)] p-3.5">
-                          <div className="flex items-center gap-1.5 mb-1.5">
-                            <div className="h-1.5 w-1.5 rounded-full bg-indigo-400/60" />
-                            <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
-                              QR Code
-                            </p>
+                            {/* Venue-collected revenue */}
+                            <div className="bg-[var(--night)] p-3.5">
+                              <div className="flex items-center gap-1.5 mb-1.5">
+                                <div className="h-1.5 w-1.5 rounded-full bg-amber-400/60" />
+                                <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
+                                  At venue
+                                </p>
+                              </div>
+                              <p
+                                className="text-lg font-semibold text-[var(--timberwolf)]"
+                                style={{ fontVariantNumeric: 'tabular-nums' }}
+                              >
+                                {billingSummary.venueCollectedRevenue.toFixed(
+                                  3
+                                )}
+                                <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
+                                  {billingSummary.currency}
+                                </span>
+                              </p>
+                              <p className="text-[10px] text-muted-foreground/40 mt-1">
+                                {billingSummary.venueCollectedCount} recording
+                                {billingSummary.venueCollectedCount === 1
+                                  ? ''
+                                  : 's'}
+                              </p>
+                            </div>
+                            {/* QR Code-collected revenue */}
+                            <div className="bg-[var(--night)] p-3.5">
+                              <div className="flex items-center gap-1.5 mb-1.5">
+                                <div className="h-1.5 w-1.5 rounded-full bg-indigo-400/60" />
+                                <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
+                                  QR Code
+                                </p>
+                              </div>
+                              <p
+                                className="text-lg font-semibold text-[var(--timberwolf)]"
+                                style={{ fontVariantNumeric: 'tabular-nums' }}
+                              >
+                                {billingSummary.playhubCollectedRevenue.toFixed(
+                                  3
+                                )}
+                                <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
+                                  {billingSummary.currency}
+                                </span>
+                              </p>
+                              <p className="text-[10px] text-muted-foreground/40 mt-1">
+                                {billingSummary.playhubCollectedCount} recording
+                                {billingSummary.playhubCollectedCount === 1
+                                  ? ''
+                                  : 's'}
+                              </p>
+                            </div>
+                            {hasProfitShare && (
+                              <>
+                                {/* Venue profit share */}
+                                <div className="bg-[var(--night)] p-3.5">
+                                  <div className="flex items-center gap-1.5 mb-1.5">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-400/60" />
+                                    <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
+                                      Your profit
+                                    </p>
+                                  </div>
+                                  <p
+                                    className="text-lg font-semibold text-emerald-400"
+                                    style={{
+                                      fontVariantNumeric: 'tabular-nums',
+                                    }}
+                                  >
+                                    {billingSummary.venueTotalProfit.toFixed(3)}
+                                    <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
+                                      {billingSummary.currency}
+                                    </span>
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground/40 mt-1">
+                                    {billingSummary.count} recording
+                                    {billingSummary.count === 1
+                                      ? ''
+                                      : 's'} in{' '}
+                                    {new Date(
+                                      billingYear,
+                                      billingMonth - 1
+                                    ).toLocaleDateString('en-GB', {
+                                      month: 'long',
+                                    })}
+                                  </p>
+                                </div>
+                                {/* Net settlement */}
+                                <div className="bg-[var(--night)] p-3.5">
+                                  <div className="flex items-center gap-1.5 mb-1.5">
+                                    <div
+                                      className={`h-1.5 w-1.5 rounded-full ${billingSummary.netBalance > 0 ? 'bg-amber-400/60' : billingSummary.netBalance < 0 ? 'bg-emerald-400/60' : 'bg-[var(--ash-grey)]/40'}`}
+                                    />
+                                    <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
+                                      Net settlement
+                                    </p>
+                                  </div>
+                                  <p
+                                    className="text-lg font-semibold text-[var(--timberwolf)]"
+                                    style={{
+                                      fontVariantNumeric: 'tabular-nums',
+                                    }}
+                                  >
+                                    {Math.abs(
+                                      billingSummary.netBalance
+                                    ).toFixed(3)}
+                                    <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
+                                      {billingSummary.currency}
+                                    </span>
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground/40 mt-1">
+                                    {billingSummary.netBalance > 0
+                                      ? 'venue owes PLAYBACK'
+                                      : billingSummary.netBalance < 0
+                                        ? 'PLAYBACK owes venue'
+                                        : 'settled'}
+                                  </p>
+                                </div>
+                              </>
+                            )}
                           </div>
-                          <p
-                            className="text-lg font-semibold text-[var(--timberwolf)]"
-                            style={{ fontVariantNumeric: 'tabular-nums' }}
-                          >
-                            {billingSummary.playhubCollectedRevenue.toFixed(3)}
-                            <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
-                              {billingSummary.currency}
-                            </span>
-                          </p>
-                          <p className="text-[10px] text-muted-foreground/40 mt-1">
-                            {billingSummary.playhubCollectedCount} recording
-                            {billingSummary.playhubCollectedCount === 1
-                              ? ''
-                              : 's'}
-                          </p>
-                        </div>
-                        {/* Venue profit share */}
-                        <div className="bg-[var(--night)] p-3.5">
-                          <div className="flex items-center gap-1.5 mb-1.5">
-                            <div className="h-1.5 w-1.5 rounded-full bg-emerald-400/60" />
-                            <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
-                              Your profit
-                            </p>
-                          </div>
-                          <p
-                            className="text-lg font-semibold text-emerald-400"
-                            style={{ fontVariantNumeric: 'tabular-nums' }}
-                          >
-                            {billingSummary.venueTotalProfit.toFixed(3)}
-                            <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
-                              {billingSummary.currency}
-                            </span>
-                          </p>
-                          <p className="text-[10px] text-muted-foreground/40 mt-1">
-                            {billingSummary.count} recording
-                            {billingSummary.count === 1 ? '' : 's'} in{' '}
-                            {new Date(
-                              billingYear,
-                              billingMonth - 1
-                            ).toLocaleDateString('en-GB', { month: 'long' })}
-                          </p>
-                        </div>
-                        {/* Net settlement */}
-                        <div className="bg-[var(--night)] p-3.5">
-                          <div className="flex items-center gap-1.5 mb-1.5">
-                            <div
-                              className={`h-1.5 w-1.5 rounded-full ${billingSummary.netBalance > 0 ? 'bg-amber-400/60' : billingSummary.netBalance < 0 ? 'bg-emerald-400/60' : 'bg-[var(--ash-grey)]/40'}`}
-                            />
-                            <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
-                              Net settlement
-                            </p>
-                          </div>
-                          <p
-                            className="text-lg font-semibold text-[var(--timberwolf)]"
-                            style={{ fontVariantNumeric: 'tabular-nums' }}
-                          >
-                            {Math.abs(billingSummary.netBalance).toFixed(3)}
-                            <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
-                              {billingSummary.currency}
-                            </span>
-                          </p>
-                          <p className="text-[10px] text-muted-foreground/40 mt-1">
-                            {billingSummary.netBalance > 0
-                              ? 'venue owes PLAYBACK'
-                              : billingSummary.netBalance < 0
-                                ? 'PLAYBACK owes venue'
-                                : 'settled'}
-                          </p>
-                        </div>
-                      </div>
-                    )}
+                        )
+                      })()}
 
                     {/* Daily recordings chart */}
                     {dailyStats && dailyStats.scenes.length > 0 && (

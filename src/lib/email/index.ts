@@ -340,8 +340,10 @@ export interface InvoiceEmailParams {
   periodLabel: string
   currency: string
   stripeInvoiceUrl?: string
-  // Costs
-  fixedCostPerRecording: number
+  // Costs (per-hour cost basis)
+  fixedCostPerHour: number
+  totalHours: number
+  totalFixedCosts: number
   ambassadorPct: number
   // Breakdown
   venueCollectedCount: number
@@ -362,7 +364,9 @@ export function renderInvoiceEmailHtml(params: InvoiceEmailParams): string {
     periodLabel,
     currency,
     stripeInvoiceUrl,
-    fixedCostPerRecording,
+    fixedCostPerHour,
+    totalHours,
+    totalFixedCosts,
     ambassadorPct,
     venueCollectedCount,
     venueCollectedRevenue,
@@ -380,12 +384,13 @@ export function renderInvoiceEmailHtml(params: InvoiceEmailParams): string {
 
   const totalCount = venueCollectedCount + playhubCollectedCount
   const totalRevenue = venueCollectedRevenue + playhubCollectedRevenue
-  const totalFixedCosts = fixedCostPerRecording * totalCount
   const totalAmbassadorCost = totalRevenue * (ambassadorPct / 100)
   const totalProfit = Math.max(
     0,
     totalRevenue - totalFixedCosts - totalAmbassadorCost
   )
+  const hoursLabel =
+    totalHours % 1 === 0 ? totalHours.toString() : totalHours.toFixed(1)
 
   // Build collector-specific breakdown rows
   let venueSection = ''
@@ -462,7 +467,7 @@ export function renderInvoiceEmailHtml(params: InvoiceEmailParams): string {
           <p style="font-size: 13px; font-weight: 600; color: #b9baa3; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 0.5px;">Costs</p>
           <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
             <tr>
-              <td style="padding: 4px 0; color: #b9baa3;">Fixed cost (${totalCount} × ${fmt(fixedCostPerRecording)})</td>
+              <td style="padding: 4px 0; color: #b9baa3;">Fixed cost (${hoursLabel} hr × ${fmt(fixedCostPerHour)}/hr)</td>
               <td style="padding: 4px 0; text-align: right;">-${fmt(totalFixedCosts)}</td>
             </tr>
             ${

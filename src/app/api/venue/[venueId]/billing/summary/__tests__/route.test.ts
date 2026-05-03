@@ -8,12 +8,14 @@ const {
   mockIsPlatformAdmin,
   mockServiceFrom,
   mockGetKwdToEurRate,
+  mockGetEurToAedRate,
 } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockIsVenueAdmin: vi.fn(),
   mockIsPlatformAdmin: vi.fn(),
   mockServiceFrom: vi.fn(),
   mockGetKwdToEurRate: vi.fn(),
+  mockGetEurToAedRate: vi.fn(),
 }))
 
 // ── Module mocks ────────────────────────────────────────────────────
@@ -38,6 +40,7 @@ vi.mock('@/lib/admin/auth', () => ({
 
 vi.mock('@/lib/fx/rates', () => ({
   getKwdToEurRate: () => mockGetKwdToEurRate(),
+  getEurToAedRate: () => mockGetEurToAedRate(),
 }))
 
 // ── Import after mocks ──────────────────────────────────────────────
@@ -90,6 +93,8 @@ function makeRecording(overrides: any = {}) {
     billable_amount: overrides.billable_amount ?? 5,
     collected_by: overrides.collected_by || 'venue',
     created_at: overrides.created_at || new Date().toISOString(),
+    // Default 1 hour so per-hour cost math matches legacy expectations
+    duration_seconds: overrides.duration_seconds ?? 3600,
   }
 }
 
@@ -108,6 +113,8 @@ beforeEach(() => {
 
   // FX rate: 1 KWD = 2.77 EUR (so 9.71 EUR = 9.71/2.77 ≈ 3.505 KWD)
   mockGetKwdToEurRate.mockResolvedValue(2.77)
+  // FX rate: 1 EUR = 4.0 AED (so 8.85 EUR = 35.4 AED per hour)
+  mockGetEurToAedRate.mockResolvedValue(4.0)
 
   // Default table routing
   let recordingsCallCount = 0
@@ -370,5 +377,103 @@ describe('GET /api/venue/[venueId]/billing/summary', () => {
     // Should use default_billable_amount (5 KWD)
     expect(json.totalRevenue).toBe(5)
     expect(json.venueCollectedRevenue).toBe(5)
+  })
+
+  it('scales fixed cost by recording duration', async () => {
+    // 1 venue-collected recording priced at 7.5 KWD (90-min booking at 5 KWD/hr)
+    // 90 minutes => 1.5x the per-hour fixed cost
+    monthRecordingsChain.lte.mockResolvedValueOnce({
+      data: [
+        makeRecording({
+          id: 'r1',
+          collected_by: 'venue',
+          billable_amount: 7.5,
+          duration_seconds: 5400, // 90 minutes
+        }),
+      ],
+      error: null,
+    })
+
+    const res = await GET(makeRequest(), makeRouteContext())
+    const json = await res.json()
+
+    // Per-hour fixed cost in KWD = 9.71 / 2.77 = 3.5054
+    // 90 min => 1.5 hours => fixed = 5.2581
+    // ambassador 10% of 7.5 = 0.75
+    // cost = 5.2581 + 0.75 = 6.0081
+    // profit = 7.5 - 6.0081 = 1.4919
+    // venue keeps 25% = 0.3730
+    const perHourKwd = 9.71 / 2.77
+    const fixed = perHourKwd * 1.5
+    const ambassador = 7.5 * 0.1
+    const profit = 7.5 - (fixed + ambassador)
+    const expectedVenueKeeps = Number((profit * 0.25).toFixed(3))
+
+    expect(json.venueKeeps).toBe(expectedVenueKeeps)
+  })
+
+  it('falls back to 1 hour when duration_seconds is missing', async () => {
+    // Legacy recordings have no duration_seconds — treat them as 1 hour
+    monthRecordingsChain.lte.mockResolvedValueOnce({
+      data: [
+        makeRecording({
+          id: 'r1',
+          collected_by: 'venue',
+          duration_seconds: null,
+        }),
+      ],
+      error: null,
+    })
+
+    const res = await GET(makeRequest(), makeRouteContext())
+    const json = await res.json()
+
+    // Same math as the original 1-hour test
+    const costPerRec = 9.71 / 2.77 + 0.5
+    const profitPerRec = 5 - costPerRec
+    const expectedVenueKeeps = Number((profitPerRec * 0.25).toFixed(3))
+
+    expect(json.venueKeeps).toBe(expectedVenueKeeps)
+  })
+
+  it('uses EUR→AED FX path when venue currency is AED', async () => {
+    // HCT-style config: AED venue, 8.85 EUR/hr fixed cost, no profit share
+    billingConfigChain.maybeSingle.mockResolvedValueOnce({
+      data: {
+        default_billable_amount: 100,
+        currency: 'AED',
+        daily_recording_target: 2,
+        fixed_cost_eur: 8.85,
+        ambassador_pct: 0,
+        venue_profit_share_pct: 0,
+      },
+      error: null,
+    })
+
+    monthRecordingsChain.lte.mockResolvedValueOnce({
+      data: [
+        makeRecording({
+          id: 'r1',
+          collected_by: 'playhub',
+          billable_amount: 100,
+          duration_seconds: 3600,
+        }),
+      ],
+      error: null,
+    })
+
+    const res = await GET(makeRequest(), makeRouteContext())
+    const json = await res.json()
+
+    // Per-hour fixed cost in AED = 8.85 * 4.0 = 35.4
+    // No ambassador, no venue share
+    // playhubCosts = 35.4, playhubProfit = 100 - 35.4 = 64.6
+    // playhubOwesVenue = 64.6 * 0% = 0
+    expect(json.currency).toBe('AED')
+    expect(json.fxRate).toBe(4)
+    expect(json.playhubOwesVenue).toBe(0)
+    expect(json.venueKeeps).toBe(0)
+    // Net should be zero — venue collects nothing, owes nothing
+    expect(json.netBalance).toBe(0)
   })
 })

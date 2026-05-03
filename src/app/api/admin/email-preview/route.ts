@@ -7,6 +7,7 @@ import { getAuthUserStrict, createServiceClient } from '@/lib/supabase/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { renderInvoiceEmailHtml } from '@/lib/email'
+import { getEurToAedRate } from '@/lib/fx/rates'
 import { getKwdToEurRate } from '@/lib/fx/rates'
 
 export async function GET(request: NextRequest) {
@@ -33,13 +34,19 @@ export async function GET(request: NextRequest) {
     }
 
     // Otherwise use manual params
+    const fixedCostPerHour = Number(p.get('fixedCostPerHour') || '4.15')
+    const totalHours = Number(p.get('totalHours') || '24')
     const html = renderInvoiceEmailHtml({
       venueName: p.get('venueName') || 'CFA Indoor Arena',
       periodLabel: p.get('period') || 'February 2026',
       currency: p.get('currency') || 'KWD',
       stripeInvoiceUrl:
         p.get('stripeUrl') || 'https://invoice.stripe.com/example',
-      fixedCostPerRecording: Number(p.get('fixedCost') || '4.15'),
+      fixedCostPerHour,
+      totalHours,
+      totalFixedCosts: Number(
+        p.get('totalFixedCosts') || (fixedCostPerHour * totalHours).toFixed(3)
+      ),
       ambassadorPct: Number(p.get('ambassadorPct') || '10'),
       venueProfitSharePct: Number(p.get('sharePct') || '30'),
       venueCollectedCount: Number(p.get('venueCount') || '18'),
@@ -111,7 +118,7 @@ async function renderLiveInvoicePreview(
   // Query billable recordings
   const { data: recordings } = await (serviceClient as any)
     .from('playhub_match_recordings')
-    .select('id, title, billable_amount, collected_by')
+    .select('id, title, billable_amount, collected_by, duration_seconds')
     .eq('organization_id', venueId)
     .eq('is_billable', true)
     .eq('status', 'published')
@@ -119,14 +126,31 @@ async function renderLiveInvoicePreview(
     .lte('created_at', periodEndTs)
 
   const items = (recordings || []) as any[]
-  const fixedCostEur = Number(config.fixed_cost_eur || 0)
-  const kwdToEurRate = await getKwdToEurRate()
-  const fixedCostKwd = fixedCostEur > 0 ? fixedCostEur / kwdToEurRate : 0
+  const fixedCostEurPerHour = Number(config.fixed_cost_eur || 0)
+  const venueCurrency = (config.currency || 'KWD').trim().toUpperCase()
+
+  // Mirror generate-invoice's currency branching so the preview matches what
+  // venues will actually receive. Unsupported currencies render as zero cost.
+  let perHourFixedCostLocal = 0
+  if (fixedCostEurPerHour > 0) {
+    if (venueCurrency === 'KWD') {
+      const kwdToEur = await getKwdToEurRate()
+      perHourFixedCostLocal = fixedCostEurPerHour / kwdToEur
+    } else if (venueCurrency === 'AED') {
+      const eurToAed = await getEurToAedRate()
+      perHourFixedCostLocal = fixedCostEurPerHour * eurToAed
+    } else if (venueCurrency === 'EUR') {
+      perHourFixedCostLocal = fixedCostEurPerHour
+    }
+  }
   const venuePct = Number(config.venue_profit_share_pct || 30)
   const ambassadorPct = Number(config.ambassador_pct || 0)
 
   const venueCollected = items.filter((r) => r.collected_by === 'venue')
   const playhubCollected = items.filter((r) => r.collected_by === 'playhub')
+
+  const hoursOf = (r: any) =>
+    ((Number(r.duration_seconds ?? 3600) || 3600) as number) / 3600
 
   const venueCollectedRevenue = venueCollected.reduce(
     (sum, r) => sum + (Number(r.billable_amount) || 0),
@@ -137,12 +161,11 @@ async function renderLiveInvoicePreview(
     0
   )
 
-  // Cost per set of recordings: fixed cost (EUR→KWD) + ambassador % of each price
   function totalCost(recs: any[]) {
     return recs.reduce((sum, r) => {
       const price = Number(r.billable_amount) || 0
       const ambassadorFee = price * (ambassadorPct / 100)
-      return sum + fixedCostKwd + ambassadorFee
+      return sum + perHourFixedCostLocal * hoursOf(r) + ambassadorFee
     }, 0)
   }
 
@@ -157,6 +180,12 @@ async function renderLiveInvoicePreview(
 
   const netAmount = venueOwesPlayhub - playhubOwesVenue
 
+  const totalHours = items.reduce((s, r) => s + hoursOf(r), 0)
+  const totalFixedCosts = items.reduce(
+    (s, r) => s + perHourFixedCostLocal * hoursOf(r),
+    0
+  )
+
   const periodLabel = new Date(year, month - 1).toLocaleDateString('en-GB', {
     month: 'long',
     year: 'numeric',
@@ -165,8 +194,10 @@ async function renderLiveInvoicePreview(
   const html = renderInvoiceEmailHtml({
     venueName: org.name,
     periodLabel,
-    currency: config.currency || 'KWD',
-    fixedCostPerRecording: fixedCostKwd,
+    currency: venueCurrency,
+    fixedCostPerHour: perHourFixedCostLocal,
+    totalHours,
+    totalFixedCosts,
     ambassadorPct,
     venueProfitSharePct: venuePct,
     venueCollectedCount: venueCollected.length,

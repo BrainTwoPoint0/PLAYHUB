@@ -118,7 +118,25 @@ export async function scheduleRecording(
     .eq('organization_id', venueId)
     .maybeSingle()
 
-  // 4. Insert recording row
+  // 4. Insert recording row.
+  //
+  // billable_amount precedence:
+  //   1. Caller-supplied billableAmount (already-priced upstream — e.g. the QR
+  //      flow that does pricePerHour × hours before calling here) → use as-is
+  //   2. billingConfig.default_billable_amount → treated as PER-HOUR rate and
+  //      scaled by recording duration. This matches /api/start/[cameraId] so
+  //      admin-scheduled and QR-paid bookings price the same way.
+  //   3. null when no config is set.
+  const fallbackHourlyRate =
+    billingConfig?.default_billable_amount != null
+      ? Number(billingConfig.default_billable_amount)
+      : null
+  const scaledFallback =
+    fallbackHourlyRate !== null
+      ? Number(((fallbackHourlyRate * durationMinutes) / 60).toFixed(3))
+      : null
+  const resolvedBillableAmount = billableAmount ?? scaledFallback
+
   const { data: recording, error: recordingError } = await serviceClient
     .from('playhub_match_recordings')
     .insert({
@@ -137,10 +155,10 @@ export async function scheduleRecording(
       created_by: createdBy || null,
       stripe_payment_intent_id: input.stripePaymentIntentId || null,
       is_billable: false,
-      billable_amount:
-        billableAmount ?? billingConfig?.default_billable_amount ?? null,
+      billable_amount: resolvedBillableAmount,
       billable_currency: billingConfig?.currency ?? 'KWD',
       collected_by: collectedBy,
+      duration_seconds: durationMinutes * 60,
       graphic_package_id: input.graphicPackageId || null,
     })
     .select('id')

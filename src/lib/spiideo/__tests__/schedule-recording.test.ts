@@ -200,7 +200,8 @@ describe('scheduleRecording', () => {
     )
   })
 
-  it('uses default billing config when billableAmount not provided', async () => {
+  it('uses default billing config as per-hour rate when billableAmount not provided', async () => {
+    // 5 KWD/hr × 60 min = 5 KWD (1 hour)
     await scheduleRecording(baseInput)
 
     const insertCall = mockRecordingChain.insert.mock.calls[0][0]
@@ -208,8 +209,28 @@ describe('scheduleRecording', () => {
     expect(insertCall.billable_currency).toBe('KWD')
   })
 
-  it('uses explicit billableAmount when provided', async () => {
-    await scheduleRecording({ ...baseInput, billableAmount: 10 })
+  it('scales default_billable_amount by duration (90-min recording)', async () => {
+    // 5 KWD/hr × 90 min = 7.5 KWD — matches the QR-code flow's pricing math
+    await scheduleRecording({ ...baseInput, durationMinutes: 90 })
+
+    const insertCall = mockRecordingChain.insert.mock.calls[0][0]
+    expect(insertCall.billable_amount).toBe(7.5)
+  })
+
+  it('scales default_billable_amount by duration (120-min recording)', async () => {
+    // 5 KWD/hr × 120 min = 10 KWD
+    await scheduleRecording({ ...baseInput, durationMinutes: 120 })
+
+    const insertCall = mockRecordingChain.insert.mock.calls[0][0]
+    expect(insertCall.billable_amount).toBe(10)
+  })
+
+  it('uses explicit billableAmount when provided (overrides per-hour fallback)', async () => {
+    await scheduleRecording({
+      ...baseInput,
+      durationMinutes: 90,
+      billableAmount: 10,
+    })
 
     const insertCall = mockRecordingChain.insert.mock.calls[0][0]
     expect(insertCall.billable_amount).toBe(10)
