@@ -159,15 +159,14 @@ export async function GET(request: NextRequest) {
       success_url: `${request.nextUrl.origin}/purchase/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${request.nextUrl.origin}/matches/${match.id}?canceled=true`,
     }
+    // Hash the FULL request body so any field drift (success_url/cancel_url
+    // differing across origins, metadata changes, etc.) generates a fresh
+    // key. Hashing a subset reintroduces silent conflicts when something
+    // outside the subset changes — exactly the bug pattern this is fixing.
     const session = await stripe.checkout.sessions.create(sessionParams, {
-      idempotencyKey: buildIdempotencyKey('checkout', {
-        scope: 'recording',
-        productId: productData.id,
+      idempotencyKey: buildIdempotencyKey('checkout-recording', {
         userId: user.id,
-        amount: sessionParams.line_items![0].price_data!.unit_amount,
-        currency: sessionParams.line_items![0].price_data!.currency,
-        name: productName,
-        description: productDescription,
+        params: sessionParams,
       }),
     })
 
@@ -278,45 +277,38 @@ export async function POST(request: NextRequest) {
     const streamUnitAmount = Math.round(
       stream.price_amount * minorUnitFactor(stream.currency)
     )
-    const session = await stripe.checkout.sessions.create(
-      {
-        mode: 'payment',
-        payment_method_types: ['card'],
-        customer_email: user.email,
-        line_items: [
-          {
-            price_data: {
-              currency: stream.currency.toLowerCase(),
-              product_data: {
-                name: safeProductName,
-                description: safeDescription,
-              },
-              unit_amount: streamUnitAmount,
+    const streamSessionParams: Stripe.Checkout.SessionCreateParams = {
+      mode: 'payment',
+      payment_method_types: ['card'],
+      customer_email: user.email,
+      line_items: [
+        {
+          price_data: {
+            currency: stream.currency.toLowerCase(),
+            product_data: {
+              name: safeProductName,
+              description: safeDescription,
             },
-            quantity: 1,
+            unit_amount: streamUnitAmount,
           },
-        ],
-        metadata: {
-          type: 'stream_access',
-          stream_id: stream.id,
-          access_type: stream.access_type,
-          user_id: user.id,
+          quantity: 1,
         },
-        success_url: `${request.nextUrl.origin}/streams/${stream_id}?purchased=true`,
-        cancel_url: `${request.nextUrl.origin}/streams/${stream_id}?canceled=true`,
+      ],
+      metadata: {
+        type: 'stream_access',
+        stream_id: stream.id,
+        access_type: stream.access_type,
+        user_id: user.id,
       },
-      {
-        idempotencyKey: buildIdempotencyKey('checkout', {
-          scope: 'stream',
-          streamId: stream.id,
-          userId: user.id,
-          amount: streamUnitAmount,
-          currency: stream.currency.toLowerCase(),
-          name: safeProductName,
-          description: safeDescription,
-        }),
-      }
-    )
+      success_url: `${request.nextUrl.origin}/streams/${stream_id}?purchased=true`,
+      cancel_url: `${request.nextUrl.origin}/streams/${stream_id}?canceled=true`,
+    }
+    const session = await stripe.checkout.sessions.create(streamSessionParams, {
+      idempotencyKey: buildIdempotencyKey('checkout-stream', {
+        userId: user.id,
+        params: streamSessionParams,
+      }),
+    })
 
     return NextResponse.json({ url: session.url })
   } catch (error) {

@@ -65,6 +65,36 @@ describe('buildIdempotencyKey', () => {
     )
   })
 
+  it('changes when nested object fields change (full-shape hashing)', () => {
+    // Regression: an earlier version of the route hashed only a subset of
+    // the Stripe request, so changes to success_url / cancel_url / metadata
+    // produced silent idempotency conflicts. Hashing the full nested params
+    // object catches any field drift.
+    const baseline = {
+      userId: 'user-1',
+      params: {
+        line_items: [
+          {
+            price_data: {
+              currency: 'aed',
+              unit_amount: 20000,
+              product_data: { name: 'A vs B', description: 'd' },
+            },
+            quantity: 1,
+          },
+        ],
+        success_url: 'https://playhub.playbacksports.ai/purchase/success',
+        cancel_url: 'https://playhub.playbacksports.ai/matches/1',
+      },
+    }
+    const changedSuccessUrl = JSON.parse(JSON.stringify(baseline))
+    changedSuccessUrl.params.success_url =
+      'https://www.playhub.playbacksports.ai/purchase/success'
+    expect(buildIdempotencyKey('checkout', baseline)).not.toBe(
+      buildIdempotencyKey('checkout', changedSuccessUrl)
+    )
+  })
+
   it('changes when any field changes (so admin edits invalidate the key)', () => {
     const renamedTeams = { ...samplePayload, name: 'A vs C' }
     const repriced = { ...samplePayload, amount: 30000 }
