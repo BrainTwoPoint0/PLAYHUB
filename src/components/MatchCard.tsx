@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'motion/react'
 import { formatPrice, formatDate } from '@braintwopoint0/playback-commons/utils'
-import { MapPin, Calendar } from 'lucide-react'
+import { MapPin, Calendar, Check } from 'lucide-react'
 
 interface MatchCardProps {
   match: {
@@ -28,6 +28,7 @@ interface MatchCardProps {
       price_amount: number
       currency: string
     }>
+    owned?: boolean
   }
 }
 
@@ -72,10 +73,17 @@ export default function MatchCard({ match }: MatchCardProps) {
               </div>
             )}
 
-            {/* Price Badge */}
-            <div className="absolute top-3 right-3 px-3 py-1.5 bg-[var(--timberwolf)] text-[var(--night)] rounded-md font-bold text-sm">
-              {price}
-            </div>
+            {/* Price / Owned Badge */}
+            {match.owned ? (
+              <div className="absolute top-3 right-3 px-3 py-1.5 bg-emerald-400/90 text-[var(--night)] rounded-md font-bold text-sm flex items-center gap-1.5">
+                <Check className="h-3.5 w-3.5" />
+                Bought
+              </div>
+            ) : (
+              <div className="absolute top-3 right-3 px-3 py-1.5 bg-[var(--timberwolf)] text-[var(--night)] rounded-md font-bold text-sm">
+                {price}
+              </div>
+            )}
           </div>
 
           {/* Content */}

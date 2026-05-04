@@ -22,12 +22,21 @@ import {
   Play,
   CheckCircle,
 } from 'lucide-react'
+import {
+  VideoPlayer,
+  type MediaPack,
+  type GraphicPackageOverlay,
+} from '@/components/video/VideoPlayer'
+import type { RecordingEvent } from '@/lib/recordings/event-types'
 
 interface MatchDetailClientProps {
   match: any
   product: any
   hasAccess: boolean
   videoUrl?: string | null
+  events?: RecordingEvent[]
+  graphicPackage?: GraphicPackageOverlay | null
+  mediaPack?: MediaPack | null
 }
 
 export default function MatchDetailClient({
@@ -35,6 +44,9 @@ export default function MatchDetailClient({
   product,
   hasAccess,
   videoUrl,
+  events = [],
+  graphicPackage,
+  mediaPack,
 }: MatchDetailClientProps) {
   const [isLoading, setIsLoading] = useState(false)
 
@@ -67,20 +79,21 @@ export default function MatchDetailClient({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Hero — inline player for paid buyers, thumbnail otherwise */}
+          {/* Hero — full PLAYHUB player (with event tags + overlays) for paid
+              buyers, thumbnail with marketplace CTA otherwise. */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="relative h-[400px] lg:h-[500px] bg-muted rounded-xl overflow-hidden border border-border group"
+            className={`relative ${hasAccess && videoUrl ? '' : 'h-[400px] lg:h-[500px]'} bg-muted rounded-xl overflow-hidden border border-border group`}
           >
             {hasAccess && videoUrl ? (
-              <video
+              <VideoPlayer
                 src={videoUrl}
-                controls
-                playsInline
-                className="w-full h-full object-contain bg-black"
-                poster={match.thumbnail_url || undefined}
+                events={events}
+                mediaPack={mediaPack || undefined}
+                graphicPackage={graphicPackage || undefined}
+                className="rounded-xl"
               />
             ) : (
               <>
@@ -214,9 +227,39 @@ export default function MatchDetailClient({
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-5">
-                {product && (
+                {hasAccess && product ? (
                   <>
-                    {/* Price */}
+                    {/* Owned state — confirm the purchase, no price block. */}
+                    <div className="text-center py-5 bg-emerald-400/[0.06] border border-emerald-400/20 rounded-lg">
+                      <p className="text-sm text-muted-foreground mb-1">
+                        Purchased
+                      </p>
+                      <p className="text-2xl font-bold text-[var(--timberwolf)]">
+                        {formatPrice(product.price_amount, product.currency)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Lifetime access · watch above
+                      </p>
+                    </div>
+
+                    <div className="pt-4 border-t border-border space-y-3">
+                      {[
+                        { icon: Film, text: 'Stream in HD quality' },
+                        { icon: Repeat, text: 'Watch unlimited times' },
+                      ].map((feature, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center text-muted-foreground text-sm gap-3"
+                        >
+                          <feature.icon className="h-4 w-4 flex-shrink-0" />
+                          <span>{feature.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : product ? (
+                  <>
+                    {/* Pre-purchase state — price + CTA. */}
                     <div className="text-center py-5 bg-muted rounded-lg">
                       <p className="text-4xl font-bold text-[var(--timberwolf)] mb-1">
                         {formatPrice(product.price_amount, product.currency)}
@@ -228,22 +271,14 @@ export default function MatchDetailClient({
                       </p>
                     </div>
 
-                    {/* CTA Button — for paid buyers the video is embedded above. */}
-                    {hasAccess ? (
-                      <div className="w-full text-center py-2 text-sm text-emerald-400 border border-emerald-400/30 rounded-md bg-emerald-400/[0.06]">
-                        Playing above. Lifetime access.
-                      </div>
-                    ) : (
-                      <Button
-                        onClick={handlePurchase}
-                        disabled={isLoading}
-                        className="w-full bg-[var(--timberwolf)] text-[var(--night)] hover:bg-[var(--ash-grey)]"
-                      >
-                        {isLoading ? 'Processing...' : 'Purchase Now'}
-                      </Button>
-                    )}
+                    <Button
+                      onClick={handlePurchase}
+                      disabled={isLoading}
+                      className="w-full bg-[var(--timberwolf)] text-[var(--night)] hover:bg-[var(--ash-grey)]"
+                    >
+                      {isLoading ? 'Processing...' : 'Purchase Now'}
+                    </Button>
 
-                    {/* Features List */}
                     <div className="pt-4 border-t border-border space-y-3">
                       {[
                         { icon: Zap, text: 'Instant access after purchase' },
@@ -264,7 +299,7 @@ export default function MatchDetailClient({
                       ))}
                     </div>
                   </>
-                )}
+                ) : null}
               </CardContent>
             </Card>
           </div>

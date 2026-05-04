@@ -30,16 +30,40 @@ export default function MatchesPage() {
 
       if (error) {
         console.error('Error fetching matches:', error)
-      } else {
-        const publishedMatches =
-          data?.filter(
-            (match: any) =>
-              match.products &&
-              match.products.length > 0 &&
-              match.products.some((p: any) => p.is_available)
-          ) || []
-        setMatches(publishedMatches)
+        setLoading(false)
+        return
       }
+
+      const publishedMatches =
+        data?.filter(
+          (match: any) =>
+            match.products &&
+            match.products.length > 0 &&
+            match.products.some((p: any) => p.is_available)
+        ) || []
+
+      // Mark recordings the signed-in user already owns so the grid card
+      // shows "Bought" instead of the price. Anonymous visitors get no
+      // ownership info — same UX as today.
+      const {
+        data: { user },
+      } = await (supabase as any).auth.getUser()
+      if (user && publishedMatches.length > 0) {
+        const ids = publishedMatches.map((m: any) => m.id)
+        const { data: rights } = await (supabase as any)
+          .from('playhub_access_rights')
+          .select('match_recording_id')
+          .eq('user_id', user.id)
+          .in('match_recording_id', ids)
+        const ownedIds = new Set(
+          (rights || []).map((r: any) => r.match_recording_id)
+        )
+        for (const m of publishedMatches) {
+          m.owned = ownedIds.has(m.id)
+        }
+      }
+
+      setMatches(publishedMatches)
       setLoading(false)
     }
 
