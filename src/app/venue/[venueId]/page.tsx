@@ -49,6 +49,13 @@ interface Recording {
   graphicPackageName?: string
   ownerOrgName?: string
   accessCount?: number
+  marketplace_enabled?: boolean
+  marketplace_product?: {
+    id: string
+    price_amount: number
+    currency: string
+    is_available: boolean
+  } | null
 }
 
 interface AccessGrant {
@@ -480,6 +487,13 @@ export default function VenueManagementPage() {
   const [marketplaceEnabled, setMarketplaceEnabled] = useState(false)
   const [marketplacePrice, setMarketplacePrice] = useState('')
 
+  // Per-recording marketplace listing state (inline editor in the recordings list)
+  const [editingListingId, setEditingListingId] = useState<string | null>(null)
+  const [listingPrice, setListingPrice] = useState('')
+  const [listingSubmitting, setListingSubmitting] = useState<string | null>(
+    null
+  )
+
   // Org-level marketplace settings
   const [orgMarketplace, setOrgMarketplace] = useState<{
     marketplace_enabled: boolean
@@ -767,6 +781,80 @@ export default function VenueManagementPage() {
       fetchRecordings()
     } catch (err) {
       console.error('Failed to revoke access:', err)
+    }
+  }
+
+  function openListingEditor(recording: Recording) {
+    setEditingListingId(recording.id)
+    setListingPrice(
+      recording.marketplace_product?.price_amount
+        ? String(recording.marketplace_product.price_amount)
+        : String(orgMarketplace?.default_price_amount || '')
+    )
+  }
+
+  function cancelListingEditor() {
+    setEditingListingId(null)
+    setListingPrice('')
+  }
+
+  async function submitListing(recording: Recording) {
+    const price = Number(listingPrice)
+    if (!Number.isFinite(price) || price <= 0) {
+      setError('Enter a valid price')
+      return
+    }
+    setListingSubmitting(recording.id)
+    try {
+      const res = await fetch(`/api/recordings/${recording.id}/marketplace`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          price_amount: price,
+          currency: orgMarketplace?.default_price_currency || 'AED',
+          is_available: true,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Failed to list recording')
+        return
+      }
+      setSuccess(
+        recording.marketplace_product
+          ? 'Listing updated'
+          : 'Recording listed for sale'
+      )
+      cancelListingEditor()
+      fetchRecordings()
+    } catch (err) {
+      console.error('Failed to submit listing:', err)
+      setError('Failed to list recording')
+    } finally {
+      setListingSubmitting(null)
+    }
+  }
+
+  async function unlistRecording(recording: Recording) {
+    if (!confirm(`Unlist "${recording.title}" from the marketplace?`)) return
+    setListingSubmitting(recording.id)
+    try {
+      const res = await fetch(`/api/recordings/${recording.id}/marketplace`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Failed to unlist recording')
+        return
+      }
+      setSuccess('Recording unlisted from marketplace')
+      cancelListingEditor()
+      fetchRecordings()
+    } catch (err) {
+      console.error('Failed to unlist:', err)
+      setError('Failed to unlist recording')
+    } finally {
+      setListingSubmitting(null)
     }
   }
 
@@ -3252,6 +3340,20 @@ export default function VenueManagementPage() {
                         >
                           Manage Access
                         </Button>
+                        {orgMarketplace?.marketplace_enabled &&
+                          recording.status === 'published' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className={outlineBtnClass}
+                              onClick={() => openListingEditor(recording)}
+                              disabled={listingSubmitting === recording.id}
+                            >
+                              {recording.marketplace_product?.is_available
+                                ? 'Manage Listing'
+                                : 'List for Sale'}
+                            </Button>
+                          )}
                         <Button
                           variant="outline"
                           size="sm"
@@ -3272,6 +3374,60 @@ export default function VenueManagementPage() {
                             : 'Delete'}
                         </Button>
                       </div>
+                      {editingListingId === recording.id && (
+                        <div className="mt-3 pt-3 border-t border-border flex flex-col sm:flex-row sm:items-center gap-2">
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={listingPrice}
+                              onChange={(e) => setListingPrice(e.target.value)}
+                              placeholder={String(
+                                orgMarketplace?.default_price_amount || '200'
+                              )}
+                              className={`w-32 ${inputClass}`}
+                            />
+                            <span className="text-sm text-muted-foreground">
+                              {orgMarketplace?.default_price_currency || 'AED'}{' '}
+                              · listed publicly on /matches
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 sm:ml-auto">
+                            <Button
+                              size="sm"
+                              onClick={() => submitListing(recording)}
+                              disabled={listingSubmitting === recording.id}
+                            >
+                              {listingSubmitting === recording.id
+                                ? 'Saving...'
+                                : recording.marketplace_product
+                                  ? 'Update'
+                                  : 'List'}
+                            </Button>
+                            {recording.marketplace_product?.is_available && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                                onClick={() => unlistRecording(recording)}
+                                disabled={listingSubmitting === recording.id}
+                              >
+                                Unlist
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className={outlineBtnClass}
+                              onClick={cancelListingEditor}
+                              disabled={listingSubmitting === recording.id}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

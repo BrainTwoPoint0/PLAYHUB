@@ -124,6 +124,7 @@ export async function GET(
       collected_by,
       graphic_package_id,
       organization_id,
+      marketplace_enabled,
       created_at
     `
     )
@@ -197,6 +198,40 @@ export async function GET(
     }
   }
 
+  // Pull marketplace product info (price/currency/is_available) for each
+  // recording so the UI can show "List for sale" vs "Manage listing" state.
+  let marketplaceProducts: Record<
+    string,
+    {
+      id: string
+      price_amount: number
+      currency: string
+      is_available: boolean
+    }
+  > = {}
+  if (recordingIds.length > 0) {
+    const { data: products } = await (serviceClient as any)
+      .from('playhub_products')
+      .select('id, match_recording_id, price_amount, currency, is_available')
+      .in('match_recording_id', recordingIds)
+
+    if (products) {
+      products.forEach((p: any) => {
+        // One product per recording today; if multiple ever exist we keep the
+        // first available one (or fall back to the first row).
+        const existing = marketplaceProducts[p.match_recording_id]
+        if (!existing || (!existing.is_available && p.is_available)) {
+          marketplaceProducts[p.match_recording_id] = {
+            id: p.id,
+            price_amount: Number(p.price_amount),
+            currency: p.currency,
+            is_available: p.is_available,
+          }
+        }
+      })
+    }
+  }
+
   // Get org names for group-type views (recordings from child venues)
   let orgNames: Record<string, string> = {}
   if (orgIds.length > 1) {
@@ -212,7 +247,7 @@ export async function GET(
     }
   }
 
-  // Enrich recordings with access count and graphic package name
+  // Enrich recordings with access count, graphic package name, and listing info
   const enrichedRecordings = (recordings || []).map((r: any) => ({
     ...r,
     accessCount: accessCounts[r.id] || 0,
@@ -221,6 +256,7 @@ export async function GET(
       orgIds.length > 1 && r.organization_id !== venueId
         ? orgNames[r.organization_id] || null
         : null,
+    marketplace_product: marketplaceProducts[r.id] || null,
   }))
 
   return NextResponse.json({

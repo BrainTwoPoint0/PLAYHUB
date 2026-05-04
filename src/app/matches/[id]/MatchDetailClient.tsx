@@ -27,12 +27,14 @@ interface MatchDetailClientProps {
   match: any
   product: any
   hasAccess: boolean
+  videoUrl?: string | null
 }
 
 export default function MatchDetailClient({
   match,
   product,
   hasAccess,
+  videoUrl,
 }: MatchDetailClientProps) {
   const [isLoading, setIsLoading] = useState(false)
 
@@ -65,45 +67,56 @@ export default function MatchDetailClient({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Hero Thumbnail */}
+          {/* Hero — inline player for paid buyers, thumbnail otherwise */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
             className="relative h-[400px] lg:h-[500px] bg-muted rounded-xl overflow-hidden border border-border group"
           >
-            <div className="absolute inset-0 bg-gradient-to-t from-[var(--night)] via-transparent to-transparent z-10" />
-
-            {match.thumbnail_url ? (
-              <Image
-                src={match.thumbnail_url}
-                alt={match.title}
-                fill
-                className="object-cover group-hover:scale-105 transition-transform duration-700"
-                priority
+            {hasAccess && videoUrl ? (
+              <video
+                src={videoUrl}
+                controls
+                playsInline
+                className="w-full h-full object-contain bg-black"
+                poster={match.thumbnail_url || undefined}
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-muted">
-                <span className="text-5xl font-bold text-muted-foreground/30">
-                  {match.home_team?.charAt(0)} v {match.away_team?.charAt(0)}
-                </span>
-              </div>
-            )}
+              <>
+                <div className="absolute inset-0 bg-gradient-to-t from-[var(--night)] via-transparent to-transparent z-10" />
 
-            {/* Sport Badge */}
-            {match.sport && (
-              <Badge className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm text-[var(--timberwolf)] border-border z-20 px-3 py-1.5">
-                {match.sport.name}
-              </Badge>
-            )}
+                {match.thumbnail_url ? (
+                  <Image
+                    src={match.thumbnail_url}
+                    alt={match.title}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-700"
+                    priority
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-muted">
+                    <span className="text-5xl font-bold text-muted-foreground/30">
+                      {match.home_team?.charAt(0)} v{' '}
+                      {match.away_team?.charAt(0)}
+                    </span>
+                  </div>
+                )}
 
-            {/* Play Button Overlay */}
-            {!hasAccess && (
-              <div className="absolute inset-0 flex items-center justify-center z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <div className="w-16 h-16 rounded-full bg-[var(--timberwolf)]/90 backdrop-blur-sm flex items-center justify-center">
-                  <Play className="h-7 w-7 text-[var(--night)] ml-0.5" />
+                {/* Sport Badge */}
+                {match.sport && (
+                  <Badge className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm text-[var(--timberwolf)] border-border z-20 px-3 py-1.5">
+                    {match.sport.name}
+                  </Badge>
+                )}
+
+                {/* Play Button Overlay */}
+                <div className="absolute inset-0 flex items-center justify-center z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div className="w-16 h-16 rounded-full bg-[var(--timberwolf)]/90 backdrop-blur-sm flex items-center justify-center">
+                    <Play className="h-7 w-7 text-[var(--night)] ml-0.5" />
+                  </div>
                 </div>
-              </div>
+              </>
             )}
           </motion.div>
 
@@ -215,11 +228,11 @@ export default function MatchDetailClient({
                       </p>
                     </div>
 
-                    {/* CTA Button */}
+                    {/* CTA Button — for paid buyers the video is embedded above. */}
                     {hasAccess ? (
-                      <Button className="w-full" asChild>
-                        <Link href={`/library`}>Watch Now</Link>
-                      </Button>
+                      <div className="w-full text-center py-2 text-sm text-emerald-400 border border-emerald-400/30 rounded-md bg-emerald-400/[0.06]">
+                        Playing above. Lifetime access.
+                      </div>
                     ) : (
                       <Button
                         onClick={handlePurchase}

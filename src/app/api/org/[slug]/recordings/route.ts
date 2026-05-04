@@ -23,7 +23,10 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     )
   }
 
-  // Fetch published marketplace recordings with their products
+  // Fetch published marketplace recordings with their products.
+  // Source of truth for "is this listed?" is playhub_products.is_available,
+  // not the denormalised marketplace_enabled flag — we filter the join rows
+  // post-query to avoid the dual-write race.
   const { data: recordings, error: recError } = await serviceClient
     .from('playhub_match_recordings')
     .select(
@@ -46,7 +49,6 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     `
     )
     .eq('organization_id', org.id)
-    .eq('marketplace_enabled', true)
     .eq('status', 'published')
     .order('match_date', { ascending: false })
 
@@ -58,10 +60,17 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     )
   }
 
-  // Shape the response — flatten product into each recording
-  const items = (recordings || []).map((r: any) => {
-    const product = r.playhub_products?.[0] || null
-    return {
+  // Shape the response — keep only recordings with at least one available
+  // product and flatten that product into each recording.
+  type RecordingRow = any
+  type ProductRow = any
+  const items: any[] = []
+  for (const r of (recordings || []) as RecordingRow[]) {
+    const product = (r.playhub_products || []).find(
+      (p: ProductRow) => p.is_available
+    ) as ProductRow | undefined
+    if (!product) continue
+    items.push({
       id: r.id,
       title: r.title,
       description: r.description,
@@ -70,16 +79,14 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       awayTeam: r.away_team,
       pitchName: r.pitch_name,
       thumbnailUrl: r.thumbnail_url,
-      product: product
-        ? {
-            id: product.id,
-            priceAmount: product.price_amount,
-            currency: product.currency,
-            isAvailable: product.is_available,
-          }
-        : null,
-    }
-  })
+      product: {
+        id: product.id,
+        priceAmount: product.price_amount,
+        currency: product.currency,
+        isAvailable: product.is_available,
+      },
+    })
+  }
 
   return NextResponse.json({
     organization: {

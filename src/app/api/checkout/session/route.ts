@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, getAuthUserStrict } from '@/lib/supabase/server'
 import Stripe from 'stripe'
+import { minorUnitFactor } from '@/lib/billing/currency'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-02-24.acacia',
@@ -69,32 +70,45 @@ export async function GET(request: NextRequest) {
     const productData = product as any
     const match = productData.match_recording
 
-    // Create Stripe checkout session
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: productData.currency.toLowerCase(),
-            product_data: {
-              name: `${match.home_team} vs ${match.away_team}`,
-              description: productData.description || match.title,
+    // Create Stripe checkout session.
+    // Idempotency key keys on (product, user) so a browser retry / double-click
+    // resolves to the same Session within Stripe's 24h window rather than
+    // minting two payment intents that both fire webhooks.
+    // Stripe limits: product_data.name ≤ 250 chars, description ≤ 500 chars.
+    const productName = `${match.home_team} vs ${match.away_team}`.slice(0, 250)
+    const productDescription = (productData.description || match.title || '')
+      .toString()
+      .slice(0, 500)
+    const session = await stripe.checkout.sessions.create(
+      {
+        mode: 'payment',
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: productData.currency.toLowerCase(),
+              product_data: {
+                name: productName,
+                description: productDescription,
+              },
+              unit_amount: Math.round(
+                productData.price_amount * minorUnitFactor(productData.currency)
+              ),
             },
-            unit_amount: Math.round(productData.price_amount * 100), // Convert to cents
+            quantity: 1,
           },
-          quantity: 1,
+        ],
+        metadata: {
+          product_id: productData.id,
+          match_recording_id: match.id,
+          user_id: user.id,
+          profile_id: profile.id,
         },
-      ],
-      metadata: {
-        product_id: productData.id,
-        match_recording_id: match.id,
-        user_id: user.id,
-        profile_id: profile.id,
+        success_url: `${request.nextUrl.origin}/purchase/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${request.nextUrl.origin}/matches/${match.id}?canceled=true`,
       },
-      success_url: `${request.nextUrl.origin}/purchase/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${request.nextUrl.origin}/matches/${match.id}?canceled=true`,
-    })
+      { idempotencyKey: `checkout-${productData.id}-${user.id}` }
+    )
 
     // Redirect to Stripe checkout
     return NextResponse.redirect(session.url!)
@@ -197,36 +211,44 @@ export async function POST(request: NextRequest) {
         ? `${stream.home_team} vs ${stream.away_team}`
         : stream.title
 
-    // Create Stripe checkout session
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card'],
-      customer_email: user.email,
-      line_items: [
-        {
-          price_data: {
-            currency: stream.currency.toLowerCase(),
-            product_data: {
-              name: productName,
-              description:
-                stream.access_type === 'group_unlock'
-                  ? `Unlock for everyone: ${stream.title}`
-                  : `Stream access: ${stream.title}`,
+    // Stripe limits: product_data.name ≤ 250, description ≤ 500.
+    const safeProductName = productName.slice(0, 250)
+    const safeDescription = (
+      stream.access_type === 'group_unlock'
+        ? `Unlock for everyone: ${stream.title}`
+        : `Stream access: ${stream.title}`
+    ).slice(0, 500)
+    const session = await stripe.checkout.sessions.create(
+      {
+        mode: 'payment',
+        payment_method_types: ['card'],
+        customer_email: user.email,
+        line_items: [
+          {
+            price_data: {
+              currency: stream.currency.toLowerCase(),
+              product_data: {
+                name: safeProductName,
+                description: safeDescription,
+              },
+              unit_amount: Math.round(
+                stream.price_amount * minorUnitFactor(stream.currency)
+              ),
             },
-            unit_amount: Math.round(stream.price_amount * 100), // Convert to cents
+            quantity: 1,
           },
-          quantity: 1,
+        ],
+        metadata: {
+          type: 'stream_access',
+          stream_id: stream.id,
+          access_type: stream.access_type,
+          user_id: user.id,
         },
-      ],
-      metadata: {
-        type: 'stream_access',
-        stream_id: stream.id,
-        access_type: stream.access_type,
-        user_id: user.id,
+        success_url: `${request.nextUrl.origin}/streams/${stream_id}?purchased=true`,
+        cancel_url: `${request.nextUrl.origin}/streams/${stream_id}?canceled=true`,
       },
-      success_url: `${request.nextUrl.origin}/streams/${stream_id}?purchased=true`,
-      cancel_url: `${request.nextUrl.origin}/streams/${stream_id}?canceled=true`,
-    })
+      { idempotencyKey: `checkout-stream-${stream.id}-${user.id}` }
+    )
 
     return NextResponse.json({ url: session.url })
   } catch (error) {

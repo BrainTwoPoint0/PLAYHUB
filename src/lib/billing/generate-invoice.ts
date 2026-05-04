@@ -18,37 +18,7 @@
 import Stripe from 'stripe'
 import { sendInvoiceEmail } from '@/lib/email'
 import { getKwdToEurRate, getEurToAedRate } from '@/lib/fx/rates'
-
-// Stripe minor-unit factor per ISO 4217: 0-decimal (JPY etc), 3-decimal (KWD,
-// BHD, JOD, OMR, TND), default 2-decimal. Hard-coding `* 1000` for KWD silently
-// 10× overcharges every other currency — this lookup makes the multiplier
-// match the currency.
-const ZERO_DECIMAL_CURRENCIES = new Set([
-  'BIF',
-  'CLP',
-  'DJF',
-  'GNF',
-  'JPY',
-  'KMF',
-  'KRW',
-  'MGA',
-  'PYG',
-  'RWF',
-  'UGX',
-  'VND',
-  'VUV',
-  'XAF',
-  'XOF',
-  'XPF',
-])
-const THREE_DECIMAL_CURRENCIES = new Set(['BHD', 'JOD', 'KWD', 'OMR', 'TND'])
-
-function minorUnitFactor(currency: string): number {
-  const c = currency.toUpperCase()
-  if (ZERO_DECIMAL_CURRENCIES.has(c)) return 1
-  if (THREE_DECIMAL_CURRENCIES.has(c)) return 1000
-  return 100
-}
+import { minorUnitFactor } from '@/lib/billing/currency'
 
 export interface InvoiceResult {
   invoice: any
