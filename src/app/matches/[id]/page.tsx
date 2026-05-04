@@ -1,12 +1,6 @@
 import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import { getPlaybackUrl } from '@/lib/s3/client'
 import MatchDetailClient from './MatchDetailClient'
-
-// The rendered HTML embeds a 1h signed S3 URL when the visitor has access.
-// Disable shared caching so a CDN or corporate proxy never serves buyer A's
-// signed URL to buyer B.
-export const dynamic = 'force-dynamic'
 
 export default async function MatchDetailPage({
   params,
@@ -77,69 +71,11 @@ export default async function MatchDetailPage({
     }
   }
 
-  // Paid buyers get an inline player on this auth-gated page. The signed S3
-  // URL is short-lived (1h) and is regenerated on each page load — there is
-  // no bearer token persisted on the recording for the buyer, so revoking
-  // the venue admin's separate `share_token` cannot kick a paying buyer out.
-  // Also fetch the events + graphic package + media pack so the same
-  // PLAYHUB VideoPlayer used by /watch can render with full overlays here.
-  let videoUrl: string | null = null
-  let events: any[] = []
-  let graphicPackage: any = null
-  let mediaPack: any = null
-  if (hasAccess && match.s3_key) {
-    try {
-      videoUrl = await getPlaybackUrl(match.s3_key, 3600)
-    } catch (err) {
-      console.error('Failed to generate playback URL:', err)
-    }
-
-    const { data: ev } = await (serviceClient as any)
-      .from('playhub_recording_events')
-      .select('*')
-      .eq('match_recording_id', match.id)
-      .eq('visibility', 'public')
-      .order('timestamp_seconds', { ascending: true })
-    events = ev || []
-
-    if (match.graphic_package_id) {
-      const { data: gp } = await (serviceClient as any)
-        .from('playhub_graphic_packages')
-        .select('*')
-        .eq('id', match.graphic_package_id)
-        .maybeSingle()
-      if (gp) graphicPackage = gp
-    }
-    if (!graphicPackage && match.organization_id) {
-      const { data: gp } = await (serviceClient as any)
-        .from('playhub_graphic_packages')
-        .select('*')
-        .eq('organization_id', match.organization_id)
-        .eq('is_default', true)
-        .maybeSingle()
-      if (gp) graphicPackage = gp
-    }
-    if (!graphicPackage && match.organization_id) {
-      const { data: cfg } = await (serviceClient as any)
-        .from('playhub_venue_billing_config')
-        .select('media_pack')
-        .eq('organization_id', match.organization_id)
-        .maybeSingle()
-      if (cfg?.media_pack && Object.keys(cfg.media_pack).length > 0) {
-        mediaPack = cfg.media_pack
-      }
-    }
-  }
-
+  // No inline player on this surface — the canonical watch URL is /watch/[id].
+  // Buyers (and venue admins) follow the "Watch" CTA on the sidebar, which
+  // navigates to /watch/[id]?from=matches. Single VideoPlayer mount across
+  // the codebase, single access-resolution code path.
   return (
-    <MatchDetailClient
-      match={match}
-      product={product}
-      hasAccess={hasAccess}
-      videoUrl={videoUrl}
-      events={events}
-      graphicPackage={graphicPackage}
-      mediaPack={mediaPack}
-    />
+    <MatchDetailClient match={match} product={product} hasAccess={hasAccess} />
   )
 }

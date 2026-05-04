@@ -13,13 +13,15 @@ export async function GET(
   const supabase = createServiceClient() as any
   const { data: recording } = await supabase
     .from('playhub_match_recordings')
-    .select('share_token')
+    .select('id, share_token')
     .eq('id', id)
     .eq('status', 'published')
     .maybeSingle()
 
   if (recording?.share_token) {
-    return NextResponse.redirect(`${origin}/watch/${recording.share_token}`)
+    return NextResponse.redirect(
+      `${origin}/watch/${recording.id}?token=${recording.share_token}`
+    )
   }
 
   // No share token — redirect to the authenticated recordings page

@@ -22,31 +22,17 @@ import {
   Play,
   CheckCircle,
 } from 'lucide-react'
-import {
-  VideoPlayer,
-  type MediaPack,
-  type GraphicPackageOverlay,
-} from '@/components/video/VideoPlayer'
-import type { RecordingEvent } from '@/lib/recordings/event-types'
 
 interface MatchDetailClientProps {
   match: any
   product: any
   hasAccess: boolean
-  videoUrl?: string | null
-  events?: RecordingEvent[]
-  graphicPackage?: GraphicPackageOverlay | null
-  mediaPack?: MediaPack | null
 }
 
 export default function MatchDetailClient({
   match,
   product,
   hasAccess,
-  videoUrl,
-  events = [],
-  graphicPackage,
-  mediaPack,
 }: MatchDetailClientProps) {
   const [isLoading, setIsLoading] = useState(false)
 
@@ -79,57 +65,51 @@ export default function MatchDetailClient({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Hero — full PLAYHUB player (with event tags + overlays) for paid
-              buyers, thumbnail with marketplace CTA otherwise. */}
+          {/* Hero — thumbnail + marketplace teasing copy. The actual player
+              lives at /watch/[id] (canonical watch surface). Owners see a
+              Watch button that links there; non-owners see Purchase Now. */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className={`relative ${hasAccess && videoUrl ? '' : 'h-[400px] lg:h-[500px]'} bg-muted rounded-xl overflow-hidden border border-border group`}
+            className="relative h-[400px] lg:h-[500px] bg-muted rounded-xl overflow-hidden border border-border group"
           >
-            {hasAccess && videoUrl ? (
-              <VideoPlayer
-                src={videoUrl}
-                events={events}
-                mediaPack={mediaPack || undefined}
-                graphicPackage={graphicPackage || undefined}
-                className="rounded-xl"
+            <div className="absolute inset-0 bg-gradient-to-t from-[var(--night)] via-transparent to-transparent z-10" />
+
+            {match.thumbnail_url ? (
+              <Image
+                src={match.thumbnail_url}
+                alt={match.title}
+                fill
+                className="object-cover group-hover:scale-105 transition-transform duration-700"
+                priority
               />
             ) : (
-              <>
-                <div className="absolute inset-0 bg-gradient-to-t from-[var(--night)] via-transparent to-transparent z-10" />
+              <div className="w-full h-full flex items-center justify-center bg-muted">
+                <span className="text-5xl font-bold text-muted-foreground/30">
+                  {match.home_team?.charAt(0)} v {match.away_team?.charAt(0)}
+                </span>
+              </div>
+            )}
 
-                {match.thumbnail_url ? (
-                  <Image
-                    src={match.thumbnail_url}
-                    alt={match.title}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-700"
-                    priority
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-muted">
-                    <span className="text-5xl font-bold text-muted-foreground/30">
-                      {match.home_team?.charAt(0)} v{' '}
-                      {match.away_team?.charAt(0)}
-                    </span>
-                  </div>
-                )}
+            {/* Sport Badge */}
+            {match.sport && (
+              <Badge className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm text-[var(--timberwolf)] border-border z-20 px-3 py-1.5">
+                {match.sport.name}
+              </Badge>
+            )}
 
-                {/* Sport Badge */}
-                {match.sport && (
-                  <Badge className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm text-[var(--timberwolf)] border-border z-20 px-3 py-1.5">
-                    {match.sport.name}
-                  </Badge>
-                )}
-
-                {/* Play Button Overlay */}
-                <div className="absolute inset-0 flex items-center justify-center z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <div className="w-16 h-16 rounded-full bg-[var(--timberwolf)]/90 backdrop-blur-sm flex items-center justify-center">
-                    <Play className="h-7 w-7 text-[var(--night)] ml-0.5" />
-                  </div>
+            {/* Click-through Play overlay for owners. */}
+            {hasAccess && (
+              <Link
+                href={`/watch/${match.id}?from=matches`}
+                className="absolute inset-0 flex items-center justify-center z-20 group-hover:bg-black/20 transition-colors duration-300"
+                aria-label="Watch this match"
+              >
+                <div className="w-20 h-20 rounded-full bg-[var(--timberwolf)]/90 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                  <Play className="h-9 w-9 text-[var(--night)] ml-1" />
                 </div>
-              </>
+              </Link>
             )}
           </motion.div>
 
@@ -229,7 +209,7 @@ export default function MatchDetailClient({
               <CardContent className="space-y-5">
                 {hasAccess && product ? (
                   <>
-                    {/* Owned state — confirm the purchase, no price block. */}
+                    {/* Owned state — confirm the purchase + Watch CTA. */}
                     <div className="text-center py-5 bg-emerald-400/[0.06] border border-emerald-400/20 rounded-lg">
                       <p className="text-sm text-muted-foreground mb-1">
                         Purchased
@@ -238,9 +218,19 @@ export default function MatchDetailClient({
                         {formatPrice(product.price_amount, product.currency)}
                       </p>
                       <p className="text-xs text-muted-foreground mt-2">
-                        Lifetime access · watch above
+                        Lifetime access
                       </p>
                     </div>
+
+                    <Button
+                      asChild
+                      className="w-full bg-[var(--timberwolf)] text-[var(--night)] hover:bg-[var(--ash-grey)]"
+                    >
+                      <Link href={`/watch/${match.id}?from=matches`}>
+                        <Play className="h-4 w-4 mr-2" />
+                        Watch now
+                      </Link>
+                    </Button>
 
                     <div className="pt-4 border-t border-border space-y-3">
                       {[

@@ -186,14 +186,17 @@ export async function sendRecordingAssignedEmail(params: {
   venueName?: string
   assignedBy?: string
   isReady?: boolean
+  /** Canonical /watch/<id> URL. Falls back to /recordings if not provided. */
+  watchUrl?: string
 }): Promise<SendEmailResult> {
-  const { toEmail, isReady } = params
+  const { toEmail, isReady, watchUrl } = params
   const recordingTitle = escapeHtml(params.recordingTitle)
   const matchDate = params.matchDate ? escapeHtml(params.matchDate) : undefined
   const venueName = params.venueName ? escapeHtml(params.venueName) : undefined
   const assignedBy = params.assignedBy
     ? escapeHtml(params.assignedBy)
     : undefined
+  const ctaUrl = watchUrl || `${APP_URL}/recordings`
 
   try {
     const { error } = await getResend().emails.send({
@@ -228,7 +231,7 @@ export async function sendRecordingAssignedEmail(params: {
               The recording is ready to watch now.
             </p>
 
-            <a href="${APP_URL}/recordings"
+            <a href="${ctaUrl}"
                style="display: inline-block; background-color: #d6d5c9; color: #0a100d; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">
               Watch now
             </a>`

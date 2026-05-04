@@ -290,6 +290,8 @@ async function handleMatchRecordingPurchase(
 
     if (rec) {
       const { sendRecordingAssignedEmail } = await import('@/lib/email')
+      const appUrl =
+        process.env.NEXT_PUBLIC_APP_URL || 'https://playhub.playbacksports.ai'
       sendRecordingAssignedEmail({
         toEmail: customerEmail,
         recordingTitle: rec.title || 'Match Recording',
@@ -298,6 +300,7 @@ async function handleMatchRecordingPurchase(
           : undefined,
         venueName: rec.organizations?.name,
         isReady: true,
+        watchUrl: `${appUrl}/watch/${match_recording_id}`,
       }).catch((err) =>
         console.error('Failed to send purchase confirmation email:', err)
       )

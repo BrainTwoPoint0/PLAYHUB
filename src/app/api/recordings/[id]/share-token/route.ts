@@ -36,11 +36,16 @@ export async function POST(
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
+  // Canonical share URL is /watch/<recording.id>?token=<bearer>. The legacy
+  // /watch/<bearer> form keeps working — the watch route handles non-UUID
+  // segments via a backward-compat redirect.
+  const base = process.env.NEXT_PUBLIC_APP_URL || ''
+
   // If token already exists, return it
   if (recording.share_token) {
     return NextResponse.json({
       token: recording.share_token,
-      shareUrl: `${process.env.NEXT_PUBLIC_APP_URL || ''}/watch/${recording.share_token}`,
+      shareUrl: `${base}/watch/${recording.id}?token=${recording.share_token}`,
     })
   }
 
@@ -61,7 +66,7 @@ export async function POST(
 
   return NextResponse.json({
     token,
-    shareUrl: `${process.env.NEXT_PUBLIC_APP_URL || ''}/watch/${token}`,
+    shareUrl: `${base}/watch/${recording.id}?token=${token}`,
   })
 }
 

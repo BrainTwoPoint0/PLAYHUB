@@ -246,7 +246,9 @@ export default function RecordingsPage() {
           ).map((recording) => (
             <div
               key={recording.id}
-              onClick={() => router.push(`/recordings/${recording.id}`)}
+              onClick={() =>
+                router.push(`/watch/${recording.id}?from=recordings`)
+              }
               className="rounded-xl border border-border bg-card hover:border-[var(--timberwolf)]/20 overflow-hidden transition-colors cursor-pointer"
             >
               <div className="p-4 md:p-5 space-y-3 md:space-y-0 md:flex md:items-center md:gap-5">
