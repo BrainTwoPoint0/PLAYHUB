@@ -216,13 +216,17 @@ async function handleMatchRecordingPurchase(
     organizationId = recData?.organization_id || null
   }
 
-  // Create purchase record (type assertion for PLAYHUB tables)
-  // Store customer info directly on purchase for audit trail (persists even if user deletes account)
+  // Create purchase record. The columns user_id and match_recording_id were
+  // previously missing from this payload, which left every PLAYHUB-marketplace
+  // purchase landing with NULL on those FK columns and broke downstream access
+  // checks. Both come from the Stripe Session metadata.
   const { data: purchase, error: purchaseError } = await (supabase as any)
     .from('playhub_purchases')
     .insert({
+      user_id,
       profile_id,
       product_id,
+      match_recording_id,
       amount_paid: session.amount_total! / 100,
       currency: session.currency!,
       status: 'completed',
@@ -243,7 +247,11 @@ async function handleMatchRecordingPurchase(
     )
   }
 
-  // Grant access to the match (type assertion for PLAYHUB tables)
+  // Grant access to the match. The earlier version passed `access_type:
+  // 'purchased'`, but no such column exists on playhub_access_rights — the
+  // Supabase JS client silently dropped it (and seems to have collateral-
+  // damaged adjacent fields), so user_id and match_recording_id landed NULL.
+  // Stick to columns that actually exist on the table.
   const { error: accessError } = await (supabase as any)
     .from('playhub_access_rights')
     .insert({
@@ -251,7 +259,7 @@ async function handleMatchRecordingPurchase(
       profile_id,
       match_recording_id,
       purchase_id: purchase.id,
-      access_type: 'purchased',
+      is_active: true,
       expires_at: null, // Lifetime access
     })
 
@@ -266,6 +274,7 @@ async function handleMatchRecordingPurchase(
   console.log('Purchase completed and access granted:', {
     purchase_id: purchase.id,
     match_recording_id,
+    user_id,
     profile_id,
   })
 
