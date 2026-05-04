@@ -1,11 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, getAuthUserStrict } from '@/lib/supabase/server'
 import Stripe from 'stripe'
+import { createHash } from 'crypto'
 import { minorUnitFactor } from '@/lib/billing/currency'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-02-24.acacia',
 })
+
+// Stripe rejects a reused idempotency key when the request body has changed,
+// so a key based purely on (productId, userId) deadlocks buyer retries any
+// time a venue admin edits the listing (price change, team rename, etc.).
+// Hash the canonical request shape so any parameter change generates a fresh
+// key while pure browser-retry of the identical request still dedupes.
+//
+// stableStringify sorts keys recursively before serializing — the literal
+// object passed today happens to have a stable insertion order, but a future
+// refactor that constructs the payload via spread/merge could silently change
+// the digest. Sorting keys removes that footgun.
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value))
+    return '[' + value.map(stableStringify).join(',') + ']'
+  const entries = Object.keys(value as object)
+    .sort()
+    .map((k) => JSON.stringify(k) + ':' + stableStringify((value as any)[k]))
+  return '{' + entries.join(',') + '}'
+}
+
+function buildIdempotencyKey(scope: string, payload: object): string {
+  const digest = createHash('sha256')
+    .update(stableStringify(payload))
+    .digest('hex')
+    .slice(0, 32)
+  return `${scope}-${digest}`
+}
 
 // GET - for match recording purchases (existing flow)
 export async function GET(request: NextRequest) {
@@ -79,36 +108,44 @@ export async function GET(request: NextRequest) {
     const productDescription = (productData.description || match.title || '')
       .toString()
       .slice(0, 500)
-    const session = await stripe.checkout.sessions.create(
-      {
-        mode: 'payment',
-        payment_method_types: ['card'],
-        line_items: [
-          {
-            price_data: {
-              currency: productData.currency.toLowerCase(),
-              product_data: {
-                name: productName,
-                description: productDescription,
-              },
-              unit_amount: Math.round(
-                productData.price_amount * minorUnitFactor(productData.currency)
-              ),
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: productData.currency.toLowerCase(),
+            product_data: {
+              name: productName,
+              description: productDescription,
             },
-            quantity: 1,
+            unit_amount: Math.round(
+              productData.price_amount * minorUnitFactor(productData.currency)
+            ),
           },
-        ],
-        metadata: {
-          product_id: productData.id,
-          match_recording_id: match.id,
-          user_id: user.id,
-          profile_id: profile.id,
+          quantity: 1,
         },
-        success_url: `${request.nextUrl.origin}/purchase/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${request.nextUrl.origin}/matches/${match.id}?canceled=true`,
+      ],
+      metadata: {
+        product_id: productData.id,
+        match_recording_id: match.id,
+        user_id: user.id,
+        profile_id: profile.id,
       },
-      { idempotencyKey: `checkout-${productData.id}-${user.id}` }
-    )
+      success_url: `${request.nextUrl.origin}/purchase/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${request.nextUrl.origin}/matches/${match.id}?canceled=true`,
+    }
+    const session = await stripe.checkout.sessions.create(sessionParams, {
+      idempotencyKey: buildIdempotencyKey('checkout', {
+        scope: 'recording',
+        productId: productData.id,
+        userId: user.id,
+        amount: sessionParams.line_items![0].price_data!.unit_amount,
+        currency: sessionParams.line_items![0].price_data!.currency,
+        name: productName,
+        description: productDescription,
+      }),
+    })
 
     // Redirect to Stripe checkout
     return NextResponse.redirect(session.url!)
@@ -218,6 +255,9 @@ export async function POST(request: NextRequest) {
         ? `Unlock for everyone: ${stream.title}`
         : `Stream access: ${stream.title}`
     ).slice(0, 500)
+    const streamUnitAmount = Math.round(
+      stream.price_amount * minorUnitFactor(stream.currency)
+    )
     const session = await stripe.checkout.sessions.create(
       {
         mode: 'payment',
@@ -231,9 +271,7 @@ export async function POST(request: NextRequest) {
                 name: safeProductName,
                 description: safeDescription,
               },
-              unit_amount: Math.round(
-                stream.price_amount * minorUnitFactor(stream.currency)
-              ),
+              unit_amount: streamUnitAmount,
             },
             quantity: 1,
           },
@@ -247,7 +285,17 @@ export async function POST(request: NextRequest) {
         success_url: `${request.nextUrl.origin}/streams/${stream_id}?purchased=true`,
         cancel_url: `${request.nextUrl.origin}/streams/${stream_id}?canceled=true`,
       },
-      { idempotencyKey: `checkout-stream-${stream.id}-${user.id}` }
+      {
+        idempotencyKey: buildIdempotencyKey('checkout', {
+          scope: 'stream',
+          streamId: stream.id,
+          userId: user.id,
+          amount: streamUnitAmount,
+          currency: stream.currency.toLowerCase(),
+          name: safeProductName,
+          description: safeDescription,
+        }),
+      }
     )
 
     return NextResponse.json({ url: session.url })
