@@ -514,8 +514,9 @@ export default function EditorPage() {
     [videoUrl, keyframes.length]
   )
 
-  const handleDetectBall = useCallback(() => {
-    if (!videoFileRef.current || processing) return
+  const handleDetectBall = useCallback(async () => {
+    if (processing) return
+    if (!videoFileRef.current && !videoUrl) return
 
     // If re-detecting, confirm
     if (keyframes.length > 0) {
@@ -525,8 +526,38 @@ export default function EditorPage() {
       if (!confirmed) return
     }
 
-    processVideoFile(videoFileRef.current)
-  }, [processing, processVideoFile, keyframes.length])
+    // Local upload path — we already have a File.
+    if (videoFileRef.current) {
+      processVideoFile(videoFileRef.current)
+      return
+    }
+
+    // URL-source path (academy flow): fetch the (already CORS-proxied)
+    // video, wrap as a File, then feed the same pipeline. Previously this
+    // branch silently no-op'd because the handler bailed on missing File.
+    setProcessing(true)
+    setErrorMessage('')
+    setProcessingStatus('Fetching video from source…')
+    try {
+      const res = await fetch(videoUrl!)
+      if (!res.ok) throw new Error(`Video fetch failed (${res.status})`)
+      const blob = await res.blob()
+      const file = new File([blob], videoFilename || 'source.mp4', {
+        type: blob.type || 'video/mp4',
+      })
+      videoFileRef.current = file
+      setProcessing(false)
+      processVideoFile(file)
+    } catch (err) {
+      setProcessing(false)
+      setProcessingStatus('')
+      setErrorMessage(
+        err instanceof Error
+          ? err.message
+          : 'Could not load video for detection'
+      )
+    }
+  }, [processing, processVideoFile, keyframes.length, videoUrl, videoFilename])
 
   const handleImportKeyframes = useCallback((file: File) => {
     if (file.size > 50 * 1024 * 1024) {
@@ -1239,11 +1270,7 @@ export default function EditorPage() {
                 <Save size={13} />
               )}
               <span className="hidden sm:inline">
-                {saving
-                  ? 'Saving…'
-                  : lastSavedAt
-                    ? 'Saved'
-                    : 'Save'}
+                {saving ? 'Saving…' : lastSavedAt ? 'Saved' : 'Save'}
               </span>
             </button>
           )}
