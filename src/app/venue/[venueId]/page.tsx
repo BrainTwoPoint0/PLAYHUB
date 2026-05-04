@@ -28,6 +28,7 @@ import {
 } from 'recharts'
 import { LoadingSpinner } from '@/components/ui/loading'
 import { HlsPlayer } from '@/components/streaming/HlsPlayer'
+import { AuditHistory } from '@/components/venue/AuditHistory'
 
 interface Recording {
   id: string
@@ -3624,6 +3625,14 @@ export default function VenueManagementPage() {
               )}
             </div>
           </>
+        )}
+
+        {/* Audit history — admin-override actions on tags etc. Hidden for
+            group orgs since they don't admin specific recordings. */}
+        {venue?.type !== 'group' && (
+          <div className="mt-6">
+            <AuditHistory venueId={venueId} />
+          </div>
         )}
 
         {/* Access Modal */}

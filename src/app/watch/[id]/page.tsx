@@ -11,7 +11,10 @@
 import { notFound, redirect } from 'next/navigation'
 import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { getPlaybackUrl } from '@/lib/s3/client'
-import { checkRecordingAccess } from '@/lib/recordings/access-control'
+import {
+  checkRecordingAccess,
+  isVenueAdmin,
+} from '@/lib/recordings/access-control'
 import WatchClient from './WatchClient'
 
 // Legacy /watch/<32-hex-share-token> URLs (still in admin clipboards and the
@@ -60,21 +63,61 @@ export default async function WatchPage({
   if (error || !recording) notFound()
   if (recording.status !== 'published') notFound()
 
-  // Access resolution — channel 1: bearer token query param.
-  let hasAccess = false
-  if (token && recording.share_token && token === recording.share_token) {
-    hasAccess = true
-  }
+  // Access resolution. Track HOW the visitor got in so the client component
+  // can offer a "Save to library" CTA only when access is bearer-only.
+  const tokenMatches = !!(
+    token &&
+    recording.share_token &&
+    token === recording.share_token
+  )
 
-  // Access resolution — channel 2 + 3: signed-in user via existing helper
-  // (covers venue admin, user_id grant, and email-keyed grant in one call).
   const { user } = await getAuthUser()
-  if (!hasAccess && user) {
+  let userHasGrant = false
+  if (user) {
     const result = await checkRecordingAccess(id, user.id)
-    if (result.hasAccess) hasAccess = true
+    userHasGrant = result.hasAccess
   }
 
+  const hasAccess = tokenMatches || userHasGrant
   if (!hasAccess) notFound()
+
+  // canSave: viewer is authenticated, accessed via the public token only,
+  // and doesn't yet have a permanent grant. Clicking save converts the
+  // bearer access into a durable access_rights row that survives token
+  // revocation. Anonymous viewers see a sign-in prompt instead.
+  const canSave = !!user && tokenMatches && !userHasGrant
+  const canSignInToSave = !user && tokenMatches
+
+  // Tagging permissions:
+  //   canTag      — signed in + has a real grant (admin / access_rights via
+  //                  email-keyed or purchase). Bearer-only viewers must save
+  //                  to library first.
+  //   canPublish  — venue admin OR paid buyer. Everyone else gets their
+  //                  visibility=public requests downgraded server-side; we
+  //                  reflect that in the UI so the toggle isn't misleading.
+  const canTag = !!user && userHasGrant
+  let canPublish = false
+  // Track admin status separately from publish rights — admins can delete any
+  // tag on their venue's recordings (including AI-generated and other staff's
+  // tags), buyers cannot.
+  let isAdmin = false
+  if (canTag && user) {
+    isAdmin = recording.organization_id
+      ? await isVenueAdmin(user.id, recording.organization_id)
+      : false
+    if (isAdmin) {
+      canPublish = true
+    } else {
+      const { data: purchase } = await serviceClient
+        .from('playhub_purchases')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('match_recording_id', id)
+        .eq('status', 'completed')
+        .maybeSingle()
+      canPublish = !!purchase
+    }
+  }
 
   // Generate signed S3 URL + fetch overlay assets. Mirrors what the legacy
   // /api/watch/[token] endpoint did so the player gets the full overlay set.
@@ -87,12 +130,58 @@ export default async function WatchPage({
     }
   }
 
-  const { data: events } = await serviceClient
+  // Fetch events. Public events show to everyone with access; private
+  // events show only to their creator. Build the union manually since we
+  // are using the service client (RLS bypassed) — apply the visibility
+  // filter explicitly.
+  const { data: publicEvents } = await serviceClient
     .from('playhub_recording_events')
     .select('*')
     .eq('match_recording_id', recording.id)
     .eq('visibility', 'public')
     .order('timestamp_seconds', { ascending: true })
+
+  let privateEvents: any[] = []
+  if (user) {
+    const { data: priv } = await serviceClient
+      .from('playhub_recording_events')
+      .select('*')
+      .eq('match_recording_id', recording.id)
+      .eq('visibility', 'private')
+      .eq('created_by', user.id)
+      .order('timestamp_seconds', { ascending: true })
+    privateEvents = priv || []
+  }
+
+  const events = [...(publicEvents || []), ...privateEvents].sort(
+    (a, b) => a.timestamp_seconds - b.timestamp_seconds
+  )
+
+  // Resume position: read the user's most recent view-history row for this
+  // recording, fall back to 0 (start). Bearer-only viewers don't persist
+  // history (the API route returns 204 for anonymous), so they never resume.
+  let resumeSeconds = 0
+  if (user) {
+    const { data: lastView } = await serviceClient
+      .from('playhub_view_history')
+      .select('watched_duration_seconds, total_duration_seconds')
+      .eq('user_id', user.id)
+      .eq('match_recording_id', id)
+      .order('last_position_at', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle()
+    if (
+      lastView?.watched_duration_seconds &&
+      lastView.watched_duration_seconds > 5 &&
+      // Don't resume if we were within 10s of the end last time — let the
+      // user start fresh rather than dropping them at the closing whistle.
+      (!lastView.total_duration_seconds ||
+        lastView.watched_duration_seconds <
+          lastView.total_duration_seconds - 10)
+    ) {
+      resumeSeconds = lastView.watched_duration_seconds
+    }
+  }
 
   let graphicPackage: any = null
   let mediaPack: any = null
@@ -152,12 +241,24 @@ export default async function WatchPage({
         awayTeam: recording.away_team,
         venue: recording.venue,
         pitchName: recording.pitch_name,
+        competition: recording.competition,
+        durationSeconds: recording.duration_seconds,
+        shareToken: recording.share_token,
+        thumbnailUrl: recording.thumbnail_url,
       }}
+      resumeSeconds={resumeSeconds}
       videoUrl={videoUrl}
-      events={events || []}
+      events={events}
       graphicPackage={graphicPackage}
       mediaPack={mediaPack}
       from={from || null}
+      token={token || null}
+      canSave={canSave}
+      canSignInToSave={canSignInToSave}
+      canTag={canTag}
+      canPublish={canPublish}
+      isAdmin={isAdmin}
+      currentUserId={user?.id || null}
     />
   )
 }

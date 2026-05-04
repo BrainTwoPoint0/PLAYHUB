@@ -426,6 +426,10 @@ export async function grantRecordingAccessBulk(
     success: boolean
     error?: string
     userExists?: boolean
+    // Lifted from the underlying single grant so audit rows can populate
+    // target_id per-recipient, mirroring the single-grant path. null on
+    // failed inserts.
+    accessId?: string | null
   }>
 }> {
   const results = await Promise.all(
@@ -440,6 +444,7 @@ export async function grantRecordingAccessBulk(
         success: result.success,
         error: result.error,
         userExists: result.userExists,
+        accessId: result.accessId ?? null,
       }
     })
   )

@@ -16,6 +16,7 @@ import {
 } from '@braintwopoint0/playback-commons/ui'
 import { FadeIn } from '@/components/FadeIn'
 import { ShareRecordingModal } from '@/components/ShareRecordingModal'
+import { PendingInvitations } from '@/components/PendingInvitations'
 import { Play, Share2, Download, Film, Lock } from 'lucide-react'
 
 interface Recording {
@@ -127,6 +128,12 @@ export default function RecordingsPage() {
 
   return (
     <div className="mx-auto max-w-screen-xl px-4 py-12 sm:px-6 lg:px-8">
+      {/* Pending invitations — only renders when the current user has
+          unwatched grants. Closes the silent-auto-claim concern: every
+          grant they hold (or that's been queued for them by email) is
+          surfaced here with a Watch / Decline action. */}
+      <PendingInvitations />
+
       {/* Header */}
       <FadeIn className="mb-10">
         <p className="text-muted-foreground text-xs font-semibold tracking-[0.25em] uppercase mb-3">

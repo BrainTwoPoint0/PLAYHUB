@@ -1,7 +1,10 @@
 // GET + POST /api/recordings/[id]/events
 import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { checkRecordingAccess } from '@/lib/recordings/access-control'
+import {
+  checkRecordingAccess,
+  isVenueAdmin,
+} from '@/lib/recordings/access-control'
 import { isValidEventType } from '@/lib/recordings/event-types'
 
 export async function GET(
@@ -111,6 +114,35 @@ export async function POST(
     )
   }
 
+  // Visibility enforcement: anyone with access can create PRIVATE tags, but
+  // only venue admins or paying buyers can publish. If a non-privileged user
+  // requests visibility=public, downgrade to private silently rather than
+  // 403 — better UX, same outcome from the perspective of other viewers.
+  let effectiveVisibility: 'public' | 'private' =
+    (visibility as 'public' | 'private') || 'private'
+  if (effectiveVisibility === 'public') {
+    const serviceClient = createServiceClient() as any
+    const { data: rec } = await serviceClient
+      .from('playhub_match_recordings')
+      .select('organization_id')
+      .eq('id', id)
+      .maybeSingle()
+    const isAdmin = rec?.organization_id
+      ? await isVenueAdmin(user.id, rec.organization_id)
+      : false
+    if (!isAdmin) {
+      const { data: purchase } = await serviceClient
+        .from('playhub_purchases')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('match_recording_id', id)
+        .eq('status', 'completed')
+        .maybeSingle()
+      const isBuyer = !!purchase
+      if (!isBuyer) effectiveVisibility = 'private'
+    }
+  }
+
   // Insert the event
   const { data: event, error } = await (supabase as any)
     .from('playhub_recording_events')
@@ -120,7 +152,7 @@ export async function POST(
       timestamp_seconds,
       team: team || null,
       label: label || null,
-      visibility: visibility || 'public',
+      visibility: effectiveVisibility,
       source: 'manual',
       created_by: user.id,
     })
