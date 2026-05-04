@@ -6,15 +6,41 @@ const {
   mockConstructEvent,
   mockScheduleRecording,
   mockSupabaseFrom,
+  sharedChain,
 } = vi.hoisted(() => {
   process.env.STRIPE_SECRET_KEY = 'sk_test_xxx'
   process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test'
+
+  // Default chain that responds to every query the same way. Individual
+  // tests can override `sharedChain.from` to route by table when they need
+  // to assert per-call payloads.
+  const c: any = {}
+  c.from = (() => {
+    const fn: any = (..._args: any[]) => c
+    return Object.assign(fn, { mockReturnValue: () => fn })
+  })()
+  c.select = (() => {
+    const fn: any = (..._args: any[]) => c
+    return Object.assign(fn, { mockReturnValue: () => fn })
+  })()
+  c.insert = (() => {
+    const fn: any = (..._args: any[]) => c
+    return Object.assign(fn, { mockReturnValue: () => fn })
+  })()
+  c.upsert = (..._args: any[]) => c
+  c.update = (..._args: any[]) => c
+  c.eq = (..._args: any[]) => c
+  c.gte = (..._args: any[]) => c
+  c.lte = (..._args: any[]) => c
+  c.single = () => Promise.resolve({ data: { id: 'purchase-1' }, error: null })
+  c.maybeSingle = () => Promise.resolve({ data: null, error: null })
 
   return {
     mockHeadersGet: vi.fn(),
     mockConstructEvent: vi.fn(),
     mockScheduleRecording: vi.fn(),
     mockSupabaseFrom: vi.fn(),
+    sharedChain: c,
   }
 })
 
@@ -41,30 +67,10 @@ vi.mock('@/lib/spiideo/schedule-recording', () => ({
   scheduleRecording: (...args: any[]) => mockScheduleRecording(...args),
 }))
 
-// Chainable Supabase mock
-function supaChain(resolvedValue: { data: any; error: any }) {
-  const c: any = {}
-  c.from = vi.fn().mockReturnValue(c)
-  c.select = vi.fn().mockReturnValue(c)
-  c.insert = vi.fn().mockReturnValue(c)
-  c.upsert = vi.fn().mockReturnValue(c)
-  c.update = vi.fn().mockReturnValue(c)
-  c.eq = vi.fn().mockReturnValue(c)
-  c.gte = vi.fn().mockReturnValue(c)
-  c.lte = vi.fn().mockReturnValue(c)
-  c.single = vi.fn().mockResolvedValue(resolvedValue)
-  c.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
-  return c
-}
-
-vi.mock('@/lib/supabase/server', () => {
-  const client = supaChain({ data: { id: 'purchase-1' }, error: null })
-  mockSupabaseFrom.mockImplementation((...args: any[]) => client.from(...args))
-  return {
-    createClient: vi.fn().mockResolvedValue(client),
-    createServiceClient: vi.fn().mockReturnValue(client),
-  }
-})
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: vi.fn().mockResolvedValue(sharedChain),
+  createServiceClient: vi.fn().mockReturnValue(sharedChain),
+}))
 
 // ── Import after mocks ──────────────────────────────────────────────
 import { POST } from '@/app/api/webhooks/stripe/route'
@@ -250,5 +256,159 @@ describe('POST /api/webhooks/stripe', () => {
     const json = await res.json()
     expect(json.received).toBe(true)
     expect(mockScheduleRecording).not.toHaveBeenCalled()
+  })
+
+  // ── Match recording purchase regression suite ─────────────────────
+  //
+  // These two assertions exist because the original handler shipped with
+  // two latent bugs that combined to leave every paid purchase invisible
+  // to the buyer:
+  //   1. The playhub_purchases insert payload was missing user_id and
+  //      match_recording_id, so those FK columns landed NULL.
+  //   2. The playhub_access_rights insert passed access_type: 'purchased'
+  //      but no such column exists on the table — supabase-js silently
+  //      dropped it (and adjacent fields). user_id + match_recording_id
+  //      ended up NULL on the access_rights row, so /matches/[id]
+  //      always returned hasAccess=false even for paying buyers.
+  // Pinning the insert payload contract here so a future refactor that
+  // re-removes a required column or re-adds a phantom one breaks the
+  // test instead of breaking buyer checkout.
+
+  function setupRecordingPurchaseChain() {
+    const purchaseInsertCalls: any[] = []
+    const accessInsertCalls: any[] = []
+
+    sharedChain.from = vi.fn().mockImplementation((table: string) => {
+      if (table === 'playhub_purchases') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({ data: null, error: null }),
+            }),
+          }),
+          insert: (payload: any) => {
+            purchaseInsertCalls.push(payload)
+            return {
+              select: () => ({
+                single: () =>
+                  Promise.resolve({
+                    data: { id: 'purchase-1' },
+                    error: null,
+                  }),
+              }),
+            }
+          },
+        }
+      }
+      if (table === 'playhub_match_recordings') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () =>
+                Promise.resolve({
+                  data: { organization_id: 'org-1', title: 'Match Title' },
+                  error: null,
+                }),
+            }),
+          }),
+        }
+      }
+      if (table === 'playhub_access_rights') {
+        return {
+          insert: (payload: any) => {
+            accessInsertCalls.push(payload)
+            return Promise.resolve({ error: null })
+          },
+        }
+      }
+      return {
+        select: () => ({
+          eq: () => ({
+            maybeSingle: () => Promise.resolve({ data: null, error: null }),
+            single: () => Promise.resolve({ data: null, error: null }),
+          }),
+        }),
+      }
+    })
+
+    return { purchaseInsertCalls, accessInsertCalls }
+  }
+
+  function recordingPurchaseEvent() {
+    return stripeEvent('checkout.session.completed', {
+      id: 'cs_live_test_123',
+      payment_intent: 'pi_test_123',
+      amount_total: 20000,
+      currency: 'aed',
+      customer_details: { email: 'buyer@example.com', name: null },
+      metadata: {
+        product_id: 'prod-1',
+        match_recording_id: 'rec-1',
+        user_id: 'user-1',
+        profile_id: 'profile-1',
+      },
+    })
+  }
+
+  it('persists user_id + match_recording_id on the purchase insert', async () => {
+    const { purchaseInsertCalls } = setupRecordingPurchaseChain()
+    mockConstructEvent.mockReturnValue(recordingPurchaseEvent())
+
+    const res = await POST(makeRequest())
+    expect(res.status).toBe(200)
+
+    expect(purchaseInsertCalls).toHaveLength(1)
+    expect(purchaseInsertCalls[0]).toMatchObject({
+      user_id: 'user-1',
+      profile_id: 'profile-1',
+      product_id: 'prod-1',
+      match_recording_id: 'rec-1',
+      currency: 'aed',
+      status: 'completed',
+      stripe_checkout_session_id: 'cs_live_test_123',
+      stripe_payment_intent_id: 'pi_test_123',
+    })
+  })
+
+  it('grants access without the phantom access_type column', async () => {
+    const { accessInsertCalls } = setupRecordingPurchaseChain()
+    mockConstructEvent.mockReturnValue(recordingPurchaseEvent())
+
+    const res = await POST(makeRequest())
+    expect(res.status).toBe(200)
+
+    expect(accessInsertCalls).toHaveLength(1)
+    const access = accessInsertCalls[0]
+    expect(access).toMatchObject({
+      user_id: 'user-1',
+      profile_id: 'profile-1',
+      match_recording_id: 'rec-1',
+      purchase_id: 'purchase-1',
+      is_active: true,
+    })
+    // Regression guard: this column does not exist on playhub_access_rights.
+    // Adding it caused supabase-js to silently drop adjacent fields.
+    expect(access).not.toHaveProperty('access_type')
+  })
+
+  it('returns 200 + does not insert when match_recording_id metadata is missing', async () => {
+    const { purchaseInsertCalls, accessInsertCalls } =
+      setupRecordingPurchaseChain()
+    mockConstructEvent.mockReturnValue(
+      stripeEvent('checkout.session.completed', {
+        id: 'cs_live_test_456',
+        metadata: {
+          product_id: 'prod-1',
+          // match_recording_id missing
+          user_id: 'user-1',
+          profile_id: 'profile-1',
+        },
+      })
+    )
+
+    const res = await POST(makeRequest())
+    expect(res.status).toBe(200)
+    expect(purchaseInsertCalls).toHaveLength(0)
+    expect(accessInsertCalls).toHaveLength(0)
   })
 })
