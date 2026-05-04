@@ -1,39 +1,63 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, getAuthUserStrict } from '@/lib/supabase/server'
 import Stripe from 'stripe'
-import { createHash } from 'crypto'
 import { minorUnitFactor } from '@/lib/billing/currency'
+import { buildIdempotencyKey } from '@/lib/stripe/idempotency'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-02-24.acacia',
 })
 
-// Stripe rejects a reused idempotency key when the request body has changed,
-// so a key based purely on (productId, userId) deadlocks buyer retries any
-// time a venue admin edits the listing (price change, team rename, etc.).
-// Hash the canonical request shape so any parameter change generates a fresh
-// key while pure browser-retry of the identical request still dedupes.
-//
-// stableStringify sorts keys recursively before serializing — the literal
-// object passed today happens to have a stable insertion order, but a future
-// refactor that constructs the payload via spread/merge could silently change
-// the digest. Sorting keys removes that footgun.
-function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value)
-  if (Array.isArray(value))
-    return '[' + value.map(stableStringify).join(',') + ']'
-  const entries = Object.keys(value as object)
-    .sort()
-    .map((k) => JSON.stringify(k) + ':' + stableStringify((value as any)[k]))
-  return '{' + entries.join(',') + '}'
-}
-
-function buildIdempotencyKey(scope: string, payload: object): string {
-  const digest = createHash('sha256')
-    .update(stableStringify(payload))
-    .digest('hex')
-    .slice(0, 32)
-  return `${scope}-${digest}`
+// Map a Stripe SDK error to an HTTP response. A bare 500 for every Stripe
+// failure forces every diagnosis through Netlify Function logs. Surfacing
+// the specific failure mode in the response (with a stable error code the
+// client can branch on) makes the next "checkout broken" report trivially
+// reproducible without log access.
+function stripeErrorResponse(err: unknown): NextResponse {
+  console.error('Checkout session error:', err)
+  if (err instanceof Stripe.errors.StripeIdempotencyError) {
+    return NextResponse.json(
+      {
+        error: {
+          code: 'idempotency_conflict',
+          message:
+            'Checkout request parameters changed mid-flight. Refresh and retry.',
+        },
+      },
+      { status: 409 }
+    )
+  }
+  if (err instanceof Stripe.errors.StripeCardError) {
+    return NextResponse.json(
+      {
+        error: {
+          code: 'card_declined',
+          message: err.message || 'Card was declined.',
+        },
+      },
+      { status: 402 }
+    )
+  }
+  if (err instanceof Stripe.errors.StripeInvalidRequestError) {
+    return NextResponse.json(
+      {
+        error: {
+          code: 'invalid_request',
+          message: err.message || 'Invalid checkout request.',
+        },
+      },
+      { status: 400 }
+    )
+  }
+  return NextResponse.json(
+    {
+      error: {
+        code: 'checkout_failed',
+        message: 'Failed to create checkout session.',
+      },
+    },
+    { status: 500 }
+  )
 }
 
 // GET - for match recording purchases (existing flow)
@@ -150,11 +174,7 @@ export async function GET(request: NextRequest) {
     // Redirect to Stripe checkout
     return NextResponse.redirect(session.url!)
   } catch (error) {
-    console.error('Checkout session error:', error)
-    return NextResponse.json(
-      { error: 'Failed to create checkout session' },
-      { status: 500 }
-    )
+    return stripeErrorResponse(error)
   }
 }
 
@@ -300,10 +320,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url: session.url })
   } catch (error) {
-    console.error('Stream checkout error:', error)
-    return NextResponse.json(
-      { error: 'Failed to create checkout session' },
-      { status: 500 }
-    )
+    return stripeErrorResponse(error)
   }
 }
