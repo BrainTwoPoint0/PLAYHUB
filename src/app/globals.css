@@ -18,6 +18,16 @@
   --timberwolf: #d6d5c9;
   --radius: 0.5rem;
 
+  /* PLAYBACK brand surface + line + ink tokens (ported from PLAYBACK Phase 1). */
+  --surface-0: #0a100d;
+  --surface-1: #0f1512;
+  --surface-2: #141a17;
+  --line: rgba(214, 213, 201, 0.08);
+  --line-strong: rgba(214, 213, 201, 0.16);
+  --text: #d6d5c9;
+  --text-muted: rgba(214, 213, 201, 0.64);
+  --text-subtle: rgba(214, 213, 201, 0.44);
+
   /* Editor-specific tokens */
   --editor-bg: #060b08;
   --editor-bar: #0a100d;

@@ -18,6 +18,24 @@ const config: Config = {
     },
     extend: {
       colors: {
+        // PLAYBACK brand tokens (ported from Phase 1).
+        night: 'var(--night)',
+        'ash-grey': 'var(--ash-grey)',
+        timberwolf: 'var(--timberwolf)',
+        surface: {
+          0: 'var(--surface-0)',
+          1: 'var(--surface-1)',
+          2: 'var(--surface-2)',
+        },
+        line: {
+          DEFAULT: 'var(--line)',
+          strong: 'var(--line-strong)',
+        },
+        ink: {
+          DEFAULT: 'var(--text)',
+          muted: 'var(--text-muted)',
+          subtle: 'var(--text-subtle)',
+        },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

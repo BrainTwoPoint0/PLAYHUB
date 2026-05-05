@@ -64,3 +64,6 @@ infrastructure/keys/
 
 # Deno
 deno.lock
+
+# Local one-off debug scripts (kept locally, never committed)
+check-*.mjs
