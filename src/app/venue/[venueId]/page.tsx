@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import {
   Button,
@@ -254,7 +254,7 @@ function MarketplaceRevenue({
   }
 
   return (
-    <div className="mb-6 rounded-xl border border-border bg-card">
+    <div className="mb-6 rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
       <div className="p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
           <div>
@@ -285,7 +285,7 @@ function MarketplaceRevenue({
           ) : (
             <div className="space-y-4">
               {/* Summary cards */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-white/[0.06]">
                 {[
                   { label: 'Total Sales', value: String(data.totalSales) },
                   {
@@ -320,7 +320,7 @@ function MarketplaceRevenue({
                 {data.perRecording.map((rec) => (
                   <div
                     key={rec.recordingId}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border"
+                    className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/[0.06]"
                   >
                     <div className="min-w-0">
                       <p className="text-sm text-[var(--timberwolf)] truncate">
@@ -467,6 +467,15 @@ export default function VenueManagementPage() {
   const [billingConfig, setBillingConfig] = useState<BillingConfig | null>(null)
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [dailyStats, setDailyStats] = useState<DailyStats | null>(null)
+  // Per-month cache so navigating Jan→Feb→Jan doesn't refetch Jan. Keyed
+  // by `${year}-${month}`. Refs (not state) because we don't need a
+  // re-render when the cache mutates — the visible state still drives
+  // re-renders via setBillingSummary / setDailyStats.
+  const summaryCacheRef = useRef<Map<string, BillingSummary>>(new Map())
+  const dailyStatsCacheRef = useRef<Map<string, DailyStats>>(new Map())
+  // Separate "chart is fetching" so we can fade the chart without
+  // unmounting the whole billing card during month nav.
+  const [chartLoading, setChartLoading] = useState(false)
   const [showBillingSection, setShowBillingSection] = useState(false)
   const [isBillable, setIsBillable] = useState(true)
   const [billableAmount, setBillableAmount] = useState('')
@@ -521,6 +530,23 @@ export default function VenueManagementPage() {
 
   useEffect(() => {
     fetchVenueData()
+    // Fire venue-id-only supplementary fetches in PARALLEL with the venue
+    // lookup. They don't need venue.type or venue.slug to begin, so there's
+    // no reason to wait for the venue object to be set. Marketplace stays
+    // tied to the venue object below since it needs venue.slug.
+    fetch(`/api/venue/${venueId}/spiideo/scenes`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.scenes) {
+          setScenes(data.scenes)
+          if (data.scenes.length > 0 && !sceneId) {
+            setSceneId(data.scenes[0].id)
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => setScenesLoading(false))
+    fetchBillingData().finally(() => setBillingLoading(false))
   }, [venueId])
 
   // Poll for channel state changes
@@ -541,24 +567,19 @@ export default function VenueManagementPage() {
     try {
       setLoading(true)
 
-      // Fetch venue info first — this is the critical data
-      const venuesRes = await fetch('/api/venue')
-      const venuesData = await venuesRes.json()
+      // Single-venue fetch — the previous /api/venue call returned the FULL
+      // venue list just to find one. New endpoint returns only this venue +
+      // a count of the user's other venues for the "Switch Venue" CTA.
+      const res = await fetch(`/api/venue/${venueId}`)
+      const data = await res.json()
 
-      if (venuesData.error) {
-        setError(venuesData.error)
+      if (data.error) {
+        setError(data.error)
         return
       }
 
-      const venuesList = venuesData.venues || []
-      setVenueCount(venuesList.length)
-
-      const currentVenue = venuesList.find((v: Venue) => v.id === venueId)
-      if (!currentVenue) {
-        setError('Venue not found or you do not have access')
-        return
-      }
-      setVenue(currentVenue)
+      setVenueCount(data.venueCount ?? 1)
+      setVenue(data.venue)
     } catch (err) {
       setError('Failed to load venue data')
     } finally {
@@ -566,11 +587,13 @@ export default function VenueManagementPage() {
     }
   }
 
-  // Load supplementary data independently once venue is available
+  // Once venue resolves, fire the type-dependent fetches: marketplace
+  // (needs venue.slug), group dashboard (groups only), and recordings.
+  // The venueId-only fetches (scenes + billing) already started in parallel
+  // with the venue lookup above.
   useEffect(() => {
     if (!venue) return
 
-    // If group org, fetch group dashboard data instead of venue-specific data
     if (venue.type === 'group') {
       setGroupLoading(true)
       fetch(`/api/venue/${venueId}/group-dashboard`)
@@ -581,16 +604,16 @@ export default function VenueManagementPage() {
         .catch(() => {})
         .finally(() => {
           setGroupLoading(false)
+          // Group orgs don't have venue-specific billing/scenes/marketplace,
+          // so resolve those loading states explicitly.
           setBillingLoading(false)
           setScenesLoading(false)
           setMarketplaceLoading(false)
         })
-      // Also fetch recordings (aggregated from child venues via Phase 4)
       fetchRecordings()
       return
     }
 
-    // Fetch org marketplace settings
     if (venue.slug) {
       fetch(`/api/org/${venue.slug}/marketplace`)
         .then((res) => (res.ok ? res.json() : null))
@@ -602,23 +625,6 @@ export default function VenueManagementPage() {
     } else {
       setMarketplaceLoading(false)
     }
-
-    // Fetch scenes for scheduling
-    fetch(`/api/venue/${venueId}/spiideo/scenes`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.scenes) {
-          setScenes(data.scenes)
-          if (data.scenes.length > 0 && !sceneId) {
-            setSceneId(data.scenes[0].id)
-          }
-        }
-      })
-      .catch(() => {})
-      .finally(() => setScenesLoading(false))
-
-    // Fetch billing data
-    fetchBillingData().finally(() => setBillingLoading(false))
   }, [venue])
 
   // Debounce search input
@@ -678,39 +684,90 @@ export default function VenueManagementPage() {
 
   async function fetchBillingData(month = billingMonth, year = billingYear) {
     const monthParams = `?month=${month}&year=${year}`
+    const cacheKey = `${year}-${month}`
+
+    // Hydrate from cache immediately — gives instant feel on month nav
+    // even if a network refresh fires in the background.
+    const cachedSummary = summaryCacheRef.current.get(cacheKey)
+    const cachedStats = dailyStatsCacheRef.current.get(cacheKey)
+    if (cachedSummary) setBillingSummary(cachedSummary)
+    if (cachedStats) setDailyStats(cachedStats)
+
+    // Month-invariant fetches: only run on the FIRST call (no config yet).
+    // Previously these refetched on every month nav for no reason.
+    const fetchInvariants = !billingConfig
+    const monthSpecificFetches: Array<Promise<any>> = [
+      cachedSummary
+        ? Promise.resolve({
+            ok: true,
+            json: async () => cachedSummary,
+            _cached: true,
+          })
+        : fetch(`/api/venue/${venueId}/billing/summary${monthParams}`),
+    ]
+    const invariantFetches: Array<Promise<any>> = fetchInvariants
+      ? [
+          fetch(`/api/venue/${venueId}/billing`),
+          fetch(`/api/venue/${venueId}/billing/invoices`),
+        ]
+      : []
+
+    // Fade the chart only when we don't have cached data to show — if
+    // cache hits, the user sees the right shape immediately and any
+    // network refresh is invisible.
+    const needsNetwork = !cachedSummary || !cachedStats
+    if (needsNetwork) setChartLoading(true)
+
     try {
-      const [configRes, summaryRes, invoicesRes] = await Promise.all([
-        fetch(`/api/venue/${venueId}/billing`),
-        fetch(`/api/venue/${venueId}/billing/summary${monthParams}`),
-        fetch(`/api/venue/${venueId}/billing/invoices`),
+      const [summaryResRaw, ...invariantResults] = await Promise.all([
+        ...monthSpecificFetches,
+        ...invariantFetches,
       ])
-      const [configData, summaryData, invoicesData] = await Promise.all([
-        configRes.json(),
-        summaryRes.json(),
-        invoicesRes.json(),
-      ])
-      if (configData.config) {
-        setBillingConfig(configData.config)
-        setBillableAmount(
-          String(configData.config.default_billable_amount || '')
-        )
+      // summary
+      const summaryRes = summaryResRaw as any
+      if (!summaryRes._cached) {
+        const summaryData = await summaryRes.json()
+        if (!summaryData.error) {
+          setBillingSummary(summaryData)
+          summaryCacheRef.current.set(cacheKey, summaryData)
+        }
       }
-      if (!summaryData.error) setBillingSummary(summaryData)
-      if (invoicesData.invoices) setInvoices(invoicesData.invoices)
+      // invariant: config + invoices
+      if (fetchInvariants && invariantResults.length === 2) {
+        const [configRes, invoicesRes] = invariantResults
+        const [configData, invoicesData] = await Promise.all([
+          configRes.json(),
+          invoicesRes.json(),
+        ])
+        if (configData.config) {
+          setBillingConfig(configData.config)
+          setBillableAmount(
+            String(configData.config.default_billable_amount || '')
+          )
+        }
+        if (invoicesData.invoices) setInvoices(invoicesData.invoices)
+      }
     } catch {
       // Billing data is supplementary — don't block the page
     }
 
-    // Fetch daily stats separately so it can't break billing
-    try {
-      const res = await fetch(
-        `/api/venue/${venueId}/billing/daily-stats${monthParams}`
-      )
-      const data = await res.json()
-      if (!data.error) setDailyStats(data)
-    } catch {
-      // Chart is optional
+    // Daily stats separately (decoupled from billing summary failure mode).
+    if (!cachedStats) {
+      try {
+        const res = await fetch(
+          `/api/venue/${venueId}/billing/daily-stats${monthParams}`
+        )
+        const data = await res.json()
+        if (!data.error) {
+          setDailyStats(data)
+          dailyStatsCacheRef.current.set(cacheKey, data)
+        }
+      } catch {
+        // Chart is optional
+      }
     }
+
+    setChartLoading(false)
   }
 
   async function openAccessModal(recording: Recording) {
@@ -1413,11 +1470,13 @@ export default function VenueManagementPage() {
     return local.toISOString().slice(0, 16)
   }
 
-  // Shared input styling
+  // Shared input + button styling — aligned with the watch-surface
+  // vocabulary: subtle white/alpha borders + hover transitions on glass-y
+  // surfaces, rather than opaque zinc + hard borders.
   const inputClass =
-    'bg-zinc-800 border-border text-[var(--timberwolf)] placeholder:text-muted-foreground/40'
+    'bg-white/[0.02] border-white/[0.08] text-[var(--timberwolf)] placeholder:text-muted-foreground/50 hover:border-white/[0.14] focus:border-emerald-400/40 focus:bg-white/[0.04] focus:ring-2 focus:ring-emerald-400/15 transition-colors'
   const outlineBtnClass =
-    'border-border text-[var(--timberwolf)] hover:bg-muted'
+    'border-white/[0.08] bg-white/[0.02] text-[var(--timberwolf)] hover:bg-white/[0.06] hover:border-white/[0.16]'
   const primaryBtnClass =
     'bg-[var(--timberwolf)] text-[var(--night)] hover:bg-[var(--ash-grey)]'
 
@@ -1435,7 +1494,7 @@ export default function VenueManagementPage() {
           </div>
 
           {/* Schedule Recording skeleton */}
-          <div className="mb-6 rounded-xl border border-border bg-card p-6">
+          <div className="mb-6 rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)] p-6">
             <div className="flex items-center justify-between">
               <div className="bg-muted rounded h-5 w-[160px]" />
               <div className="bg-muted rounded h-10 w-[140px]" />
@@ -1443,7 +1502,7 @@ export default function VenueManagementPage() {
           </div>
 
           {/* Live Streaming skeleton */}
-          <div className="mb-6 rounded-xl border border-border bg-card p-6">
+          <div className="mb-6 rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)] p-6">
             <div className="flex items-center justify-between">
               <div className="space-y-2">
                 <div className="bg-muted rounded h-5 w-[130px]" />
@@ -1454,7 +1513,7 @@ export default function VenueManagementPage() {
           </div>
 
           {/* Billing skeleton */}
-          <div className="mb-6 rounded-xl border border-border bg-card">
+          <div className="mb-6 rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
             <div className="p-5">
               {/* Header row */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
@@ -1468,7 +1527,7 @@ export default function VenueManagementPage() {
                 </div>
               </div>
               {/* 4-column financial grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-white/[0.06]">
                 {[0, 1, 2, 3].map((i) => (
                   <div key={i} className="bg-[var(--night)] p-3.5 space-y-2">
                     <div className="flex items-center gap-1.5">
@@ -1484,7 +1543,7 @@ export default function VenueManagementPage() {
           </div>
 
           {/* Recordings skeleton */}
-          <div className="rounded-xl border border-border bg-card">
+          <div className="rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
             <div className="p-6 space-y-1">
               <div className="bg-muted rounded h-5 w-[100px]" />
               <div className="bg-muted rounded h-3 w-[120px]" />
@@ -1493,7 +1552,7 @@ export default function VenueManagementPage() {
               {[0, 1, 2].map((i) => (
                 <div
                   key={i}
-                  className="p-4 rounded-lg bg-muted/50 border border-border"
+                  className="p-4 rounded-lg bg-white/[0.02] border border-white/[0.06]"
                 >
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 w-10 h-10 rounded bg-muted" />
@@ -1518,7 +1577,7 @@ export default function VenueManagementPage() {
           </div>
 
           {/* Venue Admins skeleton */}
-          <div className="mt-6 rounded-xl border border-border bg-card p-6">
+          <div className="mt-6 rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)] p-6">
             <div className="flex items-center justify-between mb-1">
               <div className="bg-muted rounded h-5 w-[120px]" />
               <div className="bg-muted rounded h-10 w-[130px]" />
@@ -1534,7 +1593,7 @@ export default function VenueManagementPage() {
     return (
       <div className="min-h-screen bg-[var(--night)]">
         <div className="container mx-auto px-5 py-16 max-w-6xl">
-          <div className="rounded-xl border border-border bg-card p-6">
+          <div className="rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)] p-6">
             <p className="text-red-400">{error}</p>
             <Button
               className={`mt-4 ${outlineBtnClass}`}
@@ -1552,19 +1611,20 @@ export default function VenueManagementPage() {
   return (
     <div className="min-h-screen bg-[var(--night)]">
       <div className="container mx-auto px-5 py-16 max-w-6xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8">
-          <div>
+        <div className="flex flex-row items-end sm:items-center justify-between gap-3 mb-8">
+          <div className="min-w-0">
             <p className="text-muted-foreground text-xs font-semibold tracking-[0.25em] uppercase mb-2">
               {venue?.type === 'group' ? 'Group Overview' : 'Venue Management'}
             </p>
-            <h1 className="text-2xl md:text-3xl font-bold text-[var(--timberwolf)]">
+            <h1 className="text-2xl md:text-3xl font-bold text-[var(--timberwolf)] truncate">
               {venue?.name}
             </h1>
           </div>
           {venueCount > 1 && (
             <Button
               variant="outline"
-              className={`self-start sm:self-auto ${outlineBtnClass}`}
+              size="sm"
+              className={`flex-shrink-0 sm:size-default ${outlineBtnClass}`}
               onClick={() => router.push('/venue')}
             >
               Switch Venue
@@ -1576,10 +1636,10 @@ export default function VenueManagementPage() {
         {venue?.type === 'group' && (
           <>
             {groupLoading ? (
-              <div className="mb-6 rounded-xl border border-border bg-card animate-pulse p-6">
+              <div className="mb-6 rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)] animate-pulse p-6">
                 <div className="space-y-4">
                   <div className="bg-muted rounded h-5 w-[200px]" />
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-white/[0.06]">
                     {[0, 1, 2, 3].map((i) => (
                       <div
                         key={i}
@@ -1596,12 +1656,12 @@ export default function VenueManagementPage() {
               groupData && (
                 <div className="space-y-6 mb-6">
                   {/* Aggregated totals */}
-                  <div className="rounded-xl border border-border bg-card">
+                  <div className="rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
                     <div className="p-5">
                       <h2 className="text-base font-semibold text-[var(--timberwolf)] mb-4">
                         Portfolio Overview
                       </h2>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-white/[0.06]">
                         {[
                           {
                             label: 'Total Recordings',
@@ -1655,7 +1715,7 @@ export default function VenueManagementPage() {
 
                   {/* Daily performance chart */}
                   {groupData.dailyChart.length > 0 && (
-                    <div className="rounded-xl border border-border bg-card">
+                    <div className="rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
                       <div className="p-5">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                           <div>
@@ -1766,7 +1826,7 @@ export default function VenueManagementPage() {
                   )}
 
                   {/* Per-venue breakdown */}
-                  <div className="rounded-xl border border-border bg-card">
+                  <div className="rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
                     <div className="p-5">
                       <h2 className="text-base font-semibold text-[var(--timberwolf)] mb-4">
                         Venues ({groupData.childVenues.length})
@@ -1775,7 +1835,7 @@ export default function VenueManagementPage() {
                         {groupData.childVenues.map((child) => (
                           <div
                             key={child.id}
-                            className="p-4 rounded-lg bg-muted/50 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                            className="p-4 rounded-lg bg-white/[0.02] border border-white/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                           >
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
@@ -1840,7 +1900,7 @@ export default function VenueManagementPage() {
         {venue?.type !== 'group' && (
           <>
             {billingLoading ? (
-              <div className="mb-6 rounded-xl border border-border bg-card animate-pulse">
+              <div className="mb-6 rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)] animate-pulse">
                 <div className="p-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <div className="space-y-1.5">
@@ -1852,7 +1912,7 @@ export default function VenueManagementPage() {
                       <div className="bg-muted rounded h-6 w-[70px]" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-white/[0.06]">
                     {[0, 1, 2, 3].map((i) => (
                       <div
                         key={i}
@@ -1871,14 +1931,16 @@ export default function VenueManagementPage() {
               </div>
             ) : (
               billingConfig?.is_active && (
-                <div className="mb-6 rounded-xl border border-[var(--ash-grey)]/8 bg-card">
+                <div className="mb-6 rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
                   <div className="p-5">
-                    {/* Header row */}
-                    <div className="relative flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 mb-4">
+                    {/* Top row: title (left) + month nav (right). Always one
+                        row at all sizes — no wrapping, no absolute positioning,
+                        no conditional rhythm change between months. */}
+                    <div className="flex items-center justify-between gap-3 mb-3">
                       <h2 className="text-base font-semibold text-[var(--timberwolf)]">
                         Billing
                       </h2>
-                      <div className="flex items-center gap-3 order-last sm:order-none ml-auto sm:ml-0 sm:absolute sm:left-1/2 sm:-translate-x-1/2">
+                      <div className="flex items-center gap-2 sm:gap-3">
                         <button
                           onClick={() => {
                             const prev =
@@ -1893,7 +1955,7 @@ export default function VenueManagementPage() {
                         >
                           ‹
                         </button>
-                        <p className="text-sm text-muted-foreground font-medium min-w-[120px] text-center">
+                        <p className="text-sm text-muted-foreground font-medium min-w-[110px] text-center">
                           {new Date(
                             billingYear,
                             billingMonth - 1
@@ -1919,8 +1981,14 @@ export default function VenueManagementPage() {
                           ›
                         </button>
                       </div>
-                      {billingSummary && (
-                        <div className="flex items-center gap-3 sm:gap-4 text-sm">
+                    </div>
+
+                    {/* Summary row: amounts / recordings / today indicator.
+                        Wraps naturally on narrow widths but always lives on
+                        its own row regardless of content variations across
+                        months. */}
+                    {billingSummary && (
+                      <div className="mb-4 flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-sm">
                           <div>
                             <span
                               className="text-[var(--timberwolf)] font-semibold text-base sm:text-lg"
@@ -1943,23 +2011,38 @@ export default function VenueManagementPage() {
                               recordings
                             </span>
                           </div>
-                          {billingSummary.dailyTarget > 0 &&
-                            isCurrentBillingMonth && (
+                          {/* Daily average: meaningful for every month —
+                              past months show the actual full-month average,
+                              the current month shows the running average
+                              based on days elapsed. */}
+                          {(() => {
+                            const daysInMonth = new Date(
+                              billingYear,
+                              billingMonth,
+                              0
+                            ).getDate()
+                            const daysElapsed = isCurrentBillingMonth
+                              ? new Date().getDate()
+                              : daysInMonth
+                            const avg =
+                              billingSummary.count /
+                              Math.max(1, daysElapsed)
+                            return (
                               <div className="border-l border-border pl-3 sm:pl-4">
                                 <span
                                   className="text-[var(--timberwolf)] font-medium"
                                   style={{ fontVariantNumeric: 'tabular-nums' }}
                                 >
-                                  {billingSummary.todayCount}
+                                  {avg.toFixed(1)}
                                 </span>
-                                <span className="text-muted-foreground/60 text-xs">
-                                  /{billingSummary.dailyTarget} today
+                                <span className="text-muted-foreground/60 text-xs ml-1">
+                                  /day avg
                                 </span>
                               </div>
-                            )}
-                        </div>
-                      )}
-                    </div>
+                            )
+                          })()}
+                      </div>
+                    )}
 
                     {/* Financial summary — hide profit/settlement cards when no profit-share or ambassador relationship */}
                     {billingSummary &&
@@ -2097,12 +2180,22 @@ export default function VenueManagementPage() {
                         )
                       })()}
 
-                    {/* Daily recordings chart */}
+                    {/* Daily recordings chart — fade chart while a fresh
+                        month loads but DON'T unmount it; cached data shows
+                        instantly on month nav and the fade is a barely-
+                        visible tell that fresh data is on its way. */}
                     {dailyStats && dailyStats.scenes.length > 0 && (
-                      <div>
+                      <div
+                        className={`transition-opacity duration-200 ${
+                          chartLoading ? 'opacity-60' : 'opacity-100'
+                        }`}
+                      >
                         <div className="flex items-center justify-between mb-2">
-                          <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
+                          <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest flex items-center gap-2">
                             Daily activity
+                            {chartLoading && (
+                              <span className="inline-flex h-1 w-1 animate-pulse rounded-full bg-emerald-400/70" />
+                            )}
                           </p>
                           {dailyStats.scenes.length > 1 && (
                             <div className="flex items-center gap-3">
@@ -2389,7 +2482,7 @@ export default function VenueManagementPage() {
             {/* Schedule Recording */}
             {venue?.feature_recordings !== false &&
               (scenesLoading ? (
-                <div className="mb-6 rounded-xl border border-border bg-card p-6 animate-pulse">
+                <div className="mb-6 rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)] p-6 animate-pulse">
                   <div className="flex items-center justify-between">
                     <div className="bg-muted rounded h-5 w-[160px]" />
                     <div className="bg-muted rounded h-10 w-[140px]" />
@@ -2397,7 +2490,7 @@ export default function VenueManagementPage() {
                 </div>
               ) : (
                 scenes.length > 0 && (
-                  <div className="mb-6 rounded-xl border border-border bg-card">
+                  <div className="mb-6 rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
                     <div className="p-6">
                       <div className="flex flex-col md:flex-row items-center justify-between gap-2">
                         <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
@@ -2725,7 +2818,7 @@ export default function VenueManagementPage() {
 
             {/* Live Streaming Section */}
             {venue?.feature_streaming !== false && (
-              <div className="mb-6 rounded-xl border border-border bg-card">
+              <div className="mb-6 rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
                 <div className="p-6">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                     <div>
@@ -3095,7 +3188,7 @@ export default function VenueManagementPage() {
 
             {/* Marketplace Revenue */}
             {marketplaceLoading ? (
-              <div className="mb-6 rounded-xl border border-border bg-card p-6 animate-pulse">
+              <div className="mb-6 rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)] p-6 animate-pulse">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                   <div className="space-y-2">
                     <div className="bg-muted rounded h-5 w-[180px]" />
@@ -3116,7 +3209,7 @@ export default function VenueManagementPage() {
         )}
 
         {/* Recordings List */}
-        <div className="rounded-xl border border-border bg-card">
+        <div className="rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
           <div className="p-6">
             <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
               Recordings
@@ -3181,17 +3274,22 @@ export default function VenueManagementPage() {
                 {recordings.map((recording) => (
                   <div
                     key={recording.id}
-                    className="p-4 rounded-lg bg-muted/50 border border-border"
+                    className="p-4 rounded-lg bg-white/[0.02] border border-white/[0.06]"
                   >
                     {/* Top row: Play button + Info + Status */}
                     <div className="flex items-start gap-3">
-                      {/* Play Button — links to recording detail page */}
+                      {/* Play Button — canonical watch surface. Earlier
+                          version pointed at the legacy /recordings/[id]
+                          admin editor; the watch unification consolidated
+                          all playback on /watch/[id]. */}
                       {recording.s3_key && (
                         <Button
                           variant="outline"
                           size="icon"
                           onClick={() =>
-                            router.push(`/recordings/${recording.id}`)
+                            router.push(
+                              `/watch/${recording.id}?from=venue:${venueId}`
+                            )
                           }
                           className={`flex-shrink-0 ${outlineBtnClass}`}
                         >
@@ -3478,7 +3576,7 @@ export default function VenueManagementPage() {
         {venue?.type !== 'group' && (
           <>
             {/* Venue Admins Section */}
-            <div className="mt-6 rounded-xl border border-border bg-card">
+            <div className="mt-6 rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
               <div className="p-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                   <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
