@@ -637,6 +637,11 @@ export default function VenueManagementPage() {
   }, [searchInput])
 
   // Separate recordings fetch with pagination + filters
+  // Holds the AbortController for the most recent recordings fetch so a
+  // rapid second click can cancel the first request before its response
+  // can stomp on the user's fresh page state.
+  const recordingsFetchRef = useRef<AbortController | null>(null)
+
   async function fetchRecordings(
     page?: number,
     search?: string,
@@ -648,6 +653,13 @@ export default function VenueManagementPage() {
     const st = status ?? statusFilter
     const b = billable ?? billableFilter
 
+    // Cancel any in-flight request — without this, rapid Previous/Next
+    // clicks accumulate parallel fetches and the LAST response to arrive
+    // wins, regardless of which click it corresponds to.
+    recordingsFetchRef.current?.abort()
+    const controller = new AbortController()
+    recordingsFetchRef.current = controller
+
     setLoadingRecordings(true)
     try {
       const params = new URLSearchParams({
@@ -658,15 +670,29 @@ export default function VenueManagementPage() {
       if (st) params.set('status', st)
       if (b) params.set('billable', b)
 
-      const res = await fetch(`/api/venue/${venueId}/recordings?${params}`)
+      const res = await fetch(
+        `/api/venue/${venueId}/recordings?${params}`,
+        { signal: controller.signal }
+      )
       const data = await res.json()
+      // Only commit results if this is still the latest fetch. Without
+      // this guard, an out-of-order response that survived the abort
+      // race could still clobber state.
+      if (recordingsFetchRef.current !== controller) return
       setRecordings(data.recordings || [])
       setTotalRecordings(data.total || 0)
-      setCurrentPage(data.page || 1)
-    } catch {
-      // Non-critical — recordings list just won't update
+      // NOTE: deliberately NOT calling setCurrentPage(data.page) here.
+      // The page state is owned by the user's clicks; echoing it back
+      // from the response creates a feedback loop where a slow response
+      // for an older page can revert the user's fresh navigation.
+    } catch (err: any) {
+      // Aborted requests are expected — the user just clicked again.
+      if (err?.name === 'AbortError') return
+      // Other failures are non-critical — list just won't update.
     } finally {
-      setLoadingRecordings(false)
+      if (recordingsFetchRef.current === controller) {
+        setLoadingRecordings(false)
+      }
     }
   }
 
@@ -1933,62 +1959,21 @@ export default function VenueManagementPage() {
               billingConfig?.is_active && (
                 <div className="mb-6 rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
                   <div className="p-5">
-                    {/* Top row: title (left) + month nav (right). Always one
-                        row at all sizes — no wrapping, no absolute positioning,
-                        no conditional rhythm change between months. */}
-                    <div className="flex items-center justify-between gap-3 mb-3">
+                    {/* Header — single row on desktop (title | summary |
+                        month nav), two rows on mobile (title + nav, summary
+                        underneath centered). flex-wrap + order classes
+                        rearrange the three slots responsively. */}
+                    <div className="flex flex-wrap items-center gap-3 mb-4">
                       <h2 className="text-base font-semibold text-[var(--timberwolf)]">
                         Billing
                       </h2>
-                      <div className="flex items-center gap-2 sm:gap-3">
-                        <button
-                          onClick={() => {
-                            const prev =
-                              billingMonth === 1
-                                ? { m: 12, y: billingYear - 1 }
-                                : { m: billingMonth - 1, y: billingYear }
-                            setBillingMonth(prev.m)
-                            setBillingYear(prev.y)
-                            fetchBillingData(prev.m, prev.y)
-                          }}
-                          className="text-muted-foreground/70 hover:text-[var(--timberwolf)] text-base px-1.5 py-0.5"
-                        >
-                          ‹
-                        </button>
-                        <p className="text-sm text-muted-foreground font-medium min-w-[110px] text-center">
-                          {new Date(
-                            billingYear,
-                            billingMonth - 1
-                          ).toLocaleDateString('en-GB', {
-                            month: 'long',
-                            year: 'numeric',
-                          })}
-                        </p>
-                        <button
-                          onClick={() => {
-                            if (isCurrentBillingMonth) return
-                            const next =
-                              billingMonth === 12
-                                ? { m: 1, y: billingYear + 1 }
-                                : { m: billingMonth + 1, y: billingYear }
-                            setBillingMonth(next.m)
-                            setBillingYear(next.y)
-                            fetchBillingData(next.m, next.y)
-                          }}
-                          disabled={isCurrentBillingMonth}
-                          className={`text-base px-1.5 py-0.5 ${isCurrentBillingMonth ? 'text-muted-foreground/20 cursor-not-allowed' : 'text-muted-foreground/70 hover:text-[var(--timberwolf)]'}`}
-                        >
-                          ›
-                        </button>
-                      </div>
-                    </div>
 
-                    {/* Summary row: amounts / recordings / today indicator.
-                        Wraps naturally on narrow widths but always lives on
-                        its own row regardless of content variations across
-                        months. */}
-                    {billingSummary && (
-                      <div className="mb-4 flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-sm">
+                      {/* Summary stats — centred between title and nav on
+                          desktop; wraps to its own full-width centred row
+                          on mobile. order-3 + w-full on mobile, order-2 +
+                          flex-1 on desktop. */}
+                      {billingSummary && (
+                        <div className="order-3 w-full sm:order-2 sm:w-auto sm:flex-1 flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-sm">
                           <div>
                             <span
                               className="text-[var(--timberwolf)] font-semibold text-base sm:text-lg"
@@ -2041,8 +2026,54 @@ export default function VenueManagementPage() {
                               </div>
                             )
                           })()}
+                        </div>
+                      )}
+
+                      {/* Month nav — appears between title and summary on
+                          mobile (right-aligned via ml-auto) and at the far
+                          right on desktop (order-3). */}
+                      <div className="order-2 ml-auto sm:order-3 sm:ml-0 flex items-center gap-2 sm:gap-3">
+                        <button
+                          onClick={() => {
+                            const prev =
+                              billingMonth === 1
+                                ? { m: 12, y: billingYear - 1 }
+                                : { m: billingMonth - 1, y: billingYear }
+                            setBillingMonth(prev.m)
+                            setBillingYear(prev.y)
+                            fetchBillingData(prev.m, prev.y)
+                          }}
+                          className="text-muted-foreground/70 hover:text-[var(--timberwolf)] text-base px-1.5 py-0.5"
+                        >
+                          ‹
+                        </button>
+                        <p className="text-sm text-muted-foreground font-medium min-w-[110px] text-center">
+                          {new Date(
+                            billingYear,
+                            billingMonth - 1
+                          ).toLocaleDateString('en-GB', {
+                            month: 'long',
+                            year: 'numeric',
+                          })}
+                        </p>
+                        <button
+                          onClick={() => {
+                            if (isCurrentBillingMonth) return
+                            const next =
+                              billingMonth === 12
+                                ? { m: 1, y: billingYear + 1 }
+                                : { m: billingMonth + 1, y: billingYear }
+                            setBillingMonth(next.m)
+                            setBillingYear(next.y)
+                            fetchBillingData(next.m, next.y)
+                          }}
+                          disabled={isCurrentBillingMonth}
+                          className={`text-base px-1.5 py-0.5 ${isCurrentBillingMonth ? 'text-muted-foreground/20 cursor-not-allowed' : 'text-muted-foreground/70 hover:text-[var(--timberwolf)]'}`}
+                        >
+                          ›
+                        </button>
                       </div>
-                    )}
+                    </div>
 
                     {/* Financial summary — hide profit/settlement cards when no profit-share or ambassador relationship */}
                     {billingSummary &&
@@ -3534,7 +3565,7 @@ export default function VenueManagementPage() {
                 {/* Pagination controls */}
                 {totalRecordings > pageSize && (
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4 pt-4 border-t border-border">
-                    <p className="text-sm text-muted-foreground text-right sm:text-left">
+                    <p className="text-sm text-muted-foreground text-center sm:text-left">
                       {(currentPage - 1) * pageSize + 1}–
                       {Math.min(currentPage * pageSize, totalRecordings)} of{' '}
                       {totalRecordings}
@@ -3544,7 +3575,11 @@ export default function VenueManagementPage() {
                         variant="outline"
                         size="sm"
                         className={outlineBtnClass}
-                        disabled={currentPage <= 1}
+                        // Disable while a fetch is in flight too — the
+                        // AbortController + race-guard handle correctness,
+                        // but disabling stops the visual flicker from
+                        // queued clicks against a still-rendering page.
+                        disabled={currentPage <= 1 || loadingRecordings}
                         onClick={() => setCurrentPage((p) => p - 1)}
                       >
                         Previous
@@ -3558,7 +3593,9 @@ export default function VenueManagementPage() {
                         size="sm"
                         className={outlineBtnClass}
                         disabled={
-                          currentPage >= Math.ceil(totalRecordings / pageSize)
+                          currentPage >=
+                            Math.ceil(totalRecordings / pageSize) ||
+                          loadingRecordings
                         }
                         onClick={() => setCurrentPage((p) => p + 1)}
                       >
