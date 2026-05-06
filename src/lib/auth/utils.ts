@@ -33,26 +33,3 @@ export async function getUserProfile(userId: string) {
 
   return { profile, error }
 }
-
-export async function createUserProfile(
-  user: User,
-  additionalData?: Record<string, any>
-) {
-  const supabase = await createClient()
-
-  const profileData = {
-    user_id: user.id,
-    username: user.user_metadata?.username || user.email?.split('@')[0] || '',
-    full_name: user.user_metadata?.full_name || '',
-    avatar_url: user.user_metadata?.avatar_url || '',
-    ...additionalData,
-  }
-
-  const { data, error } = await (supabase as any)
-    .from('profiles')
-    .insert(profileData)
-    .select()
-    .single()
-
-  return { data, error }
-}
