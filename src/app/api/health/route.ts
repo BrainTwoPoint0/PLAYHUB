@@ -1,4 +1,9 @@
 import { NextResponse } from 'next/server'
+import { spiideoHealthCache } from './spiideo-cache'
+import { testConnection } from '@/lib/spiideo/client'
+import { HeadObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { createServiceClient } from '@/lib/supabase/server'
+import Stripe from 'stripe'
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -28,8 +33,8 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([promise, timeout])
 }
 
-// Cache Spiideo health result for 5 minutes to avoid hitting their rate limit
-import { spiideoHealthCache } from './spiideo-cache'
+// Spiideo health is cached for 5 minutes (see ./spiideo-cache) to avoid
+// hitting their rate limit on every probe.
 
 async function checkSpiideo(): Promise<ServiceStatus> {
   const cached = spiideoHealthCache.get()
@@ -37,7 +42,6 @@ async function checkSpiideo(): Promise<ServiceStatus> {
 
   const start = Date.now()
   try {
-    const { testConnection } = await import('@/lib/spiideo/client')
     const result = await withTimeout(testConnection(), CHECK_TIMEOUT)
     if (!result.success) throw new Error(result.error || 'Connection failed')
     const status: ServiceStatus = {
@@ -65,7 +69,6 @@ async function checkSpiideo(): Promise<ServiceStatus> {
 async function checkS3(): Promise<ServiceStatus> {
   const start = Date.now()
   try {
-    const { HeadObjectCommand, S3Client } = await import('@aws-sdk/client-s3')
     const client = new S3Client({
       region: process.env.PLAYHUB_AWS_REGION || 'eu-west-2',
       credentials: {
@@ -116,7 +119,6 @@ async function checkS3(): Promise<ServiceStatus> {
 async function checkSupabase(): Promise<ServiceStatus> {
   const start = Date.now()
   try {
-    const { createServiceClient } = await import('@/lib/supabase/server')
     const supabase = createServiceClient()
     const query = supabase
       .from('profiles')
@@ -144,7 +146,6 @@ async function checkSupabase(): Promise<ServiceStatus> {
 async function checkStripe(): Promise<ServiceStatus> {
   const start = Date.now()
   try {
-    const Stripe = (await import('stripe')).default
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
     await withTimeout(stripe.balance.retrieve(), CHECK_TIMEOUT)
     return {
