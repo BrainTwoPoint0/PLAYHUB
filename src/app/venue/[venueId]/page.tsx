@@ -670,10 +670,9 @@ export default function VenueManagementPage() {
       if (st) params.set('status', st)
       if (b) params.set('billable', b)
 
-      const res = await fetch(
-        `/api/venue/${venueId}/recordings?${params}`,
-        { signal: controller.signal }
-      )
+      const res = await fetch(`/api/venue/${venueId}/recordings?${params}`, {
+        signal: controller.signal,
+      })
       const data = await res.json()
       // Only commit results if this is still the latest fetch. Without
       // this guard, an out-of-order response that survived the abort
@@ -2010,8 +2009,7 @@ export default function VenueManagementPage() {
                               ? new Date().getDate()
                               : daysInMonth
                             const avg =
-                              billingSummary.count /
-                              Math.max(1, daysElapsed)
+                              billingSummary.count / Math.max(1, daysElapsed)
                             return (
                               <div className="border-l border-border pl-3 sm:pl-4">
                                 <span
@@ -3504,61 +3502,61 @@ export default function VenueManagementPage() {
                             : 'Delete'}
                         </Button>
                       </div>
-                      {editingListingId === recording.id && (
-                        <div className="mt-3 pt-3 border-t border-border flex flex-col sm:flex-row sm:items-center gap-2">
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={listingPrice}
-                              onChange={(e) => setListingPrice(e.target.value)}
-                              placeholder={String(
-                                orgMarketplace?.default_price_amount || '200'
-                              )}
-                              className={`w-32 ${inputClass}`}
-                            />
-                            <span className="text-sm text-muted-foreground">
-                              {orgMarketplace?.default_price_currency || 'AED'}{' '}
-                              · listed publicly on /matches
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 sm:ml-auto">
-                            <Button
-                              size="sm"
-                              onClick={() => submitListing(recording)}
-                              disabled={listingSubmitting === recording.id}
-                            >
-                              {listingSubmitting === recording.id
-                                ? 'Saving...'
-                                : recording.marketplace_product
-                                  ? 'Update'
-                                  : 'List'}
-                            </Button>
-                            {recording.marketplace_product?.is_available && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                                onClick={() => unlistRecording(recording)}
-                                disabled={listingSubmitting === recording.id}
-                              >
-                                Unlist
-                              </Button>
+                    </div>
+                    {editingListingId === recording.id && (
+                      <div className="mt-3 pt-3 border-t border-border flex flex-col sm:flex-row sm:items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={listingPrice}
+                            onChange={(e) => setListingPrice(e.target.value)}
+                            placeholder={String(
+                              orgMarketplace?.default_price_amount || '200'
                             )}
+                            className={`w-32 ${inputClass}`}
+                          />
+                          <span className="text-sm text-muted-foreground">
+                            {orgMarketplace?.default_price_currency || 'AED'} ·
+                            listed publicly on /matches
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
+                          <Button
+                            size="sm"
+                            onClick={() => submitListing(recording)}
+                            disabled={listingSubmitting === recording.id}
+                          >
+                            {listingSubmitting === recording.id
+                              ? 'Saving...'
+                              : recording.marketplace_product
+                                ? 'Update'
+                                : 'List'}
+                          </Button>
+                          {recording.marketplace_product?.is_available && (
                             <Button
                               size="sm"
                               variant="outline"
-                              className={outlineBtnClass}
-                              onClick={cancelListingEditor}
+                              className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                              onClick={() => unlistRecording(recording)}
                               disabled={listingSubmitting === recording.id}
                             >
-                              Cancel
+                              Unlist
                             </Button>
-                          </div>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className={outlineBtnClass}
+                            onClick={cancelListingEditor}
+                            disabled={listingSubmitting === recording.id}
+                          >
+                            Cancel
+                          </Button>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 ))}
 
