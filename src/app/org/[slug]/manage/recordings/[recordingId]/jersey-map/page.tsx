@@ -38,9 +38,7 @@ export default async function JerseyMapPage({ params }: PageProps) {
 
   const { data: recording } = await supabase
     .from('playhub_match_recordings')
-    .select(
-      'id, organization_id, title, match_date, home_team, away_team'
-    )
+    .select('id, organization_id, title, match_date, home_team, away_team')
     .eq('id', recordingId)
     .maybeSingle()
   if (!recording) notFound()

@@ -12,7 +12,8 @@ import { isPlatformAdmin } from '@/lib/admin/auth'
 import { rejectCrossOrigin } from '@/lib/security/origin-check'
 import { NextRequest, NextResponse } from 'next/server'
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const SEASON_LABEL_MAX = 64
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -202,8 +203,7 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
   }
 
   const isAdmin =
-    (await isVenueAdmin(user.id, orgId)) ||
-    (await isPlatformAdmin(user.id))
+    (await isVenueAdmin(user.id, orgId)) || (await isPlatformAdmin(user.id))
   if (!isAdmin) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }

@@ -106,8 +106,8 @@ export default async function RosterPage({ params }: PageProps) {
           <CardTitle>{org.name} · Roster</CardTitle>
           <CardDescription>
             {roster.length} active player
-            {roster.length === 1 ? '' : 's'} ·{' '}
-            {verifiedCount} verified by this club
+            {roster.length === 1 ? '' : 's'} · {verifiedCount} verified by this
+            club
           </CardDescription>
         </CardHeader>
         <CardContent>

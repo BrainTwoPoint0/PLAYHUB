@@ -119,9 +119,10 @@ export async function GET(
       : Promise.resolve({ data: [] as any[] }),
   ])
 
-  const profileByUser = new Map<string, { user_id: string; username: string | null }>(
-    (profiles || []).map((p: any) => [p.user_id, p])
-  )
+  const profileByUser = new Map<
+    string,
+    { user_id: string; username: string | null }
+  >((profiles || []).map((p: any) => [p.user_id, p]))
   const recordingById = new Map<string, any>(
     (recordings || []).map((r: any) => [r.id, r])
   )
@@ -143,7 +144,7 @@ export async function GET(
         }
       : null,
     target_recording: row.target_recording_id
-      ? recordingById.get(row.target_recording_id) ?? null
+      ? (recordingById.get(row.target_recording_id) ?? null)
       : null,
   }))
 

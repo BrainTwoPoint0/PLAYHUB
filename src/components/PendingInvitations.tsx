@@ -15,12 +15,7 @@ import {
   CardTitle,
   Button,
 } from '@braintwopoint0/playback-commons/ui'
-import {
-  Loader2,
-  MailOpen,
-  Play,
-  X as XIcon,
-} from 'lucide-react'
+import { Loader2, MailOpen, Play, X as XIcon } from 'lucide-react'
 import { formatDate } from '@braintwopoint0/playback-commons/utils'
 
 interface PendingGrantRecording {

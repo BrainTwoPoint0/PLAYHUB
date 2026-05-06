@@ -16,7 +16,8 @@ import { isPlatformAdmin } from '@/lib/admin/auth'
 import { rejectCrossOrigin } from '@/lib/security/origin-check'
 import { NextRequest, NextResponse } from 'next/server'
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_ENTRIES = 60 // Squad + bench buffer; rejects pathological payloads.
 const NOTES_MAX = 500
 
@@ -135,7 +136,10 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         { status: 400 }
       )
     }
-    if (e.profileId !== null && (typeof e.profileId !== 'string' || !UUID_RE.test(e.profileId))) {
+    if (
+      e.profileId !== null &&
+      (typeof e.profileId !== 'string' || !UUID_RE.test(e.profileId))
+    ) {
       return NextResponse.json(
         { error: 'profileId must be a valid UUID or null' },
         { status: 400 }
@@ -174,8 +178,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 
   const orgId = recording.organization_id as string
   const isAdmin =
-    (await isVenueAdmin(user.id, orgId)) ||
-    (await isPlatformAdmin(user.id))
+    (await isVenueAdmin(user.id, orgId)) || (await isPlatformAdmin(user.id))
   if (!isAdmin) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }

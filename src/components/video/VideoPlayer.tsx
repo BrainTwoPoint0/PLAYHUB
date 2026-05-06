@@ -53,7 +53,10 @@ interface VideoPlayerProps {
   // element so it can advance the pinned timestamp in "Save & continue"
   // mode. We do not pause on tag click — let the player's own controls
   // handle pausing if the user wants it.
-  onAddTag?: (timestampSeconds: number, videoEl: HTMLVideoElement | null) => void
+  onAddTag?: (
+    timestampSeconds: number,
+    videoEl: HTMLVideoElement | null
+  ) => void
   onSeek?: (timestampSeconds: number) => void
   className?: string
   mediaPack?: MediaPack
@@ -268,12 +271,7 @@ export function VideoPlayer({
   // visible until first play, then enter the auto-hide regime. Also
   // suppressed while a settings menu is open.
   useEffect(() => {
-    if (
-      isPlaying &&
-      hasPlayedOnce &&
-      showControls &&
-      openMenu === null
-    ) {
+    if (isPlaying && hasPlayedOnce && showControls && openMenu === null) {
       controlsTimeoutRef.current = setTimeout(
         () => setShowControls(false),
         3000
@@ -765,10 +763,7 @@ export function VideoPlayer({
               style={{
                 left: `${Math.min(
                   92,
-                  Math.max(
-                    8,
-                    (hoveredEvent.timestamp_seconds / duration) * 100
-                  )
+                  Math.max(8, (hoveredEvent.timestamp_seconds / duration) * 100)
                 )}%`,
               }}
             >
@@ -905,9 +900,7 @@ export function VideoPlayer({
                 aria-expanded={openMenu === 'speed'}
                 title="Playback speed"
                 className={`text-white hover:bg-white/20 h-9 md:h-8 p-0 font-mono tabular-nums text-[10px] md:text-xs ${
-                  playbackRate === 1
-                    ? 'w-9 md:w-8'
-                    : 'px-2 gap-1'
+                  playbackRate === 1 ? 'w-9 md:w-8' : 'px-2 gap-1'
                 }`}
               >
                 <Gauge className="h-3.5 w-3.5" />
@@ -988,7 +981,9 @@ export function VideoPlayer({
                             : 'text-muted-foreground hover:bg-white/[0.04] hover:text-[var(--timberwolf)]'
                         }`}
                       >
-                        <span>{lvl.height ? `${lvl.height}p` : `Level ${lvl.index}`}</span>
+                        <span>
+                          {lvl.height ? `${lvl.height}p` : `Level ${lvl.index}`}
+                        </span>
                       </button>
                     ))}
                   </div>

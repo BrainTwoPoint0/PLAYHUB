@@ -92,7 +92,9 @@ export async function GET() {
       recordingIds.length > 0
         ? serviceClient
             .from('playhub_match_recordings')
-            .select('id, title, home_team, away_team, match_date, organization_id')
+            .select(
+              'id, title, home_team, away_team, match_date, organization_id'
+            )
             .in('id', recordingIds)
         : Promise.resolve({ data: [] }),
       Array.from(new Set((grants || []).map((g: any) => g.granted_by))).filter(
@@ -110,9 +112,7 @@ export async function GET() {
         : Promise.resolve({ data: [] }),
     ])
 
-  const watched = new Set(
-    (history || []).map((h: any) => h.match_recording_id)
-  )
+  const watched = new Set((history || []).map((h: any) => h.match_recording_id))
   const recordingById = new Map<string, any>(
     (recordings || []).map((r: any) => [r.id, r])
   )

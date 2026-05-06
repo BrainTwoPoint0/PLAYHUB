@@ -26,9 +26,7 @@ interface ListingBody {
   is_available?: unknown
 }
 
-function parseBody(
-  body: ListingBody
-):
+function parseBody(body: ListingBody):
   | {
       ok: true
       price: number

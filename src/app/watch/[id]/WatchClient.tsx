@@ -64,10 +64,20 @@ const TAG_GRID_ORDER: EventType[] = [
 // number row, rows 2-4 are home-row letters so a coach can stay on the
 // keyboard without thinking about modifiers.
 const TAG_SHORTCUT_KEYS: string[] = [
-  '1', '2', '3', '4',
-  'q', 'w', 'e', 'r',
-  'a', 's', 'd', 'f',
-  'z', 'x',
+  '1',
+  '2',
+  '3',
+  '4',
+  'q',
+  'w',
+  'e',
+  'r',
+  'a',
+  's',
+  'd',
+  'f',
+  'z',
+  'x',
 ]
 const KEY_TO_TYPE: Record<string, EventType> = TAG_SHORTCUT_KEYS.reduce(
   (acc, key, idx) => {
@@ -252,7 +262,9 @@ export default function WatchClient({
     setMounted(true)
     const sync = () => {
       const doc = document as any
-      setFullscreenEl(doc.fullscreenElement || doc.webkitFullscreenElement || null)
+      setFullscreenEl(
+        doc.fullscreenElement || doc.webkitFullscreenElement || null
+      )
     }
     sync()
     document.addEventListener('fullscreenchange', sync)
@@ -273,7 +285,10 @@ export default function WatchClient({
     return () => document.removeEventListener('keydown', onKey)
   }, [tagOverlay])
 
-  function openTagOverlay(timestamp: number, videoEl?: HTMLVideoElement | null) {
+  function openTagOverlay(
+    timestamp: number,
+    videoEl?: HTMLVideoElement | null
+  ) {
     // Stash the underlying video element so "Keep open after saving" can
     // advance the pinned timestamp. We do NOT pause playback — the user can
     // pause via the player's own controls if they want.
@@ -334,8 +349,7 @@ export default function WatchClient({
       // timestamp to wherever the video is now, ready for the next tag.
       // Otherwise, close + flash the toast.
       if (keepOpenAfterSave) {
-        const nextTs =
-          videoElRef.current?.currentTime ?? tagOverlay.timestamp
+        const nextTs = videoElRef.current?.currentTime ?? tagOverlay.timestamp
         setTagOverlay({
           timestamp: nextTs,
           visibility: tagOverlay.visibility,
@@ -521,9 +535,7 @@ export default function WatchClient({
                 highlightedEventId={hoveredTagId}
                 onMarkerHover={setHoveredTagId}
                 initialTimeSeconds={resumeSeconds}
-                onProgressUpdate={
-                  currentUserId ? persistProgress : undefined
-                }
+                onProgressUpdate={currentUserId ? persistProgress : undefined}
                 className="rounded-xl"
               />
             ) : (
@@ -762,10 +774,7 @@ export default function WatchClient({
                     const seek = () => {
                       const v = document.querySelector('video')
                       if (v) {
-                        v.currentTime = Math.max(
-                          0,
-                          event.timestamp_seconds - 5
-                        )
+                        v.currentTime = Math.max(0, event.timestamp_seconds - 5)
                         v.play().catch(() => {})
                       }
                     }
@@ -830,7 +839,9 @@ export default function WatchClient({
                           {isPrivate && !isConfirming && (
                             <Lock
                               className="h-3 w-3 text-muted-foreground/60"
-                              aria-label={isMine ? 'Your private tag' : 'Private'}
+                              aria-label={
+                                isMine ? 'Your private tag' : 'Private'
+                              }
                             />
                           )}
                           {canDelete && (
@@ -849,9 +860,7 @@ export default function WatchClient({
                                 }
                               }}
                               aria-label={
-                                isConfirming
-                                  ? 'Confirm delete'
-                                  : 'Delete tag'
+                                isConfirming ? 'Confirm delete' : 'Delete tag'
                               }
                               className={`relative z-[2] grid place-items-center rounded-md transition-all ${
                                 isConfirming
@@ -1065,8 +1074,7 @@ function TagOverlayInner({
                   }
                   className="absolute inset-y-1 w-[calc(50%-4px)] rounded-md bg-[var(--timberwolf)] shadow-[0_2px_8px_rgba(0,0,0,0.25)]"
                   style={{
-                    left:
-                      tagOverlay.visibility === 'public' ? 4 : 'calc(50%)',
+                    left: tagOverlay.visibility === 'public' ? 4 : 'calc(50%)',
                   }}
                 />
                 {(['public', 'private'] as const).map((v) => {
@@ -1100,8 +1108,8 @@ function TagOverlayInner({
             <div className="mb-5 flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-xs text-muted-foreground">
               <Lock className="h-3 w-3 flex-shrink-0" />
               <span>
-                Private tag — only you can see it. Buyers and venue admins
-                can add public tags.
+                Private tag — only you can see it. Buyers and venue admins can
+                add public tags.
               </span>
             </div>
           )}
@@ -1131,7 +1139,9 @@ function TagOverlayInner({
                   <span
                     aria-hidden
                     className={`pointer-events-none absolute inset-0 bg-gradient-to-b from-[var(--tile)]/15 to-transparent transition-opacity duration-200 ${
-                      isPending ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                      isPending
+                        ? 'opacity-100'
+                        : 'opacity-0 group-hover:opacity-100'
                     }`}
                   />
                   {/* Dot or spinner */}

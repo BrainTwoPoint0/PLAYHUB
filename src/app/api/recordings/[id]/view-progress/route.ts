@@ -104,23 +104,21 @@ export async function POST(
   // and on the conflict path it simply isn't in EXCLUDED so it stays put.
   // Same trick for completed_at: only included when we just crossed the
   // threshold, otherwise omitted so the prior value (or NULL) is kept.
-  const { error } = await serviceClient
-    .from('playhub_view_history')
-    .upsert(
-      {
-        user_id: user.id,
-        match_recording_id: id,
-        watched_duration_seconds: position,
-        total_duration_seconds: total,
-        completion_percentage: completion,
-        last_position_at: now,
-        ...(completedAt ? { completed_at: completedAt } : {}),
-      },
-      {
-        onConflict: 'user_id,match_recording_id',
-        ignoreDuplicates: false,
-      }
-    )
+  const { error } = await serviceClient.from('playhub_view_history').upsert(
+    {
+      user_id: user.id,
+      match_recording_id: id,
+      watched_duration_seconds: position,
+      total_duration_seconds: total,
+      completion_percentage: completion,
+      last_position_at: now,
+      ...(completedAt ? { completed_at: completedAt } : {}),
+    },
+    {
+      onConflict: 'user_id,match_recording_id',
+      ignoreDuplicates: false,
+    }
+  )
 
   if (error) {
     console.error('view-progress upsert failed', error.message)

@@ -62,8 +62,7 @@ export function JerseyMapEditor({
     })
     const out: Record<string, string> = {}
     roster.forEach((p) => {
-      const n =
-        fromExisting.get(p.profileId) ?? p.defaultJerseyNumber ?? null
+      const n = fromExisting.get(p.profileId) ?? p.defaultJerseyNumber ?? null
       out[p.profileId] = n === null ? '' : String(n)
     })
     return out
@@ -132,15 +131,12 @@ export function JerseyMapEditor({
     inFlightRef.current = true
     startTransition(async () => {
       try {
-        const res = await fetch(
-          `/api/recordings/${recordingId}/jersey-map`,
-          {
-            method: 'PUT',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ entries, lock }),
-          }
-        )
+        const res = await fetch(`/api/recordings/${recordingId}/jersey-map`, {
+          method: 'PUT',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entries, lock }),
+        })
         if (!res.ok) {
           const payload = await res.json().catch(() => ({}))
           throw new Error(payload.error ?? `Request failed: ${res.status}`)
@@ -173,109 +169,107 @@ export function JerseyMapEditor({
         submit(false)
       }}
     >
-    <Card>
-      <CardHeader>
-        <CardTitle>{recordingTitle}</CardTitle>
-        <CardDescription>
-          {homeTeam} vs {awayTeam} ·{' '}
-          {new Date(matchDate).toLocaleDateString(undefined, {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-          })}
-        </CardDescription>
-        {alreadyLocked && (
-          <div className="mt-3 flex items-start gap-2 text-xs rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-2">
-            <Lock className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-            <span>
-              This map was already locked. Saving again rewrites the row in
-              place — clip attributions for new entries will derive on the next
-              lock transition.
-            </span>
-          </div>
-        )}
-      </CardHeader>
+      <Card>
+        <CardHeader>
+          <CardTitle>{recordingTitle}</CardTitle>
+          <CardDescription>
+            {homeTeam} vs {awayTeam} ·{' '}
+            {new Date(matchDate).toLocaleDateString(undefined, {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </CardDescription>
+          {alreadyLocked && (
+            <div className="mt-3 flex items-start gap-2 text-xs rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-2">
+              <Lock className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>
+                This map was already locked. Saving again rewrites the row in
+                place — clip attributions for new entries will derive on the
+                next lock transition.
+              </span>
+            </div>
+          )}
+        </CardHeader>
 
-      <CardContent>
-        <p className="text-xs text-muted-foreground mb-4">
-          Map a jersey number to each player who took the field. Players left
-          blank are not attributed. {roster.length} active player
-          {roster.length === 1 ? '' : 's'} on the roster.
-        </p>
+        <CardContent>
+          <p className="text-xs text-muted-foreground mb-4">
+            Map a jersey number to each player who took the field. Players left
+            blank are not attributed. {roster.length} active player
+            {roster.length === 1 ? '' : 's'} on the roster.
+          </p>
 
-        <div className="divide-y divide-border">
-          {roster.map((p) => {
-            const isDuplicate = duplicates.has(p.profileId)
-            return (
-              <div
-                key={p.profileId}
-                className="flex items-center justify-between gap-4 py-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium truncate">
-                    {p.fullName ?? p.username ?? 'Unknown player'}
-                  </div>
-                  {p.username && (
-                    <div className="text-xs text-muted-foreground">
-                      @{p.username}
+          <div className="divide-y divide-border">
+            {roster.map((p) => {
+              const isDuplicate = duplicates.has(p.profileId)
+              return (
+                <div
+                  key={p.profileId}
+                  className="flex items-center justify-between gap-4 py-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate">
+                      {p.fullName ?? p.username ?? 'Unknown player'}
                     </div>
-                  )}
+                    {p.username && (
+                      <div className="text-xs text-muted-foreground">
+                        @{p.username}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={values[p.profileId] ?? ''}
+                      onChange={(e) => setNumber(p.profileId, e.target.value)}
+                      placeholder="–"
+                      aria-label={`Jersey number for ${p.fullName ?? p.username}`}
+                      className={`w-16 text-center font-mono ${
+                        isDuplicate
+                          ? 'border-destructive focus-visible:ring-destructive'
+                          : ''
+                      }`}
+                      maxLength={2}
+                      disabled={pending}
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={values[p.profileId] ?? ''}
-                    onChange={(e) => setNumber(p.profileId, e.target.value)}
-                    placeholder="–"
-                    aria-label={`Jersey number for ${p.fullName ?? p.username}`}
-                    className={`w-16 text-center font-mono ${
-                      isDuplicate
-                        ? 'border-destructive focus-visible:ring-destructive'
-                        : ''
-                    }`}
-                    maxLength={2}
-                    disabled={pending}
-                  />
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </CardContent>
-
-      <CardFooter className="flex flex-col items-stretch gap-3">
-        {error && (
-          <div className="flex items-start gap-2 text-sm text-destructive">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-            <span>{error}</span>
+              )
+            })}
           </div>
-        )}
-        {success && (
-          <div className="text-sm text-emerald-400">{success}</div>
-        )}
-        <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => submit(false)}
-            disabled={pending}
-          >
-            <Save className="mr-1.5 h-4 w-4" />
-            {pending ? 'Saving…' : 'Save draft'}
-          </Button>
-          <Button
-            type="button"
-            onClick={() => submit(true)}
-            disabled={pending}
-          >
-            <Lock className="mr-1.5 h-4 w-4" />
-            {pending ? 'Saving…' : 'Save & lock'}
-          </Button>
-        </div>
-      </CardFooter>
-    </Card>
+        </CardContent>
+
+        <CardFooter className="flex flex-col items-stretch gap-3">
+          {error && (
+            <div className="flex items-start gap-2 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+          {success && <div className="text-sm text-emerald-400">{success}</div>}
+          <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => submit(false)}
+              disabled={pending}
+            >
+              <Save className="mr-1.5 h-4 w-4" />
+              {pending ? 'Saving…' : 'Save draft'}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => submit(true)}
+              disabled={pending}
+            >
+              <Lock className="mr-1.5 h-4 w-4" />
+              {pending ? 'Saving…' : 'Save & lock'}
+            </Button>
+          </div>
+        </CardFooter>
+      </Card>
     </form>
   )
 }

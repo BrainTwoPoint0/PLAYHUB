@@ -124,17 +124,17 @@ export function AuditHistory({ venueId }: AuditHistoryProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const fetchPage = async (cursor: string | null) => {
-    const url = new URL(
-      `/api/venue/${venueId}/audit`,
-      window.location.origin
-    )
+    const url = new URL(`/api/venue/${venueId}/audit`, window.location.origin)
     if (cursor) url.searchParams.set('cursor', cursor)
     const res = await fetch(url.toString())
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
       throw new Error(data.error || 'Failed to load audit history')
     }
-    return (await res.json()) as { rows: AuditRow[]; next_cursor: string | null }
+    return (await res.json()) as {
+      rows: AuditRow[]
+      next_cursor: string | null
+    }
   }
 
   useEffect(() => {
@@ -205,8 +205,8 @@ export function AuditHistory({ venueId }: AuditHistoryProps) {
           <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-white/[0.06] bg-white/[0.01] py-8 text-center">
             <ScrollText className="h-5 w-5 text-muted-foreground/50" />
             <p className="text-xs text-muted-foreground max-w-[260px]">
-              No privileged actions recorded yet. Admin overrides on tag
-              edits and deletions will appear here.
+              No privileged actions recorded yet. Admin overrides on tag edits
+              and deletions will appear here.
             </p>
           </div>
         ) : (
@@ -238,7 +238,9 @@ export function AuditHistory({ venueId }: AuditHistoryProps) {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs text-[var(--timberwolf)]">
                         <span className="font-medium">{actorName}</span>{' '}
-                        <span className="text-muted-foreground">{label.toLowerCase()}</span>
+                        <span className="text-muted-foreground">
+                          {label.toLowerCase()}
+                        </span>
                         {row.target_recording && (
                           <>
                             <span className="text-muted-foreground"> on </span>

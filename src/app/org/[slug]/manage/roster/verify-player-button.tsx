@@ -89,12 +89,7 @@ export function VerifyPlayerButton({
 
   return (
     <div className="flex items-center gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={toggle}
-        disabled={pending}
-      >
+      <Button variant="outline" size="sm" onClick={toggle} disabled={pending}>
         <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
         {pending ? 'Verifying…' : 'Verify'}
       </Button>
