@@ -1,10 +1,4 @@
-interface ServiceStatus {
-  name: string
-  status: 'healthy' | 'unhealthy'
-  latencyMs: number
-  error?: string
-  critical: boolean
-}
+import type { ServiceStatus } from './types'
 
 let cached: { result: ServiceStatus; expiresAt: number } | null = null
 
