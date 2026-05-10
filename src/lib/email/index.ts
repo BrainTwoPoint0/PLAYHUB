@@ -18,6 +18,11 @@ const FROM_EMAIL = 'PLAYHUB <admin@playbacksports.ai>'
 const FROM_ALERT_EMAIL = 'PLAYHUB Alerts <admin@playbacksports.ai>'
 const APP_URL =
   process.env.NEXT_PUBLIC_APP_URL || 'https://playhub.playbacksports.ai'
+// PLAYBACK is the consumer-brand domain that owns identity (auth, profile,
+// claim flow). The academy claim email points here, not at PLAYHUB, because
+// the parent's account lives in PLAYBACK and the register/claim UI is there.
+const PLAYBACK_URL =
+  process.env.NEXT_PUBLIC_PLAYBACK_URL || 'https://playbacksports.ai'
 
 export type { SendEmailResult }
 
@@ -767,6 +772,83 @@ export async function sendRecordingReadyEmail(params: {
 
     if (error) {
       console.error('Failed to send recording ready email:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (err) {
+    console.error('Email send error:', err)
+    return { success: false, error: 'Failed to send email' }
+  }
+}
+
+/**
+ * Send academy "claim your account" email to a parent who paid via Stripe
+ * Checkout but doesn't yet have a PLAYBACK profile. The link drops them on
+ * PLAYBACK's register page with intent=academy and the email pre-filled —
+ * after signup + email confirmation, /api/me/provision-pending fires the
+ * Veo invite for the active subscription that handle_new_user just claimed.
+ */
+export async function sendAcademyClaimEmail(params: {
+  toEmail: string
+  clubName: string
+}): Promise<SendEmailResult> {
+  const { toEmail } = params
+  const clubName = escapeHtml(params.clubName)
+  const claimUrl = `${PLAYBACK_URL}/auth/register?intent=academy&email=${encodeURIComponent(toEmail)}`
+
+  try {
+    const { error } = await getResend().emails.send({
+      from: FROM_EMAIL,
+      to: toEmail,
+      subject: `You've subscribed to ${params.clubName} — claim your PLAYBACK account`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0a100d; color: #d6d5c9; padding: 40px 20px; margin: 0;">
+          <div style="max-width: 500px; margin: 0 auto;">
+            <h1 style="color: #d6d5c9; font-size: 24px; margin-bottom: 24px;">PLAYBACK</h1>
+
+            <p style="font-size: 16px; line-height: 1.6; margin-bottom: 16px;">
+              Thanks for subscribing to <strong>${clubName}</strong>.
+            </p>
+
+            <p style="font-size: 16px; line-height: 1.6; margin-bottom: 24px;">
+              Create your PLAYBACK account to access your team's recordings, manage your subscription, and stay in the loop with the rest of the squad.
+            </p>
+
+            <a href="${claimUrl}"
+               style="display: inline-block; background-color: #d6d5c9; color: #0a100d; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">
+              Claim your account
+            </a>
+
+            <p style="font-size: 14px; color: #b9baa3; margin-top: 32px;">
+              We've held your subscription against this email address — once you confirm your account, your access goes live automatically.
+            </p>
+
+            <hr style="border: none; border-top: 1px solid #333; margin: 32px 0;">
+
+            <p style="font-size: 13px; color: #d6d5c9;">
+              <strong>Didn't subscribe to ${clubName}?</strong>
+              Please email <a href="mailto:fraud@playbacksports.ai?subject=Disavow%20academy%20subscription&amp;body=I%20did%20not%20subscribe%20to%20${encodeURIComponent(params.clubName)}%20on%20PLAYBACK%20against%20${encodeURIComponent(toEmail)}." style="color: #d6d5c9;">fraud@playbacksports.ai</a>
+              and we'll cancel and refund the subscription immediately. Do not click the button above unless you initiated this purchase.
+            </p>
+
+            <p style="font-size: 12px; color: #b9baa3; margin-top: 16px;">
+              This email was sent by PLAYBACK because someone completed a Stripe checkout for ${clubName} using this email address.
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
+    })
+
+    if (error) {
+      console.error('Failed to send academy claim email:', error)
       return { success: false, error: error.message }
     }
 

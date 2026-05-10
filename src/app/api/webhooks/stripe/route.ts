@@ -3,6 +3,11 @@ import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createServiceClient } from '@/lib/supabase/server'
 import { scheduleRecording } from '@/lib/spiideo/schedule-recording'
+import {
+  handleAcademyCheckoutCompleted,
+  handleAcademySubscriptionUpdated,
+  handleAcademySubscriptionDeleted,
+} from '@/lib/academy/webhook-handlers'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-02-24.acacia',
@@ -39,6 +44,12 @@ export async function POST(req: Request) {
       return handleVenueBooking(session, metadata)
     }
 
+    // Academy subscription (parent subscribing to a club's academy via the
+    // PLAYBACK /academy/[clubSlug] checkout). Routed by metadata.type.
+    if (metadata.type === 'academy_subscription') {
+      return handleAcademyCheckoutWebhook(session)
+    }
+
     // camera_booking is now handled via payment_intent.succeeded (inline payment)
 
     // Ignore sessions without PLAYHUB metadata (e.g. Stripe Payment Links, subscriptions)
@@ -56,6 +67,22 @@ export async function POST(req: Request) {
 
     // Otherwise, handle match recording purchase (existing flow)
     return handleMatchRecordingPurchase(session, metadata)
+  }
+
+  // Academy subscription lifecycle — status flips and cancellations.
+  // The handler bails out early for any subscription whose product isn't
+  // an academy product, so non-academy subscriptions in the same Stripe
+  // account are silently ignored here without overlap.
+  if (event.type === 'customer.subscription.updated') {
+    return handleAcademySubscriptionUpdatedWebhook(
+      event.data.object as Stripe.Subscription
+    )
+  }
+
+  if (event.type === 'customer.subscription.deleted') {
+    return handleAcademySubscriptionDeletedWebhook(
+      event.data.object as Stripe.Subscription
+    )
   }
 
   // Handle payment_intent.succeeded (inline Stripe Elements payments)
@@ -498,4 +525,114 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 
   console.log('Invoice marked as overdue:', stripeInvoiceId)
   return NextResponse.json({ received: true })
+}
+
+// ============================================================================
+// Academy subscription webhook adapters
+// ============================================================================
+// The handler logic lives in src/lib/academy/webhook-handlers.ts (testable in
+// isolation, dep-injected). These adapters translate the structured result
+// into the NextResponse shape Stripe expects:
+//
+//   - 'created' / 'pending' / 'updated' / 'canceled' / 'duplicate' →
+//     200 with received: true (Stripe stops retrying)
+//   - 'not_academy' / 'not_found' on update/delete → 200 (legitimately not
+//     ours; not an error)
+//   - 'error' on a metadata/config issue → 200 (permanent — no point in
+//     retrying)
+//   - thrown errors bubble out → 500 → Stripe will retry (transient)
+//
+// Response body deliberately omits the structured result — error strings can
+// contain PII (emails, customer ids in PG/Stripe error text) and Vercel
+// captures response bodies in function logs. Status only is enough for Stripe;
+// full diagnostics live in the structured logs emitted by the handler.
+
+function logAcademyWebhook(
+  event: string,
+  status: string,
+  identifier: string,
+  error?: string
+): void {
+  const payload: Record<string, unknown> = {
+    event: error ? 'academy_webhook_error' : 'academy_webhook',
+    stripe_event: event,
+    status,
+    id: identifier,
+  }
+  if (error) payload.error = error
+  if (error) console.error(JSON.stringify(payload))
+  else console.log(JSON.stringify(payload))
+}
+
+async function handleAcademyCheckoutWebhook(session: Stripe.Checkout.Session) {
+  const result = await handleAcademyCheckoutCompleted(session)
+  if (result.status === 'error') {
+    logAcademyWebhook(
+      'checkout.session.completed',
+      'error',
+      session.id,
+      result.error
+    )
+    return NextResponse.json({ received: true, status: 'error' })
+  }
+  logAcademyWebhook('checkout.session.completed', result.status, session.id)
+  return NextResponse.json({ received: true, status: result.status })
+}
+
+async function handleAcademySubscriptionUpdatedWebhook(
+  subscription: Stripe.Subscription
+) {
+  const result = await handleAcademySubscriptionUpdated(subscription)
+  if (result.status === 'error') {
+    logAcademyWebhook(
+      'customer.subscription.updated',
+      'error',
+      subscription.id,
+      result.error
+    )
+    return NextResponse.json({ received: true, status: 'error' })
+  }
+  // 'not_academy' is the common case (other Stripe products in the same
+  // account) — keep it quiet to avoid log spam.
+  if (result.status !== 'not_academy') {
+    logAcademyWebhook(
+      'customer.subscription.updated',
+      result.status,
+      subscription.id
+    )
+  }
+  return NextResponse.json({ received: true, status: result.status })
+}
+
+async function handleAcademySubscriptionDeletedWebhook(
+  subscription: Stripe.Subscription
+) {
+  const result = await handleAcademySubscriptionDeleted(subscription)
+  if (result.status === 'error') {
+    logAcademyWebhook(
+      'customer.subscription.deleted',
+      'error',
+      subscription.id,
+      result.error
+    )
+    return NextResponse.json({ received: true, status: 'error' })
+  }
+  // not_found on a delete is unusual (every academy sub deletion should match
+  // a row) — log at warn level so ops can investigate orphaned events.
+  if (result.status === 'not_found') {
+    console.warn(
+      JSON.stringify({
+        event: 'academy_webhook_orphan_delete',
+        stripe_event: 'customer.subscription.deleted',
+        id: subscription.id,
+      })
+    )
+  } else if (result.status !== 'not_academy') {
+    logAcademyWebhook(
+      'customer.subscription.deleted',
+      result.status,
+      subscription.id
+    )
+  }
+  return NextResponse.json({ received: true, status: result.status })
 }

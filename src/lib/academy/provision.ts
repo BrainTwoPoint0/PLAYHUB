@@ -1,0 +1,537 @@
+// Academy subscription provisioning — Checkpoint B1
+//
+// Given an active row in playhub_academy_subscriptions with provisioned_at IS NULL,
+// this function:
+//   (1) gates on `auth.users.email_confirmed_at IS NOT NULL` — the load-bearing
+//       salted-account defence. An attacker who runs a real Stripe checkout for
+//       victim@example.com cannot obtain entitlement unless they can also click
+//       a confirmation link sent to that inbox.
+//   (2) cross-checks the Stripe customer's email against the row's customer_email
+//       — defence in depth against operational drift (e.g. ops or a Customer
+//       Portal flow editing the Stripe customer object). NOT the primary salted-
+//       account defence; the email at row-create time is whatever the attacker
+//       entered, so this comparison passes for the textbook attack.
+//   (3) resolves the Veo team via the playhub_academy_teams mapping,
+//   (4) calls invitePlayer() in lib/veo/client (idempotent — Veo returns success
+//       even if the email already has a pending invitation),
+//   (5) writes provisioned_at on success or provisioning_error on failure.
+//
+// Idempotency layered three ways:
+//   - row-level: skip if provisioned_at is already set,
+//   - DB-write: UPDATE WHERE provisioned_at IS NULL so a concurrent success isn't
+//     clobbered,
+//   - Veo-level: invitePlayer treats "already invited" as success.
+//
+// Trust contract: callers MUST authorize the subscription belongs to the
+// invoking user (or be a service-role webhook handler). Pass `expectedUserId`
+// to have the function enforce this defensively.
+//
+// Dependency injection via the `deps` arg keeps unit tests pure: defaults wire
+// to real Stripe / Veo / Supabase, tests inject mocks. No webhook integration
+// here — Checkpoint B2 wires this into the Stripe event handlers and the
+// post-claim provisioning endpoint.
+
+import Stripe from 'stripe'
+import { createServiceClient } from '@/lib/supabase/server'
+import { invitePlayer, type VeoResult } from '@/lib/veo/client'
+import { getClubBySlug, type AcademyClub } from './config'
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/** A row from playhub_academy_subscriptions, with the columns provisioning needs. */
+export interface AcademySubscriptionRow {
+  id: string
+  user_id: string
+  club_slug: string
+  stripe_subscription_id: string
+  stripe_customer_id: string
+  registration_team: string | null
+  customer_email: string
+  status: string
+  provisioned_at: string | null
+}
+
+export type ProvisionOutcome =
+  | {
+      kind: 'success'
+      subId: string
+      alreadyProvisioned: boolean
+      veoMessage?: string
+    }
+  | {
+      kind: 'failure'
+      subId: string
+      error: string
+      retryable: boolean
+      // Categorical reason codes — used by callers for structured logging /
+      // alerting (security-relevant failures should page; transient should not).
+      reason:
+        | 'not_found'
+        | 'authorization'         // expectedUserId mismatch
+        | 'not_entitled'          // status not active/trialing
+        | 'email_not_confirmed'   // SECURITY: salted-account primary defence
+        | 'auth_unreachable'      // isEmailConfirmed threw — page on rate, not single occurrence
+        | 'stripe_email_mismatch' // SECURITY: defence in depth
+        | 'stripe_unreachable'
+        | 'stripe_customer_missing'
+        | 'stripe_forbidden'      // misconfigured key — page ops immediately
+        | 'config_missing_team'
+        | 'config_unknown_club'
+        | 'config_no_veo_club'
+        | 'config_no_veo_team'
+        | 'veo_invite_failed'
+        | 'veo_threw'
+    }
+
+export interface ProvisionDeps {
+  loadSub: (subId: string) => Promise<AcademySubscriptionRow | null>
+  loadClub: (clubSlug: string) => Promise<AcademyClub | undefined>
+  resolveVeoTeamSlug: (
+    clubSlug: string,
+    teamSlug: string
+  ) => Promise<string | null>
+  /** Returns true iff the auth user has confirmed their email. */
+  isEmailConfirmed: (userId: string) => Promise<boolean>
+  /**
+   * Returns the Stripe customer's current email (lowercased + trimmed),
+   * `null` for a deleted customer, or throws a structured error for
+   * unreachable / missing / forbidden cases.
+   */
+  fetchStripeCustomerEmail: (stripeCustomerId: string) => Promise<string | null>
+  inviteToVeo: (
+    veoClubSlug: string,
+    veoTeamSlug: string,
+    email: string
+  ) => Promise<VeoResult>
+  /** Persists outcome. Skips writes that would clobber an already-provisioned row. */
+  recordOutcome: (subId: string, outcome: ProvisionOutcome) => Promise<void>
+}
+
+/** Distinguishes Stripe-level failure modes for the caller's classifier. */
+export class StripeFetchError extends Error {
+  constructor(
+    public reason: 'unreachable' | 'customer_missing' | 'forbidden',
+    message: string
+  ) {
+    super(message)
+    this.name = 'StripeFetchError'
+  }
+}
+
+// ============================================================================
+// Default dependencies — real Stripe / Veo / Supabase
+// ============================================================================
+
+let cachedStripe: Stripe | null = null
+function getStripe(): Stripe {
+  if (!cachedStripe) {
+    const key = process.env.STRIPE_SECRET_KEY
+    if (!key) {
+      throw new Error(
+        'STRIPE_SECRET_KEY is not set — provision.ts cannot run without it'
+      )
+    }
+    cachedStripe = new Stripe(key, { apiVersion: '2025-02-24.acacia' })
+  }
+  return cachedStripe
+}
+
+export function buildDefaultDeps(): ProvisionDeps {
+  return {
+    loadSub: async (subId) => {
+      const supabase = createServiceClient() as any
+      const { data, error } = await supabase
+        .from('playhub_academy_subscriptions')
+        .select(
+          'id, user_id, club_slug, stripe_subscription_id, stripe_customer_id, registration_team, customer_email, status, provisioned_at'
+        )
+        .eq('id', subId)
+        .maybeSingle()
+      if (error) throw new Error(`loadSub: ${error.message}`)
+      return data as AcademySubscriptionRow | null
+    },
+
+    loadClub: getClubBySlug,
+
+    resolveVeoTeamSlug: async (clubSlug, teamSlug) => {
+      const supabase = createServiceClient() as any
+      const { data, error } = await supabase
+        .from('playhub_academy_teams')
+        .select('veo_team_slug')
+        .eq('club_slug', clubSlug)
+        .eq('team_slug', teamSlug)
+        .eq('is_active', true)
+        .maybeSingle()
+      if (error) throw new Error(`resolveVeoTeamSlug: ${error.message}`)
+      return data?.veo_team_slug ?? null
+    },
+
+    isEmailConfirmed: async (userId) => {
+      const supabase = createServiceClient() as any
+      const { data, error } = await supabase.auth.admin.getUserById(userId)
+      if (error) throw new Error(`isEmailConfirmed: ${error.message}`)
+      // Both fields are populated by Supabase. `email_confirmed_at` reflects
+      // the email-link confirmation; `confirmed_at` reflects the most recent
+      // confirmation across channels (email, OAuth provider verification).
+      // Accepting either is intentional: Google/Apple OAuth providers verify
+      // the email as part of sign-in, so confirmed_at is also load-bearing
+      // trust here. PLAYHUB is currently email-only, so they should equal in
+      // practice — accepting both makes us forward-compatible with OAuth.
+      const u = data?.user
+      return Boolean(u?.email_confirmed_at || u?.confirmed_at)
+    },
+
+    fetchStripeCustomerEmail: async (stripeCustomerId) => {
+      let customer: Stripe.Customer | Stripe.DeletedCustomer
+      try {
+        customer = await getStripe().customers.retrieve(stripeCustomerId)
+      } catch (err) {
+        // Map known Stripe errors to a structured class so the caller can
+        // classify retryable vs non-retryable. Unknown errors bubble up
+        // (will be caught at the top level and returned as 'stripe_unreachable').
+        if (err instanceof Stripe.errors.StripeInvalidRequestError) {
+          throw new StripeFetchError(
+            'customer_missing',
+            `Stripe customer not found: ${err.message}`
+          )
+        }
+        // Auth + permission errors mean the key is misconfigured / scoped wrong /
+        // rotated — retrying won't help and will hammer Stripe. Distinct from
+        // 'customer_missing' because ops needs a different alert path.
+        if (
+          err instanceof Stripe.errors.StripePermissionError ||
+          err instanceof Stripe.errors.StripeAuthenticationError
+        ) {
+          throw new StripeFetchError(
+            'forbidden',
+            `Stripe key cannot read customer: ${err.message}`
+          )
+        }
+        if (
+          err instanceof Stripe.errors.StripeConnectionError ||
+          err instanceof Stripe.errors.StripeAPIError ||
+          err instanceof Stripe.errors.StripeRateLimitError
+        ) {
+          throw new StripeFetchError(
+            'unreachable',
+            `Stripe transient error: ${err.message}`
+          )
+        }
+        throw err
+      }
+      if ((customer as Stripe.DeletedCustomer).deleted) return null
+      const email = (customer as Stripe.Customer).email?.trim().toLowerCase()
+      // Treat empty string as null — same posture as a missing email.
+      return email || null
+    },
+
+    inviteToVeo: invitePlayer,
+
+    recordOutcome: async (subId, outcome) => {
+      const supabase = createServiceClient() as any
+      const patch =
+        outcome.kind === 'success'
+          ? { provisioned_at: new Date().toISOString(), provisioning_error: null }
+          : { provisioning_error: outcome.error }
+      const { error } = await supabase
+        .from('playhub_academy_subscriptions')
+        .update(patch)
+        .eq('id', subId)
+        // Don't clobber an already-provisioned row by re-running.
+        .is('provisioned_at', null)
+      if (error) throw new Error(`recordOutcome: ${error.message}`)
+    },
+  }
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function fail(
+  subId: string,
+  reason: Extract<ProvisionOutcome, { kind: 'failure' }>['reason'],
+  error: string,
+  retryable: boolean
+): Extract<ProvisionOutcome, { kind: 'failure' }> {
+  return { kind: 'failure', subId, error, retryable, reason }
+}
+
+// ============================================================================
+// Main entry point
+// ============================================================================
+
+export interface ProvisionOptions {
+  /**
+   * If set, the function fails with reason='authorization' when the row's
+   * user_id doesn't match. Pass the calling user's id from any caller that
+   * isn't a service-role webhook handler.
+   */
+  expectedUserId?: string
+}
+
+/** Provision a single academy subscription row by id. Idempotent + safe to retry. */
+export async function provisionAcademyAccess(
+  subId: string,
+  deps: ProvisionDeps = buildDefaultDeps(),
+  options: ProvisionOptions = {}
+): Promise<ProvisionOutcome> {
+  const sub = await deps.loadSub(subId)
+  if (!sub) {
+    // No row to write against — return without persistence.
+    return fail(subId, 'not_found', `subscription ${subId} not found`, false)
+  }
+
+  if (options.expectedUserId && sub.user_id !== options.expectedUserId) {
+    // Authz mismatch — do NOT write to the row (would leak which subId exists).
+    return fail(
+      subId,
+      'authorization',
+      `subscription ${subId} not owned by expected user`,
+      false
+    )
+  }
+
+  // Row-level idempotency: already done = success, no external calls.
+  if (sub.provisioned_at) {
+    return { kind: 'success', subId, alreadyProvisioned: true }
+  }
+
+  // Only provision rows that are actually entitled (active or trialing).
+  // past_due / canceled / unpaid / incomplete / paused are NOT failures —
+  // they're "not eligible right now". Don't write provisioning_error every
+  // dunning retry; just return the outcome without persisting.
+  if (sub.status !== 'active' && sub.status !== 'trialing') {
+    return fail(
+      subId,
+      'not_entitled',
+      `subscription not entitled (status=${sub.status})`,
+      true
+    )
+  }
+
+  if (!sub.registration_team) {
+    const outcome = fail(
+      subId,
+      'config_missing_team',
+      'no registration_team on row — cannot resolve Veo team',
+      false
+    )
+    await deps.recordOutcome(subId, outcome)
+    return outcome
+  }
+
+  // PRIMARY salted-account defence: the auth user must have confirmed their
+  // email. An attacker who runs a real Stripe checkout for victim@example.com
+  // and waits for victim to sign up cannot complete provisioning unless
+  // victim clicks the Supabase confirmation link in their inbox.
+  //
+  // RETRYABLE BUT NOT AUTO-RETRIED: if the user confirms later, *something*
+  // must call provisionAcademyAccess again. Today that "something" is the
+  // /api/me/provision-pending endpoint hit on next authenticated PLAYHUB
+  // page load (Checkpoint D2). If a parent confirms via inbox and never
+  // returns to the app, the row stays in this state until the next visit.
+  let emailConfirmed: boolean
+  try {
+    emailConfirmed = await deps.isEmailConfirmed(sub.user_id)
+  } catch (err) {
+    // Supabase auth admin outage — symmetric with stripe_unreachable.
+    const outcome = fail(
+      subId,
+      'auth_unreachable',
+      `isEmailConfirmed threw: ${err instanceof Error ? err.message : String(err)}`,
+      true
+    )
+    await deps.recordOutcome(subId, outcome)
+    return outcome
+  }
+  if (!emailConfirmed) {
+    const outcome = fail(
+      subId,
+      'email_not_confirmed',
+      `auth user ${sub.user_id} has not confirmed their email`,
+      true
+    )
+    await deps.recordOutcome(subId, outcome)
+    return outcome
+  }
+
+  // DEFENCE-IN-DEPTH: Stripe customer's email should match the row. This
+  // catches operational drift (ops edited the Customer in dashboard, parent
+  // changed email via Customer Portal). It does NOT defend against the
+  // textbook salted-account attack — the email_confirmed_at gate above does.
+  let stripeEmail: string | null
+  try {
+    stripeEmail = await deps.fetchStripeCustomerEmail(sub.stripe_customer_id)
+  } catch (err) {
+    if (err instanceof StripeFetchError) {
+      const reasonMap: Record<
+        StripeFetchError['reason'],
+        Extract<ProvisionOutcome, { kind: 'failure' }>['reason']
+      > = {
+        customer_missing: 'stripe_customer_missing',
+        forbidden: 'stripe_forbidden',
+        unreachable: 'stripe_unreachable',
+      }
+      const outcome = fail(
+        subId,
+        reasonMap[err.reason],
+        err.message,
+        err.reason === 'unreachable' // only transient → retryable
+      )
+      await deps.recordOutcome(subId, outcome)
+      return outcome
+    }
+    // Unknown Stripe error — treat as transient.
+    const outcome = fail(
+      subId,
+      'stripe_unreachable',
+      `Stripe error: ${err instanceof Error ? err.message : String(err)}`,
+      true
+    )
+    await deps.recordOutcome(subId, outcome)
+    return outcome
+  }
+
+  const rowEmail = sub.customer_email.trim().toLowerCase()
+  if (!stripeEmail || stripeEmail !== rowEmail) {
+    const outcome = fail(
+      subId,
+      'stripe_email_mismatch',
+      `Stripe customer email mismatch (stripe=${stripeEmail ?? '<none>'}, sub=${rowEmail})`,
+      false
+    )
+    await deps.recordOutcome(subId, outcome)
+    return outcome
+  }
+
+  const club = await deps.loadClub(sub.club_slug)
+  if (!club) {
+    const outcome = fail(
+      subId,
+      'config_unknown_club',
+      `unknown club ${sub.club_slug}`,
+      false
+    )
+    await deps.recordOutcome(subId, outcome)
+    return outcome
+  }
+
+  if (!club.veoClubSlug) {
+    // Future PLAYHUB-native path lives here. For Phase 1 every academy is
+    // Veo-backed, so a missing veoClubSlug is a config error.
+    const outcome = fail(
+      subId,
+      'config_no_veo_club',
+      `club ${sub.club_slug} has no veo_club_slug configured`,
+      false
+    )
+    await deps.recordOutcome(subId, outcome)
+    return outcome
+  }
+
+  // The team_slug stored on the row is the parent's checkout selection
+  // (e.g. 'lyl-u12-tigers'). The Veo team identifier may differ — look it
+  // up in playhub_academy_teams.
+  const veoTeamSlug = await deps.resolveVeoTeamSlug(
+    sub.club_slug,
+    sub.registration_team
+  )
+  if (!veoTeamSlug) {
+    const outcome = fail(
+      subId,
+      'config_no_veo_team',
+      `no veo_team_slug mapped for ${sub.club_slug}/${sub.registration_team}`,
+      false
+    )
+    await deps.recordOutcome(subId, outcome)
+    return outcome
+  }
+
+  // Fire the Veo invite. Network errors → retryable.
+  let veoResult: VeoResult
+  try {
+    veoResult = await deps.inviteToVeo(
+      club.veoClubSlug,
+      veoTeamSlug,
+      rowEmail
+    )
+  } catch (err) {
+    const outcome = fail(
+      subId,
+      'veo_threw',
+      `Veo invite threw: ${err instanceof Error ? err.message : String(err)}`,
+      true
+    )
+    await deps.recordOutcome(subId, outcome)
+    return outcome
+  }
+
+  if (!veoResult.success) {
+    const outcome = fail(
+      subId,
+      'veo_invite_failed',
+      `Veo invite failed: ${veoResult.message}`,
+      true
+    )
+    await deps.recordOutcome(subId, outcome)
+    return outcome
+  }
+
+  const outcome: ProvisionOutcome = {
+    kind: 'success',
+    subId,
+    alreadyProvisioned: false,
+    veoMessage: veoResult.message,
+  }
+  await deps.recordOutcome(subId, outcome)
+  return outcome
+}
+
+// ============================================================================
+// Convenience: provision every unprovisioned active sub for a given user
+// ============================================================================
+// Used by Checkpoint D2's post-signup claim flow: after the trigger has
+// promoted pending rows into active rows, the PLAYBACK register-success page
+// calls /api/me/provision-pending which invokes this for the new user.
+
+export async function provisionPendingForUser(
+  userId: string,
+  deps: ProvisionDeps = buildDefaultDeps()
+): Promise<ProvisionOutcome[]> {
+  const supabase = createServiceClient() as any
+  const { data, error } = await supabase
+    .from('playhub_academy_subscriptions')
+    .select('id')
+    .eq('user_id', userId)
+    .is('provisioned_at', null)
+  if (error) throw new Error(`provisionPendingForUser: ${error.message}`)
+
+  const ids = ((data as { id: string }[]) || []).map((r) => r.id)
+  const results: ProvisionOutcome[] = []
+  for (const id of ids) {
+    // Pass expectedUserId so a future caller that hands in a wrong list
+    // can't sneak through. provisionAcademyAccess re-checks the row.
+    results.push(
+      await provisionAcademyAccess(id, deps, { expectedUserId: userId })
+    )
+  }
+  return results
+}
+
+// ============================================================================
+// Failure-reason helpers for callers (logging, alerting, retry policy)
+// ============================================================================
+
+const SECURITY_REASONS: ReadonlySet<string> = new Set([
+  'authorization',
+  'email_not_confirmed',
+  'stripe_email_mismatch',
+])
+
+/** True if the failure reason should be treated as a security signal (PagerDuty / Sentry). */
+export function isSecurityFailure(outcome: ProvisionOutcome): boolean {
+  return outcome.kind === 'failure' && SECURITY_REASONS.has(outcome.reason)
+}
