@@ -231,13 +231,16 @@ export async function createAcademyCheckoutSession(
     source: 'playback_web',
   }
 
+  // subscription mode always creates a Stripe Customer — explicit
+  // customer_creation is rejected by Stripe ("customer_creation can only be
+  // used in payment mode"). Stripe's docs confirm: every subscription
+  // checkout gets a customer for free.
   const params: Stripe.Checkout.SessionCreateParams = {
     mode: 'subscription',
     payment_method_types: ['card'],
     line_items: [{ price: price.id, quantity: 1 }],
     metadata: sharedMetadata,
     subscription_data: { metadata: sharedMetadata },
-    customer_creation: 'always',
     allow_promotion_codes: true,
     success_url: successUrl,
     cancel_url: cancelUrl,

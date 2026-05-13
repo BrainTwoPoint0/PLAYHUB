@@ -201,7 +201,6 @@ describe('createAcademyCheckoutSession', () => {
               source: 'playback_web',
             },
           },
-          customer_creation: 'always',
           allow_promotion_codes: true,
           // Only {CHECKOUT_SESSION_ID} is a documented Stripe template var;
           // the register page server-side fetches the session to read the email.
