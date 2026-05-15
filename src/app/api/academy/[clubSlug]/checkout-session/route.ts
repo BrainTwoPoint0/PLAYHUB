@@ -56,6 +56,34 @@ export async function POST(
       ? String((body as { team_slug: unknown }).team_slug)
       : ''
 
+  // Optional — only present for hierarchical academies (LYL). Flat configs
+  // (CFA, SEFA) omit it. Empty string treated as absent so a thoughtless
+  // form serialiser doesn't promote a flat checkout into a hierarchical one.
+  // Non-string + non-null values (numbers, objects) are REJECTED rather
+  // than silently coerced — a malformed body shouldn't be able to demote a
+  // hierarchical intent into a flat checkout that lands the wrong row.
+  const rawSubclub =
+    body && typeof body === 'object' && 'subclub_slug' in body
+      ? (body as { subclub_slug: unknown }).subclub_slug
+      : undefined
+  if (
+    rawSubclub !== undefined &&
+    rawSubclub !== null &&
+    typeof rawSubclub !== 'string'
+  ) {
+    return NextResponse.json(
+      {
+        error: {
+          code: 'invalid_body',
+          message: 'subclub_slug must be a string or null',
+        },
+      },
+      { status: 400 }
+    )
+  }
+  const subclubSlug =
+    typeof rawSubclub === 'string' && rawSubclub.length > 0 ? rawSubclub : null
+
   if (!teamSlug) {
     return NextResponse.json(
       { error: { code: 'invalid_body', message: 'team_slug is required' } },
@@ -76,7 +104,7 @@ export async function POST(
   let outcome: CheckoutOutcome
   try {
     outcome = await createAcademyCheckoutSession(
-      { clubSlug, teamSlug },
+      { clubSlug, teamSlug, subclubSlug },
       undefined,
       idempotencyKey ? { idempotencyKey } : undefined
     )
@@ -109,6 +137,8 @@ export async function POST(
       JSON.stringify({
         event: 'academy_checkout_created',
         club_slug: clubSlug,
+        // subclub_slug only logged for hierarchical leagues; absent for flat.
+        ...(subclubSlug ? { subclub_slug: subclubSlug } : {}),
         team_slug: teamSlug,
         session_id: outcome.sessionId,
       })
@@ -120,7 +150,9 @@ export async function POST(
   // 4xx = permanent, no retry. 429 = back off + retry. 5xx = transient.
   const statusMap: Record<typeof outcome.reason, number> = {
     invalid_team_slug: 400,
+    invalid_subclub_slug: 400,
     club_not_found: 404,
+    subclub_not_found: 404,
     team_not_found: 404,
     no_recurring_price: 500,
     stripe_invalid_request: 400,
@@ -132,6 +164,7 @@ export async function POST(
     JSON.stringify({
       event: 'academy_checkout_failure',
       club_slug: clubSlug,
+      ...(subclubSlug ? { subclub_slug: subclubSlug } : {}),
       team_slug: teamSlug,
       reason: outcome.reason,
       error: outcome.error,

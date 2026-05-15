@@ -50,12 +50,19 @@ function extractProductIds(subscription: Stripe.Subscription): string[] {
   return ids
 }
 
-// team_slug arrives via attacker-influenceable Stripe metadata (any successful
-// Checkout against our account can set it). Validate as a slug to bound the
-// risk surface before it lands in the DB / logs / future UI surfaces.
+// team_slug + subclub_slug arrive via attacker-influenceable Stripe metadata
+// (any successful Checkout against our account can set them). Validate as
+// slugs to bound the risk surface before they land in the DB / logs / future
+// UI surfaces. Same shape constraint as our own ACADEMY_SLUG_RE in checkout.ts.
 const TEAM_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,63}$/
 function isValidTeamSlug(slug: string): boolean {
   return TEAM_SLUG_RE.test(slug)
+}
+// Reuse the same regex shape for subclub — both are user-supplied slugs
+// from the picker that get round-tripped through Stripe metadata.
+const SUBCLUB_SLUG_RE = TEAM_SLUG_RE
+function isValidSubclubSlug(slug: string): boolean {
+  return SUBCLUB_SLUG_RE.test(slug)
 }
 
 // True iff ANY item on the subscription matches an academy product. Iterates
@@ -141,6 +148,8 @@ export interface ActiveSubInsert {
   stripe_subscription_id: string
   stripe_customer_id: string
   registration_team: string
+  /** NULL for flat configs (CFA, SEFA). Set for hierarchical configs (LYL). */
+  registration_subclub: string | null
   customer_email: string
   customer_name: string | null
   status: string
@@ -152,6 +161,7 @@ export interface PendingSubInsert {
   stripe_subscription_id: string
   stripe_customer_id: string
   registration_team: string
+  registration_subclub: string | null
   customer_name: string | null
   last_known_status: string
 }
@@ -278,6 +288,25 @@ export async function handleAcademyCheckoutCompleted(
   const metadata = session.metadata || {}
   const clubSlug = metadata.club_slug
   const teamSlug = metadata.team_slug
+  // Optional middle layer. Absent or empty string ⇒ flat config (CFA, SEFA).
+  // Present ⇒ hierarchical (LYL). We don't enforce hierarchical-vs-flat here:
+  // the FK in the DB and the slug-shape regex are the bounded validations.
+  // (Cross-checking against playhub_academy_subclubs would couple this
+  // handler to subclub-table reads — not worth the latency cost given the
+  // FK already deny-by-default; see E.2 schema migration.)
+  const subclubSlugRaw = metadata.subclub_slug
+  // Empty-string normalization. Includes the literal strings "null" /
+  // "undefined" because PLAYBACK's form serialiser used to emit those when
+  // a field was absent — defence in depth for the FK that already
+  // deny-by-defaults at provisioning time, but keeps failure logs clean.
+  const subclubSlugTrimmed =
+    typeof subclubSlugRaw === 'string' ? subclubSlugRaw.trim() : ''
+  const subclubSlug =
+    subclubSlugTrimmed.length > 0 &&
+    subclubSlugTrimmed !== 'null' &&
+    subclubSlugTrimmed !== 'undefined'
+      ? subclubSlugTrimmed
+      : null
   const stripeSubscriptionId = session.subscription as string | null
   const stripeCustomerId = session.customer as string | null
   const customerEmail = session.customer_details?.email?.trim().toLowerCase()
@@ -291,6 +320,12 @@ export async function handleAcademyCheckoutCompleted(
     // attacker-controlled metadata. team_slug comes from a custom_field at
     // checkout, but Stripe doesn't constrain its content.
     return { status: 'error', error: `invalid team_slug shape: ${teamSlug.slice(0, 32)}` }
+  }
+  if (subclubSlug !== null && !isValidSubclubSlug(subclubSlug)) {
+    return {
+      status: 'error',
+      error: `invalid subclub_slug shape: ${subclubSlug.slice(0, 32)}`,
+    }
   }
   if (!stripeSubscriptionId) {
     return { status: 'error', error: 'session has no subscription id' }
@@ -317,6 +352,7 @@ export async function handleAcademyCheckoutCompleted(
       stripe_subscription_id: stripeSubscriptionId,
       stripe_customer_id: stripeCustomerId,
       registration_team: teamSlug,
+      registration_subclub: subclubSlug,
       customer_email: customerEmail,
       customer_name: customerName,
       // checkout.session.completed implies the first payment succeeded; status is
@@ -358,6 +394,7 @@ export async function handleAcademyCheckoutCompleted(
     stripe_subscription_id: stripeSubscriptionId,
     stripe_customer_id: stripeCustomerId,
     registration_team: teamSlug,
+    registration_subclub: subclubSlug,
     customer_name: customerName,
     last_known_status: 'active',
   })

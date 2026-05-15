@@ -82,6 +82,12 @@ export async function GET(
         event: 'academy_session_lookup_resolved',
         session_id: logId(sessionId),
         club_slug: outcome.data.club_slug,
+        // subclub_slug only logged when set — flat configs (CFA, SEFA)
+        // produce log lines without the field, which keeps existing
+        // log-based dashboards forward-compatible.
+        ...(outcome.data.subclub_slug
+          ? { subclub_slug: outcome.data.subclub_slug }
+          : {}),
         team_slug: outcome.data.team_slug,
       })
     )

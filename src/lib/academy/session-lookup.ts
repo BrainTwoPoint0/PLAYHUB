@@ -28,6 +28,7 @@
 // loader so unit tests can mock both without module mocking.
 
 import Stripe from 'stripe'
+import { createServiceClient } from '@/lib/supabase/server'
 import { getClubBySlug, type AcademyClub } from './config'
 
 export interface SessionLookupResult {
@@ -38,6 +39,16 @@ export interface SessionLookupResult {
   club_slug: string
   club_name: string
   team_slug: string
+  /** Hierarchical-academy middle layer (LYL → 'barnes-eagles'). NULL for
+   *  flat configs (CFA, SEFA). Validated to the same slug shape as
+   *  team_slug before being returned. */
+  subclub_slug: string | null
+  /** Human-readable subclub name resolved from playhub_academy_subclubs.
+   *  NULL when subclub_slug is NULL OR when the subclub row was
+   *  deactivated between checkout and register (parent should still be
+   *  able to register — the slug is the load-bearing identifier, the
+   *  name is just nice-to-have copy). */
+  subclub_name: string | null
 }
 
 export type SessionLookupOutcome =
@@ -50,6 +61,13 @@ export type SessionLookupOutcome =
 export interface SessionLookupDeps {
   fetchStripeSession: (sessionId: string) => Promise<Stripe.Checkout.Session | null>
   loadClub: (clubSlug: string) => Promise<AcademyClub | undefined>
+  /** Resolve a subclub's display_name. Only called when the session has a
+   *  subclub_slug in metadata. Returns null when row missing/inactive — the
+   *  outcome stays 'found' so the parent can still register. */
+  loadSubclubDisplayName: (
+    clubSlug: string,
+    subclubSlug: string
+  ) => Promise<string | null>
 }
 
 let cachedStripe: Stripe | null = null
@@ -78,6 +96,18 @@ export function buildDefaultDeps(): SessionLookupDeps {
       }
     },
     loadClub: getClubBySlug,
+    loadSubclubDisplayName: async (clubSlug, subclubSlug) => {
+      const supabase = createServiceClient() as any
+      const { data, error } = await supabase
+        .from('playhub_academy_subclubs')
+        .select('display_name')
+        .eq('club_slug', clubSlug)
+        .eq('subclub_slug', subclubSlug)
+        .eq('is_active', true)
+        .maybeSingle()
+      if (error) throw new Error(`loadSubclubDisplayName: ${error.message}`)
+      return data?.display_name ?? null
+    },
   }
 }
 
@@ -85,6 +115,10 @@ export function buildDefaultDeps(): SessionLookupDeps {
 // Bound the input shape so a junk id can't waste a Stripe roundtrip / pollute
 // logs / smuggle anything into the proxy.
 const SESSION_ID_RE = /^cs_(test|live)_[A-Za-z0-9]{10,200}$/
+
+// Same shape as the checkout/webhook regex — bound subclub slug pulled
+// from session metadata before it lands in our response body / logs.
+const SUBCLUB_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,63}$/
 
 export async function lookupAcademySession(
   sessionId: string,
@@ -142,6 +176,27 @@ export async function lookupAcademySession(
   const rawName = session.customer_details?.name?.trim()
   const customerName = rawName ? rawName.slice(0, 120) : null
 
+  // Hierarchical-academy middle layer. Validate slug shape BEFORE letting
+  // it leave the lookup — even though metadata.subclub_slug came from our
+  // own checkout flow, future Stripe Payment Links / dashboard-edited
+  // sessions could carry a malformed value. A failed shape check downgrades
+  // to flat (subclub_slug=null, subclub_name=null) so the parent can still
+  // register; the row's authoritative subclub identity is whatever the
+  // webhook persisted, NOT this display surface.
+  const rawSubclub = metadata.subclub_slug
+  let subclubSlug: string | null = null
+  let subclubName: string | null = null
+  if (typeof rawSubclub === 'string' && SUBCLUB_SLUG_RE.test(rawSubclub)) {
+    subclubSlug = rawSubclub
+    try {
+      subclubName = await deps.loadSubclubDisplayName(clubSlug, rawSubclub)
+    } catch {
+      // Supabase blip — keep the slug, drop the name. Register page degrades
+      // gracefully ("Welcome to your subscription" instead of subclub copy).
+      subclubName = null
+    }
+  }
+
   return {
     kind: 'found',
     data: {
@@ -150,6 +205,8 @@ export async function lookupAcademySession(
       club_slug: clubSlug,
       club_name: club.name,
       team_slug: teamSlug,
+      subclub_slug: subclubSlug,
+      subclub_name: subclubName,
     },
   }
 }

@@ -48,6 +48,11 @@ export interface AcademySubscriptionRow {
   stripe_subscription_id: string
   stripe_customer_id: string
   registration_team: string | null
+  /** Hierarchical-academy middle layer (LYL → "barnes-eagles", etc).
+   *  NULL for flat configs (CFA, SEFA). When set, Veo club lookup is
+   *  redirected to playhub_academy_subclubs.veo_club_slug instead of the
+   *  config-level veoClubSlug, and team lookup is scoped to (club, subclub). */
+  registration_subclub: string | null
   customer_email: string
   status: string
   provisioned_at: string | null
@@ -88,9 +93,25 @@ export type ProvisionOutcome =
 export interface ProvisionDeps {
   loadSub: (subId: string) => Promise<AcademySubscriptionRow | null>
   loadClub: (clubSlug: string) => Promise<AcademyClub | undefined>
+  /**
+   * Hierarchical Veo-club resolution. Returns the subclub's veo_club_slug
+   * if both the row exists and the field is non-NULL. NULL return means
+   * provisioning should fail with config_no_veo_club at the subclub level.
+   */
+  loadSubclubVeoClubSlug: (
+    clubSlug: string,
+    subclubSlug: string
+  ) => Promise<string | null>
+  /**
+   * Resolve the Veo team slug. When `subclubSlug` is set the lookup uses
+   * the (club, subclub, team) partial UNIQUE; when null it uses the flat
+   * (club, team) partial UNIQUE. The two indexes are mutually exclusive,
+   * so a single dep covers both layouts without ambiguity.
+   */
   resolveVeoTeamSlug: (
     clubSlug: string,
-    teamSlug: string
+    teamSlug: string,
+    subclubSlug: string | null
   ) => Promise<string | null>
   /** Returns true iff the auth user has confirmed their email. */
   isEmailConfirmed: (userId: string) => Promise<boolean>
@@ -145,7 +166,7 @@ export function buildDefaultDeps(): ProvisionDeps {
       const { data, error } = await supabase
         .from('playhub_academy_subscriptions')
         .select(
-          'id, user_id, club_slug, stripe_subscription_id, stripe_customer_id, registration_team, customer_email, status, provisioned_at'
+          'id, user_id, club_slug, stripe_subscription_id, stripe_customer_id, registration_team, registration_subclub, customer_email, status, provisioned_at'
         )
         .eq('id', subId)
         .maybeSingle()
@@ -155,15 +176,34 @@ export function buildDefaultDeps(): ProvisionDeps {
 
     loadClub: getClubBySlug,
 
-    resolveVeoTeamSlug: async (clubSlug, teamSlug) => {
+    loadSubclubVeoClubSlug: async (clubSlug, subclubSlug) => {
       const supabase = createServiceClient() as any
       const { data, error } = await supabase
+        .from('playhub_academy_subclubs')
+        .select('veo_club_slug')
+        .eq('club_slug', clubSlug)
+        .eq('subclub_slug', subclubSlug)
+        .eq('is_active', true)
+        .maybeSingle()
+      if (error) throw new Error(`loadSubclubVeoClubSlug: ${error.message}`)
+      return data?.veo_club_slug ?? null
+    },
+
+    resolveVeoTeamSlug: async (clubSlug, teamSlug, subclubSlug) => {
+      const supabase = createServiceClient() as any
+      let q = supabase
         .from('playhub_academy_teams')
         .select('veo_team_slug')
         .eq('club_slug', clubSlug)
         .eq('team_slug', teamSlug)
         .eq('is_active', true)
-        .maybeSingle()
+      // Postgres treats NULL as distinct in UNIQUE. We mirror that here:
+      // when the row's subclub is NULL we MUST filter `IS NULL` (not `eq`),
+      // otherwise Supabase emits `subclub_slug=eq.null` which matches no
+      // rows and a hierarchical team would silently masquerade as a flat
+      // team. The two partial UNIQUE indexes guarantee at most one match.
+      q = subclubSlug ? q.eq('subclub_slug', subclubSlug) : q.is('subclub_slug', null)
+      const { data, error } = await q.maybeSingle()
       if (error) throw new Error(`resolveVeoTeamSlug: ${error.message}`)
       return data?.veo_team_slug ?? null
     },
@@ -419,31 +459,76 @@ export async function provisionAcademyAccess(
     return outcome
   }
 
-  if (!club.veoClubSlug) {
-    // Future PLAYHUB-native path lives here. For Phase 1 every academy is
-    // Veo-backed, so a missing veoClubSlug is a config error.
-    const outcome = fail(
-      subId,
-      'config_no_veo_club',
-      `club ${sub.club_slug} has no veo_club_slug configured`,
-      false
-    )
-    await deps.recordOutcome(subId, outcome)
-    return outcome
+  // Resolve the Veo club slug. For hierarchical configs the source of
+  // truth is the subclub row (LYL → barnes-eagles → barnes-eagles-veo);
+  // for flat configs (CFA, SEFA) it's the config row itself. Both branches
+  // emit the SAME failure reason (`config_no_veo_club`) so callers don't
+  // need to know whether the subscription is hierarchical.
+  let veoClubSlug: string | null
+  if (sub.registration_subclub) {
+    try {
+      veoClubSlug = await deps.loadSubclubVeoClubSlug(
+        sub.club_slug,
+        sub.registration_subclub
+      )
+    } catch (err) {
+      // Treat infra failure as transient — same posture as auth_unreachable.
+      const outcome = fail(
+        subId,
+        'config_no_veo_club',
+        `loadSubclubVeoClubSlug threw: ${err instanceof Error ? err.message : String(err)}`,
+        true
+      )
+      await deps.recordOutcome(subId, outcome)
+      return outcome
+    }
+    if (!veoClubSlug) {
+      // Subclub row missing OR veo_club_slug still NULL (we seed LYL
+      // subclubs with veo_club_slug=NULL ahead of Veo setup; provisioning
+      // fails closed until the operator fills it in).
+      const outcome = fail(
+        subId,
+        'config_no_veo_club',
+        `subclub ${sub.club_slug}/${sub.registration_subclub} has no veo_club_slug configured`,
+        false
+      )
+      await deps.recordOutcome(subId, outcome)
+      return outcome
+    }
+  } else {
+    veoClubSlug = club.veoClubSlug ?? null
+    if (!veoClubSlug) {
+      // Future PLAYHUB-native path lives here. For Phase 1 every academy is
+      // Veo-backed, so a missing veoClubSlug is a config error.
+      const outcome = fail(
+        subId,
+        'config_no_veo_club',
+        `club ${sub.club_slug} has no veo_club_slug configured`,
+        false
+      )
+      await deps.recordOutcome(subId, outcome)
+      return outcome
+    }
   }
 
   // The team_slug stored on the row is the parent's checkout selection
-  // (e.g. 'lyl-u12-tigers'). The Veo team identifier may differ — look it
-  // up in playhub_academy_teams.
+  // (e.g. 'u12-tigers'). The Veo team identifier may differ — look it
+  // up in playhub_academy_teams. For hierarchical rows the (club, subclub)
+  // pair scopes the lookup; for flat rows the legacy (club, team) lookup
+  // applies and the subclub_slug is NULL on both sides.
   const veoTeamSlug = await deps.resolveVeoTeamSlug(
     sub.club_slug,
-    sub.registration_team
+    sub.registration_team,
+    sub.registration_subclub
   )
   if (!veoTeamSlug) {
+    const teamPath = sub.registration_subclub
+      ? `${sub.club_slug}/${sub.registration_subclub}/${sub.registration_team}`
+      : `${sub.club_slug}/${sub.registration_team}`
     const outcome = fail(
       subId,
       'config_no_veo_team',
-      `no veo_team_slug mapped for ${sub.club_slug}/${sub.registration_team}`,
+      `no veo_team_slug mapped for ${teamPath}`,
       false
     )
     await deps.recordOutcome(subId, outcome)
@@ -454,7 +539,7 @@ export async function provisionAcademyAccess(
   let veoResult: VeoResult
   try {
     veoResult = await deps.inviteToVeo(
-      club.veoClubSlug,
+      veoClubSlug,
       veoTeamSlug,
       rowEmail
     )

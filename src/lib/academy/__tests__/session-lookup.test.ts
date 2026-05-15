@@ -50,6 +50,9 @@ function makeDeps(overrides: Partial<SessionLookupDeps> = {}): SessionLookupDeps
   return {
     fetchStripeSession: vi.fn(async () => makeSession()),
     loadClub: vi.fn(async () => baseClub),
+    // Default returns a name. Hierarchical-path tests override to null /
+    // throw to exercise the degraded paths.
+    loadSubclubDisplayName: vi.fn(async () => 'Barnes Eagles'),
     ...overrides,
   }
 }
@@ -214,6 +217,9 @@ describe('lookupAcademySession', () => {
         club_slug: 'lyl',
         club_name: 'London Youth League',
         team_slug: 'lyl-u12-tigers',
+        // Default fixture has no subclub_slug in metadata → flat surface.
+        subclub_slug: null,
+        subclub_name: null,
       })
     })
 
@@ -235,6 +241,8 @@ describe('lookupAcademySession', () => {
         'club_slug',
         'customer_email',
         'customer_name',
+        'subclub_name',
+        'subclub_slug',
         'team_slug',
       ])
     })
@@ -252,6 +260,84 @@ describe('lookupAcademySession', () => {
       const o = await lookupAcademySession('cs_live_aaaaaaaaaaaaaaaaaaaa', deps)
       const ok = expectFound(o)
       expect(ok.data.customer_name).toBeNull()
+    })
+  })
+
+  describe('hierarchical (subclub) surfacing', () => {
+    // The register page uses subclub_name to render "Welcome to Barnes
+    // Eagles" instead of "Welcome to your subscription". The slug is the
+    // load-bearing identifier (it round-trips into the active sub row);
+    // the name is just nice-to-have copy with graceful degradation.
+
+    it('surfaces subclub_slug + subclub_name when metadata.subclub_slug is valid', async () => {
+      const deps = makeDeps({
+        fetchStripeSession: vi.fn(async () =>
+          makeSession({}, { subclub_slug: 'barnes-eagles' })
+        ),
+        loadSubclubDisplayName: vi.fn(async () => 'Barnes Eagles'),
+      })
+      const o = await lookupAcademySession('cs_live_aaaaaaaaaaaaaaaaaaaa', deps)
+      const ok = expectFound(o)
+      expect(ok.data.subclub_slug).toBe('barnes-eagles')
+      expect(ok.data.subclub_name).toBe('Barnes Eagles')
+      expect(deps.loadSubclubDisplayName).toHaveBeenCalledWith(
+        'lyl',
+        'barnes-eagles'
+      )
+    })
+
+    it('returns subclub_slug + null name when subclub row missing/inactive (parent still registers)', async () => {
+      const deps = makeDeps({
+        fetchStripeSession: vi.fn(async () =>
+          makeSession({}, { subclub_slug: 'barnes-eagles' })
+        ),
+        loadSubclubDisplayName: vi.fn(async () => null),
+      })
+      const o = await lookupAcademySession('cs_live_aaaaaaaaaaaaaaaaaaaa', deps)
+      const ok = expectFound(o)
+      expect(ok.data.subclub_slug).toBe('barnes-eagles')
+      expect(ok.data.subclub_name).toBeNull()
+    })
+
+    it('degrades to subclub_name=null when Supabase throws (does NOT abort lookup)', async () => {
+      const deps = makeDeps({
+        fetchStripeSession: vi.fn(async () =>
+          makeSession({}, { subclub_slug: 'barnes-eagles' })
+        ),
+        loadSubclubDisplayName: vi.fn(async () => {
+          throw new Error('Supabase timeout')
+        }),
+      })
+      const o = await lookupAcademySession('cs_live_aaaaaaaaaaaaaaaaaaaa', deps)
+      // Critically: the parent's register flow MUST still work — the lookup
+      // returns 'found' with subclub_slug intact and subclub_name=null.
+      const ok = expectFound(o)
+      expect(ok.data.subclub_slug).toBe('barnes-eagles')
+      expect(ok.data.subclub_name).toBeNull()
+    })
+
+    it('downgrades to flat (slug+name both null) on malformed subclub_slug', async () => {
+      // subclub_slug from session metadata could be malformed if a legacy
+      // Stripe Payment Link is wired through the new webhook. Fail-open:
+      // surface the rest of the data, drop the subclub fields.
+      const deps = makeDeps({
+        fetchStripeSession: vi.fn(async () =>
+          makeSession({}, { subclub_slug: 'Has Spaces & Symbols!' })
+        ),
+        loadSubclubDisplayName: vi.fn(),
+      })
+      const o = await lookupAcademySession('cs_live_aaaaaaaaaaaaaaaaaaaa', deps)
+      const ok = expectFound(o)
+      expect(ok.data.subclub_slug).toBeNull()
+      expect(ok.data.subclub_name).toBeNull()
+      // Critically: do NOT pass a malformed slug to Supabase.
+      expect(deps.loadSubclubDisplayName).not.toHaveBeenCalled()
+    })
+
+    it('flat path (no subclub_slug in metadata) NEVER calls loadSubclubDisplayName', async () => {
+      const deps = makeDeps()
+      await lookupAcademySession('cs_live_aaaaaaaaaaaaaaaaaaaa', deps)
+      expect(deps.loadSubclubDisplayName).not.toHaveBeenCalled()
     })
   })
 

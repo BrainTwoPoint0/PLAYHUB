@@ -127,6 +127,22 @@ describe('handleAcademyCheckoutCompleted', () => {
       if (result.status === 'error') expect(result.error).toMatch(/subscription id/)
     })
 
+    it('rejects invalid subclub_slug shape (same defence as team_slug — attacker-controlled metadata)', async () => {
+      const deps = makeDeps()
+      const bad = ['barnes eagles', '<img src=x>', 'A'.repeat(65), 'b\nINFO']
+      for (const subclubSlug of bad) {
+        const session = makeCheckoutSession({}, { subclub_slug: subclubSlug })
+        const result = await handleAcademyCheckoutCompleted(session, deps)
+        expect(result.status).toBe('error')
+        if (result.status === 'error') {
+          expect(result.error).toMatch(/invalid subclub_slug/)
+        }
+      }
+      // Sanity: the writes never fired.
+      expect(deps.insertActiveSub).not.toHaveBeenCalled()
+      expect(deps.insertPendingSub).not.toHaveBeenCalled()
+    })
+
     it('rejects invalid team_slug shape (defends DB / logs / future UI from attacker metadata)', async () => {
       const deps = makeDeps()
       // Spaces, HTML, log-injection sequences, length > 64, wrong charset.
@@ -202,6 +218,9 @@ describe('handleAcademyCheckoutCompleted', () => {
           stripe_subscription_id: 'sub_stripe_1',
           stripe_customer_id: 'cus_stripe_1',
           registration_team: 'lyl-u12-tigers',
+          // Default fixture omits subclub metadata → flat-config persistence.
+          // Hierarchical persistence has dedicated coverage below.
+          registration_subclub: null,
           customer_email: 'parent@example.com',
           customer_name: 'Test Parent',
           status: 'active',
@@ -296,6 +315,7 @@ describe('handleAcademyCheckoutCompleted', () => {
           stripe_subscription_id: 'sub_stripe_1',
           stripe_customer_id: 'cus_stripe_1',
           registration_team: 'lyl-u12-tigers',
+          registration_subclub: null,
           customer_name: 'Test Parent',
           last_known_status: 'active',
         } satisfies PendingSubInsert)
@@ -333,6 +353,83 @@ describe('handleAcademyCheckoutCompleted', () => {
       const result = await handleAcademyCheckoutCompleted(makeCheckoutSession(), deps)
       expect(result.status).toBe('error')
       expect(deps.sendClaimEmail).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('hierarchical (subclub) persistence', () => {
+    // The hierarchical surface is opt-in: presence of metadata.subclub_slug
+    // promotes a checkout from "flat (CFA/SEFA)" to "subclub (LYL)". These
+    // tests pin the round-trip from Stripe metadata → INSERT row so that a
+    // subclub-aware Veo invite can be fired from provision.ts later.
+
+    it('persists subclub_slug to active row when metadata includes a valid subclub', async () => {
+      const deps = makeDeps({
+        loadProfileByEmail: vi.fn(async () => ({ user_id: 'user-uuid-1' })),
+        insertActiveSub: vi.fn(
+          async (): Promise<InsertResult> => ({ kind: 'inserted', id: 'active-1' })
+        ),
+      })
+      const session = makeCheckoutSession({}, { subclub_slug: 'barnes-eagles' })
+      const result = await handleAcademyCheckoutCompleted(session, deps)
+      expect(result.status).toBe('created')
+      expect(deps.insertActiveSub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          club_slug: 'lyl',
+          registration_team: 'lyl-u12-tigers',
+          registration_subclub: 'barnes-eagles',
+        } satisfies Partial<ActiveSubInsert>)
+      )
+    })
+
+    it('persists subclub_slug to pending row when no profile exists yet', async () => {
+      const deps = makeDeps({
+        loadProfileByEmail: vi.fn(async () => null),
+        insertPendingSub: vi.fn(
+          async (): Promise<InsertResult> => ({ kind: 'inserted', id: 'pending-1' })
+        ),
+      })
+      const session = makeCheckoutSession({}, { subclub_slug: 'barnes-eagles' })
+      const result = await handleAcademyCheckoutCompleted(session, deps)
+      expect(result.status).toBe('pending')
+      expect(deps.insertPendingSub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          club_slug: 'lyl',
+          registration_team: 'lyl-u12-tigers',
+          registration_subclub: 'barnes-eagles',
+        } satisfies Partial<PendingSubInsert>)
+      )
+    })
+
+    it('treats absent subclub_slug as flat config (registration_subclub=null on both insert paths)', async () => {
+      // Existing-profile path
+      const activeDeps = makeDeps({
+        loadProfileByEmail: vi.fn(async () => ({ user_id: 'user-uuid-1' })),
+        insertActiveSub: vi.fn(
+          async (): Promise<InsertResult> => ({ kind: 'inserted', id: 'active-1' })
+        ),
+      })
+      await handleAcademyCheckoutCompleted(makeCheckoutSession(), activeDeps)
+      expect(activeDeps.insertActiveSub).toHaveBeenCalledWith(
+        expect.objectContaining({ registration_subclub: null })
+      )
+      // No-profile path
+      const pendingDeps = makeDeps({ loadProfileByEmail: vi.fn(async () => null) })
+      await handleAcademyCheckoutCompleted(makeCheckoutSession(), pendingDeps)
+      expect(pendingDeps.insertPendingSub).toHaveBeenCalledWith(
+        expect.objectContaining({ registration_subclub: null })
+      )
+    })
+
+    it('treats empty-string subclub_slug as flat (defends against accidental "" from form serialisation)', async () => {
+      const deps = makeDeps({
+        loadProfileByEmail: vi.fn(async () => null),
+      })
+      const session = makeCheckoutSession({}, { subclub_slug: '' })
+      const result = await handleAcademyCheckoutCompleted(session, deps)
+      expect(result.status).toBe('pending')
+      expect(deps.insertPendingSub).toHaveBeenCalledWith(
+        expect.objectContaining({ registration_subclub: null })
+      )
     })
   })
 

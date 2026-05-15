@@ -28,6 +28,8 @@ const baseClub: AcademyClub = {
 function makeDeps(overrides: Partial<CheckoutDeps> = {}): CheckoutDeps {
   return {
     loadClub: vi.fn(async () => baseClub),
+    // Default returns a row — tests that assert subclub_not_found override.
+    loadActiveSubclub: vi.fn(async () => ({ display_name: 'Barnes Eagles' })),
     loadActiveTeam: vi.fn(async () => ({ display_name: 'U12 Tigers' })),
     listActiveRecurringPrices: vi.fn(async () => [{ id: 'price_lyl_1' }]),
     createCheckoutSession: vi.fn(async (params) => ({
@@ -269,6 +271,149 @@ describe('createAcademyCheckoutSession', () => {
       const fail = expectFailure(outcome)
       expect(fail.reason).toBe('unknown')
       expect(fail.error).toMatch(/no URL/)
+    })
+  })
+
+  describe('hierarchical (subclub) path', () => {
+    // When subclubSlug is supplied, the checkout flow must:
+    //  - validate the subclub slug shape,
+    //  - verify the subclub exists + is active before touching teams,
+    //  - scope the team lookup to (club, subclub, team),
+    //  - encode subclub_slug into Stripe metadata (both surfaces),
+    //  - include subclub in success URL + return cancel URL to the subclub page.
+
+    it('rejects invalid subclubSlug shape pre-flight (no DB calls)', async () => {
+      const deps = makeDeps()
+      const bad = ['Has Spaces', '<script>', 'A'.repeat(65), 'a\nINFO']
+      for (const subclubSlug of bad) {
+        const outcome = await createAcademyCheckoutSession(
+          { clubSlug: 'lyl', teamSlug: 'lyl-u12-tigers', subclubSlug },
+          deps
+        )
+        const fail = expectFailure(outcome)
+        expect(fail.reason).toBe('invalid_subclub_slug')
+      }
+      expect(deps.loadActiveSubclub).not.toHaveBeenCalled()
+      expect(deps.loadActiveTeam).not.toHaveBeenCalled()
+      expect(deps.createCheckoutSession).not.toHaveBeenCalled()
+    })
+
+    it('returns subclub_not_found when the subclub does not exist or is inactive', async () => {
+      const deps = makeDeps({
+        loadActiveSubclub: vi.fn(async () => null),
+      })
+      const outcome = await createAcademyCheckoutSession(
+        {
+          clubSlug: 'lyl',
+          teamSlug: 'u12-tigers',
+          subclubSlug: 'barnes-eagles',
+        },
+        deps
+      )
+      const fail = expectFailure(outcome)
+      expect(fail.reason).toBe('subclub_not_found')
+      // Critically: do NOT proceed to team lookup if subclub is invalid.
+      expect(deps.loadActiveTeam).not.toHaveBeenCalled()
+      expect(deps.createCheckoutSession).not.toHaveBeenCalled()
+    })
+
+    it('scopes team lookup by subclubSlug (not the flat NULL lookup)', async () => {
+      const deps = makeDeps()
+      await createAcademyCheckoutSession(
+        {
+          clubSlug: 'lyl',
+          teamSlug: 'u12-tigers',
+          subclubSlug: 'barnes-eagles',
+        },
+        deps
+      )
+      // Hierarchical lookup signature: (club, team, subclub)
+      expect(deps.loadActiveTeam).toHaveBeenCalledWith(
+        'lyl',
+        'u12-tigers',
+        'barnes-eagles'
+      )
+    })
+
+    it('flat path (no subclubSlug) uses NULL subclub in team lookup', async () => {
+      const deps = makeDeps()
+      await createAcademyCheckoutSession(
+        { clubSlug: 'cfa', teamSlug: 'u11' },
+        deps
+      )
+      expect(deps.loadActiveTeam).toHaveBeenCalledWith('cfa', 'u11', null)
+      // Subclub loader is NEVER called on the flat path.
+      expect(deps.loadActiveSubclub).not.toHaveBeenCalled()
+    })
+
+    it('encodes subclub_slug in Stripe metadata, success URL, and cancel URL', async () => {
+      const deps = makeDeps()
+      await createAcademyCheckoutSession(
+        {
+          clubSlug: 'lyl',
+          teamSlug: 'u12-tigers',
+          subclubSlug: 'barnes-eagles',
+        },
+        deps
+      )
+      const params = (deps.createCheckoutSession as any).mock.calls[0][0]
+      // Metadata on session AND subscription_data — both reach the webhook.
+      expect(params.metadata).toEqual({
+        type: 'academy_subscription',
+        club_slug: 'lyl',
+        team_slug: 'u12-tigers',
+        source: 'playback_web',
+        subclub_slug: 'barnes-eagles',
+      })
+      expect(params.subscription_data.metadata).toEqual({
+        type: 'academy_subscription',
+        club_slug: 'lyl',
+        team_slug: 'u12-tigers',
+        source: 'playback_web',
+        subclub_slug: 'barnes-eagles',
+      })
+      // Success URL surfaces subclub so the register page can show
+      // "Welcome to Barnes Eagles U12" without a Supabase roundtrip.
+      expect(params.success_url).toBe(
+        'https://playbacksports.ai/auth/register?intent=academy' +
+          '&session_id={CHECKOUT_SESSION_ID}' +
+          '&club=lyl' +
+          '&subclub=barnes-eagles'
+      )
+      // Cancel returns to the SUBCLUB page, not the league page — otherwise
+      // a hierarchical parent who hits Back loses their place in the picker.
+      expect(params.cancel_url).toBe(
+        'https://playbacksports.ai/academy/lyl/barnes-eagles?canceled=1'
+      )
+    })
+
+    it('flat path omits subclub_slug from metadata entirely (Stripe rejects null values)', async () => {
+      const deps = makeDeps()
+      await createAcademyCheckoutSession(
+        { clubSlug: 'cfa', teamSlug: 'u11' },
+        deps
+      )
+      const params = (deps.createCheckoutSession as any).mock.calls[0][0]
+      // The KEY must be absent — not present-with-null.
+      expect(params.metadata).not.toHaveProperty('subclub_slug')
+      expect(params.subscription_data.metadata).not.toHaveProperty('subclub_slug')
+      // And the success URL stays clean (no &subclub= tail).
+      expect(params.success_url).not.toContain('subclub=')
+      expect(params.cancel_url).not.toContain('subclub')
+    })
+
+    it('treats empty-string subclubSlug as flat (mirrors webhook + form-serialiser robustness)', async () => {
+      const deps = makeDeps()
+      await createAcademyCheckoutSession(
+        { clubSlug: 'cfa', teamSlug: 'u11', subclubSlug: '' },
+        deps
+      )
+      // Empty string ⇒ flat path: no subclub loader call, NULL team lookup,
+      // metadata omits subclub_slug.
+      expect(deps.loadActiveSubclub).not.toHaveBeenCalled()
+      expect(deps.loadActiveTeam).toHaveBeenCalledWith('cfa', 'u11', null)
+      const params = (deps.createCheckoutSession as any).mock.calls[0][0]
+      expect(params.metadata).not.toHaveProperty('subclub_slug')
     })
   })
 

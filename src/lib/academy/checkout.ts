@@ -33,6 +33,11 @@ import { getClubBySlug, type AcademyClub } from './config'
 export interface CreateAcademyCheckoutInput {
   clubSlug: string
   teamSlug: string
+  /** Hierarchical-academy middle layer (LYL → 'barnes-eagles'). Optional —
+   *  flat configs (CFA, SEFA) omit this. When present, the team lookup is
+   *  scoped to (club, subclub, team) and the metadata round-trips through
+   *  Stripe so the webhook can persist the right subscription row. */
+  subclubSlug?: string | null
 }
 
 export type CheckoutOutcome =
@@ -41,7 +46,9 @@ export type CheckoutOutcome =
       kind: 'failure'
       reason:
         | 'invalid_team_slug'
+        | 'invalid_subclub_slug'
         | 'club_not_found'
+        | 'subclub_not_found'
         | 'team_not_found'
         | 'no_recurring_price'
         | 'stripe_invalid_request'
@@ -53,9 +60,21 @@ export type CheckoutOutcome =
 
 export interface CheckoutDeps {
   loadClub: (clubSlug: string) => Promise<AcademyClub | undefined>
+  /** Verify the subclub exists + is active under this club. Returns its
+   *  display_name so the success page can render "Welcome to <subclub>".
+   *  Only called when subclubSlug is provided. */
+  loadActiveSubclub: (
+    clubSlug: string,
+    subclubSlug: string
+  ) => Promise<{ display_name: string } | null>
+  /** Subclub-aware team lookup. When subclubSlug is null the SQL filters
+   *  `subclub_slug IS NULL` to match the flat-config partial UNIQUE; when
+   *  set it filters by exact match against the hierarchical UNIQUE. The
+   *  two indexes are mutually exclusive so each query returns ≤1 row. */
   loadActiveTeam: (
     clubSlug: string,
-    teamSlug: string
+    teamSlug: string,
+    subclubSlug: string | null
   ) => Promise<{ display_name: string } | null>
   listActiveRecurringPrices: (
     productId: string
@@ -84,6 +103,12 @@ const TEAM_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,63}$/
 export function isValidTeamSlug(slug: string): boolean {
   return TEAM_SLUG_RE.test(slug)
 }
+// subclub_slug shares the team_slug shape — both are user-facing slugs
+// surfaced in URLs and Stripe metadata; the same charset/length bounds apply.
+const SUBCLUB_SLUG_RE = TEAM_SLUG_RE
+export function isValidSubclubSlug(slug: string): boolean {
+  return SUBCLUB_SLUG_RE.test(slug)
+}
 
 // ============================================================================
 // Default dependencies
@@ -106,15 +131,33 @@ function getStripe(): Stripe {
 export function buildDefaultDeps(): CheckoutDeps {
   return {
     loadClub: getClubBySlug,
-    loadActiveTeam: async (clubSlug, teamSlug) => {
+    loadActiveSubclub: async (clubSlug, subclubSlug) => {
       const supabase = createServiceClient() as any
       const { data, error } = await supabase
+        .from('playhub_academy_subclubs')
+        .select('display_name')
+        .eq('club_slug', clubSlug)
+        .eq('subclub_slug', subclubSlug)
+        .eq('is_active', true)
+        .maybeSingle()
+      if (error) throw new Error(`loadActiveSubclub: ${error.message}`)
+      return data ?? null
+    },
+    loadActiveTeam: async (clubSlug, teamSlug, subclubSlug) => {
+      const supabase = createServiceClient() as any
+      let q = supabase
         .from('playhub_academy_teams')
         .select('display_name')
         .eq('club_slug', clubSlug)
         .eq('team_slug', teamSlug)
         .eq('is_active', true)
-        .maybeSingle()
+      // NULL-aware filter: Postgres treats NULL as distinct, so the eq
+      // operator on null returns zero rows. Use IS NULL explicitly so the
+      // flat-config (CFA/SEFA) lookup hits the right partial UNIQUE.
+      q = subclubSlug
+        ? q.eq('subclub_slug', subclubSlug)
+        : q.is('subclub_slug', null)
+      const { data, error } = await q.maybeSingle()
       if (error) throw new Error(`loadActiveTeam: ${error.message}`)
       return data ?? null
     },
@@ -152,12 +195,26 @@ export async function createAcademyCheckoutSession(
   options: CreateAcademyCheckoutOptions = {}
 ): Promise<CheckoutOutcome> {
   const { clubSlug, teamSlug } = input
+  // Empty string and null both mean "flat config" — caller-side serialisers
+  // sometimes hand us "" instead of omitting the field. Symmetric with the
+  // webhook handler's normalisation so the round-trip is loss-free.
+  const subclubSlug =
+    typeof input.subclubSlug === 'string' && input.subclubSlug.length > 0
+      ? input.subclubSlug
+      : null
 
   if (!isValidTeamSlug(teamSlug)) {
     return {
       kind: 'failure',
       reason: 'invalid_team_slug',
       error: `team_slug must match ^[a-z0-9][a-z0-9-]{0,63}$`,
+    }
+  }
+  if (subclubSlug !== null && !isValidSubclubSlug(subclubSlug)) {
+    return {
+      kind: 'failure',
+      reason: 'invalid_subclub_slug',
+      error: `subclub_slug must match ^[a-z0-9][a-z0-9-]{0,63}$`,
     }
   }
 
@@ -170,12 +227,30 @@ export async function createAcademyCheckoutSession(
     }
   }
 
-  const team = await deps.loadActiveTeam(clubSlug, teamSlug)
+  // Hierarchical pre-flight: when the caller picked a subclub, verify it
+  // exists + is active under this club before we touch the teams table.
+  // Returning a distinct reason lets the UI surface a "this subclub no
+  // longer exists" message instead of a generic "team not found".
+  if (subclubSlug !== null) {
+    const subclub = await deps.loadActiveSubclub(clubSlug, subclubSlug)
+    if (!subclub) {
+      return {
+        kind: 'failure',
+        reason: 'subclub_not_found',
+        error: `unknown subclub ${subclubSlug} for club ${clubSlug}`,
+      }
+    }
+  }
+
+  const team = await deps.loadActiveTeam(clubSlug, teamSlug, subclubSlug)
   if (!team) {
+    const teamPath = subclubSlug
+      ? `${clubSlug}/${subclubSlug}/${teamSlug}`
+      : `${clubSlug}/${teamSlug}`
     return {
       kind: 'failure',
       reason: 'team_not_found',
-      error: `unknown team ${teamSlug} for club ${clubSlug}`,
+      error: `unknown team: ${teamPath}`,
     }
   }
 
@@ -213,23 +288,34 @@ export async function createAcademyCheckoutSession(
   // register page (D1/D2) takes session_id, server-side calls
   // stripe.checkout.sessions.retrieve(id) to get customer_details.email, and
   // pre-fills the form. Single Stripe roundtrip — keeps secrets in PLAYBACK.
-  // Including club_slug in the URL lets the register page render club-aware copy.
+  // Including club_slug + (optionally) subclub in the URL lets the register
+  // page render hierarchical-aware copy without an extra DB roundtrip.
   const successUrl =
     `${deps.playbackUrl}/auth/register?intent=academy` +
     `&session_id={CHECKOUT_SESSION_ID}` +
-    `&club=${encodeURIComponent(clubSlug)}`
-  const cancelUrl = `${deps.playbackUrl}/academy/${encodeURIComponent(clubSlug)}?canceled=1`
+    `&club=${encodeURIComponent(clubSlug)}` +
+    (subclubSlug ? `&subclub=${encodeURIComponent(subclubSlug)}` : '')
+  // Cancel returns the parent to the page they came FROM — the subclub
+  // picker for hierarchical, the flat club page otherwise. Otherwise a
+  // hierarchical parent who hits Back from Stripe lands on the subclub
+  // grid and has to re-navigate, which feels broken.
+  const cancelUrl = subclubSlug
+    ? `${deps.playbackUrl}/academy/${encodeURIComponent(clubSlug)}/${encodeURIComponent(subclubSlug)}?canceled=1`
+    : `${deps.playbackUrl}/academy/${encodeURIComponent(clubSlug)}?canceled=1`
 
   // Metadata is duplicated onto BOTH session.metadata and
   // subscription_data.metadata. The webhook handler reads session.metadata
   // on checkout.session.completed; subscription metadata is what shows up on
   // every customer.subscription.* event afterwards (handy for ops tooling).
-  const sharedMetadata = {
+  // Stripe rejects null/undefined metadata values — we omit subclub_slug
+  // from the object entirely when null rather than serialising "null".
+  const sharedMetadata: Record<string, string> = {
     type: 'academy_subscription',
     club_slug: clubSlug,
     team_slug: teamSlug,
     source: 'playback_web',
   }
+  if (subclubSlug) sharedMetadata.subclub_slug = subclubSlug
 
   // subscription mode always creates a Stripe Customer — explicit
   // customer_creation is rejected by Stripe ("customer_creation can only be

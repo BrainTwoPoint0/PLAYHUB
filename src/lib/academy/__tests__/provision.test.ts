@@ -27,6 +27,9 @@ const baseSub: AcademySubscriptionRow = {
   stripe_subscription_id: 'sub_stripe_1',
   stripe_customer_id: 'cus_stripe_1',
   registration_team: 'lyl-u12-tigers',
+  // Default to flat (CFA/SEFA-shaped). Hierarchical-shape coverage is in
+  // its own describe block below.
+  registration_subclub: null,
   customer_email: 'parent@example.com',
   status: 'active',
   provisioned_at: null,
@@ -43,6 +46,10 @@ function makeDeps(overrides: Partial<ProvisionDeps> = {}): ProvisionDeps {
   return {
     loadSub: vi.fn(async () => baseSub),
     loadClub: vi.fn(async () => baseClub),
+    // Default mock returns null. The flat-config code path never calls this,
+    // so the default is a safety net — any hierarchical test must override
+    // it explicitly. A non-null default would mask "did the right branch run?"
+    loadSubclubVeoClubSlug: vi.fn(async () => null),
     resolveVeoTeamSlug: vi.fn(async () => 'lyl-u12-tigers-veo'),
     isEmailConfirmed: vi.fn(async () => true),
     fetchStripeCustomerEmail: vi.fn(async () => baseSub.customer_email),
@@ -356,6 +363,109 @@ describe('provisionAcademyAccess', () => {
       expect(fail.reason).toBe('config_no_veo_team')
       expect(fail.retryable).toBe(false)
       expect(deps.inviteToVeo).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('hierarchical (subclub) Veo resolution', () => {
+    // When registration_subclub is set on the row (LYL-shaped league), the
+    // Veo club identity comes from playhub_academy_subclubs, NOT from the
+    // playhub_academy_config row. The team lookup is also scoped to
+    // (club, subclub) so two subclubs in the same league can re-use 'u11'
+    // without collision (see partial UNIQUE indexes in 20260515 migration).
+
+    const hierarchicalSub: AcademySubscriptionRow = {
+      ...baseSub,
+      registration_subclub: 'barnes-eagles',
+      registration_team: 'u12-tigers',
+    }
+
+    it('uses subclub.veo_club_slug instead of config.veoClubSlug when subclub set', async () => {
+      const deps = makeDeps({
+        loadSub: vi.fn(async () => hierarchicalSub),
+        loadSubclubVeoClubSlug: vi.fn(async () => 'barnes-eagles-veo'),
+      })
+      const outcome = await provisionAcademyAccess('sub-uuid-1', deps)
+      expectSuccess(outcome)
+
+      // CRITICAL: invite must use the SUBCLUB's Veo identity. Using the
+      // config-level veoClubSlug ('lyl-veo-slug') would invite the parent
+      // to the wrong Veo club — silent provisioning bug.
+      expect(deps.inviteToVeo).toHaveBeenCalledWith(
+        'barnes-eagles-veo',
+        'lyl-u12-tigers-veo',
+        'parent@example.com'
+      )
+      expect(deps.loadSubclubVeoClubSlug).toHaveBeenCalledWith('lyl', 'barnes-eagles')
+      // Resolution scoped to (club, subclub, team) — see SQL partial UNIQUE.
+      expect(deps.resolveVeoTeamSlug).toHaveBeenCalledWith(
+        'lyl',
+        'u12-tigers',
+        'barnes-eagles'
+      )
+    })
+
+    it('fails config_no_veo_club when subclub row is missing or has NULL veo_club_slug', async () => {
+      // We seed LYL subclubs with veo_club_slug=NULL ahead of Veo onboarding
+      // — provisioning must fail closed, not fall back to the config-level
+      // veoClubSlug (which is also NULL for LYL's umbrella config).
+      const deps = makeDeps({
+        loadSub: vi.fn(async () => hierarchicalSub),
+        loadSubclubVeoClubSlug: vi.fn(async () => null),
+      })
+      const outcome = await provisionAcademyAccess('sub-uuid-1', deps)
+      const fail = expectFailure(outcome)
+      expect(fail.reason).toBe('config_no_veo_club')
+      expect(fail.retryable).toBe(false)
+      // No fallback — the row's intent is hierarchical; flat behaviour
+      // would invite the parent to the wrong club.
+      expect(deps.inviteToVeo).not.toHaveBeenCalled()
+    })
+
+    it('treats loadSubclubVeoClubSlug throwing as transient (retryable)', async () => {
+      const deps = makeDeps({
+        loadSub: vi.fn(async () => hierarchicalSub),
+        loadSubclubVeoClubSlug: vi.fn(async () => {
+          throw new Error('Supabase timeout')
+        }),
+      })
+      const outcome = await provisionAcademyAccess('sub-uuid-1', deps)
+      const fail = expectFailure(outcome)
+      expect(fail.reason).toBe('config_no_veo_club')
+      expect(fail.retryable).toBe(true)
+      expect(deps.recordOutcome).toHaveBeenCalled()
+      expect(deps.inviteToVeo).not.toHaveBeenCalled()
+    })
+
+    it('flat path (registration_subclub=null) NEVER calls loadSubclubVeoClubSlug', async () => {
+      const deps = makeDeps()
+      await provisionAcademyAccess('sub-uuid-1', deps)
+      expect(deps.loadSubclubVeoClubSlug).not.toHaveBeenCalled()
+      // And uses the config-level veoClubSlug as before.
+      expect(deps.inviteToVeo).toHaveBeenCalledWith(
+        'lyl-veo-slug',
+        'lyl-u12-tigers-veo',
+        'parent@example.com'
+      )
+      // resolveVeoTeamSlug receives null subclub for the flat-path lookup.
+      expect(deps.resolveVeoTeamSlug).toHaveBeenCalledWith(
+        'lyl',
+        'lyl-u12-tigers',
+        null
+      )
+    })
+
+    it('hierarchical path: config_no_veo_team failure includes subclub in the team path', async () => {
+      const deps = makeDeps({
+        loadSub: vi.fn(async () => hierarchicalSub),
+        loadSubclubVeoClubSlug: vi.fn(async () => 'barnes-eagles-veo'),
+        resolveVeoTeamSlug: vi.fn(async () => null),
+      })
+      const outcome = await provisionAcademyAccess('sub-uuid-1', deps)
+      const fail = expectFailure(outcome)
+      expect(fail.reason).toBe('config_no_veo_team')
+      // Error message disambiguates which subclub the team is missing under
+      // (operators triaging will need this for hierarchical leagues).
+      expect(fail.error).toContain('lyl/barnes-eagles/u12-tigers')
     })
   })
 
