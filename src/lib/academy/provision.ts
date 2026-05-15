@@ -459,12 +459,22 @@ export async function provisionAcademyAccess(
     return outcome
   }
 
-  // Resolve the Veo club slug. For hierarchical configs the source of
-  // truth is the subclub row (LYL → barnes-eagles → barnes-eagles-veo);
-  // for flat configs (CFA, SEFA) it's the config row itself. Both branches
-  // emit the SAME failure reason (`config_no_veo_club`) so callers don't
-  // need to know whether the subscription is hierarchical.
-  let veoClubSlug: string | null
+  // Resolve the Veo club slug with cascading fallback:
+  //   1. If the row carries a subclub_slug AND the subclub row has a
+  //      non-NULL veo_club_slug → use that (subclub override).
+  //   2. Otherwise fall back to the config-level veoClubSlug.
+  //   3. If neither resolves → config_no_veo_club.
+  //
+  // This shape lets two production realities coexist:
+  //   - LYL: one league-level Veo club (`london-youth-league`) shared across
+  //     all 16 subclubs. Set `veo_club_slug` once on the config row; every
+  //     subclub leaves theirs NULL and inherits.
+  //   - Future leagues where each member club has its own Veo club: set
+  //     `veo_club_slug` on each subclub row to override the inherited value.
+  //
+  // Both branches emit the SAME failure reason (`config_no_veo_club`) so
+  // callers don't need to know which level resolved the Veo club.
+  let veoClubSlug: string | null = null
   if (sub.registration_subclub) {
     try {
       veoClubSlug = await deps.loadSubclubVeoClubSlug(
@@ -473,6 +483,8 @@ export async function provisionAcademyAccess(
       )
     } catch (err) {
       // Treat infra failure as transient — same posture as auth_unreachable.
+      // Don't fall back to config in this case: a Supabase blip shouldn't
+      // be silently absorbed; surface it for retry.
       const outcome = fail(
         subId,
         'config_no_veo_club',
@@ -482,33 +494,29 @@ export async function provisionAcademyAccess(
       await deps.recordOutcome(subId, outcome)
       return outcome
     }
-    if (!veoClubSlug) {
-      // Subclub row missing OR veo_club_slug still NULL (we seed LYL
-      // subclubs with veo_club_slug=NULL ahead of Veo setup; provisioning
-      // fails closed until the operator fills it in).
-      const outcome = fail(
-        subId,
-        'config_no_veo_club',
-        `subclub ${sub.club_slug}/${sub.registration_subclub} has no veo_club_slug configured`,
-        false
-      )
-      await deps.recordOutcome(subId, outcome)
-      return outcome
-    }
-  } else {
+    // veoClubSlug stays null here if (a) the subclub row is missing entirely,
+    // or (b) it exists but has veo_club_slug=NULL. Either way, fall through
+    // to the config-level fallback below — the row's subclub_slug remains the
+    // load-bearing identifier for the team lookup, and the config-level Veo
+    // club is the right inherited default.
+  }
+  if (!veoClubSlug) {
     veoClubSlug = club.veoClubSlug ?? null
-    if (!veoClubSlug) {
-      // Future PLAYHUB-native path lives here. For Phase 1 every academy is
-      // Veo-backed, so a missing veoClubSlug is a config error.
-      const outcome = fail(
-        subId,
-        'config_no_veo_club',
-        `club ${sub.club_slug} has no veo_club_slug configured`,
-        false
-      )
-      await deps.recordOutcome(subId, outcome)
-      return outcome
-    }
+  }
+  if (!veoClubSlug) {
+    // Future PLAYHUB-native path lives here. For Phase 1 every academy is
+    // Veo-backed, so a missing veoClubSlug is a config error.
+    const teamPath = sub.registration_subclub
+      ? `${sub.club_slug}/${sub.registration_subclub}`
+      : sub.club_slug
+    const outcome = fail(
+      subId,
+      'config_no_veo_club',
+      `${teamPath} has no veo_club_slug configured (neither subclub nor config)`,
+      false
+    )
+    await deps.recordOutcome(subId, outcome)
+    return outcome
   }
 
   // The team_slug stored on the row is the parent's checkout selection
