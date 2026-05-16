@@ -217,7 +217,11 @@ async function main() {
         away_team: parsed.away_team,
         home_score: null,
         away_score: null,
-        processing_status: 'published',
+        // The recordings UI's parseProcessingStatus() treats anything other
+        // than '{}', 'done', or {status:'done'} as a still-processing badge
+        // (with spinner). Reconstructed rows ARE done — use '{}' so the UI
+        // renders no badge, matching the Veo-synced rows in the same table.
+        processing_status: '{}',
         team: null,
         last_synced_at: o.last_fetched_at,
       }

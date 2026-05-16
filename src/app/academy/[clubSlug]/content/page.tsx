@@ -21,7 +21,7 @@ import {
   BarChart3,
   X,
 } from 'lucide-react'
-import { DatePicker } from '@braintwopoint0/playback-commons/ui'
+import { DatePicker, MultiSelect } from '@braintwopoint0/playback-commons/ui'
 
 // ============================================================================
 // Types
@@ -208,7 +208,7 @@ function toRecordingEvents(events?: VeoEventsByType): RecordingEvent[] {
       id: g.id,
       match_recording_id: null,
       provider: 'veo',
-      provider_recording_id: null, // not threaded into FullMatchVideos
+      provider_recording_id: null, // not threaded into the player
       event_type: g.event_type as RecordingEvent['event_type'],
       timestamp_seconds: g.timestamp_seconds,
       team: g.team as RecordingEvent['team'],
@@ -224,64 +224,11 @@ function toRecordingEvents(events?: VeoEventsByType): RecordingEvent[] {
   )
 }
 
-function FullMatchVideos({
-  videos,
-  events,
-}: {
-  videos: VeoVideo[]
-  events?: VeoEventsByType
-}) {
-  const [activeIdx, setActiveIdx] = useState<number | null>(null)
-
-  // Filter to playable mp4 videos
-  const playable = videos.filter((v) => {
+function playableVideos(videos: VeoVideo[]): VeoVideo[] {
+  return videos.filter((v) => {
     const url = String(v.url || '')
     return url.endsWith('.mp4') || url.includes('.mp4?')
   })
-
-  const activeVideo = activeIdx !== null ? playable[activeIdx] : null
-  const recordingEvents = toRecordingEvents(events)
-
-  return (
-    <div>
-      <div className="flex items-center gap-2 mb-2">
-        <Play className="h-3 w-3 text-muted-foreground/30" />
-        <span className="text-[11px] text-muted-foreground/50 uppercase tracking-wider">
-          Full Match ({playable.length})
-        </span>
-      </div>
-
-      {/* Video selector buttons */}
-      <div className="flex flex-wrap gap-2 mb-3">
-        {playable.map((video, i) => (
-          <button
-            key={String(video.id || i)}
-            onClick={() => setActiveIdx(activeIdx === i ? null : i)}
-            className={`text-[11px] px-3 py-1.5 rounded-lg border transition-colors ${
-              activeIdx === i
-                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
-                : 'bg-white/[0.04] border-white/[0.06] text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-white/[0.08]'
-            }`}
-          >
-            {videoLabel(video)}
-          </button>
-        ))}
-      </div>
-
-      {/* PLAYHUB VideoPlayer — renders goal markers ON the progress bar
-          (no more "Jump to goal" button row, no Veo watermark, full coach
-          controls). Goals come from playhub_recording_events via the
-          admin-gated route; the events array is empty for non-admins. */}
-      {activeVideo && (
-        <VideoPlayer
-          key={String(activeVideo.id || activeIdx)}
-          src={`/api/veo/proxy?url=${encodeURIComponent(String(activeVideo.url || ''))}`}
-          events={recordingEvents}
-          className="w-full max-h-[500px] rounded-lg overflow-hidden"
-        />
-      )}
-    </div>
-  )
 }
 
 function StatBar({ stats }: { stats: Record<string, unknown> }) {
@@ -307,11 +254,11 @@ function StatBar({ stats }: { stats: Record<string, unknown> }) {
   )
 }
 
-function teamAssocLabel(
-  assoc: unknown,
-  homeTeam: unknown,
-  awayTeam: unknown
-): string | null {
+/**
+ * Normalize Veo's team_association field to one of: 'own' | 'opponent' | null.
+ * Handles string-or-object input shapes from the Veo API.
+ */
+function teamAssocValue(assoc: unknown): 'own' | 'opponent' | null {
   const val =
     typeof assoc === 'string'
       ? assoc
@@ -322,31 +269,39 @@ function teamAssocLabel(
               ''
           )
         : ''
-  if (!val) return null
   const v = val.toLowerCase()
-  if (v === 'home') return teamName(homeTeam) || 'Home'
-  if (v === 'away') return teamName(awayTeam) || 'Away'
-  // May be a team name/slug directly
-  return val
+  if (v === 'own') return 'own'
+  if (v === 'opponent') return 'opponent'
+  return null
+}
+
+/** Display label for a team_association. Veo's vocabulary, not home/away. */
+function teamAssocLabel(assoc: unknown): string | null {
+  const v = teamAssocValue(assoc)
+  if (v === 'own') return 'Ours'
+  if (v === 'opponent') return 'Opponent'
+  return null
 }
 
 function HighlightCard({
   highlight,
   clubSlug,
-  homeTeam,
-  awayTeam,
+  onOpen,
+  isPlaying,
 }: {
   highlight: VeoHighlight
   clubSlug: string
-  homeTeam?: unknown
-  awayTeam?: unknown
+  onOpen: () => void
+  isPlaying: boolean
 }) {
   const router = useRouter()
   const videoUrl = highlight.videos?.[0]?.url
   const tag = tagToString(highlight.tags?.[0])
-  const team = teamAssocLabel(highlight.team_association, homeTeam, awayTeam)
+  const team = teamAssocLabel(highlight.team_association)
 
-  function openInEditor() {
+  function openInEditor(e: React.MouseEvent) {
+    // Don't bubble to the card-level click that opens the player.
+    e.stopPropagation()
     if (!videoUrl) return
     const params = new URLSearchParams({
       videoUrl,
@@ -357,7 +312,22 @@ function HighlightCard({
   }
 
   return (
-    <div className="group relative rounded-lg overflow-hidden bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.08] transition-colors">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => videoUrl && onOpen()}
+      onKeyDown={(e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && videoUrl) {
+          e.preventDefault()
+          onOpen()
+        }
+      }}
+      className={`group relative rounded-lg overflow-hidden bg-white/[0.02] border transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
+        isPlaying
+          ? 'border-emerald-500/50 ring-1 ring-emerald-500/30'
+          : 'border-white/[0.04] hover:border-white/[0.08]'
+      }`}
+    >
       {/* Thumbnail */}
       <div className="relative aspect-video bg-black/30">
         {extractUrl(highlight.thumbnail) ? (
@@ -371,19 +341,27 @@ function HighlightCard({
             <Film className="h-6 w-6 text-muted-foreground/20" />
           </div>
         )}
+        {/* Play overlay — appears on hover/focus to telegraph the click action */}
+        {videoUrl && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity">
+            <div className="rounded-full bg-emerald-500/90 p-3">
+              <Play className="h-5 w-5 text-black fill-black" />
+            </div>
+          </div>
+        )}
         {/* Duration overlay */}
-        <span className="absolute bottom-1.5 right-1.5 text-[10px] tabular-nums px-1.5 py-0.5 rounded bg-black/70 text-white/80">
+        <span className="absolute bottom-1.5 right-1.5 text-[10px] tabular-nums px-1.5 py-0.5 rounded bg-black/70 text-white/80 pointer-events-none">
           {formatDuration(highlight.duration)}
         </span>
         {/* AI badge */}
         {highlight.is_ai_generated && (
-          <span className="absolute top-1.5 left-1.5 text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 backdrop-blur-sm">
+          <span className="absolute top-1.5 left-1.5 text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 backdrop-blur-sm pointer-events-none">
             AI
           </span>
         )}
         {/* Team badge */}
         {team && (
-          <span className="absolute top-1.5 right-1.5 text-[9px] px-1.5 py-0.5 rounded bg-black/60 text-white/70 backdrop-blur-sm max-w-[50%] truncate">
+          <span className="absolute top-1.5 right-1.5 text-[9px] px-1.5 py-0.5 rounded bg-black/60 text-white/70 backdrop-blur-sm max-w-[50%] truncate pointer-events-none">
             {team}
           </span>
         )}
@@ -405,6 +383,7 @@ function HighlightCard({
           {videoUrl && (
             <button
               onClick={openInEditor}
+              title="Open in portrait-crop editor"
               className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-white/[0.08] transition-colors sm:opacity-0 sm:group-hover:opacity-100"
             >
               <Scissors className="h-3 w-3" />
@@ -432,7 +411,12 @@ function ExpandedRecording({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set(['goal']))
-  const [teamFilter, setTeamFilter] = useState<string>('all') // 'all' | 'home' | 'away'
+  const [teamFilter, setTeamFilter] = useState<'all' | 'own' | 'opponent'>('all')
+  // Player state lives here so highlight clicks swap the same player's
+  // source — no separate modal, no second mount.
+  const [fullMatchIdx, setFullMatchIdx] = useState<number | null>(null)
+  const [playingHighlight, setPlayingHighlight] =
+    useState<VeoHighlight | null>(null)
 
   useEffect(() => {
     async function fetchContent() {
@@ -484,25 +468,17 @@ function ExpandedRecording({
   }
   const allTags = Array.from(tagCounts.keys()).sort()
 
-  // Detect if team_association data exists
-  function getTeamAssoc(h: VeoHighlight): string {
-    const val = h.team_association
-    if (!val) return ''
-    if (typeof val === 'string') return val.toLowerCase()
-    if (typeof val === 'object' && val !== null) {
-      const obj = val as Record<string, unknown>
-      return String(obj.name || obj.slug || '').toLowerCase()
-    }
-    return ''
-  }
-  const hasTeamData = content.highlights.some((h) => getTeamAssoc(h) !== '')
+  const hasTeamData = content.highlights.some(
+    (h) => teamAssocValue(h.team_association) !== null
+  )
 
-  // Filter highlights by active tags + team
+  // Filter highlights by active tags + team (Veo's own/opponent vocabulary,
+  // not home/away — which never matched and silently hid everything).
   const filteredHighlights = content.highlights.filter((h) => {
     if (activeTags.size > 0 && !activeTags.has(getHighlightTag(h))) return false
     if (teamFilter !== 'all' && hasTeamData) {
-      const assoc = getTeamAssoc(h)
-      if (assoc && assoc !== teamFilter) return false
+      const assoc = teamAssocValue(h.team_association)
+      if (assoc !== teamFilter) return false
     }
     return true
   })
@@ -534,10 +510,81 @@ function ExpandedRecording({
         </div>
       )}
 
-      {/* Full match videos */}
-      {content.videos.length > 0 && (
-        <FullMatchVideos videos={content.videos} events={content.events} />
-      )}
+      {/* Single VideoPlayer — feeds from either full-match (selected via
+          Standard/Panorama buttons) or a highlight clicked below. Highlight
+          plays in-place; "Back to full match" pill returns. */}
+      {content.videos.length > 0 &&
+        (() => {
+          const playable = playableVideos(content.videos)
+          const fullVideo =
+            fullMatchIdx !== null ? playable[fullMatchIdx] : null
+          const playerSrc = playingHighlight
+            ? playingHighlight.videos?.[0]?.url
+            : fullVideo?.url
+          const playerEvents = playingHighlight
+            ? []
+            : toRecordingEvents(content.events)
+          const playerKey = playingHighlight
+            ? `highlight-${playingHighlight.id}`
+            : `full-${fullMatchIdx}`
+
+          return (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Play className="h-3 w-3 text-muted-foreground/30" />
+                <span className="text-[11px] text-muted-foreground/50 uppercase tracking-wider">
+                  Full Match ({playable.length})
+                </span>
+              </div>
+
+              {/* Full-match render selector */}
+              <div className="flex flex-wrap gap-2 mb-3">
+                {playable.map((video, i) => (
+                  <button
+                    key={String(video.id || i)}
+                    onClick={() => {
+                      // Picking a full render always exits highlight mode.
+                      setPlayingHighlight(null)
+                      setFullMatchIdx(fullMatchIdx === i && !playingHighlight ? null : i)
+                    }}
+                    className={`text-[11px] px-3 py-1.5 rounded-lg border transition-colors ${
+                      fullMatchIdx === i && !playingHighlight
+                        ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                        : 'bg-white/[0.04] border-white/[0.06] text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-white/[0.08]'
+                    }`}
+                  >
+                    {videoLabel(video)}
+                  </button>
+                ))}
+              </div>
+
+              {/* "Back to full match" pill — only while playing a highlight
+                  AND a full match was previously selected to return to. */}
+              {playingHighlight && fullMatchIdx !== null && (
+                <button
+                  onClick={() => setPlayingHighlight(null)}
+                  className="flex items-center gap-1.5 mb-3 text-[11px] px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                  Back to full match
+                </button>
+              )}
+
+              {playerSrc ? (
+                <VideoPlayer
+                  key={playerKey}
+                  src={`/api/veo/proxy?url=${encodeURIComponent(playerSrc)}`}
+                  events={playerEvents}
+                  className="w-full max-h-[500px] rounded-lg overflow-hidden"
+                />
+              ) : (
+                <div className="aspect-video flex items-center justify-center bg-black/30 rounded-lg border border-white/[0.04] text-sm text-muted-foreground/40">
+                  Select a full-match render above, or click a highlight to play.
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
       {/* Highlights */}
       {content.highlights.length > 0 ? (
@@ -588,13 +635,9 @@ function ExpandedRecording({
               <span className="text-[10px] text-muted-foreground/30 mr-1">
                 Team:
               </span>
-              {(['all', 'home', 'away'] as const).map((opt) => {
+              {(['all', 'own', 'opponent'] as const).map((opt) => {
                 const label =
-                  opt === 'all'
-                    ? 'Both'
-                    : opt === 'home'
-                      ? teamName(recording.home_team) || 'Home'
-                      : teamName(recording.away_team) || 'Away'
+                  opt === 'all' ? 'All' : opt === 'own' ? 'Ours' : 'Opponent'
                 return (
                   <button
                     key={opt}
@@ -619,8 +662,8 @@ function ExpandedRecording({
                   key={String(h.id || i)}
                   highlight={h}
                   clubSlug={clubSlug}
-                  homeTeam={recording.home_team}
-                  awayTeam={recording.away_team}
+                  onOpen={() => setPlayingHighlight(h)}
+                  isPlaying={playingHighlight?.id === h.id}
                 />
               ))}
             </div>
@@ -661,7 +704,26 @@ export default function AcademyContentPage() {
   const [privacyFilter, setPrivacyFilter] = useState<string>('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  // Multi-select team filter — empty list = all teams.
+  const [selectedTeams, setSelectedTeams] = useState<string[]>([])
   const [page, setPage] = useState(1)
+
+  // Distinct teams appearing across all recordings, with their match count.
+  // The multi-select shows every team (including opponents) so admins can
+  // also filter "all our games vs Bowers Pitsea" — sorted by frequency desc
+  // then alpha, so the academy's own teams (highest counts) surface first.
+  const teamOptions = (() => {
+    const counts = new Map<string, number>()
+    for (const rec of recordings) {
+      const home = teamName(rec.home_team)
+      const away = teamName(rec.away_team)
+      if (home) counts.set(home, (counts.get(home) ?? 0) + 1)
+      if (away) counts.set(away, (counts.get(away) ?? 0) + 1)
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([name, count]) => ({ value: name, label: name, count }))
+  })()
 
   useEffect(() => {
     async function fetchRecordings() {
@@ -693,12 +755,24 @@ export default function AcademyContentPage() {
   useEffect(() => {
     setPage(1)
     setExpandedSlug(null)
-  }, [search, privacyFilter, dateFrom, dateTo])
+  }, [search, privacyFilter, dateFrom, dateTo, selectedTeams])
 
   // Filter recordings
   const filtered = recordings.filter((rec) => {
     // Privacy filter
     if (privacyFilter !== 'all' && rec.privacy !== privacyFilter) return false
+
+    // Team filter — recording passes if ANY selected team appears as home
+    // or away (OR-match across the selection). Empty selection = no filter.
+    if (selectedTeams.length > 0) {
+      const home = teamName(rec.home_team).toLowerCase()
+      const away = teamName(rec.away_team).toLowerCase()
+      const match = selectedTeams.some((t) => {
+        const q = t.toLowerCase()
+        return home.includes(q) || away.includes(q)
+      })
+      if (!match) return false
+    }
 
     // Date range filter
     if (dateFrom || dateTo) {
@@ -807,6 +881,27 @@ export default function AcademyContentPage() {
         </div>
       </div>
 
+      {/* Team multi-select — derived from recordings, ordered by match count
+          desc (the academy's own teams have the most matches and surface
+          first; recurring opponents land below them). */}
+      {teamOptions.length > 1 && (
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-[10px] text-muted-foreground/30 uppercase tracking-wider">
+            Teams
+          </span>
+          <MultiSelect
+            options={teamOptions}
+            selected={selectedTeams}
+            onChange={setSelectedTeams}
+            placeholder="All teams"
+            searchPlaceholder="Search teams..."
+            emptyLabel="No teams match"
+            aria-label="Filter by team"
+            className="min-w-[200px] sm:min-w-[260px]"
+          />
+        </div>
+      )}
+
       {/* Date range */}
       <div className="flex items-center gap-2 mb-5">
         <div className="flex-1 max-w-[200px]">
@@ -863,13 +958,18 @@ export default function AcademyContentPage() {
               ? 'No recordings match your filters.'
               : 'No recordings found for this club.'}
           </p>
-          {(search || privacyFilter !== 'all' || dateFrom || dateTo) && (
+          {(search ||
+            privacyFilter !== 'all' ||
+            dateFrom ||
+            dateTo ||
+            selectedTeams.length > 0) && (
             <button
               onClick={() => {
                 setSearch('')
                 setPrivacyFilter('all')
                 setDateFrom('')
                 setDateTo('')
+                setSelectedTeams([])
               }}
               className="mt-3 text-[11px] text-muted-foreground/40 hover:text-muted-foreground/70 underline underline-offset-2 transition-colors"
             >
