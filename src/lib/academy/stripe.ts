@@ -74,7 +74,10 @@ interface CacheEntry<T> {
 }
 
 const cache: Record<string, CacheEntry<unknown>> = {}
-const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+// 30 min covers a typical admin session on the access-audit page without
+// repeated cold-load fan-outs to Stripe. `?refresh=1` on the route still
+// calls clearCache() for explicit re-syncs.
+const CACHE_TTL_MS = 30 * 60 * 1000
 
 function getCached<T>(key: string): T | null {
   const entry = cache[key]

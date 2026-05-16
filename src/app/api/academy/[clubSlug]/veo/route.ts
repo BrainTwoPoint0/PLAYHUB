@@ -57,18 +57,46 @@ export async function GET(
   }
 
   try {
-    // Read Veo data from cache + fetch live Stripe subscribers in parallel
+    // Fan everything out in parallel: Veo Supabase cache + primary Stripe
+    // subscribers + per-extra-product Stripe subscribers all run together.
+    // Was previously sequential (~3 roundtrips back-to-back). On a cold
+    // load this halves end-to-end latency for clubs with extra products
+    // (SEFA: Maidstone, H&B). Per-fetch error details preserved via
+    // Promise.allSettled + selective surface.
     const productIds = getAllProductIds(club)
     const additionalIds = productIds.slice(1) // skip primary (fetched via clubSlug)
 
-    let cachedData,
-      primarySubs: Awaited<ReturnType<typeof getAcademySubscribers>>,
-      additionalSubs: Awaited<ReturnType<typeof getSubscribersByProduct>>[]
-    try {
-      cachedData = await getCachedClubData(clubSlug)
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      console.error(`getCachedClubData failed (${clubSlug}):`, msg)
+    const [cachedRes, primaryRes, additionalRes] = await Promise.allSettled([
+      getCachedClubData(clubSlug),
+      getAcademySubscribers(clubSlug),
+      Promise.all(additionalIds.map((pid) => getSubscribersByProduct(pid))),
+    ])
+
+    // Log every rejection up front — when multiple legs fail, the first-
+    // rejection-wins branch ladder below would otherwise swallow the others
+    // and leave them invisible in CloudWatch. Logging here preserves the
+    // full picture for debugging without changing the error envelope.
+    for (const [label, res] of [
+      ['getCachedClubData', cachedRes],
+      ['getAcademySubscribers', primaryRes],
+      ['getSubscribersByProduct', additionalRes],
+    ] as const) {
+      if (res.status === 'rejected') {
+        const msg =
+          res.reason instanceof Error ? res.reason.message : String(res.reason)
+        console.error(`[academy-veo] ${label} rejected (${clubSlug}):`, msg)
+      }
+    }
+
+    // Branch precedence: cache → primary → additional. Cached data is the
+    // upstream dependency, primary subs gate the response shape, additional
+    // are augmentation. Surfacing them in that order keeps the 500 detail
+    // pointed at the root cause rather than a downstream symptom.
+    if (cachedRes.status === 'rejected') {
+      const msg =
+        cachedRes.reason instanceof Error
+          ? cachedRes.reason.message
+          : String(cachedRes.reason)
       return NextResponse.json(
         {
           error: 'Failed to fetch Veo data',
@@ -77,12 +105,11 @@ export async function GET(
         { status: 500 }
       )
     }
-
-    try {
-      primarySubs = await getAcademySubscribers(clubSlug)
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      console.error(`getAcademySubscribers failed (${clubSlug}):`, msg)
+    if (primaryRes.status === 'rejected') {
+      const msg =
+        primaryRes.reason instanceof Error
+          ? primaryRes.reason.message
+          : String(primaryRes.reason)
       return NextResponse.json(
         {
           error: 'Failed to fetch Veo data',
@@ -91,14 +118,11 @@ export async function GET(
         { status: 500 }
       )
     }
-
-    try {
-      additionalSubs = await Promise.all(
-        additionalIds.map((pid) => getSubscribersByProduct(pid))
-      )
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      console.error(`getSubscribersByProduct failed (${clubSlug}):`, msg)
+    if (additionalRes.status === 'rejected') {
+      const msg =
+        additionalRes.reason instanceof Error
+          ? additionalRes.reason.message
+          : String(additionalRes.reason)
       return NextResponse.json(
         {
           error: 'Failed to fetch Veo data',
@@ -107,6 +131,10 @@ export async function GET(
         { status: 500 }
       )
     }
+
+    const cachedData = cachedRes.value
+    const primarySubs = primaryRes.value
+    const additionalSubs = additionalRes.value
 
     // Merge all subscribers, dedup by email (keep first/best match)
     const subscribers = [...primarySubs, ...additionalSubs.flat()]
