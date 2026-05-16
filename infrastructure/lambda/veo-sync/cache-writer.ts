@@ -21,6 +21,42 @@ export function getSupabase() {
 }
 
 // ============================================================================
+// Stale-prune safety check — used across recordings, teams, and members.
+//
+// History (2026-05-16): every stale-prune branch in this file used the same
+// pattern — delete rows in DB that aren't in the incoming Veo list. A partial
+// Veo fetch (transient auth blip, Playwright navigation race, rate limit,
+// silent filter regression) would shrink the incoming list and trigger a
+// silent bulk delete of legitimate data. CFA lost ~150 recordings this way
+// before diagnosis.
+//
+// Guard: if the incoming list is much smaller than what we already have,
+// refuse to prune and log loudly. Set CACHE_FORCE_PRUNE=1 to bypass when
+// you've manually confirmed a real shrink (e.g. a club genuinely deleted
+// half their content).
+// ============================================================================
+const PRUNE_SHRINK_THRESHOLD = 0.5
+const PRUNE_FLOOR_COUNT = 10
+
+export function shouldSkipPrune(
+  veoClubSlug: string,
+  what: 'recordings' | 'teams' | 'members',
+  incoming: number,
+  existing: number
+): boolean {
+  if (process.env.CACHE_FORCE_PRUNE === '1') return false
+  if (existing < PRUNE_FLOOR_COUNT) return false // small caches prune normally
+  if (incoming / existing >= PRUNE_SHRINK_THRESHOLD) return false
+  console.warn(
+    `[cache] Skipping ${what} stale-prune for ${veoClubSlug}: ` +
+      `incoming=${incoming}, existing=${existing} ` +
+      `(below ${PRUNE_SHRINK_THRESHOLD * 100}% — looks like a partial fetch). ` +
+      `Set CACHE_FORCE_PRUNE=1 to override.`
+  )
+  return true
+}
+
+// ============================================================================
 // Write: delete+insert fresh data for a club
 // ============================================================================
 
@@ -66,29 +102,38 @@ export async function writeCachedClubData(
       throw new Error(`Failed to upsert teams: ${teamsError.message}`)
   }
 
-  // Delete stale teams no longer in Veo
+  // Stale teams reconciliation — guarded against partial fetches.
   const incomingTeamSlugs = data.teams.map((t) => t.slug)
   const { data: existingTeams } = await supabase
     .from('playhub_veo_teams')
     .select('veo_team_slug')
     .eq('veo_club_slug', veoClubSlug)
 
-  const staleTeams = (existingTeams || [])
-    .map((t: any) => t.veo_team_slug)
-    .filter((slug: string) => !incomingTeamSlugs.includes(slug))
+  if (
+    !shouldSkipPrune(
+      veoClubSlug,
+      'teams',
+      data.teams.length,
+      (existingTeams || []).length
+    )
+  ) {
+    const staleTeams = (existingTeams || [])
+      .map((t: { veo_team_slug: string }) => t.veo_team_slug)
+      .filter((slug: string) => !incomingTeamSlugs.includes(slug))
 
-  if (staleTeams.length > 0) {
-    // Delete members of stale teams first
-    await supabase
-      .from('playhub_veo_members')
-      .delete()
-      .eq('veo_club_slug', veoClubSlug)
-      .in('veo_team_slug', staleTeams)
-    await supabase
-      .from('playhub_veo_teams')
-      .delete()
-      .eq('veo_club_slug', veoClubSlug)
-      .in('veo_team_slug', staleTeams)
+    if (staleTeams.length > 0) {
+      // Delete members of stale teams first
+      await supabase
+        .from('playhub_veo_members')
+        .delete()
+        .eq('veo_club_slug', veoClubSlug)
+        .in('veo_team_slug', staleTeams)
+      await supabase
+        .from('playhub_veo_teams')
+        .delete()
+        .eq('veo_club_slug', veoClubSlug)
+        .in('veo_team_slug', staleTeams)
+    }
   }
 
   // Upsert members (uses unique constraint: veo_club_slug, veo_team_slug, veo_member_id)
@@ -119,7 +164,7 @@ export async function writeCachedClubData(
     }
   }
 
-  // Delete stale members no longer in Veo
+  // Stale members reconciliation — guarded against partial fetches.
   const incomingMemberKeys = new Set(
     allMembers.map(
       (m) => `${m.veo_club_slug}:${m.veo_team_slug}:${m.veo_member_id}`
@@ -130,17 +175,33 @@ export async function writeCachedClubData(
     .select('id, veo_club_slug, veo_team_slug, veo_member_id')
     .eq('veo_club_slug', veoClubSlug)
 
-  const staleMemberIds = (existingMembers || [])
-    .filter(
-      (m: any) =>
-        !incomingMemberKeys.has(
-          `${m.veo_club_slug}:${m.veo_team_slug}:${m.veo_member_id}`
-        )
+  if (
+    !shouldSkipPrune(
+      veoClubSlug,
+      'members',
+      allMembers.length,
+      (existingMembers || []).length
     )
-    .map((m: any) => m.id)
+  ) {
+    const staleMemberIds = (existingMembers || [])
+      .filter(
+        (m: {
+          veo_club_slug: string
+          veo_team_slug: string
+          veo_member_id: string
+        }) =>
+          !incomingMemberKeys.has(
+            `${m.veo_club_slug}:${m.veo_team_slug}:${m.veo_member_id}`
+          )
+      )
+      .map((m: { id: string }) => m.id)
 
-  if (staleMemberIds.length > 0) {
-    await supabase.from('playhub_veo_members').delete().in('id', staleMemberIds)
+    if (staleMemberIds.length > 0) {
+      await supabase
+        .from('playhub_veo_members')
+        .delete()
+        .in('id', staleMemberIds)
+    }
   }
 }
 
@@ -163,11 +224,21 @@ export async function writeCachedRecordings(
   const now = new Date().toISOString()
 
   if (recordings.length === 0) {
-    // No recordings from Veo — delete all cached for this club
-    await supabase
-      .from('playhub_veo_recordings_cache')
-      .delete()
-      .eq('veo_club_slug', veoClubSlug)
+    // Veo returned zero recordings. This historically triggered a bulk delete
+    // of the club's entire cache, but transient Veo glitches (auth blips, the
+    // recurring "Execution context was destroyed, most likely because of a
+    // navigation" error from Playwright, rate limits) can produce a spurious
+    // 0-result response and quietly wipe legitimate data. Diagnosed
+    // 2026-05-16 after CFA's cache dropped from ~150 recordings to 15.
+    //
+    // No-op instead. Veo doesn't push per-recording deletes through this
+    // path today, so the cache is effectively append-only. The cost is that
+    // a recording legitimately removed from Veo (privacy flip, account
+    // closure) lingers in our cache until manually pruned — acceptable
+    // trade-off vs silent data loss.
+    console.warn(
+      `[recordings-cache] Veo returned 0 recordings for ${veoClubSlug} — leaving cache untouched (was previously a bulk-delete trigger).`
+    )
     return
   }
 
@@ -200,15 +271,39 @@ export async function writeCachedRecordings(
       throw new Error(`Failed to upsert recordings batch: ${error.message}`)
   }
 
-  // Delete stale recordings no longer in Veo
+  // Stale-recording reconciliation.
+  //
+  // Originally this branch deleted any cached recording whose slug wasn't
+  // in the incoming Veo list. That made it the same-class hazard as the
+  // empty-response wipe above: a partial Veo response (e.g. `filter=own`
+  // returning 15 when the workspace truly has ~165) would silently delete
+  // the missing 150. Diagnosed 2026-05-16 — this path is what actually
+  // wiped CFA, not the empty-response branch.
+  //
+  // Guard: only run the stale-prune when the incoming list is at least
+  // ~half the size of the current cache. Anything smaller is statistically
+  // a partial fetch (filter regression, pagination bug, rate limit) rather
+  // than a real corpus shrink. Real shrinks > 50% are rare enough that
+  // catching them via manual reconciliation is acceptable.
   const incomingSlugs = recordings.map((r) => r.slug)
   const { data: existing } = await supabase
     .from('playhub_veo_recordings_cache')
     .select('match_slug')
     .eq('veo_club_slug', veoClubSlug)
 
+  if (
+    shouldSkipPrune(
+      veoClubSlug,
+      'recordings',
+      recordings.length,
+      (existing || []).length
+    )
+  ) {
+    return
+  }
+
   const stale = (existing || [])
-    .map((r: any) => r.match_slug)
+    .map((r: { match_slug: string }) => r.match_slug)
     .filter((slug: string) => !incomingSlugs.includes(slug))
 
   if (stale.length > 0) {
