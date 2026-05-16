@@ -21,6 +21,7 @@ import {
   getRecordingSlugsForClubs,
   writeMatchContentCache,
 } from './cache-writer'
+import { writeRecordingEventsForVeoMatch } from './recording-events-writer'
 import { CLUB_VEO_SLUGS, PUBLIC_RECORDING_TEAMS } from './config'
 
 const PLAYHUB_URL = process.env.PLAYHUB_URL!
@@ -476,6 +477,27 @@ async function runContentPrecache(): Promise<ClubResult[]> {
 
       if (isProcessing) {
         console.log(`  ${matchSlug}: cached (processing — no content yet)`)
+      } else if (content.highlights.length > 0) {
+        // Phase 1a: mirror provider goal events into playhub_recording_events.
+        // Cache write above is the system of record; events writer failures
+        // are non-fatal and logged.
+        try {
+          const r = await writeRecordingEventsForVeoMatch(
+            matchSlug,
+            content.highlights
+          )
+          if (r.mapped > 0) {
+            console.log(
+              `[events-writer] ${matchSlug}: ${r.mapped} goal highlights, ${r.matched} rows touched`
+            )
+          }
+        } catch (eventsErr) {
+          const msg =
+            eventsErr instanceof Error ? eventsErr.message : String(eventsErr)
+          console.warn(
+            `[events-writer] ${matchSlug}: failed (non-fatal) — ${msg}`
+          )
+        }
       }
     } catch (err) {
       failed++

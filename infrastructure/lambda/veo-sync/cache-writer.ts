@@ -9,7 +9,7 @@ import type { VeoTeam, VeoMember, VeoRecording } from './veo-scraper'
 // Supabase client (service role — bypasses RLS)
 // ============================================================================
 
-function getSupabase() {
+export function getSupabase() {
   const url = process.env.SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) {

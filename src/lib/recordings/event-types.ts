@@ -56,10 +56,13 @@ export const EVENT_TYPE_COLORS: Record<EventType, string> = {
 export type EventVisibility = 'public' | 'private'
 export type EventSource = 'manual' | 'ai_detected'
 export type EventTeam = 'home' | 'away'
+export type EventProvider = 'veo' | 'spiideo'
 
 export interface RecordingEvent {
   id: string
-  match_recording_id: string
+  match_recording_id: string | null
+  provider: EventProvider | null
+  provider_recording_id: string | null
   event_type: EventType
   timestamp_seconds: number
   team: EventTeam | null
@@ -67,9 +70,25 @@ export interface RecordingEvent {
   visibility: EventVisibility
   source: EventSource
   confidence_score: number | null
-  created_by: string
+  created_by: string | null
+  provider_event_id: string | null
   created_at: string
   updated_at: string
+}
+
+export interface InsertRecordingEvent {
+  match_recording_id: string | null
+  provider: EventProvider | null
+  provider_recording_id: string | null
+  event_type: EventType
+  timestamp_seconds: number
+  team: EventTeam | null
+  label: string | null
+  visibility: EventVisibility
+  source: EventSource
+  confidence_score: number | null
+  created_by: string | null
+  provider_event_id: string | null
 }
 
 /**
