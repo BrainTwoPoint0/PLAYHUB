@@ -295,14 +295,40 @@ export async function listClubRecordings(
   let page = 1
 
   while (true) {
-    const res = await session.api(
-      'GET',
-      `/api/app/clubs/${clubSlug}/recordings/?filter=own&fields=privacy&fields=title&fields=slug&fields=duration&fields=thumbnail&fields=uuid&fields=match_date&fields=home_team&fields=away_team&fields=home_score&fields=away_score&fields=processing_status&page_size=100&page=${page}`
-    )
+    const url = `/api/app/clubs/${clubSlug}/recordings/?filter=own&fields=privacy&fields=title&fields=slug&fields=duration&fields=thumbnail&fields=uuid&fields=match_date&fields=home_team&fields=away_team&fields=home_score&fields=away_score&fields=processing_status&page_size=100&page=${page}`
+    const res = await session.api('GET', url)
+
+    // Veo's recordings endpoint returns 404 when you request a page past
+    // the end of the list (rather than 200 with []). Diagnosed 2026-05-16:
+    // SEFA has exactly 600 recordings = 6 full pages of 100; page 7 → 404.
+    // CFA dodges this because its total isn't a multiple of 100 (page 3
+    // returns 77, the < 100 short-circuit fires, page 4 is never requested).
+    // Treat 404 on page > 1 as end-of-pagination; page 1 stays a real error.
+    if (res.status === 404 && page > 1) {
+      if (allRecordings.length === 0) {
+        // Page 1 returned 200 with empty AND page 2 returned 404 — never
+        // observed in practice but worth flagging if it ever happens.
+        console.warn(
+          `[listClubRecordings] ${clubSlug} page=${page} 404 with 0 accumulated — investigate`
+        )
+      }
+      console.log(
+        `Page ${page}: end-of-pagination (Veo returned 404; ${allRecordings.length} total)`
+      )
+      break
+    }
 
     if (res.status !== 200) {
+      const bodySnippet =
+        typeof res.body === 'string'
+          ? res.body.slice(0, 500)
+          : JSON.stringify(res.body ?? null).slice(0, 500)
+      console.error(
+        `[listClubRecordings] ${clubSlug} page=${page} HTTP ${res.status} url=${url} body=${bodySnippet}`
+      )
       throw new Error(
-        `Failed to list recordings for ${clubSlug}: HTTP ${res.status}`
+        `Failed to list recordings for ${clubSlug}: HTTP ${res.status}` +
+          ` | upstream: ${bodySnippet || '<empty>'}`
       )
     }
 
