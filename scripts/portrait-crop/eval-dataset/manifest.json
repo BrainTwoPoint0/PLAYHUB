@@ -1,10 +1,212 @@
 {
   "$schema": "./manifest.schema.json",
   "version": 1,
-  "frozen_holdout": [
-    "012958-goal-2026-02-28",
-    "005036-goal-2026-03-01",
-    "003615-goal"
-  ],
-  "clips": []
+  "frozen_holdout": [],
+  "clips": [
+    {
+      "id": "veo_20260502_goal_01",
+      "file": "veo_20260502_goal_01.mp4",
+      "category": "goal",
+      "hero": true,
+      "label_fps": 25,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "clean",
+        "notes": "Match 2026-05-02 (well after the Feb-Mar 2026 fine-tune); hero clip = dense label every frame."
+      },
+      "notes": "veo_match=20260502-untitled-recording-2026-05-02_12-04-05-ve3415dd, highlight_id=39ccedb9-3904-4e2e-b10a-6cbd0f1d8e4c, start=774, url=https://veo-content-ii.s3.eu-west-1.amazonaws.com/3929ca67-f4f1-4152-ac40-531711741b64/highlight-v2/39ccedb9-3904-4e2e-b10a-6cbd0f1d8e4c_1778193999.621097/video.mp4"
+    },
+    {
+      "id": "veo_20260502b_goal_01",
+      "file": "veo_20260502b_goal_01.mp4",
+      "category": "goal",
+      "label_fps": 5,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "clean",
+        "notes": "Match 2026-05-02 separate recording, fresh post-fine-tune."
+      },
+      "notes": "veo_match=20260502-untitled-recording-2026-05-02_12-03-41-v40ff5bb, highlight_id=bfeff3e1-8f88-4684-9b88-067f152bcd42, start=222, url=https://veo-content-ii.s3.eu-west-1.amazonaws.com/54a2e957-67ef-4320-a2d8-4b440ab9dbda/highlight-v2/bfeff3e1-8f88-4684-9b88-067f152bcd42_1778195726.602911/video.mp4"
+    },
+    {
+      "id": "veo_20260506_hb_cupfinal_goal_01",
+      "file": "veo_20260506_hb_cupfinal_goal_01.mp4",
+      "category": "goal",
+      "label_fps": 5,
+      "source": "veo_academy_hollands_blair",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "clean",
+        "notes": "Cup-final 2026-05-06, fresh post-fine-tune."
+      },
+      "notes": "veo_match=20260506-hollands-blair-u23-vs-ta-cup-final-v471daec, highlight_id=19da9261-05e3-44a5-9150-0603e5fc9445, start=3082, url=https://veo-content-ii.s3.eu-west-1.amazonaws.com/21a123ec-4aad-479a-8ba8-cb0a8976338a/highlight-v2/19da9261-05e3-44a5-9150-0603e5fc9445_1778117161.795974/video.mp4"
+    },
+    {
+      "id": "veo_20260505_sefa_u19_goal_01",
+      "file": "veo_20260505_sefa_u19_goal_01.mp4",
+      "category": "goal",
+      "label_fps": 5,
+      "source": "veo_academy_sefa",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "clean",
+        "notes": "SEFA u19 training 2026-05-05, fresh post-fine-tune."
+      },
+      "notes": "veo_match=20260505-training-soccer-elite-fa-u19-vfc429e3, highlight_id=ba2c24d9-bfd8-41bf-88b0-5c112caf6097, start=3061, url=https://veo-content-ii.s3.eu-west-1.amazonaws.com/23bc5b0b-a8a9-466d-aa8e-8f08b968f8ea/highlight-v2/ba2c24d9-bfd8-41bf-88b0-5c112caf6097_1778115248.194411/video.mp4"
+    },
+    {
+      "id": "veo_20260501_ncfe_goal_01",
+      "file": "veo_20260501_ncfe_goal_01.mp4",
+      "category": "goal",
+      "label_fps": 5,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "clean",
+        "notes": "NCFE L3 practical 2026-05-01, fresh post-fine-tune."
+      },
+      "notes": "veo_match=20260501-ncfe-l3-2nd-year-practical-work-vf142fc8, highlight_id=14c25cc5-44b8-4dc2-8a5a-b784bd88ab8b, start=3271, url=https://veo-content-ii.s3.eu-west-1.amazonaws.com/a24232ab-9459-4d59-a470-1ff38b8ff36b/highlight-v2/14c25cc5-44b8-4dc2-8a5a-b784bd88ab8b_1777982954.843849/video.mp4"
+    },
+    {
+      "id": "veo_20260502_match_goal_01",
+      "file": "veo_20260502_match_goal_01.mp4",
+      "category": "goal",
+      "label_fps": 5,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "clean",
+        "notes": "Match 2026-05-02 (third recording from the date)."
+      },
+      "notes": "veo_match=20260502-match-2-may-2026-v0f8747f, highlight_id=1d9ec180-1532-457a-ac32-5241d987955e, start=421, url=https://veo-content-ii.s3.eu-west-1.amazonaws.com/07198e32-de4c-44b4-bae9-ddcd06eac9af/highlight-v2/1d9ec180-1532-457a-ac32-5241d987955e_1777733152.660806/video.mp4"
+    },
+    {
+      "id": "veo_20260502_passage_01",
+      "file": "veo_20260502_passage_01.mp4",
+      "category": "passage",
+      "subcategory": "shot_on_goal_buildup",
+      "label_fps": 5,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "clean",
+        "notes": "Veo shot-on-goal tag = 25s of pre-shot build-up. Fresh post-fine-tune."
+      },
+      "notes": "veo_match=20260502-untitled-recording-2026-05-02_12-04-05-ve3415dd, highlight_id=83778db6-9b53-41c6-80f8-ee13657201dd, start=207, url=https://veo-content-ii.s3.eu-west-1.amazonaws.com/3929ca67-f4f1-4152-ac40-531711741b64/highlight-v2/83778db6-9b53-41c6-80f8-ee13657201dd_1778193999.621097/video.mp4"
+    },
+    {
+      "id": "veo_20260502b_passage_01",
+      "file": "veo_20260502b_passage_01.mp4",
+      "category": "passage",
+      "subcategory": "shot_on_goal_buildup",
+      "label_fps": 5,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "clean",
+        "notes": "Shot-on-goal build-up from the 2026-05-02 secondary recording."
+      },
+      "notes": "veo_match=20260502-untitled-recording-2026-05-02_12-03-41-v40ff5bb, highlight_id=ac81d3f8-b04e-4a98-8244-51d5d51774f6, start=221, url=https://veo-content-ii.s3.eu-west-1.amazonaws.com/54a2e957-67ef-4320-a2d8-4b440ab9dbda/highlight-v2/ac81d3f8-b04e-4a98-8244-51d5d51774f6_1778195726.602911/video.mp4"
+    },
+    {
+      "id": "veo_20260505_hb_matchday1_passage_01",
+      "file": "veo_20260505_hb_matchday1_passage_01.mp4",
+      "category": "passage",
+      "subcategory": "shot_on_goal_buildup",
+      "label_fps": 5,
+      "source": "veo_academy_hollands_blair",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "clean",
+        "notes": "Hollands Blair u23 matchday-1, 2026-05-05."
+      },
+      "notes": "veo_match=20260505-hollands-blair-u23-vs-matchday-1-vs-ta-v5b3f5dc, highlight_id=4efabfb1-c47b-41f2-b460-d995bb862adb, start=2039, url=https://veo-content-ii.s3.eu-west-1.amazonaws.com/31d89fc9-cda6-43e7-a4b6-88bc025f48e9/highlight-v2/4efabfb1-c47b-41f2-b460-d995bb862adb_1778114510.68403/video.mp4"
+    },
+    {
+      "id": "veo_20260506_hb_cupfinal_passage_01",
+      "file": "veo_20260506_hb_cupfinal_passage_01.mp4",
+      "category": "passage",
+      "subcategory": "shot_on_goal_buildup",
+      "label_fps": 5,
+      "source": "veo_academy_hollands_blair",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "clean",
+        "notes": "Cup-final 2026-05-06, distinct from the goal clip on the same match."
+      },
+      "notes": "veo_match=20260506-hollands-blair-u23-vs-ta-cup-final-v471daec, highlight_id=14294cce-9766-450d-a3b1-86ec0dd60de2, start=2632, url=https://veo-content-ii.s3.eu-west-1.amazonaws.com/21a123ec-4aad-479a-8ba8-cb0a8976338a/highlight-v2/14294cce-9766-450d-a3b1-86ec0dd60de2_1778117161.795974/video.mp4"
+    },
+    {
+      "id": "veo_20250920_cfa_u9_corner_01",
+      "file": "veo_20250920_cfa_u9_corner_01.mp4",
+      "category": "edge",
+      "subcategory": "corner",
+      "label_fps": 5,
+      "source": "veo_academy_cfa",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "unknown",
+        "notes": "CFA u9 from 2025-09-20 — predates the Veo fine-tune. KARIM: verify against Roboflow project 'veo-ball-detection v1' before labeling; swap if ID overlap. The only corner-tagged highlight currently in cache."
+      },
+      "notes": "veo_match=20250920-cfa-u9-vs-mezzie-youth-477d786a, highlight_id=05e9564a-ce71-47f1-a9bc-743e0f187504, start=2018, url=https://c.veocdn.com/283a6f1f-21ac-49ed-a4d2-d802ebc5e842/highlight-v2/05e9564a-ce71-47f1-a9bc-743e0f187504_1758535356.716584/video.mp4?v=sAPSUUT4"
+    },
+    {
+      "id": "veo_20250927_cfa_u9_freekick_01",
+      "file": "veo_20250927_cfa_u9_freekick_01.mp4",
+      "category": "edge",
+      "subcategory": "set_piece",
+      "label_fps": 5,
+      "source": "veo_academy_cfa",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "unknown",
+        "notes": "CFA u9 2025-09-27 — verify against Roboflow before labeling."
+      },
+      "notes": "veo_match=20250927-cfa-u9-yellow-vs-valley-green-ba185d64, highlight_id=72115aea-f816-46e2-bd3b-9cc87a4eeef8, start=541, url=https://c.veocdn.com/d085767a-e391-44f9-bf61-b8e14bff8717/highlight-v2/72115aea-f816-46e2-bd3b-9cc87a4eeef8_1759143983.223454/video.mp4?v=AiydCK1h"
+    },
+    {
+      "id": "veo_20240918_goalkick_01",
+      "file": "veo_20240918_goalkick_01.mp4",
+      "category": "edge",
+      "subcategory": "keeper_long_ball",
+      "label_fps": 5,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "unknown",
+        "notes": "Goal-kick from 2024-09-18 — old, verify against Roboflow before labeling. Stands in for the 'keeper long ball' edge case."
+      },
+      "notes": "veo_match=20240918-match-18-sep-2024-20de1d37, highlight_id=051aab26-93cf-41f1-9033-8b2a59386de2, start=1536, url=https://c.veocdn.com/99d16727-0566-4c19-b05a-61bd57c61a3f/highlight-v2/051aab26-93cf-41f1-9033-8b2a59386de2_1727793249.724764/video.mp4"
+    },
+    {
+      "id": "CURSED_01_lens_flare",
+      "file": "CURSED_01_lens_flare.mp4",
+      "category": "cursed",
+      "subcategory": "lens_flare_or_lowlight",
+      "label_fps": 5,
+      "source": "TBD_KARIM_PICKS_DURING_SPRINT",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "clean",
+        "notes": "PLACEHOLDER — Karim picks a clip during sprint by visual review (lens flare, low-light, sunset, etc.). Veo metadata can't surface visual properties."
+      },
+      "notes": "Skip if no good candidate surfaces during the labeling sprint — drop to 14 clips rather than mislabel as cursed."
+    },
+    {
+      "id": "CURSED_02_two_ball",
+      "file": "CURSED_02_two_ball.mp4",
+      "category": "cursed",
+      "subcategory": "two_ball_warmup",
+      "label_fps": 5,
+      "source": "TBD_KARIM_PICKS_DURING_SPRINT",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "clean",
+        "notes": "PLACEHOLDER — Karim picks a clip with visible warm-up ball / multi-ball confusion during the labeling sprint."
+      },
+      "notes": "Tests the tracker's ability to lock onto the right ball under ambiguity."
+    }
+  ]
 }
