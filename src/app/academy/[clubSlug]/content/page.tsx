@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { formatTimestamp } from '@/lib/recordings/event-types'
 import { useParams, useRouter } from 'next/navigation'
 import {
   ChevronDown,
@@ -59,10 +60,23 @@ interface VeoHighlight {
   is_ai_generated?: boolean
 }
 
+interface VeoEvent {
+  id: string
+  event_type: string
+  timestamp_seconds: number
+  team: string | null
+  confidence_score: number | null
+}
+
+interface VeoEventsByType {
+  goals: VeoEvent[]
+}
+
 interface MatchContent {
   videos: VeoVideo[]
   highlights: VeoHighlight[]
   stats: Record<string, unknown> | null
+  events?: VeoEventsByType
 }
 
 // ============================================================================
@@ -179,8 +193,15 @@ function videoLabel(video: VeoVideo): string {
   return 'Video'
 }
 
-function FullMatchVideos({ videos }: { videos: VeoVideo[] }) {
+function FullMatchVideos({
+  videos,
+  events,
+}: {
+  videos: VeoVideo[]
+  events?: VeoEventsByType
+}) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   // Filter to playable mp4 videos
   const playable = videos.filter((v) => {
@@ -189,6 +210,16 @@ function FullMatchVideos({ videos }: { videos: VeoVideo[] }) {
   })
 
   const activeVideo = activeIdx !== null ? playable[activeIdx] : null
+  const goalEvents = events?.goals ?? []
+
+  function seekTo(seconds: number) {
+    const el = videoRef.current
+    if (!el) return
+    el.currentTime = seconds
+    // Best-effort autoplay after seek; ignore promise rejection (some
+    // browsers refuse without user gesture, but the user just clicked).
+    void el.play().catch(() => {})
+  }
 
   return (
     <div>
@@ -220,11 +251,33 @@ function FullMatchVideos({ videos }: { videos: VeoVideo[] }) {
       {activeVideo && (
         <div className="rounded-lg overflow-hidden bg-black">
           <video
+            ref={videoRef}
             key={String(activeVideo.id || activeIdx)}
             controls
             className="w-full max-h-[500px]"
             src={`/api/veo/proxy?url=${encodeURIComponent(String(activeVideo.url || ''))}`}
           />
+        </div>
+      )}
+
+      {/* Jump-to-goal seek buttons (Veo AI-detected goals from
+          playhub_recording_events; admin-only via the API auth check) */}
+      {activeVideo && goalEvents.length > 0 && (
+        <div className="mt-3">
+          <div className="text-[10px] text-muted-foreground/50 uppercase tracking-wider mb-1.5">
+            Jump to goal ({goalEvents.length})
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {goalEvents.map((e, i) => (
+              <button
+                key={e.id}
+                onClick={() => seekTo(e.timestamp_seconds)}
+                className="text-[11px] px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-white/[0.08] transition-colors tabular-nums"
+              >
+                Goal {i + 1} — {formatTimestamp(e.timestamp_seconds)}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -482,7 +535,9 @@ function ExpandedRecording({
       )}
 
       {/* Full match videos */}
-      {content.videos.length > 0 && <FullMatchVideos videos={content.videos} />}
+      {content.videos.length > 0 && (
+        <FullMatchVideos videos={content.videos} events={content.events} />
+      )}
 
       {/* Highlights */}
       {content.highlights.length > 0 ? (

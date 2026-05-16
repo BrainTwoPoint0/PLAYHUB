@@ -5,10 +5,19 @@
 import { getAuthUser } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
+// Keep in sync with VIDEO_URL_ALLOWED_HOSTS in src/lib/editor/validation.ts.
+// Veo serves video through two surfaces in production data (per the
+// playhub_veo_match_content_cache audit on 2026-05-16):
+//   - c.veocdn.com                                  (24,608 clips, legacy CDN)
+//   - veo-content-ii.s3.eu-west-1.amazonaws.com     (519 clips, recent regional S3)
+// The two `*.s3.amazonaws.com` entries below are kept for older content that
+// referenced the path-style global S3 endpoint; they may be stale but pruning
+// them needs a fresh cache audit first.
 const ALLOWED_HOSTS = [
   'c.veocdn.com',
   'veo-content-ii.s3.amazonaws.com',
   'veo-content.s3.amazonaws.com',
+  'veo-content-ii.s3.eu-west-1.amazonaws.com',
 ]
 
 export async function GET(request: NextRequest) {

@@ -8,10 +8,13 @@
 
 import type { CropClient } from './db-types'
 
+// Keep in sync with ALLOWED_HOSTS in src/app/api/veo/proxy/route.ts.
+// See that file for the production-data rationale per hostname.
 export const VIDEO_URL_ALLOWED_HOSTS = [
   'c.veocdn.com',
   'veo-content-ii.s3.amazonaws.com',
   'veo-content.s3.amazonaws.com',
+  'veo-content-ii.s3.eu-west-1.amazonaws.com',
 ]
 
 export const SOURCE_WIDTH = 1920
