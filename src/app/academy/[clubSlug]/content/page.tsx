@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { formatTimestamp } from '@/lib/recordings/event-types'
+import { useState, useEffect } from 'react'
+import { VideoPlayer } from '@/components/video/VideoPlayer'
+import type { RecordingEvent } from '@/lib/recordings/event-types'
 import { useParams, useRouter } from 'next/navigation'
 import {
   ChevronDown,
@@ -193,6 +194,36 @@ function videoLabel(video: VeoVideo): string {
   return 'Video'
 }
 
+/**
+ * Adapt the per-match API's `events: { goals: VeoEvent[] }` envelope to the
+ * `RecordingEvent[]` shape VideoPlayer consumes. The player reads only
+ * { id, event_type, timestamp_seconds, label } from each event for marker
+ * rendering — everything else is type-required but inert. We fill in honest
+ * Veo provenance so the values look right in DevTools / future debugging.
+ */
+function toRecordingEvents(events?: VeoEventsByType): RecordingEvent[] {
+  if (!events?.goals?.length) return []
+  return events.goals.map(
+    (g): RecordingEvent => ({
+      id: g.id,
+      match_recording_id: null,
+      provider: 'veo',
+      provider_recording_id: null, // not threaded into FullMatchVideos
+      event_type: g.event_type as RecordingEvent['event_type'],
+      timestamp_seconds: g.timestamp_seconds,
+      team: g.team as RecordingEvent['team'],
+      label: null,
+      visibility: 'private',
+      source: 'ai_detected',
+      confidence_score: g.confidence_score,
+      created_by: null,
+      provider_event_id: null,
+      created_at: '',
+      updated_at: '',
+    })
+  )
+}
+
 function FullMatchVideos({
   videos,
   events,
@@ -201,7 +232,6 @@ function FullMatchVideos({
   events?: VeoEventsByType
 }) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
 
   // Filter to playable mp4 videos
   const playable = videos.filter((v) => {
@@ -210,16 +240,7 @@ function FullMatchVideos({
   })
 
   const activeVideo = activeIdx !== null ? playable[activeIdx] : null
-  const goalEvents = events?.goals ?? []
-
-  function seekTo(seconds: number) {
-    const el = videoRef.current
-    if (!el) return
-    el.currentTime = seconds
-    // Best-effort autoplay after seek; ignore promise rejection (some
-    // browsers refuse without user gesture, but the user just clicked).
-    void el.play().catch(() => {})
-  }
+  const recordingEvents = toRecordingEvents(events)
 
   return (
     <div>
@@ -247,38 +268,17 @@ function FullMatchVideos({
         ))}
       </div>
 
-      {/* Inline video player */}
+      {/* PLAYHUB VideoPlayer — renders goal markers ON the progress bar
+          (no more "Jump to goal" button row, no Veo watermark, full coach
+          controls). Goals come from playhub_recording_events via the
+          admin-gated route; the events array is empty for non-admins. */}
       {activeVideo && (
-        <div className="rounded-lg overflow-hidden bg-black">
-          <video
-            ref={videoRef}
-            key={String(activeVideo.id || activeIdx)}
-            controls
-            className="w-full max-h-[500px]"
-            src={`/api/veo/proxy?url=${encodeURIComponent(String(activeVideo.url || ''))}`}
-          />
-        </div>
-      )}
-
-      {/* Jump-to-goal seek buttons (Veo AI-detected goals from
-          playhub_recording_events; admin-only via the API auth check) */}
-      {activeVideo && goalEvents.length > 0 && (
-        <div className="mt-3">
-          <div className="text-[10px] text-muted-foreground/50 uppercase tracking-wider mb-1.5">
-            Jump to goal ({goalEvents.length})
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {goalEvents.map((e, i) => (
-              <button
-                key={e.id}
-                onClick={() => seekTo(e.timestamp_seconds)}
-                className="text-[11px] px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-white/[0.08] transition-colors tabular-nums"
-              >
-                Goal {i + 1} — {formatTimestamp(e.timestamp_seconds)}
-              </button>
-            ))}
-          </div>
-        </div>
+        <VideoPlayer
+          key={String(activeVideo.id || activeIdx)}
+          src={`/api/veo/proxy?url=${encodeURIComponent(String(activeVideo.url || ''))}`}
+          events={recordingEvents}
+          className="w-full max-h-[500px] rounded-lg overflow-hidden"
+        />
       )}
     </div>
   )
