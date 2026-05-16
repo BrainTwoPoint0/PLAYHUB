@@ -881,14 +881,12 @@ export default function AcademyContentPage() {
         </div>
       </div>
 
-      {/* Team multi-select — derived from recordings, ordered by match count
-          desc (the academy's own teams have the most matches and surface
-          first; recurring opponents land below them). */}
-      {teamOptions.length > 1 && (
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-[10px] text-muted-foreground/30 uppercase tracking-wider">
-            Teams
-          </span>
+      {/* Team multi-select + date range on one row — coherent filter strip
+          below search. Team list derived from recordings, ordered by match
+          count desc (academy teams surface first; recurring opponents
+          below). */}
+      <div className="flex flex-wrap items-center gap-2 mb-5">
+        {teamOptions.length > 1 && (
           <MultiSelect
             options={teamOptions}
             selected={selectedTeams}
@@ -897,20 +895,16 @@ export default function AcademyContentPage() {
             searchPlaceholder="Search teams..."
             emptyLabel="No teams match"
             aria-label="Filter by team"
-            className="min-w-[200px] sm:min-w-[260px]"
+            className="min-w-[200px] sm:min-w-[240px]"
           />
-        </div>
-      )}
-
-      {/* Date range */}
-      <div className="flex items-center gap-2 mb-5">
+        )}
         <div className="flex-1 max-w-[200px]">
           <DatePicker
             value={dateFrom}
             onChange={setDateFrom}
             max={dateTo || undefined}
             placeholder="From date"
-            className="h-9 w-full"
+            className="w-full"
           />
         </div>
         <div className="flex-1 max-w-[200px]">
@@ -919,7 +913,7 @@ export default function AcademyContentPage() {
             onChange={setDateTo}
             min={dateFrom || undefined}
             placeholder="To date"
-            className="h-9 w-full"
+            className="w-full"
           />
         </div>
         {(dateFrom || dateTo) && (
