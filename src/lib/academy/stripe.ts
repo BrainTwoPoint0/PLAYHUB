@@ -227,26 +227,86 @@ async function fetchClubData(
     new Map(prices.map((p) => [p.id, p])).values()
   )
 
-  // Fetch subscriptions per price
-  const results: PriceWithSubs[] = []
+  // Fetch subscriptions per price.
+  //
+  // Was previously `status: 'all'` walked serially per price — that means
+  // paginating through every historically-canceled subscription, then
+  // filtering them out client-side. For an academy with thousands of
+  // cancellations over years that's tens of seconds of Stripe roundtrips.
+  //
+  // Strategy: only fetch the statuses the audit UI actually displays
+  // (active / trialing / past_due). Canceled, incomplete, and
+  // incomplete_expired are skipped entirely. Three status filters per
+  // price in parallel, all prices in parallel — Stripe rate-limit
+  // handles the fan-out fine at academy scale (~10 prices × 3 = 30
+  // concurrent paginations).
+  // `unpaid` is the post-dunning state before `canceled` — subs there
+  // still need to show in the audit so admins can act on them. Skipping
+  // `canceled`/`incomplete`/`incomplete_expired` entirely (terminal /
+  // never-paid-once states; audit UI hides them).
+  const RELEVANT_STATUSES: Stripe.SubscriptionListParams.Status[] = [
+    'active',
+    'trialing',
+    'past_due',
+    'unpaid',
+  ]
 
-  for (const price of uniquePrices) {
-    const subscriptions: Stripe.Subscription[] = []
-
+  async function collectSubsForPrice(
+    priceId: string,
+    status: Stripe.SubscriptionListParams.Status
+  ): Promise<Stripe.Subscription[]> {
+    const subs: Stripe.Subscription[] = []
     for await (const sub of stripe.subscriptions.list({
-      price: price.id,
-      status: 'all',
+      price: priceId,
+      status,
       limit: 100,
       expand: ['data.customer', 'data.discount'],
     })) {
-      subscriptions.push(sub)
+      subs.push(sub)
     }
+    return subs
+  }
 
-    if (subscriptions.length > 0) {
-      results.push({ price, subscriptions })
+  // Concurrency-cap the outer fan-out. Stripe's read rate limit is
+  // ~25 req/sec; each price spawns 4 status-paginations (each possibly
+  // multiple pages), so 8 prices × 4 statuses = 32 concurrent
+  // paginations is already at the edge. Batching at 8 keeps us under
+  // 429 territory for academies with many prices.
+  const CONCURRENCY = 8
+  const results: PriceWithSubs[] = []
+  for (let i = 0; i < uniquePrices.length; i += CONCURRENCY) {
+    const batch = uniquePrices.slice(i, i + CONCURRENCY)
+    const batchResults = await Promise.all(
+      batch.map(async (price) => {
+        const perStatus = await Promise.all(
+          RELEVANT_STATUSES.map((status) =>
+            collectSubsForPrice(price.id, status)
+          )
+        )
+        // Dedupe by subscription id. Real Stripe partitions cleanly by
+        // status so this is usually a no-op, but it defends against:
+        //   (a) a subscription transitioning status mid-fetch (rare race)
+        //   (b) test mocks that don't honour the status filter and return
+        //       the same set across all four calls
+        const byId = new Map<string, Stripe.Subscription>()
+        for (const sub of perStatus.flat()) {
+          byId.set(sub.id, sub)
+        }
+        const subscriptions = [...byId.values()]
+        return subscriptions.length > 0
+          ? ({ price, subscriptions } as PriceWithSubs)
+          : null
+      })
+    )
+    for (const r of batchResults) {
+      if (r) results.push(r)
     }
   }
 
+  // Audit result is a "best-effort point-in-time" snapshot. A sub that
+  // flips status (e.g. past_due → canceled) mid-fan-out may disappear
+  // from every status list and be absent here. Acceptable for an admin
+  // read view; mutations always go through Stripe direct, not this cache.
   return results
 }
 
