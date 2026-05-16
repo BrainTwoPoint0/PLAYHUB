@@ -887,60 +887,56 @@ export default function AcademyContentPage() {
           below). */}
       <div className="flex flex-wrap items-center gap-2 mb-5">
         {teamOptions.length > 1 && (
-          <div className="flex items-center gap-1">
-            <MultiSelect
-              options={teamOptions}
-              selected={selectedTeams}
-              onChange={setSelectedTeams}
-              placeholder="All teams"
-              searchPlaceholder="Search teams..."
-              emptyLabel="No teams match"
-              aria-label="Filter by team"
-              className="min-w-[200px] sm:min-w-[240px]"
-            />
-            {selectedTeams.length > 0 && (
-              <button
-                onClick={() => setSelectedTeams([])}
-                aria-label="Clear team filter"
-                className="p-1.5 rounded-md text-muted-foreground/70 hover:text-[var(--timberwolf)] hover:bg-white/[0.06] transition-colors"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
+          <MultiSelect
+            options={teamOptions}
+            selected={selectedTeams}
+            onChange={setSelectedTeams}
+            placeholder="All teams"
+            searchPlaceholder="Search teams..."
+            emptyLabel="No teams match"
+            aria-label="Filter by team"
+            className="min-w-[200px] sm:min-w-[240px]"
+          />
         )}
-        <div className="flex items-center gap-1">
-          <div className="flex-1 max-w-[200px]">
-            <DatePicker
-              value={dateFrom}
-              onChange={setDateFrom}
-              max={dateTo || undefined}
-              placeholder="From date"
-              className="w-full"
-            />
-          </div>
-          <div className="flex-1 max-w-[200px]">
-            <DatePicker
-              value={dateTo}
-              onChange={setDateTo}
-              min={dateFrom || undefined}
-              placeholder="To date"
-              className="w-full"
-            />
-          </div>
-          {(dateFrom || dateTo) && (
-            <button
-              onClick={() => {
-                setDateFrom('')
-                setDateTo('')
-              }}
-              aria-label="Clear date filter"
-              className="p-1.5 rounded-md text-muted-foreground/70 hover:text-[var(--timberwolf)] hover:bg-white/[0.06] transition-colors"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
+        {selectedTeams.length > 0 && (
+          <button
+            onClick={() => setSelectedTeams([])}
+            aria-label="Clear team filter"
+            className="p-1.5 rounded-md text-muted-foreground/70 hover:text-[var(--timberwolf)] hover:bg-white/[0.06] transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+        <div className="flex-1 max-w-[200px]">
+          <DatePicker
+            value={dateFrom}
+            onChange={setDateFrom}
+            max={dateTo || undefined}
+            placeholder="From date"
+            className="w-full"
+          />
         </div>
+        <div className="flex-1 max-w-[200px]">
+          <DatePicker
+            value={dateTo}
+            onChange={setDateTo}
+            min={dateFrom || undefined}
+            placeholder="To date"
+            className="w-full"
+          />
+        </div>
+        {(dateFrom || dateTo) && (
+          <button
+            onClick={() => {
+              setDateFrom('')
+              setDateTo('')
+            }}
+            aria-label="Clear date filter"
+            className="p-1.5 rounded-md text-muted-foreground/70 hover:text-[var(--timberwolf)] hover:bg-white/[0.06] transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Results count */}
