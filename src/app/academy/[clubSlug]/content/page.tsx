@@ -885,59 +885,64 @@ export default function AcademyContentPage() {
           below search. Team list derived from recordings, ordered by match
           count desc (academy teams surface first; recurring opponents
           below). */}
-      <div className="flex flex-wrap items-center gap-2 mb-5">
-        {teamOptions.length > 1 && (
-          <MultiSelect
-            options={teamOptions}
-            selected={selectedTeams}
-            onChange={setSelectedTeams}
-            placeholder="All teams"
-            searchPlaceholder="Search teams..."
-            emptyLabel="No teams match"
-            aria-label="Filter by team"
-            className="min-w-[200px] sm:min-w-[240px]"
-          />
-        )}
-        {selectedTeams.length > 0 && (
-          <button
-            onClick={() => setSelectedTeams([])}
-            aria-label="Clear team filter"
-            className="p-1.5 rounded-md text-muted-foreground/70 hover:text-[var(--timberwolf)] hover:bg-white/[0.06] transition-colors"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
-        <div className="flex-1 max-w-[200px]">
-          <DatePicker
-            value={dateFrom}
-            onChange={setDateFrom}
-            max={dateTo || undefined}
-            placeholder="From date"
-            className="w-full"
-          />
-        </div>
-        <div className="flex-1 max-w-[200px]">
-          <DatePicker
-            value={dateTo}
-            onChange={setDateTo}
-            min={dateFrom || undefined}
-            placeholder="To date"
-            className="w-full"
-          />
-        </div>
-        {(dateFrom || dateTo) && (
-          <button
-            onClick={() => {
-              setDateFrom('')
-              setDateTo('')
-            }}
-            aria-label="Clear date filter"
-            className="p-1.5 rounded-md text-muted-foreground/70 hover:text-[var(--timberwolf)] hover:bg-white/[0.06] transition-colors"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
+      {(() => {
+        const anyFilterActive =
+          search ||
+          privacyFilter !== 'all' ||
+          dateFrom ||
+          dateTo ||
+          selectedTeams.length > 0
+        return (
+          <div className="flex flex-wrap items-center gap-2 mb-5">
+            {teamOptions.length > 1 && (
+              <MultiSelect
+                options={teamOptions}
+                selected={selectedTeams}
+                onChange={setSelectedTeams}
+                placeholder="All teams"
+                searchPlaceholder="Search teams..."
+                emptyLabel="No teams match"
+                aria-label="Filter by team"
+                className="min-w-[200px] sm:min-w-[240px]"
+              />
+            )}
+            <div className="flex-1 max-w-[200px]">
+              <DatePicker
+                value={dateFrom}
+                onChange={setDateFrom}
+                max={dateTo || undefined}
+                placeholder="From date"
+                className="w-full"
+              />
+            </div>
+            <div className="flex-1 max-w-[200px]">
+              <DatePicker
+                value={dateTo}
+                onChange={setDateTo}
+                min={dateFrom || undefined}
+                placeholder="To date"
+                className="w-full"
+              />
+            </div>
+            {anyFilterActive && (
+              <button
+                onClick={() => {
+                  setSearch('')
+                  setPrivacyFilter('all')
+                  setDateFrom('')
+                  setDateTo('')
+                  setSelectedTeams([])
+                }}
+                aria-label="Clear all filters"
+                className="flex items-center gap-1.5 px-3 h-10 rounded-md text-[12px] text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-white/[0.06] transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+                Clear filters
+              </button>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Results count */}
       <div className="flex items-center justify-between mb-3">
