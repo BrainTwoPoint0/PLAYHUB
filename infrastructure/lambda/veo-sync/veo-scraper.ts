@@ -295,7 +295,18 @@ export async function listClubRecordings(
   let page = 1
 
   while (true) {
-    const url = `/api/app/clubs/${clubSlug}/recordings/?filter=own&fields=privacy&fields=title&fields=slug&fields=duration&fields=thumbnail&fields=uuid&fields=match_date&fields=home_team&fields=away_team&fields=home_score&fields=away_score&fields=processing_status&page_size=100&page=${page}`
+    // Match PLAYHUB's `src/lib/veo/client.ts:listRecordings` query
+    // exactly — that version returns the full set, this Lambda version
+    // historically returned a strict subset for LYL (7 instead of 69).
+    // Suspected cause: passing `&page=` explicitly to Veo's recordings
+    // endpoint silently restricts to a different filter set (only
+    // club-level / unassigned recordings, omitting team-folder ones).
+    // Adding `&fields=team` AND dropping the explicit `&page=` on first
+    // request fixes it without breaking CFA/SEFA pagination — for later
+    // pages we still pass `&page=` since pagination IS needed for
+    // workspaces with >page_size recordings.
+    const pageParam = page === 1 ? '' : `&page=${page}`
+    const url = `/api/app/clubs/${clubSlug}/recordings/?filter=own&fields=privacy&fields=title&fields=slug&fields=duration&fields=thumbnail&fields=uuid&fields=match_date&fields=home_team&fields=away_team&fields=home_score&fields=away_score&fields=processing_status&fields=team&page_size=200${pageParam}`
     const res = await session.api('GET', url)
 
     // Veo's recordings endpoint returns 404 when you request a page past
