@@ -1,0 +1,22 @@
+{
+  "name": "playhub-lyl-sync",
+  "version": "1.0.0",
+  "description": "Lambda for the weekly LYL Veo recording-assignment sync",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "esbuild index.ts --bundle --platform=node --target=node20 --outfile=dist/index.js --external:@sparticuz/chromium --external:playwright-core",
+    "package": "npm run build && rm -rf dist/node_modules && mkdir -p dist/node_modules && cp -r node_modules/playwright-core dist/node_modules/ && rm -f dist.zip && cd dist && zip -r ../dist.zip .",
+    "deploy": "npm run package && cd ../../terraform && AWS_PROFILE=playhub terraform apply -target=aws_lambda_function.lyl_sync -auto-approve"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.0",
+    "@supabase/supabase-js": "2.97.0",
+    "playwright-core": "^1.49.0",
+    "@sparticuz/chromium": "^131.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.0.0"
+  }
+}
