@@ -241,17 +241,17 @@ resource "aws_lambda_permission" "eventbridge_veo_content_precache" {
 # ceiling — catches Lambda cold-start failures / throttle events within
 # seconds rather than the sweep's 1-hour worst-case latency.
 #
-# Gated behind `var.enable_veo_sync_dlq` (default false) because
-# `playhub-admin` currently lacks `sqs:CreateQueue` permission. To enable:
-#   1. Grant playhub-admin: sqs:CreateQueue, sqs:GetQueueAttributes,
-#      sqs:SetQueueAttributes, sqs:TagQueue, sqs:UntagQueue, sqs:DeleteQueue
-#      via AWS console.
-#   2. Set TF_VAR_enable_veo_sync_dlq=true and run terraform apply.
-#   3. Uncomment the destination_config block in event_invoke_config below.
+# IAM for the DLQ lives outside Terraform on the `playhub-admin` deploy
+# user (inline policy `veo-sync-dlq-management` scoped to the DLQ ARN).
+# Granted via AWS CLI on 2026-05-17. If you ever rename the queue, also
+# update that inline policy's Resource ARN to match.
+#
+# Kept as a variable so a future destroy / restage can toggle without
+# editing every dependent resource's count expression.
 variable "enable_veo_sync_dlq" {
-  description = "When true, provisions the veo-sync DLQ + alarm. Requires playhub-admin to have sqs:* permissions; default false until IAM is granted."
+  description = "When true (default), provisions the veo-sync DLQ + alarm + Lambda destination_config wiring. Set false only for tear-down."
   type        = bool
-  default     = false
+  default     = true
 }
 
 resource "aws_sqs_queue" "veo_sync_dlq" {
@@ -284,19 +284,21 @@ resource "aws_iam_role_policy" "veo_sync_lambda_dlq" {
 
 # Disable Lambda's own async invocation retries (EventBridge retry_policy handles
 # EventBridge-triggered retries, but this covers manual async invocations too).
-#
-# DLQ destination_config is commented out until SQS IAM is granted to
-# playhub-admin — see the `veo_sync_dlq` resource block above for the
-# missing permissions. Once the IAM is granted, uncomment + apply.
+# Route async-invoke failures to the DLQ when var.enable_veo_sync_dlq is set —
+# gated behind a `length()` check so the resource still applies cleanly when
+# the queue isn't provisioned (var=false).
 resource "aws_lambda_function_event_invoke_config" "veo_sync" {
   function_name          = aws_lambda_function.veo_sync.function_name
   maximum_retry_attempts = 0
 
-  # destination_config {
-  #   on_failure {
-  #     destination = aws_sqs_queue.veo_sync_dlq.arn
-  #   }
-  # }
+  dynamic "destination_config" {
+    for_each = length(aws_sqs_queue.veo_sync_dlq) > 0 ? [1] : []
+    content {
+      on_failure {
+        destination = aws_sqs_queue.veo_sync_dlq[0].arn
+      }
+    }
+  }
 }
 
 # Alarm if anything lands in the DLQ — paying customer may be unprovisioned.
