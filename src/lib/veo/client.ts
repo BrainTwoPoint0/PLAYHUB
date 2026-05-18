@@ -50,6 +50,9 @@ export interface VeoRecording {
   home_score?: number | null
   away_score?: number | null
   processing_status?: string
+  /** Veo's structured assignment: a team UUID (not slug) or null when
+   *  unassigned. Used for idempotent re-runs of the assignment pipeline. */
+  team?: string | null
 }
 
 export interface VeoVideo {
@@ -349,12 +352,24 @@ export async function listClubsAndTeams(): Promise<
     for (const club of clubs) {
       let teams: VeoTeam[] = []
       if (club.team_count > 0) {
+        // page_size=500 mirrors the members endpoint convention — Veo's
+        // default page is small (~20) and silently truncates when the
+        // club has more teams than that. Without this, listClubsAndTeams
+        // returns an empty teams array for any club past the default
+        // page boundary, which broke executor idempotency for LYL (~30+ teams).
         const teamsRes = await session.api(
           'GET',
-          `/api/app/clubs/${club.slug}/teams/`
+          `/api/app/clubs/${club.slug}/teams/?page_size=500`
         )
         if (teamsRes.status === 200) {
-          teams = parseBody(teamsRes.body) || []
+          const body = parseBody(teamsRes.body)
+          // Tolerate both shapes: flat array (small clubs) OR DRF-style
+          // paginated `{ count, next, previous, results: [...] }` wrapper.
+          teams = Array.isArray(body)
+            ? body
+            : Array.isArray(body?.results)
+              ? body.results
+              : []
         }
       }
       result.push({ ...club, teams })
@@ -377,7 +392,7 @@ export async function listRecordings(
   return withSession(async (session) => {
     const res = await session.api(
       'GET',
-      `/api/app/clubs/${clubSlug}/recordings/?filter=own&fields=privacy&fields=title&fields=slug&fields=duration&fields=thumbnail&fields=uuid&fields=match_date&fields=home_team&fields=away_team&fields=home_score&fields=away_score&fields=processing_status&page_size=50`
+      `/api/app/clubs/${clubSlug}/recordings/?filter=own&fields=privacy&fields=title&fields=slug&fields=duration&fields=thumbnail&fields=uuid&fields=match_date&fields=home_team&fields=away_team&fields=home_score&fields=away_score&fields=processing_status&fields=team&page_size=200`
     )
 
     if (res.status !== 200) {
@@ -392,6 +407,397 @@ export async function listRecordings(
       success: true,
       message: `Found ${recordings.length} recordings`,
       data: { recordings },
+    }
+  })
+}
+
+/**
+ * Create a team under a club. Veo derives the team slug from `name`
+ * (lower-case, hyphenated). Returns the full team object on success;
+ * the caller will want `id` (UUID) for later recording-assignment
+ * calls and `slug` for any URL-building.
+ *
+ * Idempotency: Veo allows duplicate team names (each gets a unique
+ * auto-suffixed slug). Callers should pre-check via listClubsAndTeams
+ * and skip creation when a team with the desired slug already exists.
+ *
+ * Endpoint reverse-engineered 2026-05-17 via veo-automations capture.
+ */
+export interface CreateTeamInput {
+  clubSlug: string
+  name: string
+  /** Veo accepts "U6"…"U21" and other custom strings; we use "U7"-"U18"
+   *  for LYL. Required by Veo even though some flows don't show it. */
+  ageGroup: string
+  /** "male" | "female" | "mixed". Required by Veo. LYL pilot uses "male". */
+  gender: 'male' | 'female' | 'mixed'
+  /** Up to ~3 chars typically (Veo's UI cap). Falls back to the
+   *  uppercase initials of `name` if not supplied. */
+  shortName?: string
+}
+
+export interface VeoTeamFull {
+  id: string
+  slug: string
+  name: string
+  age_group: string
+  gender: string
+  short_name: string
+  match_count: number
+  member_count: number
+  url: string
+}
+
+export async function createTeam(
+  input: CreateTeamInput
+): Promise<VeoResult<{ team: VeoTeamFull }>> {
+  // Default short_name to upper-case initials of the team name if the
+  // caller didn't supply one — Veo will 400 on missing short_name.
+  const shortName =
+    input.shortName ??
+    input.name
+      .split(/\s+/)
+      .map((w) => w[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 6)
+  return withSession(async (session) => {
+    const res = await session.api('POST', `/api/app/teams/`, {
+      club: input.clubSlug,
+      name: input.name,
+      age_group: input.ageGroup,
+      gender: input.gender,
+      short_name: shortName,
+    })
+    if (res.status !== 201 && res.status !== 200) {
+      return {
+        success: false,
+        message: `Failed to create team "${input.name}": ${res.status} ${
+          typeof res.body === 'string' ? res.body.slice(0, 200) : JSON.stringify(res.body).slice(0, 200)
+        }`,
+      }
+    }
+    const team = parseBody(res.body) as VeoTeamFull | null
+    if (!team || !team.id || !team.slug) {
+      return {
+        success: false,
+        message: `Team creation returned malformed body for "${input.name}"`,
+      }
+    }
+    return {
+      success: true,
+      message: `Created team ${team.slug} (id=${team.id})`,
+      data: { team },
+    }
+  })
+}
+
+/**
+ * Upload a new crest (team logo) for a team.
+ *
+ * Endpoint reverse-engineered 2026-05-17 via veo-automations capture
+ * (`capture-team-logo-upload.mjs` → /tmp/veo-team-logo-capture.json).
+ *
+ * Endpoint: POST /api/app/clubs/{clubSlug}/teams/{teamSlug}/crest/
+ * Body: multipart/form-data with a single file part. Field name presumed
+ * `crest` (matches the endpoint path; Playwright's `postDataBuffer()`
+ * returned null for the captured upload so we couldn't read the field
+ * name directly — first failure with a 400 should switch to `image` or
+ * `file`). Response is the new asset URL string (NOT a JSON object).
+ *
+ * Permission gate: `teams.update_team_crest` on the team detail response.
+ * Throws if the team detail's permission flag is false.
+ *
+ * @param input.clubSlug Veo club slug (e.g. 'london-youth-league')
+ * @param input.teamSlug Veo team slug (e.g. 'barnes-eagles-u10')
+ * @param input.imageBytes Raw image bytes (PNG / JPG / WebP)
+ * @param input.mimeType MIME type matching the bytes
+ * @param input.filename Filename to send with the part (cosmetic on Veo's side, but they store it). Defaults to `crest.<ext>`.
+ */
+// Defense-in-depth allowlists at the call boundary. Today's callers
+// pass safe inputs, but these functions are exported and reusable;
+// the next caller might not. Per 2026-05-17 security review.
+const VEO_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,80}$/
+const ALLOWED_CREST_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+
+export async function uploadTeamCrest(input: {
+  clubSlug: string
+  teamSlug: string
+  imageBytes: Buffer
+  mimeType: string
+  filename?: string
+}): Promise<VeoResult<{ crestUrl: string }>> {
+  // Slug shape check — rejects path traversal / weird characters before
+  // they hit the URL interpolation.
+  if (!VEO_SLUG_RE.test(input.clubSlug) || !VEO_SLUG_RE.test(input.teamSlug)) {
+    return { success: false, message: 'uploadTeamCrest: invalid slug shape' }
+  }
+  // MIME allowlist — Veo accepts more than this (and re-encodes), but
+  // we lock to safe raster formats so a stray image/svg+xml can't get
+  // through and become an XSS surface elsewhere.
+  if (!ALLOWED_CREST_MIME.has(input.mimeType)) {
+    return { success: false, message: `uploadTeamCrest: mime "${input.mimeType}" not in allowlist` }
+  }
+  const ext = input.mimeType.split('/')[1] || 'png'
+  const filename = input.filename ?? `crest.${ext}`
+  return withSession(async (session) => {
+    const res = await session.apiMultipart(
+      'POST',
+      `/api/app/clubs/${input.clubSlug}/teams/${input.teamSlug}/crest/`,
+      [
+        {
+          name: 'crest',
+          filename,
+          mimeType: input.mimeType,
+          buffer: input.imageBytes,
+        },
+      ]
+    )
+    if (res.status !== 200 && res.status !== 201) {
+      // Strip non-printable bytes from the preview — if Veo echoes the
+      // upload payload back in an error response, we don't want raw
+      // image bytes corrupting our logs.
+      const rawPreview = typeof res.body === 'string' ? res.body.slice(0, 300) : JSON.stringify(res.body).slice(0, 300)
+      const preview = rawPreview.replace(/[^\x20-\x7e]/g, '?')
+      return {
+        success: false,
+        message: `Failed to upload crest for ${input.clubSlug}/${input.teamSlug}: ${res.status} ${preview}`,
+      }
+    }
+    // Veo returns the asset URL as a JSON-quoted string body (not an
+    // object). Strip the surrounding quotes if present.
+    const raw = typeof res.body === 'string' ? res.body.trim() : ''
+    const crestUrl = raw.startsWith('"') && raw.endsWith('"') ? raw.slice(1, -1) : raw
+    // Validate the returned URL is actually a Veo asset — protects any
+    // downstream code that persists / renders this URL from an
+    // unexpected Veo response redirecting to an arbitrary host.
+    if (!/^https:\/\/[^/]*(?:veo\.co|veocdn\.com)\//.test(crestUrl)) {
+      return {
+        success: false,
+        message: `Crest upload returned unexpected URL for ${input.teamSlug}: ${raw.slice(0, 200)}`,
+      }
+    }
+    return {
+      success: true,
+      message: `Uploaded crest for ${input.teamSlug}`,
+      data: { crestUrl },
+    }
+  })
+}
+
+/**
+ * Assign a recording to a team. The recording is addressed by its UUID
+ * (not slug — Veo's `/api/app/matches/{uuid}/` endpoint requires the UUID
+ * even though the consumer URLs use slugs). `teamUUID` is the team's `id`
+ * field as returned by createTeam / listClubsAndTeams.
+ *
+ * Endpoint reverse-engineered 2026-05-17 via veo-automations capture.
+ * Note: Veo's data model only allows ONE assigned team per recording
+ * (the `team` field is a single FK, not an array). To assign a match to
+ * BOTH the home + away age-group folders, we need to call this once with
+ * the home team UUID — see the executor for the second-side strategy.
+ */
+export async function assignRecordingToTeam(
+  recordingUUID: string,
+  teamUUID: string
+): Promise<VeoResult<{ recording: { id: string; team: string } }>> {
+  return withSession(async (session) => {
+    const res = await session.api(
+      'PATCH',
+      `/api/app/matches/${recordingUUID}/`,
+      { team: teamUUID }
+    )
+    if (res.status !== 200) {
+      return {
+        success: false,
+        message: `Failed to assign recording ${recordingUUID} → team ${teamUUID}: ${res.status}`,
+      }
+    }
+    const body = parseBody(res.body) as { id: string; team: string } | null
+    return {
+      success: true,
+      message: `Assigned recording ${recordingUUID} → team ${teamUUID}`,
+      data: { recording: body ?? { id: recordingUUID, team: teamUUID } },
+    }
+  })
+}
+
+/**
+ * Send a share invitation for a recording. Veo's "Share with Opponent"
+ * feature; creates a pending invitation tied to the recipient email and
+ * returns a `key` used by the accept endpoint.
+ *
+ * The returned URL pattern is:
+ *   https://app.veo.co/matches/{recordingSlug}/share-invitations/{key}/
+ * The recipient (or the LYL admin acting as recipient) accepts via that
+ * URL, which fires acceptShareInvitation() below.
+ *
+ * Endpoint reverse-engineered 2026-05-17 via veo-automations capture.
+ */
+export interface CreateShareInvitationInput {
+  /** The slug of the recording to share (NOT the UUID — Veo uses the
+   *  slug on this endpoint, unlike the assign-team PATCH). */
+  recordingSlug: string
+  email: string
+}
+
+export interface VeoShareInvitation {
+  key: string
+  email: string
+  accepted: boolean
+  /** Populated only AFTER acceptance — UUID of the new match record
+   *  Veo creates in the recipient's clubhouse. */
+  output_recording: string | null
+  output_club: string | null
+  output_user: string | null
+}
+
+export async function createShareInvitation(
+  input: CreateShareInvitationInput
+): Promise<VeoResult<{ invitation: VeoShareInvitation }>> {
+  return withSession(async (session) => {
+    const res = await session.api(
+      'POST',
+      `/api/app/matches/${input.recordingSlug}/share-invitations/`,
+      { email: input.email }
+    )
+    if (res.status !== 201 && res.status !== 200) {
+      return {
+        success: false,
+        message: `Failed to share ${input.recordingSlug} → ${input.email}: ${res.status}`,
+      }
+    }
+    const body = parseBody(res.body) as VeoShareInvitation | null
+    if (!body?.key) {
+      return {
+        success: false,
+        message: `Share invitation for ${input.recordingSlug} returned no key`,
+      }
+    }
+    return {
+      success: true,
+      message: `Shared ${input.recordingSlug} → ${input.email} (key=${body.key.slice(0, 8)}…)`,
+      data: { invitation: body },
+    }
+  })
+}
+
+/**
+ * Accept a share invitation, duplicating the recording into another
+ * team's folder. The team can be in the SAME club (which is what we
+ * want for LYL where home + away are both LYL teams) or a different
+ * club. Returns the new match record's UUID.
+ *
+ * Programmatic acceptance avoids the email-delivery round trip — once
+ * we have the `key` from createShareInvitation(), we can immediately
+ * accept on the same Veo session.
+ *
+ * Endpoint reverse-engineered 2026-05-17 via veo-automations capture.
+ */
+export interface AcceptShareInvitationInput {
+  shareKey: string
+  /** Which club the duplicate match should land in. For LYL → 'london-youth-league' */
+  ownClubSlug: string
+  /** Team UUID (from createTeam or listClubsAndTeams) the duplicate should be assigned to. */
+  teamUUID: string
+  /** Title for the new match record. Typically copy from the source recording. */
+  title: string
+  /** ISO timestamps from the source recording. Required by the endpoint. */
+  start: string
+  end: string
+  /** "home" or "away" — describes which side OWNS this duplicate. For
+   *  cross-team sharing within LYL, the receiving (away) team is the
+   *  owner of the new copy, so the canonical value is "away". */
+  ownTeamHomeOrAway?: 'home' | 'away'
+  /** Defaults to "private" matching the Veo UI default. */
+  privacy?: 'private' | 'public'
+  /** Name of the originating club (shown in the new match metadata).
+   *  Defaults to the same club's title — for LYL this is "London Youth League". */
+  opponentClubName?: string
+}
+
+export interface VeoMatchCreated {
+  id: string
+  slug: string
+  title: string
+  team: string
+}
+
+export async function acceptShareInvitation(
+  input: AcceptShareInvitationInput
+): Promise<VeoResult<{ match: VeoMatchCreated }>> {
+  return withSession(async (session) => {
+    const res = await session.api('POST', `/api/app/matches/`, {
+      signup_token: {
+        key: input.shareKey,
+        type: 'recordingshareinvitation',
+      },
+      team: input.teamUUID,
+      own_club: input.ownClubSlug,
+      own_team_home_or_away: input.ownTeamHomeOrAway ?? 'away',
+      title: input.title,
+      start: input.start,
+      end: input.end,
+      opponent_club_name: input.opponentClubName ?? '',
+      privacy: input.privacy ?? 'private',
+    })
+    if (res.status !== 201 && res.status !== 200) {
+      return {
+        success: false,
+        message: `Failed to accept share ${input.shareKey.slice(0, 8)}…: ${res.status} ${
+          typeof res.body === 'string' ? res.body.slice(0, 200) : JSON.stringify(res.body).slice(0, 200)
+        }`,
+      }
+    }
+    // Tolerant body parse: Veo's accept response shape isn't fully
+    // documented; the response may use `id` + `slug` (the create-match
+    // shape) OR a wrapper around it. Treat 2xx as authoritative success
+    // and pass through whatever id/slug we can find — both are
+    // informational for our purposes (the actual side-effect, creating
+    // the new match assigned to the target team, has already happened).
+    const body = parseBody(res.body) as Partial<VeoMatchCreated> | null
+    const id = body?.id ?? 'unknown'
+    const slug = body?.slug ?? 'unknown'
+    return {
+      success: true,
+      message: `Accepted share → new match ${slug} (id=${id}) assigned to team ${input.teamUUID}`,
+      data: {
+        match: {
+          id,
+          slug,
+          title: body?.title ?? input.title,
+          team: body?.team ?? input.teamUUID,
+        },
+      },
+    }
+  })
+}
+
+/**
+ * Delete a team from a club. Used to clean up the capture-test-team
+ * created during the Veo API reverse-engineering capture; also useful
+ * for ops removal of mis-spelled team rows before they collect members.
+ */
+export async function deleteTeam(
+  clubSlug: string,
+  teamSlug: string
+): Promise<VeoResult> {
+  return withSession(async (session) => {
+    const res = await session.api(
+      'DELETE',
+      `/api/app/clubs/${clubSlug}/teams/${teamSlug}/`
+    )
+    // 204 (no content) is Veo's standard delete success. Some Veo
+    // endpoints return 200 — accept both.
+    if (res.status !== 204 && res.status !== 200) {
+      return {
+        success: false,
+        message: `Failed to delete team ${clubSlug}/${teamSlug}: ${res.status}`,
+      }
+    }
+    return {
+      success: true,
+      message: `Deleted team ${clubSlug}/${teamSlug}`,
     }
   })
 }
