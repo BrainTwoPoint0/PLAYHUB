@@ -321,10 +321,22 @@ export async function createAcademyCheckoutSession(
   // customer_creation is rejected by Stripe ("customer_creation can only be
   // used in payment mode"). Stripe's docs confirm: every subscription
   // checkout gets a customer for free.
+  // Line items: recurring subscription + optional one-time registration
+  // fee. Stripe charges the one-time fee on the first invoice alongside
+  // the recurring price. Same shape as the legacy CFA Payment Links
+  // (which include the canonical £0.35 Processing Fee as a second line
+  // item). Per-club via playhub_academy_config.registration_fee_stripe_price_id.
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+    { price: price.id, quantity: 1 },
+  ]
+  if (club.registrationFeeStripePriceId) {
+    lineItems.push({ price: club.registrationFeeStripePriceId, quantity: 1 })
+  }
+
   const params: Stripe.Checkout.SessionCreateParams = {
     mode: 'subscription',
     payment_method_types: ['card'],
-    line_items: [{ price: price.id, quantity: 1 }],
+    line_items: lineItems,
     metadata: sharedMetadata,
     subscription_data: { metadata: sharedMetadata },
     allow_promotion_codes: true,

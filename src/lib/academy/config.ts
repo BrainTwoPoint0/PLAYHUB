@@ -12,6 +12,14 @@ export interface AcademyClub {
   organizationId?: string
   logoUrl?: string | null
   hasScholarships?: boolean
+  /** Optional one-time Stripe price ID added as a second line item on the
+   *  Checkout Session. Charged once on the first invoice alongside the
+   *  recurring subscription. Set per-club via playhub_academy_config so
+   *  each league can opt in/out. Today this is the canonical £0.35
+   *  Processing-Fee price (`price_1Q5afBGeCTeSkDl96AwVXwmP`) shared
+   *  across CFA / SEFA / LYL — same fee that the legacy CFA Payment
+   *  Links already include as a second line item. */
+  registrationFeeStripePriceId?: string
 }
 
 // ============================================================================
@@ -47,6 +55,7 @@ async function loadClubs(): Promise<AcademyClub[]> {
     organizationId: row.organization_id || undefined,
     logoUrl: row.logo_url || null,
     hasScholarships: row.has_scholarships ?? false,
+    registrationFeeStripePriceId: row.registration_fee_stripe_price_id || undefined,
   }))
   cacheExpiresAt = Date.now() + CACHE_TTL_MS
 
