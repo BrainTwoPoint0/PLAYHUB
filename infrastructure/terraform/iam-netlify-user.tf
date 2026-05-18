@@ -112,6 +112,36 @@ resource "aws_iam_user_policy" "netlify_medialive" {
 }
 
 # ----------------------------------------------------------------------------
+# Lambda invoke: PLAYHUB Next.js routes call AWS SDK to async-invoke
+# background Lambdas. Currently used by the Academy → Sync Now flow
+# (cache-sync, cleanup-sync, privacy-sync — all dispatched via the
+# playhub-veo-sync Lambda's `action` payload field).
+#
+# Add new ARNs here as routes start invoking other Lambdas. The LYL
+# sync Lambda is intentionally NOT here — it uses a Function URL with
+# x-api-key auth, not SDK invocation, so it doesn't need IAM permissions.
+# ----------------------------------------------------------------------------
+
+resource "aws_iam_user_policy" "netlify_lambda" {
+  name = "playhub-netlify-lambda"
+  user = aws_iam_user.netlify.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "InvokeBackgroundLambdas"
+        Effect   = "Allow"
+        Action   = "lambda:InvokeFunction"
+        Resource = [
+          aws_lambda_function.veo_sync.arn,
+        ]
+      },
+    ]
+  })
+}
+
+# ----------------------------------------------------------------------------
 # Access key for Netlify env vars
 # ----------------------------------------------------------------------------
 

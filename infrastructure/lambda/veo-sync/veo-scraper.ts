@@ -623,3 +623,53 @@ export async function removeMembersFromClub(
 
   return results
 }
+
+// ============================================================================
+// Invite a single player to a Veo team
+// ============================================================================
+
+/**
+ * Invite a player by email to a Veo team. Mirror of src/lib/veo/client.ts
+ * `invitePlayer` — kept in the Lambda's own copy of the scraper because
+ * the Lambda runs in its own bundle with its own Playwright session.
+ *
+ * Idempotent: Veo returns 200 + `existing_invitations` if the email is
+ * already pending — we treat that as success.
+ */
+export async function invitePlayerToTeam(
+  session: VeoSession,
+  clubSlug: string,
+  teamSlug: string,
+  email: string
+): Promise<{ success: boolean; message: string; status: number }> {
+  const res = await session.api(
+    'POST',
+    `/api/app/clubs/${clubSlug}/teams/${teamSlug}/addressed-invitations/`,
+    { invitations: [{ email, permission_role: 'viewer' }] }
+  )
+  const data = parseBody(res.body)
+  if (res.status === 201) {
+    return { success: true, message: `Invitation sent to ${email}`, status: 201 }
+  }
+  // 200 + populated `existing_invitations` = already pending. Treat as
+  // success so retries are idempotent (Stripe webhook replay, manual
+  // re-invite from admin UI, defensive cron sweep).
+  if (res.status === 200 && data?.existing_invitations?.length > 0) {
+    return {
+      success: true,
+      message: `${email} already has a pending invitation`,
+      status: 200,
+    }
+  }
+  // Strip non-printable bytes from error body — Veo occasionally returns
+  // multipart-form-encoded error pages whose raw bytes would corrupt the
+  // CloudWatch log line.
+  const preview = res.body
+    .slice(0, 300)
+    .replace(/[^\x20-\x7e]/g, '?')
+  return {
+    success: false,
+    message: `Failed to invite ${email}: ${res.status} ${preview}`,
+    status: res.status,
+  }
+}

@@ -507,11 +507,21 @@ function logProvisioningOutcome(
   context: string
 ): void {
   if (outcome.kind === 'success') {
+    // IMPORTANT: `kind === 'success'` here means "Lambda dispatch accepted"
+    // (the async-invoke fan-out from the webhook), NOT "Veo confirmed the
+    // invite". The Lambda emits a separate `veo_invite_succeeded` /
+    // `veo_invite_failed` log when the actual Veo write lands ~10-30s later.
+    // Alerts that need "the customer actually has access" must key on the
+    // Lambda's veo_invite_* events or on `provisioned_at IS NOT NULL`,
+    // NOT on this dispatch event.
+    //
+    // The `result: 'dispatched'` field below is the load-bearing signal.
+    // Renamed from 'success' on 2026-05-17 per API-architect review.
     console.log(
       JSON.stringify({
         event: 'academy_provisioning',
         context,
-        result: 'success',
+        result: outcome.alreadyProvisioned ? 'already_provisioned' : 'dispatched',
         sub_id: outcome.subId,
         already_provisioned: outcome.alreadyProvisioned,
       })

@@ -115,6 +115,11 @@ resource "aws_lambda_function" "veo_sync" {
       SUPABASE_URL             = var.supabase_url
       SUPABASE_SERVICE_ROLE_KEY = var.supabase_service_key
       LAMBDA_TIMEOUT           = "600"
+      # Used by the `invite-member` action handler to email
+      # admin@playbacksports.ai when a Veo invite fails for a paying
+      # customer. var.resend_api_key is already declared in invoicing-lambda.tf.
+      RESEND_API_KEY           = var.resend_api_key
+      ADMIN_ALERT_EMAIL        = var.alert_email
     }
   }
 
@@ -231,11 +236,130 @@ resource "aws_lambda_permission" "eventbridge_veo_content_precache" {
   source_arn    = aws_cloudwatch_event_rule.veo_content_precache_schedule.arn
 }
 
+# Dead Letter Queue for async invocations that crash before completion.
+# Defense-in-depth on top of the hourly sweep + failure email + attempt
+# ceiling — catches Lambda cold-start failures / throttle events within
+# seconds rather than the sweep's 1-hour worst-case latency.
+#
+# Gated behind `var.enable_veo_sync_dlq` (default false) because
+# `playhub-admin` currently lacks `sqs:CreateQueue` permission. To enable:
+#   1. Grant playhub-admin: sqs:CreateQueue, sqs:GetQueueAttributes,
+#      sqs:SetQueueAttributes, sqs:TagQueue, sqs:UntagQueue, sqs:DeleteQueue
+#      via AWS console.
+#   2. Set TF_VAR_enable_veo_sync_dlq=true and run terraform apply.
+#   3. Uncomment the destination_config block in event_invoke_config below.
+variable "enable_veo_sync_dlq" {
+  description = "When true, provisions the veo-sync DLQ + alarm. Requires playhub-admin to have sqs:* permissions; default false until IAM is granted."
+  type        = bool
+  default     = false
+}
+
+resource "aws_sqs_queue" "veo_sync_dlq" {
+  count                      = var.enable_veo_sync_dlq ? 1 : 0
+  name                       = "${var.project_name}-veo-sync-dlq"
+  message_retention_seconds  = 1209600 # 14 days — max
+  visibility_timeout_seconds = 60
+
+  tags = {
+    Name        = "PLAYHUB Veo Sync DLQ"
+    Environment = var.environment
+  }
+}
+
+resource "aws_iam_role_policy" "veo_sync_lambda_dlq" {
+  count = var.enable_veo_sync_dlq ? 1 : 0
+  name  = "${var.project_name}-veo-sync-lambda-dlq"
+  role  = aws_iam_role.veo_sync_lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid      = "WriteToDeadLetterQueue"
+      Effect   = "Allow"
+      Action   = "sqs:SendMessage"
+      Resource = aws_sqs_queue.veo_sync_dlq[0].arn
+    }]
+  })
+}
+
 # Disable Lambda's own async invocation retries (EventBridge retry_policy handles
-# EventBridge-triggered retries, but this covers manual async invocations too)
+# EventBridge-triggered retries, but this covers manual async invocations too).
+#
+# DLQ destination_config is commented out until SQS IAM is granted to
+# playhub-admin — see the `veo_sync_dlq` resource block above for the
+# missing permissions. Once the IAM is granted, uncomment + apply.
 resource "aws_lambda_function_event_invoke_config" "veo_sync" {
   function_name          = aws_lambda_function.veo_sync.function_name
   maximum_retry_attempts = 0
+
+  # destination_config {
+  #   on_failure {
+  #     destination = aws_sqs_queue.veo_sync_dlq.arn
+  #   }
+  # }
+}
+
+# Alarm if anything lands in the DLQ — paying customer may be unprovisioned.
+resource "aws_cloudwatch_metric_alarm" "veo_sync_dlq_not_empty" {
+  count               = var.enable_veo_sync_dlq ? 1 : 0
+  alarm_name          = "${var.project_name}-veo-sync-dlq-not-empty"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  namespace           = "AWS/SQS"
+  period              = 300
+  statistic           = "Maximum"
+  threshold           = 0
+  alarm_description   = "veo-sync Lambda async invocation failed and landed in DLQ — paying customer may be unprovisioned"
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    QueueName = aws_sqs_queue.veo_sync_dlq[0].name
+  }
+
+  alarm_actions = [aws_sns_topic.sync_alerts.arn]
+  ok_actions    = [aws_sns_topic.sync_alerts.arn]
+
+  tags = {
+    Name        = "PLAYHUB Veo Sync DLQ Alarm"
+    Environment = var.environment
+  }
+}
+
+# ============================================================================
+# PROVISION-RETRY SWEEP — defensive hourly sweep for any academy_subscriptions
+# row that's active+unprovisioned for >5min. Catches lost events from the
+# Stripe-webhook → Lambda async-dispatch path. See invite-member.ts.
+# ============================================================================
+
+resource "aws_cloudwatch_event_rule" "veo_sync_provision_retry_schedule" {
+  name                = "${var.project_name}-veo-sync-provision-retry-schedule"
+  description         = "Trigger veo-sync Lambda's provision-retry sweep hourly"
+  schedule_expression = "rate(1 hour)"
+  tags = {
+    Name        = "PLAYHUB Provision-Retry Sweep Schedule"
+    Environment = var.environment
+  }
+}
+
+resource "aws_cloudwatch_event_target" "veo_sync_provision_retry_target" {
+  rule      = aws_cloudwatch_event_rule.veo_sync_provision_retry_schedule.name
+  target_id = "veo-sync-provision-retry"
+  arn       = aws_lambda_function.veo_sync.arn
+  input     = jsonencode({ action = "provision-retry" })
+
+  retry_policy {
+    maximum_retry_attempts       = 0
+    maximum_event_age_in_seconds = 60
+  }
+}
+
+resource "aws_lambda_permission" "eventbridge_veo_sync_provision_retry" {
+  statement_id  = "AllowEventBridgeProvisionRetry"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.veo_sync.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.veo_sync_provision_retry_schedule.arn
 }
 
 # Reuse existing SNS topic for alerts

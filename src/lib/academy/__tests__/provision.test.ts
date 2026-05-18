@@ -240,7 +240,8 @@ describe('provisionAcademyAccess', () => {
       expect(deps.inviteToVeo).toHaveBeenCalledWith(
         'lyl-veo-slug',
         'lyl-u12-tigers-veo',
-        'parent@example.com'
+        'parent@example.com',
+        'sub-uuid-1'
       )
     })
 
@@ -393,7 +394,8 @@ describe('provisionAcademyAccess', () => {
       expect(deps.inviteToVeo).toHaveBeenCalledWith(
         'barnes-eagles-veo',
         'lyl-u12-tigers-veo',
-        'parent@example.com'
+        'parent@example.com',
+        'sub-uuid-1'
       )
       expect(deps.loadSubclubVeoClubSlug).toHaveBeenCalledWith('lyl', 'barnes-eagles')
       // Resolution scoped to (club, subclub, team) — see SQL partial UNIQUE.
@@ -418,7 +420,8 @@ describe('provisionAcademyAccess', () => {
       expect(deps.inviteToVeo).toHaveBeenCalledWith(
         'lyl-veo-slug',
         'lyl-u12-tigers-veo',
-        'parent@example.com'
+        'parent@example.com',
+        'sub-uuid-1'
       )
     })
 
@@ -462,7 +465,8 @@ describe('provisionAcademyAccess', () => {
       expect(deps.inviteToVeo).toHaveBeenCalledWith(
         'lyl-veo-slug',
         'lyl-u12-tigers-veo',
-        'parent@example.com'
+        'parent@example.com',
+        'sub-uuid-1'
       )
       // resolveVeoTeamSlug receives null subclub for the flat-path lookup.
       expect(deps.resolveVeoTeamSlug).toHaveBeenCalledWith(
@@ -499,7 +503,8 @@ describe('provisionAcademyAccess', () => {
       expect(deps.inviteToVeo).toHaveBeenCalledWith(
         'lyl-veo-slug',
         'lyl-u12-tigers-veo',
-        'parent@example.com'
+        'parent@example.com',
+        'sub-uuid-1'
       )
       expect(deps.recordOutcome).toHaveBeenCalledWith(
         'sub-uuid-1',

@@ -23,6 +23,7 @@ import {
 } from './cache-writer'
 import { writeRecordingEventsForVeoMatch } from './recording-events-writer'
 import { CLUB_VEO_SLUGS, PUBLIC_RECORDING_TEAMS } from './config'
+import { runInviteMember, runProvisionRetrySweep } from './invite-member'
 
 const PLAYHUB_URL = process.env.PLAYHUB_URL!
 const SYNC_API_KEY = process.env.SYNC_API_KEY!
@@ -32,8 +33,15 @@ const CLUB_SLUGS = (process.env.CLUB_SLUGS || 'cfa,sefa')
 const SYNC_MODE = (process.env.SYNC_MODE || 'dry-run') as 'dry-run' | 'execute'
 
 interface EventPayload {
-  action?: 'cache-sync' | 'cleanup-sync' | 'privacy-sync' | 'content-precache'
+  action?: 'cache-sync' | 'cleanup-sync' | 'privacy-sync' | 'content-precache' | 'invite-member' | 'provision-retry'
   clubSlug?: string // Optional: sync only this club (for manual triggers)
+  // invite-member-only fields. Lambda dispatched async from PLAYHUB's
+  // Stripe webhook + admin re-invite + post-claim retry endpoints.
+  // See invite-member.ts for full contract.
+  subId?: string
+  veoClubSlug?: string
+  veoTeamSlug?: string
+  email?: string
 }
 
 // Lambda Function URL events have requestContext; EventBridge events don't
@@ -594,6 +602,54 @@ export const handler = async (
   console.log(
     `Veo sync Lambda invoked (action: ${action}, club: ${targetClub || 'all'}, clubs: ${CLUB_SLUGS.join(', ')})`
   )
+
+  // Defensive hourly sweep — picks up any academy_subscriptions row that
+  // is active but unprovisioned for >5min and re-dispatches the invite.
+  // Wired to EventBridge schedule `playhub-provision-retry-schedule`.
+  if (action === 'provision-retry') {
+    const sweep = await runProvisionRetrySweep()
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ...sweep }),
+    }
+  }
+
+  // invite-member returns a different shape than the *-sync actions
+  // (single sub_id outcome, not per-club). Branch out early.
+  if (action === 'invite-member') {
+    // subId is OPTIONAL — webhook-triggered invites pass it (so the
+    // Lambda can flip provisioned_at), ad-hoc admin invites omit it.
+    if (!payload.veoClubSlug || !payload.veoTeamSlug || !payload.email) {
+      return {
+        statusCode: 400,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          error: 'invite-member requires veoClubSlug, veoTeamSlug, email (subId optional)',
+        }),
+      }
+    }
+    const inviteResult = await runInviteMember({
+      subId: payload.subId,
+      veoClubSlug: payload.veoClubSlug,
+      veoTeamSlug: payload.veoTeamSlug,
+      email: payload.email,
+    })
+    // 200 for success / already_provisioned (both fine), 400 for invalid
+    // input, 404 for sub_not_found, 500 for invite_failed. The webhook
+    // dispatched us async via `InvocationType: 'Event'` so the status
+    // code is logged but not seen by the caller — the admin failure
+    // email is the real out-of-band signal on invite_failed.
+    let statusCode = 200
+    if (inviteResult.status === 'invalid_input') statusCode = 400
+    else if (inviteResult.status === 'sub_not_found') statusCode = 404
+    else if (inviteResult.status === 'invite_failed') statusCode = 500
+    return {
+      statusCode,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ...inviteResult }),
+    }
+  }
 
   let results: ClubResult[]
 

@@ -33,8 +33,76 @@
 
 import Stripe from 'stripe'
 import { createServiceClient } from '@/lib/supabase/server'
-import { invitePlayer, type VeoResult } from '@/lib/veo/client'
+import { type VeoResult } from '@/lib/veo/client'
 import { getClubBySlug, type AcademyClub } from './config'
+import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda'
+
+// Production Veo invite path goes through the playhub-veo-sync Lambda
+// (`action: 'invite-member'`) — Netlify functions have no Chromium binary
+// so direct invitePlayer() calls from here would crash on every paying
+// customer. The Lambda owns the DB flip (provisioned_at, provisioning_error)
+// asynchronously; this module just enqueues the dispatch.
+const VEO_SYNC_LAMBDA_NAME =
+  process.env.VEO_SYNC_LAMBDA_NAME || 'playhub-veo-sync'
+
+let cachedLambda: LambdaClient | null = null
+function getLambda(): LambdaClient {
+  if (!cachedLambda) {
+    cachedLambda = new LambdaClient({
+      region: process.env.PLAYHUB_AWS_REGION || 'eu-west-2',
+      credentials: {
+        accessKeyId: process.env.PLAYHUB_AWS_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.PLAYHUB_AWS_SECRET_ACCESS_KEY!,
+      },
+    })
+  }
+  return cachedLambda
+}
+
+/**
+ * Dispatch the Veo invite to the playhub-veo-sync Lambda asynchronously.
+ * Returns `{ success: true }` once the Lambda accepts the dispatch — the
+ * actual Veo invite happens in the background. The Lambda is responsible
+ * for flipping `provisioned_at`, recording `provisioning_error`, and
+ * emailing admin@playbacksports.ai on failure.
+ *
+ * The shape mirrors the legacy invitePlayer signature so the rest of
+ * provision.ts (which DI's `inviteToVeo`) doesn't need to know about
+ * the async-vs-sync change.
+ */
+async function dispatchInviteToVeoLambda(
+  veoClubSlug: string,
+  veoTeamSlug: string,
+  email: string,
+  subId: string
+): Promise<VeoResult> {
+  try {
+    await getLambda().send(
+      new InvokeCommand({
+        FunctionName: VEO_SYNC_LAMBDA_NAME,
+        InvocationType: 'Event',  // async — Lambda runs in background
+        Payload: Buffer.from(
+          JSON.stringify({
+            action: 'invite-member',
+            subId,
+            veoClubSlug,
+            veoTeamSlug,
+            email,
+          })
+        ),
+      })
+    )
+    return {
+      success: true,
+      message: `dispatched invite for ${email} → ${veoClubSlug}/${veoTeamSlug} (sub ${subId})`,
+    }
+  } catch (err) {
+    return {
+      success: false,
+      message: `Lambda dispatch failed: ${err instanceof Error ? err.message : String(err)}`,
+    }
+  }
+}
 
 // ============================================================================
 // Types
@@ -121,10 +189,16 @@ export interface ProvisionDeps {
    * unreachable / missing / forbidden cases.
    */
   fetchStripeCustomerEmail: (stripeCustomerId: string) => Promise<string | null>
+  /** Enqueues the Veo invite for the given subscription. Production impl
+   *  fires an async invocation to the playhub-veo-sync Lambda — the actual
+   *  Veo dashboard scrape happens out-of-band and the Lambda owns the
+   *  DB flip (`provisioned_at` / `provisioning_error`). Sync test impls
+   *  pass through to a fake that returns immediately. */
   inviteToVeo: (
     veoClubSlug: string,
     veoTeamSlug: string,
-    email: string
+    email: string,
+    subId: string
   ) => Promise<VeoResult>
   /** Persists outcome. Skips writes that would clobber an already-provisioned row. */
   recordOutcome: (subId: string, outcome: ProvisionOutcome) => Promise<void>
@@ -267,13 +341,31 @@ export function buildDefaultDeps(): ProvisionDeps {
       return email || null
     },
 
-    inviteToVeo: invitePlayer,
+    inviteToVeo: dispatchInviteToVeoLambda,
 
     recordOutcome: async (subId, outcome) => {
       const supabase = createServiceClient() as any
+      // Async-Lambda model: `provisioned_at` is owned by the Lambda's
+      // invite-member action handler — it flips it only when Veo actually
+      // accepts the invite. THIS function only records the enqueue-level
+      // outcome (Lambda dispatch ok / Lambda dispatch failed). Setting
+      // provisioned_at here would falsely mark the row as provisioned
+      // before any real Veo call had happened.
+      //
+      // - kind=success → enqueue ok. Clear stale error (we're retrying).
+      //   Lambda will set provisioned_at when the invite actually lands.
+      // - kind=failure → enqueue failed (or a pre-enqueue check did).
+      //   Record the error so the admin UI surfaces it.
+      // Set `provisioning_dispatched_at` on enqueue success so we can
+      // detect rows stuck in flight via SQL: provisioned_at IS NULL AND
+      // provisioning_error IS NULL AND provisioning_dispatched_at < now() - '15 min'.
+      // The Lambda then flips provisioned_at when the actual Veo invite lands.
       const patch =
         outcome.kind === 'success'
-          ? { provisioned_at: new Date().toISOString(), provisioning_error: null }
+          ? {
+              provisioning_error: null,
+              provisioning_dispatched_at: new Date().toISOString(),
+            }
           : { provisioning_error: outcome.error }
       const { error } = await supabase
         .from('playhub_academy_subscriptions')
@@ -544,12 +636,20 @@ export async function provisionAcademyAccess(
   }
 
   // Fire the Veo invite. Network errors → retryable.
+  //
+  // Important: the prod impl is now an async LAMBDA DISPATCH not a direct
+  // Veo call. `veoResult.success` here means "Lambda accepted the event",
+  // not "Veo accepted the invite". The actual Veo write happens out-of-
+  // band; the Lambda owns flipping `provisioned_at` and emailing
+  // admin@playbacksports.ai on Veo-level failures. From this caller's
+  // perspective, an enqueue success transitions the row to "in flight".
   let veoResult: VeoResult
   try {
     veoResult = await deps.inviteToVeo(
       veoClubSlug,
       veoTeamSlug,
-      rowEmail
+      rowEmail,
+      sub.id
     )
   } catch (err) {
     const outcome = fail(

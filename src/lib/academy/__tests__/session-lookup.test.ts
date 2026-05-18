@@ -229,7 +229,6 @@ describe('lookupAcademySession', () => {
           makeSession({
             customer: 'cus_secret_xxx',
             subscription: 'sub_secret_xxx',
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } as any)
         ),
       })
