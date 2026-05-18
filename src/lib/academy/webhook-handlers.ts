@@ -152,6 +152,10 @@ export interface ActiveSubInsert {
   registration_subclub: string | null
   customer_email: string
   customer_name: string | null
+  /** From Stripe custom_fields[playername]. NULL on legacy Payment Links that omit the field. */
+  player_name: string | null
+  /** From Stripe custom_fields[subscribertype]. 'parent' | 'player' | NULL. */
+  subscriber_type: string | null
   status: string
 }
 
@@ -163,6 +167,8 @@ export interface PendingSubInsert {
   registration_team: string
   registration_subclub: string | null
   customer_name: string | null
+  player_name: string | null
+  subscriber_type: string | null
   last_known_status: string
 }
 
@@ -312,6 +318,31 @@ export async function handleAcademyCheckoutCompleted(
   const customerEmail = session.customer_details?.email?.trim().toLowerCase()
   const customerName = session.customer_details?.name || null
 
+  // Stripe Checkout custom_fields. Self-serve flow sets `playername` (text)
+  // and `subscribertype` (dropdown: 'parent' | 'player'). Legacy CFA / SEFA
+  // Payment Links use the same keys for the playername entry but a different
+  // key family for team — we only care about the two roster fields here;
+  // team_slug already lives in session.metadata. Bounded both fields to
+  // protect downstream UI from oversized attacker input; subscriber_type is
+  // additionally allowlisted because it drives roster-side logic.
+  let playerName: string | null = null
+  let subscriberType: string | null = null
+  for (const cf of session.custom_fields || []) {
+    const raw =
+      cf.type === 'dropdown'
+        ? cf.dropdown?.value
+        : cf.type === 'text'
+          ? cf.text?.value
+          : null
+    if (!raw) continue
+    if (cf.key === 'playername') {
+      playerName = raw.trim().slice(0, 80) || null
+    } else if (cf.key === 'subscribertype') {
+      const v = raw.trim().toLowerCase()
+      subscriberType = v === 'parent' || v === 'player' ? v : null
+    }
+  }
+
   if (!clubSlug || !teamSlug) {
     return { status: 'error', error: 'missing club_slug or team_slug in metadata' }
   }
@@ -355,6 +386,8 @@ export async function handleAcademyCheckoutCompleted(
       registration_subclub: subclubSlug,
       customer_email: customerEmail,
       customer_name: customerName,
+      player_name: playerName,
+      subscriber_type: subscriberType,
       // checkout.session.completed implies the first payment succeeded; status is
       // 'active' (or 'trialing' if a trial was configured — webhook only fires
       // when payment-side checkout completes, so 'active' is the safe default).
@@ -396,6 +429,8 @@ export async function handleAcademyCheckoutCompleted(
     registration_team: teamSlug,
     registration_subclub: subclubSlug,
     customer_name: customerName,
+    player_name: playerName,
+    subscriber_type: subscriberType,
     last_known_status: 'active',
   })
 

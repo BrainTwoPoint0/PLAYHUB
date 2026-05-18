@@ -185,7 +185,7 @@ describe('createAcademyCheckoutSession', () => {
         deps
       )
       expect(deps.createCheckoutSession).toHaveBeenCalledWith(
-        {
+        expect.objectContaining({
           mode: 'subscription',
           payment_method_types: ['card'],
           line_items: [{ price: 'price_lyl_1', quantity: 1 }],
@@ -211,7 +211,7 @@ describe('createAcademyCheckoutSession', () => {
             '&session_id={CHECKOUT_SESSION_ID}' +
             '&club=lyl',
           cancel_url: 'https://playbacksports.ai/academy/lyl?canceled=1',
-        },
+        }),
         // No idempotencyKey passed in this test → second arg is undefined
         undefined
       )
@@ -380,10 +380,13 @@ describe('createAcademyCheckoutSession', () => {
           '&club=lyl' +
           '&subclub=barnes-eagles'
       )
-      // Cancel returns to the SUBCLUB page, not the league page — otherwise
-      // a hierarchical parent who hits Back loses their place in the picker.
+      // Cancel returns to the CLUB page with the subclub as a query param —
+      // PLAYBACK's AcademyHierarchicalPicker keys subclub selection on
+      // ?club=<subclubSlug>; there is no nested /academy/lyl/barnes-eagles
+      // route, so a nested-path cancel_url 404s. The query param re-opens
+      // the right tab without losing the parent's place in the picker.
       expect(params.cancel_url).toBe(
-        'https://playbacksports.ai/academy/lyl/barnes-eagles?canceled=1'
+        'https://playbacksports.ai/academy/lyl?club=barnes-eagles&canceled=1'
       )
     })
 

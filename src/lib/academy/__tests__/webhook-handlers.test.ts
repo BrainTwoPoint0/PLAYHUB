@@ -223,6 +223,11 @@ describe('handleAcademyCheckoutCompleted', () => {
           registration_subclub: null,
           customer_email: 'parent@example.com',
           customer_name: 'Test Parent',
+          // Default fixture omits custom_fields → roster fields persist as
+          // null. Threading from a populated custom_fields[] has dedicated
+          // coverage in the "custom_fields parsing" describe block below.
+          player_name: null,
+          subscriber_type: null,
           status: 'active',
         } satisfies ActiveSubInsert)
       )
@@ -317,6 +322,8 @@ describe('handleAcademyCheckoutCompleted', () => {
           registration_team: 'lyl-u12-tigers',
           registration_subclub: null,
           customer_name: 'Test Parent',
+          player_name: null,
+          subscriber_type: null,
           last_known_status: 'active',
         } satisfies PendingSubInsert)
       )
@@ -429,6 +436,118 @@ describe('handleAcademyCheckoutCompleted', () => {
       expect(result.status).toBe('pending')
       expect(deps.insertPendingSub).toHaveBeenCalledWith(
         expect.objectContaining({ registration_subclub: null })
+      )
+    })
+  })
+
+  describe('custom_fields parsing (playername + subscribertype)', () => {
+    // Pin the round-trip from Stripe custom_fields[] → INSERT row. These
+    // fields are optional on the legacy CFA / SEFA Payment Links (which
+    // omit them entirely) and required on the new self-serve checkout —
+    // the handler must tolerate both shapes without losing data.
+
+    function makeSessionWithFields(
+      fields: Array<{ key: string; type: 'text' | 'dropdown'; value: string }>
+    ): Stripe.Checkout.Session {
+      const custom_fields = fields.map((f) =>
+        f.type === 'text'
+          ? { key: f.key, type: 'text', text: { value: f.value } }
+          : { key: f.key, type: 'dropdown', dropdown: { value: f.value } }
+      )
+      return makeCheckoutSession({ custom_fields } as any)
+    }
+
+    it('persists playername + subscribertype to active row when both present', async () => {
+      const deps = makeDeps({
+        loadProfileByEmail: vi.fn(async () => ({ user_id: 'user-uuid-1' })),
+      })
+      const session = makeSessionWithFields([
+        { key: 'playername', type: 'text', value: 'Charlie Turner' },
+        { key: 'subscribertype', type: 'dropdown', value: 'parent' },
+      ])
+      await handleAcademyCheckoutCompleted(session, deps)
+      expect(deps.insertActiveSub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          player_name: 'Charlie Turner',
+          subscriber_type: 'parent',
+        } satisfies Partial<ActiveSubInsert>)
+      )
+    })
+
+    it('persists playername + subscribertype to pending row when no profile exists', async () => {
+      const deps = makeDeps()
+      const session = makeSessionWithFields([
+        { key: 'playername', type: 'text', value: 'Charlie Turner' },
+        { key: 'subscribertype', type: 'dropdown', value: 'player' },
+      ])
+      await handleAcademyCheckoutCompleted(session, deps)
+      expect(deps.insertPendingSub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          player_name: 'Charlie Turner',
+          subscriber_type: 'player',
+        } satisfies Partial<PendingSubInsert>)
+      )
+    })
+
+    it('trims whitespace + caps playername at 80 chars (defends UI/DB from oversized attacker input)', async () => {
+      const deps = makeDeps({
+        loadProfileByEmail: vi.fn(async () => ({ user_id: 'user-uuid-1' })),
+      })
+      const longName = '  ' + 'a'.repeat(200) + '  '
+      const session = makeSessionWithFields([
+        { key: 'playername', type: 'text', value: longName },
+        { key: 'subscribertype', type: 'dropdown', value: 'parent' },
+      ])
+      await handleAcademyCheckoutCompleted(session, deps)
+      expect(deps.insertActiveSub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          player_name: 'a'.repeat(80),
+        } satisfies Partial<ActiveSubInsert>)
+      )
+    })
+
+    it('rejects subscribertype values outside the {parent, player} allowlist (defence against attacker-controlled dropdown injection via Stripe API)', async () => {
+      const deps = makeDeps({
+        loadProfileByEmail: vi.fn(async () => ({ user_id: 'user-uuid-1' })),
+      })
+      const session = makeSessionWithFields([
+        { key: 'playername', type: 'text', value: 'OK Name' },
+        { key: 'subscribertype', type: 'dropdown', value: 'admin' },
+      ])
+      await handleAcademyCheckoutCompleted(session, deps)
+      expect(deps.insertActiveSub).toHaveBeenCalledWith(
+        expect.objectContaining({ subscriber_type: null })
+      )
+    })
+
+    it('persists null for both fields when custom_fields[] is absent (legacy payment link compatibility)', async () => {
+      const deps = makeDeps({
+        loadProfileByEmail: vi.fn(async () => ({ user_id: 'user-uuid-1' })),
+      })
+      // Default makeCheckoutSession omits custom_fields entirely.
+      await handleAcademyCheckoutCompleted(makeCheckoutSession(), deps)
+      expect(deps.insertActiveSub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          player_name: null,
+          subscriber_type: null,
+        } satisfies Partial<ActiveSubInsert>)
+      )
+    })
+
+    it('ignores unrelated custom_field keys (preserves forward-compat with new fields)', async () => {
+      const deps = makeDeps({
+        loadProfileByEmail: vi.fn(async () => ({ user_id: 'user-uuid-1' })),
+      })
+      const session = makeSessionWithFields([
+        { key: 'extraField', type: 'text', value: 'whatever' },
+        { key: 'playername', type: 'text', value: 'Charlie' },
+      ])
+      await handleAcademyCheckoutCompleted(session, deps)
+      expect(deps.insertActiveSub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          player_name: 'Charlie',
+          subscriber_type: null,
+        } satisfies Partial<ActiveSubInsert>)
       )
     })
   })

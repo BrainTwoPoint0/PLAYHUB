@@ -295,13 +295,16 @@ export async function createAcademyCheckoutSession(
     `&session_id={CHECKOUT_SESSION_ID}` +
     `&club=${encodeURIComponent(clubSlug)}` +
     (subclubSlug ? `&subclub=${encodeURIComponent(subclubSlug)}` : '')
-  // Cancel returns the parent to the page they came FROM — the subclub
-  // picker for hierarchical, the flat club page otherwise. Otherwise a
-  // hierarchical parent who hits Back from Stripe lands on the subclub
-  // grid and has to re-navigate, which feels broken.
-  const cancelUrl = subclubSlug
-    ? `${deps.playbackUrl}/academy/${encodeURIComponent(clubSlug)}/${encodeURIComponent(subclubSlug)}?canceled=1`
-    : `${deps.playbackUrl}/academy/${encodeURIComponent(clubSlug)}?canceled=1`
+  // Cancel returns the parent to the page they came FROM. PLAYBACK's
+  // hierarchical picker (AcademyHierarchicalPicker.tsx) keeps subclub
+  // selection in the `?club=<subclubSlug>` QUERY PARAM — there is NO
+  // nested /academy/[clubSlug]/[subclubSlug] route. So a nested-path
+  // cancel_url 404s. Always land on /academy/[clubSlug], optionally
+  // carrying the subclub selection so the picker re-opens the right tab.
+  const cancelQs = subclubSlug
+    ? `?club=${encodeURIComponent(subclubSlug)}&canceled=1`
+    : `?canceled=1`
+  const cancelUrl = `${deps.playbackUrl}/academy/${encodeURIComponent(clubSlug)}${cancelQs}`
 
   // Metadata is duplicated onto BOTH session.metadata and
   // subscription_data.metadata. The webhook handler reads session.metadata
@@ -333,6 +336,37 @@ export async function createAcademyCheckoutSession(
     lineItems.push({ price: club.registrationFeeStripePriceId, quantity: 1 })
   }
 
+  // Custom fields collected at Stripe Checkout. Both are OPTIONAL on Stripe's
+  // side so the form NEVER blocks the parent from paying — the change must
+  // not introduce a new failure mode in the checkout funnel. The webhook
+  // parser at handleAcademyCheckoutCompleted reads them out by key when
+  // present (null otherwise) and stores them on playhub_academy_subscriptions
+  // for roster reconciliation later. Keys MUST stay alphanumeric — Stripe
+  // rejects underscores in custom_field keys, hence "playername" /
+  // "subscribertype" (matching the legacy CFA / SEFA Payment Link convention
+  // that lib/academy/stripe.ts already parses).
+  const customFields: Stripe.Checkout.SessionCreateParams.CustomField[] = [
+    {
+      key: 'playername',
+      type: 'text',
+      label: { type: 'custom', custom: "Player's full name" },
+      optional: true,
+      text: { maximum_length: 80 },
+    },
+    {
+      key: 'subscribertype',
+      type: 'dropdown',
+      label: { type: 'custom', custom: 'I am the…' },
+      optional: true,
+      dropdown: {
+        options: [
+          { label: 'Parent / guardian', value: 'parent' },
+          { label: 'Player', value: 'player' },
+        ],
+      },
+    },
+  ]
+
   const params: Stripe.Checkout.SessionCreateParams = {
     mode: 'subscription',
     payment_method_types: ['card'],
@@ -340,6 +374,7 @@ export async function createAcademyCheckoutSession(
     metadata: sharedMetadata,
     subscription_data: { metadata: sharedMetadata },
     allow_promotion_codes: true,
+    custom_fields: customFields,
     success_url: successUrl,
     cancel_url: cancelUrl,
   }
