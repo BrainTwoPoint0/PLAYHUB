@@ -599,8 +599,8 @@ export async function uploadTeamCrest(input: {
  */
 export async function assignRecordingToTeam(
   recordingUUID: string,
-  teamUUID: string
-): Promise<VeoResult<{ recording: { id: string; team: string } }>> {
+  teamUUID: string | null
+): Promise<VeoResult<{ recording: { id: string; team: string | null } }>> {
   return withSession(async (session) => {
     const res = await session.api(
       'PATCH',
@@ -610,13 +610,13 @@ export async function assignRecordingToTeam(
     if (res.status !== 200) {
       return {
         success: false,
-        message: `Failed to assign recording ${recordingUUID} → team ${teamUUID}: ${res.status}`,
+        message: `Failed to assign recording ${recordingUUID} → team ${teamUUID ?? '<unassigned>'}: ${res.status}`,
       }
     }
-    const body = parseBody(res.body) as { id: string; team: string } | null
+    const body = parseBody(res.body) as { id: string; team: string | null } | null
     return {
       success: true,
-      message: `Assigned recording ${recordingUUID} → team ${teamUUID}`,
+      message: `Assigned recording ${recordingUUID} → team ${teamUUID ?? '<unassigned>'}`,
       data: { recording: body ?? { id: recordingUUID, team: teamUUID } },
     }
   })
