@@ -267,10 +267,24 @@ export async function getCachedRecordings(clubSlug: string): Promise<{
 } | null> {
   const supabase = createServiceClient() as any
 
+  // Filter to ORIGINALS only — exclude share-accepted copies.
+  //
+  // Share-copies have camera=NULL because they're metadata pointers,
+  // not physical captures. Confirmed empirically on LYL (42 originals
+  // all had a camera id, 27 share-copies all had camera=null — zero
+  // false positives or false negatives). This dedupes the Content tab
+  // for clubs that use the home→share-with-opponent flow without
+  // touching the cache writer (originals + shares are both stored).
+  //
+  // Pre-2026-05-18 rows have camera=NULL (column was just added) — if
+  // a club's cache is older than the camera column, run a one-shot
+  // cache-sync to repopulate before this filter starts trusting the
+  // signal for that club.
   const { data, error } = await supabase
     .from('playhub_veo_recordings_cache')
     .select('*')
     .eq('club_slug', clubSlug)
+    .not('camera', 'is', null)
     .order('match_date', { ascending: false, nullsFirst: false })
 
   if (error)

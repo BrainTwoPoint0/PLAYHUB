@@ -52,6 +52,10 @@ export interface VeoRecording {
   home_score?: number | null
   away_score?: number | null
   processing_status?: string
+  /** Veo camera id (e.g. `vc3-83788`). NULL on share-accepted copies.
+   *  Used as the "is this an original?" signal — reader filters
+   *  `camera IS NOT NULL` to dedupe. */
+  camera?: string | null
 }
 
 // ============================================================================
@@ -306,7 +310,11 @@ export async function listClubRecordings(
     // pages we still pass `&page=` since pagination IS needed for
     // workspaces with >page_size recordings.
     const pageParam = page === 1 ? '' : `&page=${page}`
-    const url = `/api/app/clubs/${clubSlug}/recordings/?filter=own&fields=privacy&fields=title&fields=slug&fields=duration&fields=thumbnail&fields=uuid&fields=match_date&fields=home_team&fields=away_team&fields=home_score&fields=away_score&fields=processing_status&fields=team&page_size=200${pageParam}`
+    // `&fields=camera` added 2026-05-18: share-accepted copies have
+    // camera=null (they're metadata pointers, not physical captures),
+    // originals have a camera UUID. Reader filters on `camera IS NOT NULL`
+    // to dedupe the Content tab without false negatives.
+    const url = `/api/app/clubs/${clubSlug}/recordings/?filter=own&fields=privacy&fields=title&fields=slug&fields=duration&fields=thumbnail&fields=uuid&fields=match_date&fields=home_team&fields=away_team&fields=home_score&fields=away_score&fields=processing_status&fields=team&fields=camera&page_size=200${pageParam}`
     const res = await session.api('GET', url)
 
     // Veo's recordings endpoint returns 404 when you request a page past

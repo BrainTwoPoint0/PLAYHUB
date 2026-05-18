@@ -261,6 +261,7 @@ export async function writeCachedRecordings(
       away_score: r.away_score ?? null,
       processing_status: r.processing_status || null,
       team: r.team || null,
+      camera: r.camera || null,
       last_synced_at: now,
     }))
 
