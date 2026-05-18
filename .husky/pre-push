@@ -1,0 +1,20 @@
+# Pre-push: full Next.js build + type check.
+#
+# Catches the failure modes pre-commit's lint-only check misses:
+#   - webpack module resolution (e.g. `@sparticuz/chromium` missing from
+#     PLAYHUB's deps when imported from shared veo/auth.ts — bit us
+#     2026-05-17, took 2 deploy iterations to spot remotely)
+#   - tsc errors that lint doesn't surface
+#   - Next.js route-level type-check (.next/types/* — bit us 2026-05-17
+#     when a deleted /api/veo/invite route left stale type files)
+#
+# `next build` runs lint + type-check + production compile in one shot,
+# so this is the same gate Netlify enforces — just locally, before the
+# remote build burns ~60-90s of CI minutes.
+#
+# Skipped: vitest (run separately, slower, often async-with-real-services).
+# Run `npm run release` manually for the full pre-release sweep.
+#
+# Emergency bypass: `git push --no-verify` — but flag it loudly and
+# expect to clean up the broken Netlify build manually.
+npm run build

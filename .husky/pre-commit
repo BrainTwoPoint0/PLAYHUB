@@ -1,0 +1,10 @@
+# Pre-commit: lint only. Fast (~5-10s) so it doesn't slow normal commits.
+# Catches the ESLint error class that has cost us multiple wasted Netlify
+# builds (the most recent: an unescaped apostrophe inside JSX text on
+# 2026-05-18 that failed `next build` after 60s of remote CI).
+#
+# Heavier checks (type-check, build, tests) live in pre-push so they
+# don't block every commit but DO catch the issues before they leave
+# the laptop. To bypass in an emergency: `git commit --no-verify` —
+# but the next push will still run pre-push and may bounce.
+npm run lint
