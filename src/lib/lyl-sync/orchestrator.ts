@@ -467,6 +467,19 @@ export async function runSync(
             opponentClubName: 'London Youth League',
           })
           awayAcceptedRecordingUuid = accepted.slug // we store the slug as the marker
+
+          // 9a. Belt-and-braces: force the share-copy into the AWAY team.
+          //     Empirically observed 2026-05-18 — Veo's acceptShareInvitation
+          //     `team` param doesn't always land the share in the requested
+          //     team folder (the LYL Library was showing originals + share-
+          //     copies BOTH bucketed under the home team for ~30 matches).
+          //     A direct PATCH via assignRecordingToTeam is the canonical
+          //     placement op and is idempotent — if Veo's accept honoured
+          //     `teamUUID`, this is a no-op. Resolve the share-copy's UUID
+          //     via getRecordingUUID since acceptShareInvitation only
+          //     returns the slug.
+          const acceptedDetails = await deps.veo.getRecordingUUID(accepted.slug)
+          await deps.veo.assignRecordingToTeam(acceptedDetails.id, awayTeam.id)
           shareAccepts++
         }
 

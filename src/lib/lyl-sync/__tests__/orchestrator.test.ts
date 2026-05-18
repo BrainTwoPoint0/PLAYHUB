@@ -223,9 +223,13 @@ describe('runSync orchestrator', () => {
       rulesParsed: 1, llmParsed: 0, unparseable: 0,
       homeAssignments: 1, shareAccepts: 1, autoCorrections: 0, failures: 0,
     })
-    // Verify Veo writes happened.
+    // Verify Veo writes happened. assignRecordingToTeam is called TWICE:
+    // once for the original (home-team patch in step 6a), then again as the
+    // belt-and-braces explicit assign for the share-copy in step 9a
+    // (Veo's acceptShareInvitation `teamUUID` is empirically unreliable, so
+    // we force the placement via a direct PATCH after every accept).
     expect(veo.createTeam).toHaveBeenCalledTimes(2)
-    expect(veo.assignRecordingToTeam).toHaveBeenCalledTimes(1)
+    expect(veo.assignRecordingToTeam).toHaveBeenCalledTimes(2)
     expect(veo.createShareInvitation).toHaveBeenCalledTimes(1)
     expect(veo.acceptShareInvitation).toHaveBeenCalledTimes(1)
     // Verify the assignment row reflects fully_assigned.
