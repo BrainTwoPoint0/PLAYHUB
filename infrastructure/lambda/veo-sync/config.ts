@@ -4,6 +4,7 @@
 export const CLUB_VEO_SLUGS: Record<string, string> = {
   cfa: 'playback-15fdc44b',
   sefa: 'soccer-elite-fa-0b0814d2',
+  lyl: 'london-youth-league',
 }
 
 // Recordings from these teams should stay public (matched by team name on recording)
