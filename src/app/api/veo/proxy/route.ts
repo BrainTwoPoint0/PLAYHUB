@@ -108,6 +108,19 @@ export async function GET(request: NextRequest) {
     if (acceptRanges) headers.set('Accept-Ranges', acceptRanges)
     headers.set('Cache-Control', 'private, max-age=86400')
 
+    // Optional `?download=1[&filename=foo.mp4]` — forces browser to save
+    // instead of inline-play. filename is sanitised to keep us off any
+    // header-injection footguns (Content-Disposition is structured text;
+    // a quote / newline in the filename can corrupt the response header).
+    const downloadFlag = request.nextUrl.searchParams.get('download')
+    if (downloadFlag === '1') {
+      const rawName = request.nextUrl.searchParams.get('filename') || 'video.mp4'
+      const safeName = rawName
+        .replace(/[^A-Za-z0-9._-]/g, '_')
+        .slice(0, 120)
+      headers.set('Content-Disposition', `attachment; filename="${safeName}"`)
+    }
+
     return new NextResponse(upstream.body, {
       status: upstream.status,
       headers,
