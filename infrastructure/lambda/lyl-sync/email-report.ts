@@ -16,9 +16,123 @@
 // arbitrary content, so we treat everything as untrusted.
 
 import type { RunSyncResult } from '../../../src/lib/lyl-sync/orchestrator'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails'
 const FROM = 'PLAYHUB Alerts <admin@playbacksports.ai>'
+
+/** Per-recording row rendered in the email's actions table. Sourced from
+ *  playhub_recording_assignments filtered by the current run's run id, so
+ *  we always show the canonical post-run state (including auto-corrections
+ *  + intra-team matches + failed rows). */
+interface RecordingActionRow {
+  recording_slug: string
+  recording_title: string | null
+  status: string                 // 'fully_assigned' | 'intra_team' | 'unparseable' | 'too_long' | 'failed'
+  home_team_slug: string | null
+  away_team_slug: string | null
+  away_accepted_recording_uuid: string | null
+  failure_stage: string | null
+  last_error: string | null
+}
+
+/** Pull every assignment row touched by this run (last_sync_run_id match).
+ *  Returns [] on error — the per-recording table is a courtesy section,
+ *  it must never block the email itself from sending. Wrapped in a 5s
+ *  Promise.race deadline (supabase-js doesn't accept AbortSignal on
+ *  query builders): a hung PostgREST response would otherwise eat the
+ *  remaining Lambda budget and the crash-email path would never fire
+ *  because we're already inside the success path. */
+const QUERY_DEADLINE_MS = 5000
+async function loadRunActions(
+  supabase: SupabaseClient,
+  runId: string
+): Promise<RecordingActionRow[]> {
+  try {
+    const queryPromise = supabase
+      .from('playhub_recording_assignments')
+      .select('recording_slug, recording_title, status, home_team_slug, away_team_slug, away_accepted_recording_uuid, failure_stage, last_error')
+      .eq('last_sync_run_id', runId)
+      .order('status', { ascending: true })
+      .order('recording_title', { ascending: true })
+    const deadlinePromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`loadRunActions deadline (${QUERY_DEADLINE_MS}ms) exceeded`)), QUERY_DEADLINE_MS)
+    )
+    const { data, error } = (await Promise.race([queryPromise, deadlinePromise])) as Awaited<typeof queryPromise>
+    if (error) {
+      console.warn('[lyl-sync] loadRunActions failed:', error.message)
+      return []
+    }
+    return (data ?? []) as RecordingActionRow[]
+  } catch (e) {
+    console.warn('[lyl-sync] loadRunActions threw:', e instanceof Error ? e.message : e)
+    return []
+  }
+}
+
+function statusBadgeColor(status: string): string {
+  switch (status) {
+    case 'fully_assigned': return '#10b981'  // green
+    case 'intra_team':     return '#3b82f6'  // blue
+    case 'too_long':       return '#6b7280'  // grey
+    case 'unparseable':    return '#f59e0b'  // amber
+    case 'failed':         return '#dc2626'  // red
+    default:               return '#b9baa3'
+  }
+}
+
+/** Human-readable summary of what happened to this recording. Reads the
+ *  assignment row's columns and synthesises a one-line description. */
+function describeAction(row: RecordingActionRow): string {
+  switch (row.status) {
+    case 'fully_assigned':
+      return `placed in <strong>${escapeHtml(row.home_team_slug ?? '?')}</strong> · shared to <strong>${escapeHtml(row.away_team_slug ?? '?')}</strong>`
+    case 'intra_team':
+      return `placed in <strong>${escapeHtml(row.home_team_slug ?? '?')}</strong> (intra-team scrimmage — no opponent share)`
+    case 'too_long':
+      return `skipped — recording exceeds the duration cap`
+    case 'unparseable':
+      return `couldn't parse title — operator review needed${row.last_error ? `: <em>${escapeHtml(row.last_error.slice(0, 200))}</em>` : ''}`
+    case 'failed':
+      return `<span style="color:#dc2626;">failed at <code>${escapeHtml(row.failure_stage ?? '?')}</code></span>${row.last_error ? ` — <em>${escapeHtml(row.last_error.slice(0, 200))}</em>` : ''}`
+    default:
+      return escapeHtml(row.status)
+  }
+}
+
+function renderActionsTable(rows: RecordingActionRow[]): string {
+  if (rows.length === 0) {
+    return `<p style="color:#6b7280; font-size:13px; font-style:italic;">No recording-level rows touched by this run.</p>`
+  }
+  const limit = 100
+  const trimmed = rows.slice(0, limit)
+  return `
+    <table style="width:100%; border-collapse:collapse; font-size:12px; background:#1a1f1d; border-radius:6px; overflow:hidden;">
+      <thead><tr style="background:#0a100d;">
+        <th style="text-align:left; padding:8px; color:#b9baa3;">Status</th>
+        <th style="text-align:left; padding:8px; color:#b9baa3;">Recording</th>
+        <th style="text-align:left; padding:8px; color:#b9baa3;">Action</th>
+      </tr></thead>
+      <tbody>
+      ${trimmed.map((row) => `
+        <tr style="border-top:1px solid #2a2f2d; vertical-align:top;">
+          <td style="padding:8px;">
+            <span style="display:inline-block; padding:2px 8px; border-radius:10px; font-size:10px; font-family:monospace; background:${statusBadgeColor(row.status)}33; color:${statusBadgeColor(row.status)};">
+              ${escapeHtml(row.status)}
+            </span>
+          </td>
+          <td style="padding:8px; color:#d6d5c9;">
+            ${escapeHtml(row.recording_title ?? '(no title)')}
+            <br><span style="color:#6b7280; font-family:monospace; font-size:11px;">${escapeHtml(row.recording_slug)}</span>
+          </td>
+          <td style="padding:8px; color:#d6d5c9;">${describeAction(row)}</td>
+        </tr>
+      `).join('')}
+      ${rows.length > limit ? `<tr><td colspan="3" style="padding:8px; color:#6b7280; font-style:italic;">… ${rows.length - limit} more (see admin UI)</td></tr>` : ''}
+      </tbody>
+    </table>
+  `
+}
 
 function escapeHtml(input: string): string {
   return input
@@ -46,9 +160,13 @@ interface SendInput {
   result: RunSyncResult
   trigger: 'cron' | 'manual' | 'api'
   leagueClubSlug: string
+  /** Optional — when provided, the email includes the per-recording actions
+   *  table (queried from playhub_recording_assignments by last_sync_run_id).
+   *  Omit to render the legacy counts+failures-only email. */
+  supabase?: SupabaseClient
 }
 
-export async function sendRunReportEmail({ result, trigger, leagueClubSlug }: SendInput): Promise<void> {
+export async function sendRunReportEmail({ result, trigger, leagueClubSlug, supabase }: SendInput): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY
   const to = process.env.LYL_REPORT_EMAIL
   if (!apiKey || !to) {
@@ -59,6 +177,17 @@ export async function sendRunReportEmail({ result, trigger, leagueClubSlug }: Se
   const banner = statusBanner(result.status)
   const subjectPrefix = result.status === 'succeeded' ? 'OK' : result.status === 'partial' ? 'PARTIAL' : 'FAILED'
   const subject = `[LYL sync · ${subjectPrefix}] ${result.counts.shareAccepts} shared, ${result.counts.homeAssignments} placed, ${result.counts.failures} failures`
+
+  // Per-recording actions table (post-run state from the assignment table).
+  // Best-effort — if the supabase client wasn't passed, or the query fails,
+  // we omit this section silently rather than blocking the whole email.
+  const actionRows = supabase ? await loadRunActions(supabase, result.runId) : []
+  const actionsSection = supabase
+    ? `
+      <h3 style="color:#d6d5c9; font-size:14px; margin:24px 0 8px;">Per-recording actions</h3>
+      ${renderActionsTable(actionRows)}
+    `
+    : ''
 
   const errorsTable = result.errors.length
     ? `
@@ -112,6 +241,8 @@ export async function sendRunReportEmail({ result, trigger, leagueClubSlug }: Se
           <tr><td style="padding:6px 8px; color:#b9baa3;">Output tokens</td><td style="padding:6px 8px; color:#d6d5c9; text-align:right;">${result.llm.outputTokens.toLocaleString()}</td></tr>
           <tr><td style="padding:6px 8px; color:#b9baa3;">Cost</td><td style="padding:6px 8px; color:#d6d5c9; text-align:right;">$${result.llm.costUsd.toFixed(4)}</td></tr>
         </table>
+
+        ${actionsSection}
 
         ${errorsTable}
 

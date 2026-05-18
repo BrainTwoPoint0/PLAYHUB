@@ -228,6 +228,18 @@ function isShareAcceptedCopy(recordingSlug: string, leagueClubSlug: string): boo
   return recordingSlug.startsWith(`${leagueClubSlug}-`)
 }
 
+/** Tagged error so the per-recording catch can record the EXACT failure
+ *  stage in failure_stage (vs the old "infer from message text" heuristic
+ *  which collapsed everything into 'home_patch'). Throw this wherever the
+ *  failure is known (subclub missing, Veo team create failed, etc.); the
+ *  catch block reads `.stage` directly. */
+class StageError extends Error {
+  constructor(public readonly stage: FailureStage, message: string) {
+    super(message)
+    this.name = 'StageError'
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main entry point
 // ---------------------------------------------------------------------------
@@ -379,20 +391,32 @@ export async function runSync(
 
         // 6. Resolve / create the HOME team in Veo.
         const homeSubclub = subclubBySlug.get(parsed.home!.subclubSlug)
-        if (!homeSubclub) throw new Error(`Unknown home subclub: ${parsed.home!.subclubSlug}`)
+        if (!homeSubclub) {
+          throw new StageError(
+            'unknown_home_subclub',
+            `Unknown home subclub: ${parsed.home!.subclubSlug}`
+          )
+        }
         const homeName = buildVeoTeamName(homeSubclub.display_name, parsed.home!.ageGroup)
         let homeTeam = veoTeamByName.get(homeName)
         if (!homeTeam) {
-          const created = await deps.veo.createTeam({
-            clubSlug: input.leagueClubSlug,
-            name: homeName,
-            ageGroup: parsed.home!.ageGroup.toUpperCase(),
-            gender: 'male',
-            shortName: buildVeoShortName(homeSubclub.display_name),
-          })
-          homeTeam = { id: created.id, slug: created.slug, name: homeName, age_group: parsed.home!.ageGroup.toUpperCase() }
-          veoTeamBySlug.set(homeTeam.slug, homeTeam)
-          veoTeamByName.set(homeName, homeTeam)
+          try {
+            const created = await deps.veo.createTeam({
+              clubSlug: input.leagueClubSlug,
+              name: homeName,
+              ageGroup: parsed.home!.ageGroup.toUpperCase(),
+              gender: 'male',
+              shortName: buildVeoShortName(homeSubclub.display_name),
+            })
+            homeTeam = { id: created.id, slug: created.slug, name: homeName, age_group: parsed.home!.ageGroup.toUpperCase() }
+            veoTeamBySlug.set(homeTeam.slug, homeTeam)
+            veoTeamByName.set(homeName, homeTeam)
+          } catch (err) {
+            throw new StageError(
+              'team_create',
+              `Failed to create home team "${homeName}": ${err instanceof Error ? err.message : String(err)}`
+            )
+          }
         }
 
         // 6a. Compare CURRENT Veo team vs intended home team. Auto-correct
@@ -428,20 +452,32 @@ export async function runSync(
 
         // 8. Resolve / create the AWAY team.
         const awaySubclub = subclubBySlug.get(parsed.away!.subclubSlug)
-        if (!awaySubclub) throw new Error(`Unknown away subclub: ${parsed.away!.subclubSlug}`)
+        if (!awaySubclub) {
+          throw new StageError(
+            'unknown_away_subclub',
+            `Unknown away subclub: ${parsed.away!.subclubSlug}`
+          )
+        }
         const awayName = buildVeoTeamName(awaySubclub.display_name, parsed.away!.ageGroup)
         let awayTeam = veoTeamByName.get(awayName)
         if (!awayTeam) {
-          const created = await deps.veo.createTeam({
-            clubSlug: input.leagueClubSlug,
-            name: awayName,
-            ageGroup: parsed.away!.ageGroup.toUpperCase(),
-            gender: 'male',
-            shortName: buildVeoShortName(awaySubclub.display_name),
-          })
-          awayTeam = { id: created.id, slug: created.slug, name: awayName, age_group: parsed.away!.ageGroup.toUpperCase() }
-          veoTeamBySlug.set(awayTeam.slug, awayTeam)
-          veoTeamByName.set(awayName, awayTeam)
+          try {
+            const created = await deps.veo.createTeam({
+              clubSlug: input.leagueClubSlug,
+              name: awayName,
+              ageGroup: parsed.away!.ageGroup.toUpperCase(),
+              gender: 'male',
+              shortName: buildVeoShortName(awaySubclub.display_name),
+            })
+            awayTeam = { id: created.id, slug: created.slug, name: awayName, age_group: parsed.away!.ageGroup.toUpperCase() }
+            veoTeamBySlug.set(awayTeam.slug, awayTeam)
+            veoTeamByName.set(awayName, awayTeam)
+          } catch (err) {
+            throw new StageError(
+              'team_create',
+              `Failed to create away team "${awayName}": ${err instanceof Error ? err.message : String(err)}`
+            )
+          }
         }
 
         // 9. Share+accept into AWAY team — skip if we already did it for
@@ -452,20 +488,36 @@ export async function runSync(
           existing?.away_team_uuid === awayTeam.id &&
           existing?.away_accepted_recording_uuid !== null
         if (!alreadyAwayAssigned) {
-          const share = await deps.veo.createShareInvitation(
-            recording.slug,
-            input.shareRecipientEmail
-          )
+          let share: { key: string }
+          try {
+            share = await deps.veo.createShareInvitation(
+              recording.slug,
+              input.shareRecipientEmail
+            )
+          } catch (err) {
+            throw new StageError(
+              'share_create',
+              `createShareInvitation failed: ${err instanceof Error ? err.message : String(err)}`
+            )
+          }
           awayShareKey = share.key
-          const accepted = await deps.veo.acceptShareInvitation({
-            shareKey: share.key,
-            ownClubSlug: input.leagueClubSlug,
-            teamUUID: awayTeam.id,
-            title: details.title || recording.title,
-            start: details.start,
-            end: details.end,
-            opponentClubName: 'London Youth League',
-          })
+          let accepted: { slug: string }
+          try {
+            accepted = await deps.veo.acceptShareInvitation({
+              shareKey: share.key,
+              ownClubSlug: input.leagueClubSlug,
+              teamUUID: awayTeam.id,
+              title: details.title || recording.title,
+              start: details.start,
+              end: details.end,
+              opponentClubName: 'London Youth League',
+            })
+          } catch (err) {
+            throw new StageError(
+              'share_accept',
+              `acceptShareInvitation failed: ${err instanceof Error ? err.message : String(err)}`
+            )
+          }
           awayAcceptedRecordingUuid = accepted.slug // we store the slug as the marker
 
           // 9a. Belt-and-braces: force the share-copy into the AWAY team.
@@ -478,8 +530,15 @@ export async function runSync(
           //     `teamUUID`, this is a no-op. Resolve the share-copy's UUID
           //     via getRecordingUUID since acceptShareInvitation only
           //     returns the slug.
-          const acceptedDetails = await deps.veo.getRecordingUUID(accepted.slug)
-          await deps.veo.assignRecordingToTeam(acceptedDetails.id, awayTeam.id)
+          try {
+            const acceptedDetails = await deps.veo.getRecordingUUID(accepted.slug)
+            await deps.veo.assignRecordingToTeam(acceptedDetails.id, awayTeam.id)
+          } catch (err) {
+            throw new StageError(
+              'away_force_assign',
+              `Failed to force-assign share-copy ${accepted.slug} into away team: ${err instanceof Error ? err.message : String(err)}`
+            )
+          }
           shareAccepts++
         }
 
@@ -509,13 +568,17 @@ export async function runSync(
         failures++
         overallStatus = 'partial'
         const message = err instanceof Error ? err.message : String(err)
-        // Best-effort stage inference for the failure_stage column. We
-        // distinguish create-team/patch errors via the message body when
-        // the underlying client throws structured errors; otherwise we
-        // mark as 'home_patch' as the catch-all for Phase 2 issues.
+        // Stage tagging — prefer the StageError carried by tagged throws
+        // (unknown_home_subclub, team_create, share_create, etc). Untagged
+        // errors fall back to the legacy message-substring inference so
+        // pre-tagging code paths still classify roughly correctly.
         let stage: FailureStage = 'home_patch'
-        if (message.toLowerCase().includes('share')) stage = 'share_create'
-        if (message.toLowerCase().includes('accept')) stage = 'share_accept'
+        if (err instanceof StageError) {
+          stage = err.stage
+        } else {
+          if (message.toLowerCase().includes('share')) stage = 'share_create'
+          if (message.toLowerCase().includes('accept')) stage = 'share_accept'
+        }
         errors.push({
           recording_slug: recording.slug,
           recording_title: recording.title,

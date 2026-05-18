@@ -23,6 +23,12 @@ export type FailureStage =
   | 'share_create'
   | 'share_accept'
   | 'cleanup'
+  // Fine-grained additions (2026-05-19) so the report tells ops exactly
+  // which step blew up instead of a 'home_patch' catch-all.
+  | 'unknown_home_subclub'   // parser returned a subclub slug we don't have a row for
+  | 'unknown_away_subclub'   // same, away side
+  | 'team_create'            // Veo createTeam call failed (home OR away)
+  | 'away_force_assign'      // belt-and-braces assignRecordingToTeam after acceptShareInvitation failed
 
 export type TriggerSource = 'cron' | 'manual' | 'api'
 

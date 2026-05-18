@@ -108,11 +108,14 @@ export async function handler(event: LambdaEvent) {
 
     // Fire-and-log report email. Wrapped so a Resend outage can't
     // poison the Lambda response — sendRunReportEmail already swallows
-    // its own errors but we belt-and-brace here too.
+    // its own errors but we belt-and-brace here too. Pass the supabase
+    // client so the email can render the per-recording actions table
+    // (queried by last_sync_run_id from playhub_recording_assignments).
     await sendRunReportEmail({
       result,
       trigger,
       leagueClubSlug: LEAGUE_CLUB_SLUG,
+      supabase,
     }).catch((emailErr) => {
       console.error('lyl-sync: report email dispatch failed', emailErr)
     })
