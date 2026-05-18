@@ -1378,7 +1378,7 @@ function DownloadModal({
         )}
 
         <p className="mt-5 text-[11px] text-muted-foreground/40 leading-relaxed">
-          Files download via PLAYHUB's Veo CDN proxy (auth-gated, host-allowlisted).
+          Files download via the PLAYHUB Veo CDN proxy (auth-gated, host-allowlisted).
           Large match files may take a while — keep this tab open until the
           download completes.
         </p>
