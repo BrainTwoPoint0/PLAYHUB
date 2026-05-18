@@ -67,3 +67,6 @@ deno.lock
 
 # Local one-off debug scripts (kept locally, never committed)
 check-*.mjs
+
+# Phase 4 training data — clips + sidecars, multi-GB, never committed
+training-data/
