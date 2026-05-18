@@ -382,7 +382,7 @@ function HighlightCard({
             </span>
           </div>
           {videoUrl && (
-            <div className="flex items-center gap-1 flex-shrink-0">
+            <div className="flex items-center gap-1.5 flex-shrink-0">
               <a
                 href={`/api/veo/proxy?url=${encodeURIComponent(videoUrl)}&download=1&filename=${encodeURIComponent(
                   `${(tag || 'highlight').replace(/[^A-Za-z0-9._-]/g, '_')}_${formatDuration(highlight.start).replace(/:/g, '-')}.mp4`
@@ -390,17 +390,19 @@ function HighlightCard({
                 onClick={(e) => e.stopPropagation()}
                 title="Download highlight clip"
                 aria-label="Download highlight clip"
-                className="p-1.5 rounded-md bg-white/[0.04] text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-white/[0.08] transition-colors sm:opacity-0 sm:group-hover:opacity-100"
+                className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-white/[0.06] text-[var(--timberwolf)] active:bg-white/[0.12] transition-colors sm:gap-1 sm:px-2 sm:py-1 sm:text-[10px] sm:bg-white/[0.04] sm:text-muted-foreground sm:hover:text-[var(--timberwolf)] sm:hover:bg-white/[0.08] sm:opacity-0 sm:group-hover:opacity-100"
               >
-                <Download className="h-3 w-3" />
+                <Download className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
+                <span className="sm:hidden">Download</span>
               </a>
               <button
                 onClick={openInEditor}
                 title="Open in portrait-crop editor"
                 aria-label="Open in portrait-crop editor"
-                className="p-1.5 rounded-md bg-white/[0.04] text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-white/[0.08] transition-colors sm:opacity-0 sm:group-hover:opacity-100"
+                className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-white/[0.06] text-[var(--timberwolf)] active:bg-white/[0.12] transition-colors sm:gap-1 sm:px-2 sm:py-1 sm:text-[10px] sm:bg-white/[0.04] sm:text-muted-foreground sm:hover:text-[var(--timberwolf)] sm:hover:bg-white/[0.08] sm:opacity-0 sm:group-hover:opacity-100"
               >
-                <Scissors className="h-3 w-3" />
+                <Scissors className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
+                <span className="sm:hidden">Portrait</span>
               </button>
             </div>
           )}
