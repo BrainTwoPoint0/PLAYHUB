@@ -382,14 +382,27 @@ function HighlightCard({
             </span>
           </div>
           {videoUrl && (
-            <button
-              onClick={openInEditor}
-              title="Open in portrait-crop editor"
-              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-white/[0.08] transition-colors sm:opacity-0 sm:group-hover:opacity-100"
-            >
-              <Scissors className="h-3 w-3" />
-              Portrait
-            </button>
+            <div className="flex items-center gap-1">
+              <a
+                href={`/api/veo/proxy?url=${encodeURIComponent(videoUrl)}&download=1&filename=${encodeURIComponent(
+                  `${(tag || 'highlight').replace(/[^A-Za-z0-9._-]/g, '_')}_${formatDuration(highlight.start).replace(/:/g, '-')}.mp4`
+                )}`}
+                onClick={(e) => e.stopPropagation()}
+                title="Download highlight clip"
+                className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-white/[0.08] transition-colors sm:opacity-0 sm:group-hover:opacity-100"
+              >
+                <Download className="h-3 w-3" />
+                Download
+              </a>
+              <button
+                onClick={openInEditor}
+                title="Open in portrait-crop editor"
+                className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-white/[0.08] transition-colors sm:opacity-0 sm:group-hover:opacity-100"
+              >
+                <Scissors className="h-3 w-3" />
+                Portrait
+              </button>
+            </div>
           )}
         </div>
       </div>
