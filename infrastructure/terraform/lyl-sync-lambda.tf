@@ -233,15 +233,23 @@ resource "aws_cloudwatch_metric_alarm" "lyl_sync_lambda_duration" {
   }
 }
 
-# Error alarm — fires if the Lambda errors in any 24h window. Reuses the
+# Error alarm — fires on any Lambda error in a 1h window. Reuses the
 # existing sync_alerts SNS topic (subscribers already set up).
+#
+# Period was 86400s (24h) originally — that made the alarm stick for
+# 24-48h after any single error (CloudWatch's rolling-24h evaluation
+# kept including the error datapoint long after the underlying issue
+# was fixed). Diagnosed 2026-05-19 when a single May 17 supabase-js
+# error kept the alarm in ALARM state for 48h despite zero errors
+# since. The Lambda runs hourly (provision-retry) so empty buckets
+# are normal — treat_missing_data=notBreaching keeps that quiet.
 resource "aws_cloudwatch_metric_alarm" "lyl_sync_lambda_errors" {
   alarm_name          = "${var.project_name}-lyl-sync-lambda-errors"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
   metric_name         = "Errors"
   namespace           = "AWS/Lambda"
-  period              = 86400
+  period              = 3600
   statistic           = "Sum"
   threshold           = 0
   alarm_description   = "LYL sync Lambda function failed"
