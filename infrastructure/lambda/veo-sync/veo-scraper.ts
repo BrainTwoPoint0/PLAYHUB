@@ -261,14 +261,30 @@ export async function listClubTeamsWithMembers(
   clubName: string
   teams: (VeoTeam & { members: VeoMember[] })[]
 }> {
-  // Fetch teams
-  const teamsRes = await session.api('GET', `/api/app/clubs/${clubSlug}/teams/`)
+  // Fetch teams. Veo's default page_size for the teams endpoint is 20 —
+  // diagnosed 2026-05-19 when the LYL audit was missing 14 of 34 teams
+  // (Roehampton Elite, TAA, National Harrow, etc. — every team
+  // alphabetically after "London Thames U7"). Bumping to 500 covers
+  // every academy we operate today (CFA: 6, SEFA: 13, LYL: 34). The
+  // shape parser below already tolerates both array + paginated-object
+  // responses, so if a club ever crosses 500 the fix is to add a page
+  // loop, not a structural rewrite.
+  const teamsRes = await session.api(
+    'GET',
+    `/api/app/clubs/${clubSlug}/teams/?page_size=500`
+  )
 
   if (teamsRes.status !== 200) {
     throw new Error(`Failed to list teams: HTTP ${teamsRes.status}`)
   }
 
-  const teams: VeoTeam[] = parseBody(teamsRes.body) || []
+  // Response can be either a plain array (most clubs) or a paginated
+  // { count, next, results } envelope — Veo's API is inconsistent
+  // across endpoints. Same defensive pattern as listClubRecordings.
+  const parsed = parseBody(teamsRes.body)
+  const teams: VeoTeam[] = Array.isArray(parsed)
+    ? parsed
+    : (parsed?.results ?? [])
   const result: (VeoTeam & { members: VeoMember[] })[] = []
 
   // Fetch members for each team within the same session
@@ -277,6 +293,16 @@ export async function listClubTeamsWithMembers(
       'GET',
       `/api/app/clubs/${clubSlug}/teams/${team.slug}/members/?status=active&page_size=500`
     )
+    if (membersRes.status !== 200) {
+      // Visibility: a silent non-200 here causes the team to land in the
+      // cache with an empty members[] — which then feeds the stale-prune
+      // counter and (at higher team counts) could trigger spurious member
+      // deletes for the team whose fetch happened to fail this run. Log
+      // so partial failures are visible in CloudWatch.
+      console.warn(
+        `[listClubTeamsWithMembers] members fetch non-200 for ${clubSlug}/${team.slug}: HTTP ${membersRes.status}`
+      )
+    }
     const members: VeoMember[] =
       membersRes.status === 200 ? parseBody(membersRes.body) || [] : []
     result.push({ ...team, members })
