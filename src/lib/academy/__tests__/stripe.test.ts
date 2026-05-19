@@ -106,6 +106,10 @@ function makePrice(overrides: Partial<Stripe.Price> = {}): Stripe.Price {
     nickname: 'CFA U9 Monthly',
     unit_amount: 3000, // £30.00
     currency: 'gbp',
+    // type='recurring' is required for fetchClubData to include this price
+    // in subscriptions.list lookups — non-recurring prices are filtered
+    // out client-side (Stripe rejects subscriptions.list({ price: oneTime }))
+    type: 'recurring',
     recurring: { interval: 'month', interval_count: 1 } as any,
     active: true,
     product: 'prod_CFA',
@@ -235,6 +239,81 @@ describe('getAcademySummary', () => {
     expect(summary.mrr).toBe(0)
     expect(summary.churnRate).toBe(0)
     expect(summary.teams).toEqual([])
+  })
+
+  it('filters out non-recurring prices before listing subscriptions (Stripe rejects subscriptions.list with one-time price ids)', async () => {
+    // Regression: Stripe API returns "You can only filter subscriptions
+    // by prices for recurring purchases." if we pass a one-time price
+    // into subscriptions.list({ price }). LYL's checkout product also
+    // carries a one-time registration fee SKU; fetchClubData must
+    // skip those at the price-list stage, not at the subs-list stage.
+    const recurringPrice = makePrice({ id: 'price_recurring' })
+    const oneTimePrice = makePrice({
+      id: 'price_one_time',
+      type: 'one_time',
+      recurring: null as any,
+    })
+
+    let subsListCalls: string[] = []
+    ;(mockStripeInstance as any).prices.list.mockImplementation(
+      (params: { active?: boolean }) => {
+        if (params?.active === true) {
+          return asyncIterable([recurringPrice, oneTimePrice])
+        }
+        return asyncIterable([])
+      }
+    )
+    ;(mockStripeInstance as any).subscriptions.list.mockImplementation(
+      (params: { price: string }) => {
+        subsListCalls.push(params.price)
+        return asyncIterable([])
+      }
+    )
+    ;(mockStripeInstance as any).checkout.sessions.list.mockReturnValue(
+      paginatedResponse([])
+    )
+
+    await getAcademySummary('cfa')
+
+    // subscriptions.list must have been called for the recurring price
+    // (4 status filters: active/trialing/past_due/unpaid) but NEVER
+    // for the one-time price.
+    expect(subsListCalls).not.toContain('price_one_time')
+    expect(subsListCalls.filter((id) => id === 'price_recurring').length).toBe(4)
+  })
+
+  it('keeps INACTIVE recurring prices in the subs lookup (their canceled subs still need to surface in the audit)', async () => {
+    // Regression guard for the security-specialist's observation:
+    // `p.type === 'recurring'` is independent of `p.active`. Inactive
+    // recurring prices (e.g. retired team plans) often still have live
+    // canceled-subscription rows that the audit page must show.
+    const inactiveRecurring = makePrice({
+      id: 'price_retired_team',
+      active: false,
+    })
+
+    let subsListCalls: string[] = []
+    ;(mockStripeInstance as any).prices.list.mockImplementation(
+      (params: { active?: boolean }) => {
+        if (params?.active === true) return asyncIterable([])
+        // Inactive list returns the retired recurring price
+        return asyncIterable([inactiveRecurring])
+      }
+    )
+    ;(mockStripeInstance as any).subscriptions.list.mockImplementation(
+      (params: { price: string }) => {
+        subsListCalls.push(params.price)
+        return asyncIterable([])
+      }
+    )
+    ;(mockStripeInstance as any).checkout.sessions.list.mockReturnValue(
+      paginatedResponse([])
+    )
+
+    await getAcademySummary('cfa')
+
+    // Inactive recurring price must still be queried — 4 status filters.
+    expect(subsListCalls.filter((id) => id === 'price_retired_team').length).toBe(4)
   })
 
   it('correctly counts subscriptions by status', async () => {

@@ -222,10 +222,32 @@ async function fetchClubData(
     prices.push(price)
   }
 
-  // Deduplicate prices by ID
-  const uniquePrices = Array.from(
+  // Deduplicate prices by ID. Also drop non-recurring prices —
+  // Stripe's subscriptions.list rejects `price: <one_time_price_id>`
+  // with "You can only filter subscriptions by prices for recurring
+  // purchases." A product can legitimately carry both recurring +
+  // one-time prices (e.g. the LYL subscription product co-existing
+  // with a one-time processing fee SKU), so the filter is per-price
+  // not per-product. Independent of `active` — inactive recurring
+  // prices with live subscriptions are intentionally kept.
+  const dedupedPrices = Array.from(
     new Map(prices.map((p) => [p.id, p])).values()
   )
+  const uniquePrices = dedupedPrices.filter((p) => p.type === 'recurring')
+  if (uniquePrices.length === 0 && dedupedPrices.length > 0) {
+    // Misconfigured product — every price is one-time. Aggregation will
+    // return zeros for this club's audit page. Log the COUNT only (no
+    // price IDs — they correlate to product structure and tend to leak
+    // into third-party log sinks).
+    console.warn(
+      JSON.stringify({
+        event: 'academy_no_recurring_prices',
+        stripe_product_id: stripeProductId,
+        total_prices: dedupedPrices.length,
+        recurring: 0,
+      })
+    )
+  }
 
   // Fetch subscriptions per price.
   //
