@@ -38,7 +38,8 @@ const SYNC_API_KEY = process.env.SYNC_API_KEY || ''
 
 // Supabase auth.users.id is a UUID v4. Bound the input shape so attacker-
 // controlled junk can't pollute logs / drive a flood of pointless DB scans.
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const
 

@@ -427,12 +427,15 @@ function ExpandedRecording({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set(['goal']))
-  const [teamFilter, setTeamFilter] = useState<'all' | 'own' | 'opponent'>('all')
+  const [teamFilter, setTeamFilter] = useState<'all' | 'own' | 'opponent'>(
+    'all'
+  )
   // Player state lives here so highlight clicks swap the same player's
   // source — no separate modal, no second mount.
   const [fullMatchIdx, setFullMatchIdx] = useState<number | null>(null)
-  const [playingHighlight, setPlayingHighlight] =
-    useState<VeoHighlight | null>(null)
+  const [playingHighlight, setPlayingHighlight] = useState<VeoHighlight | null>(
+    null
+  )
 
   useEffect(() => {
     async function fetchContent() {
@@ -561,7 +564,9 @@ function ExpandedRecording({
                     onClick={() => {
                       // Picking a full render always exits highlight mode.
                       setPlayingHighlight(null)
-                      setFullMatchIdx(fullMatchIdx === i && !playingHighlight ? null : i)
+                      setFullMatchIdx(
+                        fullMatchIdx === i && !playingHighlight ? null : i
+                      )
                     }}
                     className={`text-[11px] px-3 py-1.5 rounded-lg border transition-colors ${
                       fullMatchIdx === i && !playingHighlight
@@ -595,7 +600,8 @@ function ExpandedRecording({
                 />
               ) : (
                 <div className="aspect-video flex items-center justify-center bg-black/30 rounded-lg border border-white/[0.04] text-sm text-muted-foreground/40">
-                  Select a full-match render above, or click a highlight to play.
+                  Select a full-match render above, or click a highlight to
+                  play.
                 </div>
               )}
             </div>
@@ -1173,7 +1179,6 @@ export default function AcademyContentPage() {
           )}
         </>
       )}
-
     </div>
   )
 }

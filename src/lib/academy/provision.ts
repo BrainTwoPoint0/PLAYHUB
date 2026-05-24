@@ -80,7 +80,7 @@ async function dispatchInviteToVeoLambda(
     await getLambda().send(
       new InvokeCommand({
         FunctionName: VEO_SYNC_LAMBDA_NAME,
-        InvocationType: 'Event',  // async — Lambda runs in background
+        InvocationType: 'Event', // async — Lambda runs in background
         Payload: Buffer.from(
           JSON.stringify({
             action: 'invite-member',
@@ -142,14 +142,14 @@ export type ProvisionOutcome =
       // alerting (security-relevant failures should page; transient should not).
       reason:
         | 'not_found'
-        | 'authorization'         // expectedUserId mismatch
-        | 'not_entitled'          // status not active/trialing
-        | 'email_not_confirmed'   // SECURITY: salted-account primary defence
-        | 'auth_unreachable'      // isEmailConfirmed threw — page on rate, not single occurrence
+        | 'authorization' // expectedUserId mismatch
+        | 'not_entitled' // status not active/trialing
+        | 'email_not_confirmed' // SECURITY: salted-account primary defence
+        | 'auth_unreachable' // isEmailConfirmed threw — page on rate, not single occurrence
         | 'stripe_email_mismatch' // SECURITY: defence in depth
         | 'stripe_unreachable'
         | 'stripe_customer_missing'
-        | 'stripe_forbidden'      // misconfigured key — page ops immediately
+        | 'stripe_forbidden' // misconfigured key — page ops immediately
         | 'config_missing_team'
         | 'config_unknown_club'
         | 'config_no_veo_club'
@@ -276,7 +276,9 @@ export function buildDefaultDeps(): ProvisionDeps {
       // otherwise Supabase emits `subclub_slug=eq.null` which matches no
       // rows and a hierarchical team would silently masquerade as a flat
       // team. The two partial UNIQUE indexes guarantee at most one match.
-      q = subclubSlug ? q.eq('subclub_slug', subclubSlug) : q.is('subclub_slug', null)
+      q = subclubSlug
+        ? q.eq('subclub_slug', subclubSlug)
+        : q.is('subclub_slug', null)
       const { data, error } = await q.maybeSingle()
       if (error) throw new Error(`resolveVeoTeamSlug: ${error.message}`)
       return data?.veo_team_slug ?? null

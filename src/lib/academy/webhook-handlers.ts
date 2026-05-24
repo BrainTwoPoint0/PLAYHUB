@@ -44,7 +44,12 @@ function extractProductIds(subscription: Stripe.Subscription): string[] {
   for (const item of subscription.items.data ?? []) {
     const raw = item?.price?.product
     if (typeof raw === 'string') ids.push(raw)
-    else if (raw && typeof raw === 'object' && 'id' in raw && typeof raw.id === 'string')
+    else if (
+      raw &&
+      typeof raw === 'object' &&
+      'id' in raw &&
+      typeof raw.id === 'string'
+    )
       ids.push(raw.id)
   }
   return ids
@@ -103,7 +108,11 @@ export type CheckoutResult =
 
 export type UpdateResult =
   | { status: 'updated'; rowKind: 'active' | 'pending' }
-  | { status: 'updated_and_provisioned'; subId: string; provisionOutcome: ProvisionOutcome }
+  | {
+      status: 'updated_and_provisioned'
+      subId: string
+      provisionOutcome: ProvisionOutcome
+    }
   | { status: 'not_academy' }
   | { status: 'not_found' }
   | { status: 'error'; error: string }
@@ -234,7 +243,11 @@ export function buildDefaultDeps(): WebhookDeps {
       return { kind: 'inserted', id: data.id }
     },
 
-    updateActiveStatus: async (stripeSubscriptionId, status, currentPeriodEnd) => {
+    updateActiveStatus: async (
+      stripeSubscriptionId,
+      status,
+      currentPeriodEnd
+    ) => {
       const supabase = createServiceClient() as any
       const patch: Record<string, unknown> = { status }
       if (currentPeriodEnd) patch.current_period_end = currentPeriodEnd
@@ -344,13 +357,19 @@ export async function handleAcademyCheckoutCompleted(
   }
 
   if (!clubSlug || !teamSlug) {
-    return { status: 'error', error: 'missing club_slug or team_slug in metadata' }
+    return {
+      status: 'error',
+      error: 'missing club_slug or team_slug in metadata',
+    }
   }
   if (!isValidTeamSlug(teamSlug)) {
     // Bounded slug shape protects DB / logs / downstream UI from
     // attacker-controlled metadata. team_slug comes from a custom_field at
     // checkout, but Stripe doesn't constrain its content.
-    return { status: 'error', error: `invalid team_slug shape: ${teamSlug.slice(0, 32)}` }
+    return {
+      status: 'error',
+      error: `invalid team_slug shape: ${teamSlug.slice(0, 32)}`,
+    }
   }
   if (subclubSlug !== null && !isValidSubclubSlug(subclubSlug)) {
     return {
@@ -398,7 +417,10 @@ export async function handleAcademyCheckoutCompleted(
       return { status: 'duplicate', reason: 'active_exists' }
     }
     if (insert.kind === 'error') {
-      return { status: 'error', error: `insert active sub failed: ${insert.message}` }
+      return {
+        status: 'error',
+        error: `insert active sub failed: ${insert.message}`,
+      }
     }
 
     let provisionOutcome: ProvisionOutcome
@@ -438,7 +460,10 @@ export async function handleAcademyCheckoutCompleted(
     return { status: 'duplicate', reason: 'pending_exists' }
   }
   if (insert.kind === 'error') {
-    return { status: 'error', error: `insert pending sub failed: ${insert.message}` }
+    return {
+      status: 'error',
+      error: `insert pending sub failed: ${insert.message}`,
+    }
   }
 
   // Fire-and-forget — failed claim email is logged but doesn't fail the webhook.
@@ -485,7 +510,9 @@ export async function handleAcademySubscriptionUpdated(
         provisionOutcome = {
           kind: 'failure',
           subId: activeRow.id,
-          error: truncateError(err instanceof Error ? err.message : String(err)),
+          error: truncateError(
+            err instanceof Error ? err.message : String(err)
+          ),
           retryable: true,
           reason: 'veo_threw',
         }
@@ -521,7 +548,11 @@ export async function handleAcademySubscriptionDeleted(
   }
 
   // Active row first.
-  const activeRow = await deps.updateActiveStatus(subscription.id, 'canceled', null)
+  const activeRow = await deps.updateActiveStatus(
+    subscription.id,
+    'canceled',
+    null
+  )
   if (activeRow) return { status: 'canceled', rowKind: 'active' }
 
   // Pending row fallback.
@@ -556,7 +587,9 @@ function logProvisioningOutcome(
       JSON.stringify({
         event: 'academy_provisioning',
         context,
-        result: outcome.alreadyProvisioned ? 'already_provisioned' : 'dispatched',
+        result: outcome.alreadyProvisioned
+          ? 'already_provisioned'
+          : 'dispatched',
         sub_id: outcome.subId,
         already_provisioned: outcome.alreadyProvisioned,
       })

@@ -279,7 +279,9 @@ describe('getAcademySummary', () => {
     // (4 status filters: active/trialing/past_due/unpaid) but NEVER
     // for the one-time price.
     expect(subsListCalls).not.toContain('price_one_time')
-    expect(subsListCalls.filter((id) => id === 'price_recurring').length).toBe(4)
+    expect(subsListCalls.filter((id) => id === 'price_recurring').length).toBe(
+      4
+    )
   })
 
   it('keeps INACTIVE recurring prices in the subs lookup (their canceled subs still need to surface in the audit)', async () => {
@@ -313,7 +315,9 @@ describe('getAcademySummary', () => {
     await getAcademySummary('cfa')
 
     // Inactive recurring price must still be queried — 4 status filters.
-    expect(subsListCalls.filter((id) => id === 'price_retired_team').length).toBe(4)
+    expect(
+      subsListCalls.filter((id) => id === 'price_retired_team').length
+    ).toBe(4)
   })
 
   it('correctly counts subscriptions by status', async () => {

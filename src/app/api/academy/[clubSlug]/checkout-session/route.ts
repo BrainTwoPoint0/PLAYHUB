@@ -143,7 +143,10 @@ export async function POST(
         session_id: outcome.sessionId,
       })
     )
-    return NextResponse.json({ url: outcome.url, session_id: outcome.sessionId })
+    return NextResponse.json({
+      url: outcome.url,
+      session_id: outcome.sessionId,
+    })
   }
 
   // Map categorical failure reasons to HTTP statuses.

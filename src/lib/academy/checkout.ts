@@ -175,7 +175,9 @@ export function buildDefaultDeps(): CheckoutDeps {
       const stripe = getStripe()
       const session = await stripe.checkout.sessions.create(
         params,
-        options?.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : undefined
+        options?.idempotencyKey
+          ? { idempotencyKey: options.idempotencyKey }
+          : undefined
       )
       return { id: session.id, url: session.url }
     },
@@ -383,7 +385,9 @@ export async function createAcademyCheckoutSession(
   try {
     session = await deps.createCheckoutSession(
       params,
-      options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : undefined
+      options.idempotencyKey
+        ? { idempotencyKey: options.idempotencyKey }
+        : undefined
     )
   } catch (err) {
     return classifyStripeError(err)

@@ -124,7 +124,8 @@ describe('handleAcademyCheckoutCompleted', () => {
       const session = makeCheckoutSession({ subscription: null })
       const result = await handleAcademyCheckoutCompleted(session, deps)
       expect(result.status).toBe('error')
-      if (result.status === 'error') expect(result.error).toMatch(/subscription id/)
+      if (result.status === 'error')
+        expect(result.error).toMatch(/subscription id/)
     })
 
     it('rejects invalid subclub_slug shape (same defence as team_slug — attacker-controlled metadata)', async () => {
@@ -146,7 +147,12 @@ describe('handleAcademyCheckoutCompleted', () => {
     it('rejects invalid team_slug shape (defends DB / logs / future UI from attacker metadata)', async () => {
       const deps = makeDeps()
       // Spaces, HTML, log-injection sequences, length > 64, wrong charset.
-      const bad = ['team with spaces', '<script>', 'A'.repeat(65), 'team\n[INFO] forged']
+      const bad = [
+        'team with spaces',
+        '<script>',
+        'A'.repeat(65),
+        'team\n[INFO] forged',
+      ]
       for (const teamSlug of bad) {
         const session = makeCheckoutSession({}, { team_slug: teamSlug })
         const result = await handleAcademyCheckoutCompleted(session, deps)
@@ -162,7 +168,13 @@ describe('handleAcademyCheckoutCompleted', () => {
 
     it('accepts well-formed slugs (lowercase, digits, hyphens, ≤64 chars)', async () => {
       const deps = makeDeps()
-      const good = ['lyl', 'lyl-u12-tigers', 'a1', '1team', 'a' + '-'.repeat(63)]
+      const good = [
+        'lyl',
+        'lyl-u12-tigers',
+        'a1',
+        '1team',
+        'a' + '-'.repeat(63),
+      ]
       for (const teamSlug of good) {
         const session = makeCheckoutSession({}, { team_slug: teamSlug })
         const result = await handleAcademyCheckoutCompleted(session, deps)
@@ -186,14 +198,19 @@ describe('handleAcademyCheckoutCompleted', () => {
       })
       const result = await handleAcademyCheckoutCompleted(session, deps)
       expect(result.status).toBe('error')
-      if (result.status === 'error') expect(result.error).toMatch(/customer email/)
+      if (result.status === 'error')
+        expect(result.error).toMatch(/customer email/)
     })
 
     it('errors when club_slug not in academy config', async () => {
       const deps = makeDeps({ loadClub: vi.fn(async () => undefined) })
-      const result = await handleAcademyCheckoutCompleted(makeCheckoutSession(), deps)
+      const result = await handleAcademyCheckoutCompleted(
+        makeCheckoutSession(),
+        deps
+      )
       expect(result.status).toBe('error')
-      if (result.status === 'error') expect(result.error).toMatch(/unknown club/)
+      if (result.status === 'error')
+        expect(result.error).toMatch(/unknown club/)
     })
   })
 
@@ -243,9 +260,13 @@ describe('handleAcademyCheckoutCompleted', () => {
           async (): Promise<InsertResult> => ({ kind: 'duplicate' })
         ),
       })
-      const result = await handleAcademyCheckoutCompleted(makeCheckoutSession(), deps)
+      const result = await handleAcademyCheckoutCompleted(
+        makeCheckoutSession(),
+        deps
+      )
       expect(result.status).toBe('duplicate')
-      if (result.status === 'duplicate') expect(result.reason).toBe('active_exists')
+      if (result.status === 'duplicate')
+        expect(result.reason).toBe('active_exists')
       // Critically: do NOT call provision on a duplicate.
       expect(deps.provision).not.toHaveBeenCalled()
     })
@@ -260,7 +281,10 @@ describe('handleAcademyCheckoutCompleted', () => {
           })
         ),
       })
-      const result = await handleAcademyCheckoutCompleted(makeCheckoutSession(), deps)
+      const result = await handleAcademyCheckoutCompleted(
+        makeCheckoutSession(),
+        deps
+      )
       expect(result.status).toBe('error')
       expect(deps.provision).not.toHaveBeenCalled()
     })
@@ -272,7 +296,10 @@ describe('handleAcademyCheckoutCompleted', () => {
           throw new Error('Veo session boot failed')
         }),
       })
-      const result = await handleAcademyCheckoutCompleted(makeCheckoutSession(), deps)
+      const result = await handleAcademyCheckoutCompleted(
+        makeCheckoutSession(),
+        deps
+      )
       expect(result.status).toBe('created')
       if (result.status === 'created') {
         expect(result.provisionOutcome.kind).toBe('failure')
@@ -296,9 +323,15 @@ describe('handleAcademyCheckoutCompleted', () => {
           })
         ),
       })
-      const result = await handleAcademyCheckoutCompleted(makeCheckoutSession(), deps)
+      const result = await handleAcademyCheckoutCompleted(
+        makeCheckoutSession(),
+        deps
+      )
       expect(result.status).toBe('created')
-      if (result.status === 'created' && result.provisionOutcome.kind === 'failure') {
+      if (
+        result.status === 'created' &&
+        result.provisionOutcome.kind === 'failure'
+      ) {
         expect(result.provisionOutcome.reason).toBe('email_not_confirmed')
       }
     })
@@ -311,7 +344,8 @@ describe('handleAcademyCheckoutCompleted', () => {
       const result = await handleAcademyCheckoutCompleted(session, deps)
 
       expect(result.status).toBe('pending')
-      if (result.status === 'pending') expect(result.pendingId).toBe('pending-1')
+      if (result.status === 'pending')
+        expect(result.pendingId).toBe('pending-1')
 
       expect(deps.insertPendingSub).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -341,9 +375,13 @@ describe('handleAcademyCheckoutCompleted', () => {
           async (): Promise<InsertResult> => ({ kind: 'duplicate' })
         ),
       })
-      const result = await handleAcademyCheckoutCompleted(makeCheckoutSession(), deps)
+      const result = await handleAcademyCheckoutCompleted(
+        makeCheckoutSession(),
+        deps
+      )
       expect(result.status).toBe('duplicate')
-      if (result.status === 'duplicate') expect(result.reason).toBe('pending_exists')
+      if (result.status === 'duplicate')
+        expect(result.reason).toBe('pending_exists')
       // No claim email on duplicate (parent already received the first one).
       expect(deps.sendClaimEmail).not.toHaveBeenCalled()
     })
@@ -357,7 +395,10 @@ describe('handleAcademyCheckoutCompleted', () => {
           })
         ),
       })
-      const result = await handleAcademyCheckoutCompleted(makeCheckoutSession(), deps)
+      const result = await handleAcademyCheckoutCompleted(
+        makeCheckoutSession(),
+        deps
+      )
       expect(result.status).toBe('error')
       expect(deps.sendClaimEmail).not.toHaveBeenCalled()
     })
@@ -373,7 +414,10 @@ describe('handleAcademyCheckoutCompleted', () => {
       const deps = makeDeps({
         loadProfileByEmail: vi.fn(async () => ({ user_id: 'user-uuid-1' })),
         insertActiveSub: vi.fn(
-          async (): Promise<InsertResult> => ({ kind: 'inserted', id: 'active-1' })
+          async (): Promise<InsertResult> => ({
+            kind: 'inserted',
+            id: 'active-1',
+          })
         ),
       })
       const session = makeCheckoutSession({}, { subclub_slug: 'barnes-eagles' })
@@ -392,7 +436,10 @@ describe('handleAcademyCheckoutCompleted', () => {
       const deps = makeDeps({
         loadProfileByEmail: vi.fn(async () => null),
         insertPendingSub: vi.fn(
-          async (): Promise<InsertResult> => ({ kind: 'inserted', id: 'pending-1' })
+          async (): Promise<InsertResult> => ({
+            kind: 'inserted',
+            id: 'pending-1',
+          })
         ),
       })
       const session = makeCheckoutSession({}, { subclub_slug: 'barnes-eagles' })
@@ -412,7 +459,10 @@ describe('handleAcademyCheckoutCompleted', () => {
       const activeDeps = makeDeps({
         loadProfileByEmail: vi.fn(async () => ({ user_id: 'user-uuid-1' })),
         insertActiveSub: vi.fn(
-          async (): Promise<InsertResult> => ({ kind: 'inserted', id: 'active-1' })
+          async (): Promise<InsertResult> => ({
+            kind: 'inserted',
+            id: 'active-1',
+          })
         ),
       })
       await handleAcademyCheckoutCompleted(makeCheckoutSession(), activeDeps)
@@ -420,7 +470,9 @@ describe('handleAcademyCheckoutCompleted', () => {
         expect.objectContaining({ registration_subclub: null })
       )
       // No-profile path
-      const pendingDeps = makeDeps({ loadProfileByEmail: vi.fn(async () => null) })
+      const pendingDeps = makeDeps({
+        loadProfileByEmail: vi.fn(async () => null),
+      })
       await handleAcademyCheckoutCompleted(makeCheckoutSession(), pendingDeps)
       expect(pendingDeps.insertPendingSub).toHaveBeenCalledWith(
         expect.objectContaining({ registration_subclub: null })
@@ -661,7 +713,10 @@ describe('handleAcademySubscriptionUpdated', () => {
         provisioned_at: '2026-05-10T12:00:00Z',
       })),
     })
-    const result = await handleAcademySubscriptionUpdated(makeSubscription(), deps)
+    const result = await handleAcademySubscriptionUpdated(
+      makeSubscription(),
+      deps
+    )
     expect(result.status).toBe('updated')
     if (result.status === 'updated') expect(result.rowKind).toBe('active')
     // No re-provision: row was already provisioned.
@@ -675,7 +730,10 @@ describe('handleAcademySubscriptionUpdated', () => {
         provisioned_at: null,
       })),
     })
-    const result = await handleAcademySubscriptionUpdated(makeSubscription({ status: 'active' }), deps)
+    const result = await handleAcademySubscriptionUpdated(
+      makeSubscription({ status: 'active' }),
+      deps
+    )
     expect(result.status).toBe('updated_and_provisioned')
     if (result.status === 'updated_and_provisioned') {
       expect(result.subId).toBe('active-1')
@@ -691,7 +749,10 @@ describe('handleAcademySubscriptionUpdated', () => {
         provisioned_at: null,
       })),
     })
-    const result = await handleAcademySubscriptionUpdated(makeSubscription({ status: 'trialing' }), deps)
+    const result = await handleAcademySubscriptionUpdated(
+      makeSubscription({ status: 'trialing' }),
+      deps
+    )
     expect(result.status).toBe('updated_and_provisioned')
     expect(deps.provision).toHaveBeenCalledTimes(1)
   })
@@ -703,7 +764,10 @@ describe('handleAcademySubscriptionUpdated', () => {
         provisioned_at: null,
       })),
     })
-    const result = await handleAcademySubscriptionUpdated(makeSubscription({ status: 'past_due' }), deps)
+    const result = await handleAcademySubscriptionUpdated(
+      makeSubscription({ status: 'past_due' }),
+      deps
+    )
     expect(result.status).toBe('updated')
     expect(deps.provision).not.toHaveBeenCalled()
   })
@@ -713,10 +777,16 @@ describe('handleAcademySubscriptionUpdated', () => {
       updateActiveStatus: vi.fn(async () => null),
       updatePendingStatus: vi.fn(async () => ({ id: 'pending-1' })),
     })
-    const result = await handleAcademySubscriptionUpdated(makeSubscription(), deps)
+    const result = await handleAcademySubscriptionUpdated(
+      makeSubscription(),
+      deps
+    )
     expect(result.status).toBe('updated')
     if (result.status === 'updated') expect(result.rowKind).toBe('pending')
-    expect(deps.updatePendingStatus).toHaveBeenCalledWith('sub_stripe_1', 'active')
+    expect(deps.updatePendingStatus).toHaveBeenCalledWith(
+      'sub_stripe_1',
+      'active'
+    )
   })
 
   it('returns not_found when neither active nor pending row exists', async () => {
@@ -724,7 +794,10 @@ describe('handleAcademySubscriptionUpdated', () => {
       updateActiveStatus: vi.fn(async () => null),
       updatePendingStatus: vi.fn(async () => null),
     })
-    const result = await handleAcademySubscriptionUpdated(makeSubscription(), deps)
+    const result = await handleAcademySubscriptionUpdated(
+      makeSubscription(),
+      deps
+    )
     expect(result.status).toBe('not_found')
   })
 
@@ -738,7 +811,10 @@ describe('handleAcademySubscriptionUpdated', () => {
         throw new Error('Veo down')
       }),
     })
-    const result = await handleAcademySubscriptionUpdated(makeSubscription(), deps)
+    const result = await handleAcademySubscriptionUpdated(
+      makeSubscription(),
+      deps
+    )
     expect(result.status).toBe('updated_and_provisioned')
     if (
       result.status === 'updated_and_provisioned' &&
@@ -758,18 +834,31 @@ describe('handleAcademySubscriptionDeleted', () => {
 
   it('returns not_academy when product is not academy', async () => {
     const deps = makeDeps({ isAcademyProduct: vi.fn(async () => false) })
-    const result = await handleAcademySubscriptionDeleted(makeSubscription(), deps)
+    const result = await handleAcademySubscriptionDeleted(
+      makeSubscription(),
+      deps
+    )
     expect(result.status).toBe('not_academy')
   })
 
   it('cancels active row when one exists', async () => {
     const deps = makeDeps({
-      updateActiveStatus: vi.fn(async () => ({ id: 'active-1', provisioned_at: null })),
+      updateActiveStatus: vi.fn(async () => ({
+        id: 'active-1',
+        provisioned_at: null,
+      })),
     })
-    const result = await handleAcademySubscriptionDeleted(makeSubscription(), deps)
+    const result = await handleAcademySubscriptionDeleted(
+      makeSubscription(),
+      deps
+    )
     expect(result.status).toBe('canceled')
     if (result.status === 'canceled') expect(result.rowKind).toBe('active')
-    expect(deps.updateActiveStatus).toHaveBeenCalledWith('sub_stripe_1', 'canceled', null)
+    expect(deps.updateActiveStatus).toHaveBeenCalledWith(
+      'sub_stripe_1',
+      'canceled',
+      null
+    )
   })
 
   it('falls back to pending row when no active row exists', async () => {
@@ -777,7 +866,10 @@ describe('handleAcademySubscriptionDeleted', () => {
       updateActiveStatus: vi.fn(async () => null),
       updatePendingStatus: vi.fn(async () => ({ id: 'pending-1' })),
     })
-    const result = await handleAcademySubscriptionDeleted(makeSubscription(), deps)
+    const result = await handleAcademySubscriptionDeleted(
+      makeSubscription(),
+      deps
+    )
     expect(result.status).toBe('canceled')
     if (result.status === 'canceled') expect(result.rowKind).toBe('pending')
   })
@@ -787,13 +879,19 @@ describe('handleAcademySubscriptionDeleted', () => {
       updateActiveStatus: vi.fn(async () => null),
       updatePendingStatus: vi.fn(async () => null),
     })
-    const result = await handleAcademySubscriptionDeleted(makeSubscription(), deps)
+    const result = await handleAcademySubscriptionDeleted(
+      makeSubscription(),
+      deps
+    )
     expect(result.status).toBe('not_found')
   })
 
   it('does not fire provisioning on delete (entitlement is being revoked, not granted)', async () => {
     const deps = makeDeps({
-      updateActiveStatus: vi.fn(async () => ({ id: 'active-1', provisioned_at: null })),
+      updateActiveStatus: vi.fn(async () => ({
+        id: 'active-1',
+        provisioned_at: null,
+      })),
     })
     await handleAcademySubscriptionDeleted(makeSubscription(), deps)
     expect(deps.provision).not.toHaveBeenCalled()

@@ -215,7 +215,9 @@ describe('provisionAcademyAccess', () => {
     })
 
     it('blocks when Stripe customer email is null (deleted customer)', async () => {
-      const deps = makeDeps({ fetchStripeCustomerEmail: vi.fn(async () => null) })
+      const deps = makeDeps({
+        fetchStripeCustomerEmail: vi.fn(async () => null),
+      })
       const outcome = await provisionAcademyAccess('sub-uuid-1', deps)
       const fail = expectFailure(outcome)
       expect(fail.reason).toBe('stripe_email_mismatch')
@@ -301,7 +303,10 @@ describe('provisionAcademyAccess', () => {
     it('classifies StripeFetchError(forbidden) as non-retryable stripe_forbidden', async () => {
       const deps = makeDeps({
         fetchStripeCustomerEmail: vi.fn(async () => {
-          throw new StripeFetchError('forbidden', 'Stripe key cannot read customer')
+          throw new StripeFetchError(
+            'forbidden',
+            'Stripe key cannot read customer'
+          )
         }),
       })
       const outcome = await provisionAcademyAccess('sub-uuid-1', deps)
@@ -397,7 +402,10 @@ describe('provisionAcademyAccess', () => {
         'parent@example.com',
         'sub-uuid-1'
       )
-      expect(deps.loadSubclubVeoClubSlug).toHaveBeenCalledWith('lyl', 'barnes-eagles')
+      expect(deps.loadSubclubVeoClubSlug).toHaveBeenCalledWith(
+        'lyl',
+        'barnes-eagles'
+      )
       // Resolution scoped to (club, subclub, team) — see SQL partial UNIQUE.
       expect(deps.resolveVeoTeamSlug).toHaveBeenCalledWith(
         'lyl',
@@ -618,7 +626,11 @@ describe('provisionAcademyAccess', () => {
 
     it('returns false for success outcomes', () => {
       expect(
-        isSecurityFailure({ kind: 'success', subId: 'x', alreadyProvisioned: false })
+        isSecurityFailure({
+          kind: 'success',
+          subId: 'x',
+          alreadyProvisioned: false,
+        })
       ).toBe(false)
     })
   })

@@ -61,7 +61,13 @@ function expectFailure(
 
 describe('isValidTeamSlug', () => {
   it('accepts well-formed slugs', () => {
-    for (const s of ['lyl', 'lyl-u12-tigers', 'a1', '1team', 'a' + '-'.repeat(63)]) {
+    for (const s of [
+      'lyl',
+      'lyl-u12-tigers',
+      'a1',
+      '1team',
+      'a' + '-'.repeat(63),
+    ]) {
       expect(isValidTeamSlug(s)).toBe(true)
     }
   })
@@ -399,7 +405,9 @@ describe('createAcademyCheckoutSession', () => {
       const params = (deps.createCheckoutSession as any).mock.calls[0][0]
       // The KEY must be absent — not present-with-null.
       expect(params.metadata).not.toHaveProperty('subclub_slug')
-      expect(params.subscription_data.metadata).not.toHaveProperty('subclub_slug')
+      expect(params.subscription_data.metadata).not.toHaveProperty(
+        'subclub_slug'
+      )
       // And the success URL stays clean (no &subclub= tail).
       expect(params.success_url).not.toContain('subclub=')
       expect(params.cancel_url).not.toContain('subclub')

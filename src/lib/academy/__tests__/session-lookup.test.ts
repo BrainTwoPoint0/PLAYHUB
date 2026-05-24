@@ -46,7 +46,9 @@ function makeSession(
   } as Stripe.Checkout.Session
 }
 
-function makeDeps(overrides: Partial<SessionLookupDeps> = {}): SessionLookupDeps {
+function makeDeps(
+  overrides: Partial<SessionLookupDeps> = {}
+): SessionLookupDeps {
   return {
     fetchStripeSession: vi.fn(async () => makeSession()),
     loadClub: vi.fn(async () => baseClub),
@@ -154,7 +156,10 @@ describe('lookupAcademySession', () => {
         const deps = makeDeps({
           fetchStripeSession: vi.fn(async () => makeSession({ status })),
         })
-        const o = await lookupAcademySession('cs_live_aaaaaaaaaaaaaaaaaaaa', deps)
+        const o = await lookupAcademySession(
+          'cs_live_aaaaaaaaaaaaaaaaaaaa',
+          deps
+        )
         expectNotFound(o)
       }
     })
@@ -191,7 +196,10 @@ describe('lookupAcademySession', () => {
             return { ...s, metadata: meta } as Stripe.Checkout.Session
           }),
         })
-        const o = await lookupAcademySession('cs_live_aaaaaaaaaaaaaaaaaaaa', deps)
+        const o = await lookupAcademySession(
+          'cs_live_aaaaaaaaaaaaaaaaaaaa',
+          deps
+        )
         expectNotFound(o)
       }
     })

@@ -59,7 +59,9 @@ export type SessionLookupOutcome =
   | { kind: 'transient'; error: string }
 
 export interface SessionLookupDeps {
-  fetchStripeSession: (sessionId: string) => Promise<Stripe.Checkout.Session | null>
+  fetchStripeSession: (
+    sessionId: string
+  ) => Promise<Stripe.Checkout.Session | null>
   loadClub: (clubSlug: string) => Promise<AcademyClub | undefined>
   /** Resolve a subclub's display_name. Only called when the session has a
    *  subclub_slug in metadata. Returns null when row missing/inactive — the
@@ -75,7 +77,9 @@ function getStripe(): Stripe {
   if (!cachedStripe) {
     const key = process.env.STRIPE_SECRET_KEY
     if (!key) {
-      throw new Error('STRIPE_SECRET_KEY is not set — academy/session-lookup cannot run without it')
+      throw new Error(
+        'STRIPE_SECRET_KEY is not set — academy/session-lookup cannot run without it'
+      )
     }
     cachedStripe = new Stripe(key, { apiVersion: '2025-02-24.acacia' })
   }

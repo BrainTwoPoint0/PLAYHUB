@@ -55,7 +55,8 @@ async function loadClubs(): Promise<AcademyClub[]> {
     organizationId: row.organization_id || undefined,
     logoUrl: row.logo_url || null,
     hasScholarships: row.has_scholarships ?? false,
-    registrationFeeStripePriceId: row.registration_fee_stripe_price_id || undefined,
+    registrationFeeStripePriceId:
+      row.registration_fee_stripe_price_id || undefined,
   }))
   cacheExpiresAt = Date.now() + CACHE_TTL_MS
 
