@@ -265,26 +265,70 @@ async function getExistingGameIds(): Promise<Set<string>> {
   // A game is excluded from the sync queue if:
   //   - already synced to S3 (s3_key not null), OR
   //   - permanently given up on (sync_attempts >= GIVE_UP_THRESHOLD), OR
-  //   - explicitly marked failed (e.g. orphan game with no live production)
+  //   - explicitly marked failed (e.g. orphan game with no live production), OR
+  //   - tombstoned by a user-initiated PLAYHUB delete (Spiideo's DELETE only
+  //     unschedules; without this the orphan branch re-creates the row).
   // This guarantees a broken game can never stall the queue across runs.
   // PostgREST caps .select() at 1000 rows by default — raise the ceiling
   // so we never silently truncate the exclusion set at scale (a truncated
   // set would re-admit already-synced or permanently-failed games into
   // the queue on every run).
-  const { data } = await supabase
-    .from('playhub_match_recordings')
-    .select('spiideo_game_id, s3_key, sync_attempts, status')
-    .not('spiideo_game_id', 'is', null)
-    .range(0, 49999)
+  const EXCLUSION_CAP = 49999
+  const [recordingsResult, tombstonesResult] = await Promise.all([
+    supabase
+      .from('playhub_match_recordings')
+      .select('spiideo_game_id, s3_key, sync_attempts, status')
+      .not('spiideo_game_id', 'is', null)
+      .range(0, EXCLUSION_CAP),
+    supabase
+      .from('playhub_deleted_spiideo_games')
+      .select('spiideo_game_id')
+      .range(0, EXCLUSION_CAP),
+  ])
+
+  // Fail loudly on either query error. A swallowed error would leave the
+  // excluded set incomplete and the orphan branch would re-create rows for
+  // already-synced or tombstoned games — exactly the failure mode the
+  // tombstone table exists to prevent.
+  if (recordingsResult.error) {
+    throw new Error(
+      `getExistingGameIds: recordings query failed: ${recordingsResult.error.message}`
+    )
+  }
+  if (tombstonesResult.error) {
+    throw new Error(
+      `getExistingGameIds: tombstones query failed: ${tombstonesResult.error.message}`
+    )
+  }
+
+  // Hard-stop if either query hits the 50K cap. Silent truncation here
+  // re-admits already-synced games into the sync queue and burns S3/Spiideo
+  // bandwidth on redundant transfers. When this fires, switch to keyset
+  // pagination (or aggressive cleanup) rather than just raising the cap.
+  const recordings = recordingsResult.data || []
+  const tombstones = tombstonesResult.data || []
+  if (recordings.length > EXCLUSION_CAP) {
+    throw new Error(
+      `getExistingGameIds: recordings query hit ${EXCLUSION_CAP + 1}-row cap — paginate before more rows are silently excluded`
+    )
+  }
+  if (tombstones.length > EXCLUSION_CAP) {
+    throw new Error(
+      `getExistingGameIds: tombstones query hit ${EXCLUSION_CAP + 1}-row cap — paginate before more rows are silently excluded`
+    )
+  }
 
   const excluded = new Set<string>()
-  for (const r of data || []) {
+  for (const r of recordings) {
     const synced = r.s3_key !== null
     const givenUp = (r.sync_attempts ?? 0) >= GIVE_UP_THRESHOLD
     const failed = r.status === 'failed'
     if (synced || givenUp || failed) {
       excluded.add(r.spiideo_game_id)
     }
+  }
+  for (const t of tombstones) {
+    excluded.add(t.spiideo_game_id)
   }
   return excluded
 }

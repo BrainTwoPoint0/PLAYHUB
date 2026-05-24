@@ -239,8 +239,31 @@ export async function DELETE(
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
-  // Delete Spiideo game if it exists (prevents sync lambda from re-creating it)
+  // Delete Spiideo game if it exists. Spiideo's DELETE /v1/games/{id} only
+  // "unschedules" — the game still appears in /v1/games with no productions,
+  // which the sync Lambda would otherwise pick up as an orphan and re-insert
+  // as status='failed'. Write a tombstone so the Lambda's exclusion set
+  // covers it permanently. Tombstone first, then Spiideo call: a failed
+  // Spiideo call is recoverable, but losing the tombstone would silently
+  // reintroduce the bug we're fixing.
   if (recording.spiideo_game_id) {
+    const { error: tombstoneErr } = await (serviceClient as any)
+      .from('playhub_deleted_spiideo_games')
+      .upsert(
+        {
+          spiideo_game_id: recording.spiideo_game_id,
+          deleted_by: user.id,
+        },
+        { onConflict: 'spiideo_game_id' }
+      )
+    if (tombstoneErr) {
+      console.error('Failed to write Spiideo deletion tombstone:', tombstoneErr)
+      return NextResponse.json(
+        { error: 'Failed to record deletion — try again' },
+        { status: 500 }
+      )
+    }
+
     try {
       const { deleteGame } = await import('@/lib/spiideo/client')
       await deleteGame(recording.spiideo_game_id)
