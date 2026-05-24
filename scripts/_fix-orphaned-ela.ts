@@ -24,7 +24,11 @@ import { shutdownVeoSession } from '../src/lib/veo/auth'
 
 function loadEnvFile(path: string): void {
   let raw: string
-  try { raw = readFileSync(path, 'utf8') } catch { return }
+  try {
+    raw = readFileSync(path, 'utf8')
+  } catch {
+    return
+  }
   for (const line of raw.split('\n')) {
     const t = line.trim()
     if (!t || t.startsWith('#')) continue
@@ -32,7 +36,11 @@ function loadEnvFile(path: string): void {
     if (eq < 0) continue
     const key = t.slice(0, eq).trim()
     let value = t.slice(eq + 1).trim()
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1)
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    )
+      value = value.slice(1, -1)
     if (!(key in process.env)) process.env[key] = value
   }
 }
@@ -41,23 +49,37 @@ loadEnvFile(join(__dirname, '..', '.env.local'))
 
 const VEO_CLUB_SLUG = 'london-youth-league'
 const ORPHANS = [
-  { slug: '20260517-elite-london-academy-u7-vs-roehampton-elite-u7-v7ed782b', targetTeamSlug: 'ela-u7' },
-  { slug: '20260517-elite-london-academy-u8-vs-roehampton-elite-u8-v115e326', targetTeamSlug: 'ela-u8' },
+  {
+    slug: '20260517-elite-london-academy-u7-vs-roehampton-elite-u7-v7ed782b',
+    targetTeamSlug: 'ela-u7',
+  },
+  {
+    slug: '20260517-elite-london-academy-u8-vs-roehampton-elite-u8-v115e326',
+    targetTeamSlug: 'ela-u8',
+  },
 ]
 
 async function main() {
   // Resolve ela-u7 + ela-u8 UUIDs from Veo
   const r = await listClubsAndTeams()
-  if (!r.success) { console.error(r.message); process.exit(1) }
+  if (!r.success) {
+    console.error(r.message)
+    process.exit(1)
+  }
   const lyl = r.data!.clubs.find((c) => c.slug === VEO_CLUB_SLUG)
-  if (!lyl) { console.error('lyl not found'); process.exit(1) }
+  if (!lyl) {
+    console.error('lyl not found')
+    process.exit(1)
+  }
   const teams = lyl.teams as Array<{ slug: string; id: string }>
   const targetIds = new Map(teams.map((t) => [t.slug, t.id]))
 
   for (const orphan of ORPHANS) {
     const targetTeamId = targetIds.get(orphan.targetTeamSlug)
     if (!targetTeamId) {
-      console.error(`Target team ${orphan.targetTeamSlug} not found in Veo, skipping ${orphan.slug}`)
+      console.error(
+        `Target team ${orphan.targetTeamSlug} not found in Veo, skipping ${orphan.slug}`
+      )
       continue
     }
     process.stdout.write(`Resolving ${orphan.slug} → uuid… `)
@@ -82,4 +104,8 @@ async function main() {
   await shutdownVeoSession()
 }
 
-main().catch(async (e) => { console.error(e); await shutdownVeoSession(); process.exit(1) })
+main().catch(async (e) => {
+  console.error(e)
+  await shutdownVeoSession()
+  process.exit(1)
+})

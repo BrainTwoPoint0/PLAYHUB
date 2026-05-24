@@ -70,9 +70,14 @@ async function findOrCreateProduct(): Promise<Stripe.Product> {
   // Search the account for an existing product with the same name. The
   // products.search API would be cleaner but requires search-enabled
   // accounts — list+filter is more portable for a one-shot script.
-  for await (const product of stripe.products.list({ limit: 100, active: true })) {
+  for await (const product of stripe.products.list({
+    limit: 100,
+    active: true,
+  })) {
     if (product.name === PRODUCT_NAME) {
-      console.log(`Found existing product ${product.id} matching "${PRODUCT_NAME}"`)
+      console.log(
+        `Found existing product ${product.id} matching "${PRODUCT_NAME}"`
+      )
       return product
     }
   }
@@ -126,7 +131,9 @@ async function main() {
   console.log(`stripe_price_id  : '${price.id}'`)
   console.log(`display_price    : '£15/month'`)
   console.log()
-  console.log(`Stripe dashboard: https://dashboard.stripe.com/products/${product.id}`)
+  console.log(
+    `Stripe dashboard: https://dashboard.stripe.com/products/${product.id}`
+  )
 }
 
 main().catch((err) => {

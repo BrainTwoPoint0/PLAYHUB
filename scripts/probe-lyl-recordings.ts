@@ -20,7 +20,11 @@ import { join } from 'node:path'
 
 function loadEnvFile(path: string): void {
   let raw: string
-  try { raw = readFileSync(path, 'utf8') } catch { return }
+  try {
+    raw = readFileSync(path, 'utf8')
+  } catch {
+    return
+  }
   for (const line of raw.split('\n')) {
     const trimmed = line.trim()
     if (!trimmed || trimmed.startsWith('#')) continue
@@ -28,7 +32,10 @@ function loadEnvFile(path: string): void {
     if (eq < 0) continue
     const key = trimmed.slice(0, eq).trim()
     let value = trimmed.slice(eq + 1).trim()
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.slice(1, -1)
     }
     if (!(key in process.env)) process.env[key] = value
@@ -73,7 +80,7 @@ async function main() {
     }
   }
 
-  function format(r: typeof all[number]) {
+  function format(r: (typeof all)[number]) {
     const dur = `${Math.round(r.duration / 60)}m`.padStart(5)
     const date = (r.match_date ?? '').slice(0, 10).padEnd(10)
     const home = (r.home_team ?? '—').slice(0, 28).padEnd(28)
@@ -88,7 +95,9 @@ async function main() {
   console.log(`\n▶ Missing teams (need manual review): ${missingTeams.length}`)
   for (const r of missingTeams) console.log(format(r))
 
-  console.log(`\n▶ Long recordings (>60min — skip per user instruction): ${long.length}`)
+  console.log(
+    `\n▶ Long recordings (>60min — skip per user instruction): ${long.length}`
+  )
   for (const r of long) console.log(format(r))
 
   // Aggregate unique team names so we can plan which teams to create.
@@ -98,7 +107,9 @@ async function main() {
     if (r.away_team) teamNames.add(r.away_team.trim())
   }
 
-  console.log(`\n▶ Unique team names across eligible recordings: ${teamNames.size}`)
+  console.log(
+    `\n▶ Unique team names across eligible recordings: ${teamNames.size}`
+  )
   const sortedTeams = [...teamNames].sort()
   for (const name of sortedTeams) {
     console.log(`  - ${name}`)

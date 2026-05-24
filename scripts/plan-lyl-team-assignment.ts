@@ -24,7 +24,11 @@ import { join } from 'node:path'
 
 function loadEnvFile(path: string): void {
   let raw: string
-  try { raw = readFileSync(path, 'utf8') } catch { return }
+  try {
+    raw = readFileSync(path, 'utf8')
+  } catch {
+    return
+  }
   for (const line of raw.split('\n')) {
     const trimmed = line.trim()
     if (!trimmed || trimmed.startsWith('#')) continue
@@ -32,7 +36,10 @@ function loadEnvFile(path: string): void {
     if (eq < 0) continue
     const key = trimmed.slice(0, eq).trim()
     let value = trimmed.slice(eq + 1).trim()
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.slice(1, -1)
     }
     if (!(key in process.env)) process.env[key] = value
@@ -55,20 +62,35 @@ const TEAM_LOOKUP: Array<{ patterns: string[]; subclubSlug: string }> = [
   // 18 LYL subclubs (16 originals + 2 we just added).
   { patterns: ['Barnes Eagles'], subclubSlug: 'barnes-eagles' },
   { patterns: ['Champs FC', 'Champs'], subclubSlug: 'champs-fc' },
-  { patterns: ['Chosen one FC', 'Chosen One', 'Chosen one'], subclubSlug: 'chosen-one' },
+  {
+    patterns: ['Chosen one FC', 'Chosen One', 'Chosen one'],
+    subclubSlug: 'chosen-one',
+  },
   { patterns: ['DBX'], subclubSlug: 'dbx' },
-  { patterns: ['Elite London Academy', 'Elite London academy'], subclubSlug: 'elite-london-academy' },
+  {
+    patterns: ['Elite London Academy', 'Elite London academy'],
+    subclubSlug: 'elite-london-academy',
+  },
   { patterns: ['ELA'], subclubSlug: 'ela' },
   { patterns: ['FC Juniors'], subclubSlug: 'fc-juniors' },
   // "Forza skillz" (with space) → forzaskillz. Order before generic words.
-  { patterns: ['Forzaskillz', 'Forza skillz', 'Forza Skillz'], subclubSlug: 'forzaskillz' },
+  {
+    patterns: ['Forzaskillz', 'Forza skillz', 'Forza Skillz'],
+    subclubSlug: 'forzaskillz',
+  },
   { patterns: ['JSFC'], subclubSlug: 'jsfc' },
   { patterns: ['LFS'], subclubSlug: 'lfs' },
   { patterns: ['London Thames'], subclubSlug: 'london-thames' },
-  { patterns: ['National Harrow', 'National Harr'], subclubSlug: 'national-harrow' },
+  {
+    patterns: ['National Harrow', 'National Harr'],
+    subclubSlug: 'national-harrow',
+  },
   { patterns: ['N.S.F.C', 'NSFC'], subclubSlug: 'nsfc' },
   { patterns: ['Project 1v1'], subclubSlug: 'project-1v1' },
-  { patterns: ['Roehampton Elite', 'Roehampton'], subclubSlug: 'roehampton-elite' },
+  {
+    patterns: ['Roehampton Elite', 'Roehampton'],
+    subclubSlug: 'roehampton-elite',
+  },
   { patterns: ['Rockslane Chiswick'], subclubSlug: 'rockslane-chiswick' },
   { patterns: ['Rugby Portobello Trust', 'RPT'], subclubSlug: 'rpt' },
   { patterns: ['Storm Elite'], subclubSlug: 'storm-elite' },
@@ -139,11 +161,11 @@ interface ParsedRecording {
   home: ParsedSide | null
   away: ParsedSide | null
   status:
-    | 'eligible'         // both teams + age resolved → can assign
-    | 'partial_resolve'  // only one team resolved
-    | 'no_age'           // teams ok but age missing
-    | 'unparseable'      // can't even split on vs
-    | 'too_long'         // >60min, skip
+    | 'eligible' // both teams + age resolved → can assign
+    | 'partial_resolve' // only one team resolved
+    | 'no_age' // teams ok but age missing
+    | 'unparseable' // can't even split on vs
+    | 'too_long' // >60min, skip
 }
 
 function parseRecording(r: {
@@ -261,36 +283,58 @@ async function main() {
     teamsToCreate.add(`${p.away!.subclubSlug}-${p.away!.ageGroup}`)
   }
 
-  console.log(`▶ Eligible (will be assigned to BOTH teams): ${byStatus.eligible.length}`)
+  console.log(
+    `▶ Eligible (will be assigned to BOTH teams): ${byStatus.eligible.length}`
+  )
   for (const p of byStatus.eligible) {
     const a = `${p.home!.subclubSlug}-${p.home!.ageGroup}`
     const b = `${p.away!.subclubSlug}-${p.away!.ageGroup}`
-    console.log(`  ${(p.match_date ?? '').slice(0, 10).padEnd(10)} → ${a.padEnd(28)} + ${b.padEnd(28)}  "${p.title.slice(0, 60)}"`)
+    console.log(
+      `  ${(p.match_date ?? '').slice(0, 10).padEnd(10)} → ${a.padEnd(28)} + ${b.padEnd(28)}  "${p.title.slice(0, 60)}"`
+    )
   }
 
-  console.log(`\n▶ Partial resolve (one team matched, one didn't — needs lookup-table tweak): ${byStatus.partial_resolve.length}`)
+  console.log(
+    `\n▶ Partial resolve (one team matched, one didn't — needs lookup-table tweak): ${byStatus.partial_resolve.length}`
+  )
   for (const p of byStatus.partial_resolve) {
     const h = p.home ? p.home.subclubSlug : `?? "${p.raw.home}"`
     const a = p.away ? p.away.subclubSlug : `?? "${p.raw.away}"`
-    console.log(`  ${(p.match_date ?? '').slice(0, 10).padEnd(10)}  home=${h.padEnd(20)} away=${a.padEnd(20)}  "${p.title.slice(0, 60)}"`)
+    console.log(
+      `  ${(p.match_date ?? '').slice(0, 10).padEnd(10)}  home=${h.padEnd(20)} away=${a.padEnd(20)}  "${p.title.slice(0, 60)}"`
+    )
   }
 
-  console.log(`\n▶ No age group parseable (will skip): ${byStatus.no_age.length}`)
+  console.log(
+    `\n▶ No age group parseable (will skip): ${byStatus.no_age.length}`
+  )
   for (const p of byStatus.no_age) {
-    console.log(`  ${(p.match_date ?? '').slice(0, 10).padEnd(10)}  "${p.title}"`)
+    console.log(
+      `  ${(p.match_date ?? '').slice(0, 10).padEnd(10)}  "${p.title}"`
+    )
   }
 
-  console.log(`\n▶ Unparseable (no " vs " split — will skip): ${byStatus.unparseable.length}`)
+  console.log(
+    `\n▶ Unparseable (no " vs " split — will skip): ${byStatus.unparseable.length}`
+  )
   for (const p of byStatus.unparseable) {
-    console.log(`  ${(p.match_date ?? '').slice(0, 10).padEnd(10)}  "${p.title}"`)
+    console.log(
+      `  ${(p.match_date ?? '').slice(0, 10).padEnd(10)}  "${p.title}"`
+    )
   }
 
-  console.log(`\n▶ Too long (>60min — skipped per user instruction): ${byStatus.too_long.length}`)
+  console.log(
+    `\n▶ Too long (>60min — skipped per user instruction): ${byStatus.too_long.length}`
+  )
   for (const p of byStatus.too_long) {
-    console.log(`  ${(p.match_date ?? '').slice(0, 10).padEnd(10)}  ${Math.round(p.duration / 60)}m  "${p.title}"`)
+    console.log(
+      `  ${(p.match_date ?? '').slice(0, 10).padEnd(10)}  ${Math.round(p.duration / 60)}m  "${p.title}"`
+    )
   }
 
-  console.log(`\n▶ Teams that need to be created in Veo (${teamsToCreate.size}):`)
+  console.log(
+    `\n▶ Teams that need to be created in Veo (${teamsToCreate.size}):`
+  )
   for (const t of [...teamsToCreate].sort()) console.log(`  - ${t}`)
 
   // Persist a machine-readable plan that the Stage-3 executor will consume.
@@ -324,8 +368,15 @@ async function main() {
         matched_away: p.away?.subclubSlug ?? null,
       })),
       no_age: byStatus.no_age.map((p) => ({ slug: p.slug, title: p.title })),
-      unparseable: byStatus.unparseable.map((p) => ({ slug: p.slug, title: p.title })),
-      too_long: byStatus.too_long.map((p) => ({ slug: p.slug, title: p.title, duration: p.duration })),
+      unparseable: byStatus.unparseable.map((p) => ({
+        slug: p.slug,
+        title: p.title,
+      })),
+      too_long: byStatus.too_long.map((p) => ({
+        slug: p.slug,
+        title: p.title,
+        duration: p.duration,
+      })),
     },
   }
   writeFileSync(PLAN_OUTPUT, JSON.stringify(plan, null, 2))

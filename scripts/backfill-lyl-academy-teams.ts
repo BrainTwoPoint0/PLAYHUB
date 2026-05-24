@@ -38,7 +38,11 @@ import { shutdownVeoSession } from '../src/lib/veo/auth'
 
 function loadEnv(p: string): void {
   let raw: string
-  try { raw = readFileSync(p, 'utf8') } catch { return }
+  try {
+    raw = readFileSync(p, 'utf8')
+  } catch {
+    return
+  }
   for (const line of raw.split('\n')) {
     const t = line.trim()
     if (!t || t.startsWith('#')) continue
@@ -46,7 +50,11 @@ function loadEnv(p: string): void {
     if (eq < 0) continue
     const key = t.slice(0, eq).trim()
     let value = t.slice(eq + 1).trim()
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1)
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    )
+      value = value.slice(1, -1)
     if (!(key in process.env)) process.env[key] = value
   }
 }
@@ -76,17 +84,28 @@ async function main() {
     .select('subclub_slug, display_name, logo_url')
     .eq('club_slug', CLUB_SLUG)
     .eq('is_active', true)
-  if (subErr) { console.error(subErr); process.exit(1) }
+  if (subErr) {
+    console.error(subErr)
+    process.exit(1)
+  }
   const subclubs = (subsRaw ?? []) as SubclubRow[]
   // Sort longest slug first so e.g. `rockslane-chiswick` wins over `rockslane`.
-  const subclubsByLengthDesc = [...subclubs].sort((a, b) => b.subclub_slug.length - a.subclub_slug.length)
+  const subclubsByLengthDesc = [...subclubs].sort(
+    (a, b) => b.subclub_slug.length - a.subclub_slug.length
+  )
   console.log(`Loaded ${subclubs.length} LYL subclubs`)
 
   // Veo teams
   const allClubs = await listClubsAndTeams()
-  if (!allClubs.success) { console.error(allClubs.message); process.exit(1) }
+  if (!allClubs.success) {
+    console.error(allClubs.message)
+    process.exit(1)
+  }
   const lyl = allClubs.data!.clubs.find((c) => c.slug === VEO_CLUB_SLUG)
-  if (!lyl) { console.error('lyl Veo club not found'); process.exit(1) }
+  if (!lyl) {
+    console.error('lyl Veo club not found')
+    process.exit(1)
+  }
   const veoTeams = lyl.teams as Array<{ slug: string; name: string }>
   console.log(`Found ${veoTeams.length} Veo teams under ${VEO_CLUB_SLUG}\n`)
 
@@ -101,13 +120,29 @@ async function main() {
   }
   const plan: Plan[] = veoTeams.map((veo) => {
     const m = veo.slug.match(AGE_RE)
-    if (!m) return { teamSlug: veo.slug, subclubSlug: null, ageGroup: null, displayName: '', veoName: veo.name, reason: 'no -u\\d+ suffix' }
+    if (!m)
+      return {
+        teamSlug: veo.slug,
+        subclubSlug: null,
+        ageGroup: null,
+        displayName: '',
+        veoName: veo.name,
+        reason: 'no -u\\d+ suffix',
+      }
     const prefix = m[1]
     const age = `u${m[2]}`
     // Longest-prefix match: the Veo slug prefix should EQUAL a subclub_slug
     // (not just include it) to avoid `rpt` accidentally matching `rocks…`.
     const match = subclubsByLengthDesc.find((sc) => sc.subclub_slug === prefix)
-    if (!match) return { teamSlug: veo.slug, subclubSlug: null, ageGroup: age, displayName: '', veoName: veo.name, reason: `no subclub matches prefix "${prefix}"` }
+    if (!match)
+      return {
+        teamSlug: veo.slug,
+        subclubSlug: null,
+        ageGroup: age,
+        displayName: '',
+        veoName: veo.name,
+        reason: `no subclub matches prefix "${prefix}"`,
+      }
     return {
       teamSlug: veo.slug,
       subclubSlug: match.subclub_slug,
@@ -124,12 +159,16 @@ async function main() {
   console.log(`  Actionable: ${actionable.length} team rows will be upserted`)
   console.log(`  Skipped:    ${skipped.length}`)
   for (const p of actionable.slice(0, 10)) {
-    console.log(`    ${p.teamSlug.padEnd(35)} → subclub=${p.subclubSlug?.padEnd(20)} display="${p.displayName}"  (veo "${p.veoName}")`)
+    console.log(
+      `    ${p.teamSlug.padEnd(35)} → subclub=${p.subclubSlug?.padEnd(20)} display="${p.displayName}"  (veo "${p.veoName}")`
+    )
   }
-  if (actionable.length > 10) console.log(`    … and ${actionable.length - 10} more`)
+  if (actionable.length > 10)
+    console.log(`    … and ${actionable.length - 10} more`)
   if (skipped.length) {
     console.log(`\n  Skipped:`)
-    for (const p of skipped) console.log(`    ${p.teamSlug.padEnd(35)} — ${p.reason}`)
+    for (const p of skipped)
+      console.log(`    ${p.teamSlug.padEnd(35)} — ${p.reason}`)
   }
 
   if (!APPLY) {
@@ -173,9 +212,7 @@ async function main() {
     await shutdownVeoSession()
     process.exit(1)
   }
-  const { error } = await supabase
-    .from('playhub_academy_teams')
-    .insert(rows)
+  const { error } = await supabase.from('playhub_academy_teams').insert(rows)
   if (error) {
     console.error('upsert failed:', error)
     await shutdownVeoSession()
@@ -185,4 +222,8 @@ async function main() {
 
   await shutdownVeoSession()
 }
-main().catch(async (e) => { console.error(e); await shutdownVeoSession(); process.exit(1) })
+main().catch(async (e) => {
+  console.error(e)
+  await shutdownVeoSession()
+  process.exit(1)
+})

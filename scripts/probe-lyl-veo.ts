@@ -84,9 +84,13 @@ async function main() {
     return
   }
 
-  console.log('--- Veo teams (paste into LYL seed once subclub mapping is decided) ---\n')
+  console.log(
+    '--- Veo teams (paste into LYL seed once subclub mapping is decided) ---\n'
+  )
   for (const t of lyl.teams) {
-    console.log(`  ${t.slug.padEnd(50)} ${t.name}  [members: ${t.member_count}]`)
+    console.log(
+      `  ${t.slug.padEnd(50)} ${t.name}  [members: ${t.member_count}]`
+    )
   }
 }
 

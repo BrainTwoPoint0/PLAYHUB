@@ -58,7 +58,9 @@ function parseArgs(argv: string[]): Args {
 
 async function veoOnly(args: Args): Promise<number> {
   if (!args.veoClubSlug || !args.veoTeamSlug || !args.email) {
-    console.error('--veo-only mode needs --veo-club-slug, --veo-team-slug, --email')
+    console.error(
+      '--veo-only mode needs --veo-club-slug, --veo-team-slug, --email'
+    )
     return 2
   }
   console.log(

@@ -207,15 +207,15 @@ async function main() {
       .upload(objectKey, buf, { contentType: mime, upsert: true })
 
     if (error) {
-      console.error(`✗ ${basename(entry.source)} → ${objectKey}: ${error.message}`)
+      console.error(
+        `✗ ${basename(entry.source)} → ${objectKey}: ${error.message}`
+      )
       throw error
     }
 
     const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(objectKey)
     results.push({ entry, publicUrl: pub.publicUrl })
-    const tag = entry.isUmbrella
-      ? '[umbrella]'
-      : `[${entry.subclubSlug}]`
+    const tag = entry.isUmbrella ? '[umbrella]' : `[${entry.subclubSlug}]`
     console.log(`✓ ${tag.padEnd(22)} ${objectKey}`)
   }
 

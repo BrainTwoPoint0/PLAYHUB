@@ -39,10 +39,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
-import {
-  listClubsAndTeams,
-  uploadTeamCrest,
-} from '../src/lib/veo/client'
+import { listClubsAndTeams, uploadTeamCrest } from '../src/lib/veo/client'
 import { shutdownVeoSession } from '../src/lib/veo/auth'
 
 const LEAGUE_CLUB_SLUG = 'lyl'
@@ -50,7 +47,11 @@ const VEO_CLUB_SLUG = 'london-youth-league'
 
 function loadEnvFile(path: string): void {
   let raw: string
-  try { raw = readFileSync(path, 'utf8') } catch { return }
+  try {
+    raw = readFileSync(path, 'utf8')
+  } catch {
+    return
+  }
   for (const line of raw.split('\n')) {
     const t = line.trim()
     if (!t || t.startsWith('#')) continue
@@ -58,7 +59,10 @@ function loadEnvFile(path: string): void {
     if (eq < 0) continue
     const key = t.slice(0, eq).trim()
     let value = t.slice(eq + 1).trim()
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.slice(1, -1)
     }
     if (!(key in process.env)) process.env[key] = value
@@ -78,7 +82,15 @@ const ONLY = (() => {
 // re-uploading every other team's crest).
 const SLUGS = (() => {
   const a = process.argv.find((x) => x.startsWith('--slugs='))
-  return a ? new Set(a.split('=')[1].split(',').map((s) => s.trim()).filter(Boolean)) : null
+  return a
+    ? new Set(
+        a
+          .split('=')[1]
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      )
+    : null
 })()
 // Veo names uploaded crest assets by Unix-second timestamp
 // (team_<unixSeconds>.png) — two uploads in the same second COLLIDE,
@@ -92,7 +104,12 @@ const INTER_UPLOAD_DELAY_MS = 1100
 // so a future bad write could land an arbitrary URL there. Forbid
 // fetching anything that isn't a public Supabase Storage object. Per
 // 2026-05-17 security review.
-const ALLOWED_LOGO_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+const ALLOWED_LOGO_MIME = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+])
 function isAllowedLogoUrl(url: string, supabaseUrl: string): boolean {
   // Require exact prefix match against the project's Supabase URL +
   // the public-storage path. Rejects redirects, IPs, metadata endpoints.
@@ -126,7 +143,9 @@ async function main() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !supabaseKey) {
-    console.error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in PLAYHUB/.env')
+    console.error(
+      'Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in PLAYHUB/.env'
+    )
     process.exit(1)
   }
   if (!process.env.VEO_EMAIL || !process.env.VEO_PASSWORD) {
@@ -156,7 +175,9 @@ async function main() {
   )
 
   // 2. List Veo teams in the LYL clubhouse (filter from all clubs+teams)
-  console.log(`\nFetching clubs+teams from Veo and filtering to "${VEO_CLUB_SLUG}"…`)
+  console.log(
+    `\nFetching clubs+teams from Veo and filtering to "${VEO_CLUB_SLUG}"…`
+  )
   const allClubsRes = await listClubsAndTeams()
   if (!allClubsRes.success) {
     console.error(`Failed to list Veo clubs+teams: ${allClubsRes.message}`)
@@ -184,7 +205,12 @@ async function main() {
       return { veo, matched: null, logoUrl: null, reason: 'filtered by --only' }
     }
     if (SLUGS && !SLUGS.has(veo.slug)) {
-      return { veo, matched: null, logoUrl: null, reason: 'filtered by --slugs' }
+      return {
+        veo,
+        matched: null,
+        logoUrl: null,
+        reason: 'filtered by --slugs',
+      }
     }
     // Try to match by display_name prefix (case-insensitive, dropping trailing age group).
     // The Veo team's name is "<DisplayName> U<NN>" so strip the suffix.
@@ -193,10 +219,20 @@ async function main() {
       (sc) => sc.display_name.toLowerCase() === nameWithoutAge.toLowerCase()
     )
     if (!matched) {
-      return { veo, matched: null, logoUrl: null, reason: `no subclub matches "${nameWithoutAge}"` }
+      return {
+        veo,
+        matched: null,
+        logoUrl: null,
+        reason: `no subclub matches "${nameWithoutAge}"`,
+      }
     }
     if (!matched.logo_url) {
-      return { veo, matched, logoUrl: null, reason: `subclub "${matched.subclub_slug}" has no logo_url in DB` }
+      return {
+        veo,
+        matched,
+        logoUrl: null,
+        reason: `subclub "${matched.subclub_slug}" has no logo_url in DB`,
+      }
     }
     return { veo, matched, logoUrl: matched.logo_url }
   })
@@ -205,12 +241,16 @@ async function main() {
   const actionable = plan.filter((p) => p.logoUrl)
   const unmatched = plan.filter((p) => !p.logoUrl)
   console.log(`\n=== PLAN ===`)
-  console.log(`  Actionable: ${actionable.length} teams will have their crest updated`)
+  console.log(
+    `  Actionable: ${actionable.length} teams will have their crest updated`
+  )
   console.log(`  Skipped:    ${unmatched.length} teams (no match or no logo)`)
   if (actionable.length) {
     console.log(`\n  First 5 actionable:`)
     for (const p of actionable.slice(0, 5)) {
-      console.log(`    ${p.veo.slug.padEnd(40)} → ${p.matched!.subclub_slug.padEnd(20)} (${p.logoUrl})`)
+      console.log(
+        `    ${p.veo.slug.padEnd(40)} → ${p.matched!.subclub_slug.padEnd(20)} (${p.logoUrl})`
+      )
     }
   }
   if (unmatched.length) {
@@ -221,7 +261,9 @@ async function main() {
   }
 
   if (!APPLY) {
-    console.log(`\nDry-run. Pass --apply to execute (and ideally --only=<one-slug> for first-test).`)
+    console.log(
+      `\nDry-run. Pass --apply to execute (and ideally --only=<one-slug> for first-test).`
+    )
     await shutdownVeoSession()
     return
   }
@@ -256,7 +298,9 @@ async function main() {
         continue
       }
       const imgBytes = Buffer.from(await imgResp.arrayBuffer())
-      const mimeType = imgResp.headers.get('content-type')?.split(';')[0]?.trim() || sniffMimeType(p.logoUrl!)
+      const mimeType =
+        imgResp.headers.get('content-type')?.split(';')[0]?.trim() ||
+        sniffMimeType(p.logoUrl!)
       // MIME allowlist at the boundary — uploadTeamCrest enforces this too,
       // but failing here gives a clearer log line.
       if (!ALLOWED_LOGO_MIME.has(mimeType)) {
@@ -281,7 +325,9 @@ async function main() {
         failCount++
       }
     } catch (err) {
-      console.log(`✗ exception: ${err instanceof Error ? err.message : String(err)}`)
+      console.log(
+        `✗ exception: ${err instanceof Error ? err.message : String(err)}`
+      )
       failCount++
     }
   }
@@ -296,6 +342,8 @@ async function main() {
 
 main().catch(async (err) => {
   console.error('Unhandled error:', err)
-  try { await shutdownVeoSession() } catch {}
+  try {
+    await shutdownVeoSession()
+  } catch {}
   process.exit(1)
 })

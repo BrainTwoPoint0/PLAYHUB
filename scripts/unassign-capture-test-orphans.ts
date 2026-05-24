@@ -18,7 +18,11 @@ import { join } from 'node:path'
 
 function loadEnvFile(path: string): void {
   let raw: string
-  try { raw = readFileSync(path, 'utf8') } catch { return }
+  try {
+    raw = readFileSync(path, 'utf8')
+  } catch {
+    return
+  }
   for (const line of raw.split('\n')) {
     const t = line.trim()
     if (!t || t.startsWith('#')) continue
@@ -26,7 +30,10 @@ function loadEnvFile(path: string): void {
     if (eq < 0) continue
     const key = t.slice(0, eq).trim()
     let value = t.slice(eq + 1).trim()
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.slice(1, -1)
     }
     if (!(key in process.env)) process.env[key] = value
@@ -39,14 +46,20 @@ const VEO_CLUB_SLUG = 'london-youth-league'
 const GHOST_TEAM_NAME = 'capture-test-team'
 
 async function main(): Promise<void> {
-  const { listRecordings, getMatchDetails, assignRecordingToTeam } = await import('../src/lib/veo/client')
+  const { listRecordings, getMatchDetails, assignRecordingToTeam } =
+    await import('../src/lib/veo/client')
 
-  console.log(`=== Unassign capture-test orphans (${APPLY ? 'APPLY' : 'DRY-RUN'}) ===\n`)
+  console.log(
+    `=== Unassign capture-test orphans (${APPLY ? 'APPLY' : 'DRY-RUN'}) ===\n`
+  )
 
   const listRes = await listRecordings(VEO_CLUB_SLUG)
-  if (!listRes.success || !listRes.data) throw new Error(`listRecordings: ${listRes.message}`)
+  if (!listRes.success || !listRes.data)
+    throw new Error(`listRecordings: ${listRes.message}`)
 
-  const orphans = listRes.data.recordings.filter((r) => r.team === GHOST_TEAM_NAME)
+  const orphans = listRes.data.recordings.filter(
+    (r) => r.team === GHOST_TEAM_NAME
+  )
   if (orphans.length === 0) {
     console.log('No orphans found. Done.')
     return
@@ -67,7 +80,9 @@ async function main(): Promise<void> {
   for (const o of orphans) {
     const detailsRes = await getMatchDetails(o.slug)
     if (!detailsRes.success || !detailsRes.data) {
-      console.error(`  ✗ ${o.slug}: getMatchDetails failed: ${detailsRes.message}`)
+      console.error(
+        `  ✗ ${o.slug}: getMatchDetails failed: ${detailsRes.message}`
+      )
       continue
     }
     const uuid = (detailsRes.data as { id?: string }).id

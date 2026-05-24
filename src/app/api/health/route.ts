@@ -6,11 +6,7 @@ import { testConnection } from '@/lib/spiideo/client'
 import { HeadObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
-import type {
-  HealthErrorCode,
-  HealthResponse,
-  ServiceStatus,
-} from './types'
+import type { HealthErrorCode, HealthResponse, ServiceStatus } from './types'
 
 // ─── Config ─────────────────────────────────────────────────────
 

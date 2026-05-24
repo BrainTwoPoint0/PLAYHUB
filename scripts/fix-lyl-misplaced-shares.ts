@@ -28,7 +28,11 @@ import { createClient } from '@supabase/supabase-js'
 
 function loadEnvFile(path: string): void {
   let raw: string
-  try { raw = readFileSync(path, 'utf8') } catch { return }
+  try {
+    raw = readFileSync(path, 'utf8')
+  } catch {
+    return
+  }
   for (const line of raw.split('\n')) {
     const t = line.trim()
     if (!t || t.startsWith('#')) continue
@@ -36,7 +40,10 @@ function loadEnvFile(path: string): void {
     if (eq < 0) continue
     const key = t.slice(0, eq).trim()
     let value = t.slice(eq + 1).trim()
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.slice(1, -1)
     }
     if (!(key in process.env)) process.env[key] = value
@@ -50,21 +57,32 @@ const VEO_CLUB_SLUG = 'london-youth-league'
 
 async function main(): Promise<void> {
   // Dynamic imports so the env loader runs before module-init reads env.
-  const { listRecordings, listClubsAndTeams, getMatchDetails, assignRecordingToTeam } = await import('../src/lib/veo/client')
+  const {
+    listRecordings,
+    listClubsAndTeams,
+    getMatchDetails,
+    assignRecordingToTeam,
+  } = await import('../src/lib/veo/client')
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
   if (!supabaseUrl || !supabaseKey) {
-    throw new Error('NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY required')
+    throw new Error(
+      'NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY required'
+    )
   }
   const supabase = createClient(supabaseUrl, supabaseKey)
 
-  console.log(`=== LYL misplaced-share cleanup (${APPLY ? 'APPLY' : 'DRY-RUN'}) ===\n`)
+  console.log(
+    `=== LYL misplaced-share cleanup (${APPLY ? 'APPLY' : 'DRY-RUN'}) ===\n`
+  )
 
   // 1. Load all fully_assigned rows for LYL.
   const { data: assignments, error } = await supabase
     .from('playhub_recording_assignments')
-    .select('recording_slug, recording_title, home_team_slug, home_team_uuid, away_team_slug, away_team_uuid, away_accepted_recording_uuid')
+    .select(
+      'recording_slug, recording_title, home_team_slug, home_team_uuid, away_team_slug, away_team_uuid, away_accepted_recording_uuid'
+    )
     .eq('league_club_slug', LEAGUE_CLUB_SLUG)
     .eq('status', 'fully_assigned')
     .not('away_accepted_recording_uuid', 'is', null)
@@ -83,7 +101,10 @@ async function main(): Promise<void> {
   if (!listRes.success || !listRes.data) {
     throw new Error(`listRecordings failed: ${listRes.message}`)
   }
-  const recordingBySlug = new Map<string, { slug: string; team: string | null }>()
+  const recordingBySlug = new Map<
+    string,
+    { slug: string; team: string | null }
+  >()
   for (const r of listRes.data.recordings) {
     recordingBySlug.set(r.slug, { slug: r.slug, team: r.team ?? null })
   }
@@ -117,7 +138,9 @@ async function main(): Promise<void> {
     const shareSlug = a.away_accepted_recording_uuid as string
     const expectedTeamName = teamNameByUuid.get(a.away_team_uuid as string)
     if (!expectedTeamName) {
-      console.warn(`  [warn ] ${shareSlug.slice(0, 64)} away_team_uuid ${a.away_team_uuid} not in Veo team list — skip`)
+      console.warn(
+        `  [warn ] ${shareSlug.slice(0, 64)} away_team_uuid ${a.away_team_uuid} not in Veo team list — skip`
+      )
       continue
     }
     const current = recordingBySlug.get(shareSlug)
@@ -136,7 +159,9 @@ async function main(): Promise<void> {
   }
 
   if (notFound.length) {
-    console.warn(`${notFound.length} share-copy slug(s) not found in Veo listing (likely deleted or stale assignment row). Sample:`)
+    console.warn(
+      `${notFound.length} share-copy slug(s) not found in Veo listing (likely deleted or stale assignment row). Sample:`
+    )
     for (const s of notFound.slice(0, 5)) console.warn(`  ${s}`)
     console.log()
   }
@@ -150,7 +175,9 @@ async function main(): Promise<void> {
   for (const a of actions) {
     console.log(`  [${APPLY ? 'MOVE  ' : 'plan  '}] ${a.title}`)
     console.log(`           slug=${a.shareSlug}`)
-    console.log(`           current="${a.currentTeam ?? '<no team>'}" → target="${a.expectedTeamName}"`)
+    console.log(
+      `           current="${a.currentTeam ?? '<no team>'}" → target="${a.expectedTeamName}"`
+    )
   }
   if (!APPLY) {
     console.log('\nDry-run only — pass --apply to execute.')
@@ -163,7 +190,9 @@ async function main(): Promise<void> {
     // endpoint returns the match object at the top level (not wrapped).
     const detailsRes = await getMatchDetails(a.shareSlug)
     if (!detailsRes.success || !detailsRes.data) {
-      console.error(`  ✗ ${a.shareSlug.slice(0, 64)}: getMatchDetails failed: ${detailsRes.message}`)
+      console.error(
+        `  ✗ ${a.shareSlug.slice(0, 64)}: getMatchDetails failed: ${detailsRes.message}`
+      )
       continue
     }
     const uuid = (detailsRes.data as { id?: string }).id

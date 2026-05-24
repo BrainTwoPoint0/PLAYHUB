@@ -39,7 +39,11 @@ import { shutdownVeoSession } from '../src/lib/veo/auth'
 
 function loadEnvFile(path: string): void {
   let raw: string
-  try { raw = readFileSync(path, 'utf8') } catch { return }
+  try {
+    raw = readFileSync(path, 'utf8')
+  } catch {
+    return
+  }
   for (const line of raw.split('\n')) {
     const t = line.trim()
     if (!t || t.startsWith('#')) continue
@@ -47,7 +51,11 @@ function loadEnvFile(path: string): void {
     if (eq < 0) continue
     const key = t.slice(0, eq).trim()
     let value = t.slice(eq + 1).trim()
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1)
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    )
+      value = value.slice(1, -1)
     if (!(key in process.env)) process.env[key] = value
   }
 }
@@ -57,7 +65,8 @@ loadEnvFile(join(__dirname, '..', '.env.local'))
 const APPLY = process.argv.includes('--apply')
 const VEO_CLUB_SLUG = 'london-youth-league'
 const LEAGUE_CLUB_SLUG = 'lyl'
-const ELA_LOGO_URL = 'https://zfaadonrmgfxnwzyudxi.supabase.co/storage/v1/object/public/graphic-packages/lyl/lyl-ela.png'
+const ELA_LOGO_URL =
+  'https://zfaadonrmgfxnwzyudxi.supabase.co/storage/v1/object/public/graphic-packages/lyl/lyl-ela.png'
 
 async function main() {
   const supabase = createClient(
@@ -77,27 +86,37 @@ async function main() {
     console.error(`Veo club "${VEO_CLUB_SLUG}" not found`)
     process.exit(1)
   }
-  const teams = lylClub.teams as Array<{ slug: string; id: string; name: string }>
+  const teams = lylClub.teams as Array<{
+    slug: string
+    id: string
+    name: string
+  }>
   const elaU7 = teams.find((t) => t.slug === 'ela-u7')
   const elaU8 = teams.find((t) => t.slug === 'ela-u8')
   const dupU7 = teams.find((t) => t.slug === 'elite-london-academy-u7')
   const dupU8 = teams.find((t) => t.slug === 'elite-london-academy-u8')
 
   if (!dupU7 && !dupU8) {
-    console.log('No elite-london-academy-* teams found in Veo. Already migrated?')
+    console.log(
+      'No elite-london-academy-* teams found in Veo. Already migrated?'
+    )
   }
   if (!elaU8) {
     console.error('ela-u8 not found in Veo — unexpected; aborting.')
     process.exit(1)
   }
 
-  console.log(`  ela-u7: ${elaU7 ? `${elaU7.id} (exists)` : '(missing — will create)'}`)
+  console.log(
+    `  ela-u7: ${elaU7 ? `${elaU7.id} (exists)` : '(missing — will create)'}`
+  )
   console.log(`  ela-u8: ${elaU8.id}`)
   console.log(`  elite-london-academy-u7: ${dupU7?.id ?? '(missing)'}`)
   console.log(`  elite-london-academy-u8: ${dupU8?.id ?? '(missing)'}`)
 
   // === Step 2: list recordings to migrate ===
-  console.log('\nListing all LYL recordings to find ones under elite-london-academy-*…')
+  console.log(
+    '\nListing all LYL recordings to find ones under elite-london-academy-*…'
+  )
   const recsRes = await listRecordings(VEO_CLUB_SLUG)
   if (!recsRes.success) {
     console.error(`Failed to list recordings: ${recsRes.message}`)
@@ -107,15 +126,19 @@ async function main() {
     slug: string
     uuid?: string
     title: string
-    team?: string | null  // team NAME not UUID
+    team?: string | null // team NAME not UUID
   }>
   // r.team returns team NAME — match against the display names of dup teams.
   const dupU7Name = dupU7?.name
   const dupU8Name = dupU8?.name
   const toMoveU7 = allRecs.filter((r) => dupU7Name && r.team === dupU7Name)
   const toMoveU8 = allRecs.filter((r) => dupU8Name && r.team === dupU8Name)
-  console.log(`  ${toMoveU7.length} recordings to move from elite-london-academy-u7 → ela-u7`)
-  console.log(`  ${toMoveU8.length} recordings to move from elite-london-academy-u8 → ela-u8`)
+  console.log(
+    `  ${toMoveU7.length} recordings to move from elite-london-academy-u7 → ela-u7`
+  )
+  console.log(
+    `  ${toMoveU8.length} recordings to move from elite-london-academy-u8 → ela-u8`
+  )
   for (const r of [...toMoveU7, ...toMoveU8]) {
     console.log(`    ${r.slug.padEnd(45)} "${r.title}"`)
   }
@@ -131,12 +154,19 @@ async function main() {
   // === Plan summary ===
   console.log('\n=== MIGRATION PLAN ===')
   if (!elaU7) console.log('  1. CREATE Veo team "ela-u7" (name "ELA U7")')
-  if (toMoveU7.length) console.log(`  2. PATCH ${toMoveU7.length} recordings: team → ela-u7`)
-  if (toMoveU8.length) console.log(`  3. PATCH ${toMoveU8.length} recordings: team → ela-u8`)
-  if (dupU7) console.log(`  4. DELETE Veo team elite-london-academy-u7 (${dupU7.id})`)
-  if (dupU8) console.log(`  5. DELETE Veo team elite-london-academy-u8 (${dupU8.id})`)
+  if (toMoveU7.length)
+    console.log(`  2. PATCH ${toMoveU7.length} recordings: team → ela-u7`)
+  if (toMoveU8.length)
+    console.log(`  3. PATCH ${toMoveU8.length} recordings: team → ela-u8`)
+  if (dupU7)
+    console.log(`  4. DELETE Veo team elite-london-academy-u7 (${dupU7.id})`)
+  if (dupU8)
+    console.log(`  5. DELETE Veo team elite-london-academy-u8 (${dupU8.id})`)
   if (!elaU7) console.log('  6. UPLOAD ELA logo to ela-u7 (after creation)')
-  if (subRow) console.log(`  7. DELETE playhub_academy_subclubs row for elite-london-academy (id=${subRow.id})`)
+  if (subRow)
+    console.log(
+      `  7. DELETE playhub_academy_subclubs row for elite-london-academy (id=${subRow.id})`
+    )
   console.log('')
 
   if (!APPLY) {
@@ -174,17 +204,33 @@ async function main() {
   // the existing assignRecordingToTeam helper which takes a UUID.
   // Sniff the uuid from listRecordings response if present, else fetch
   // detail.
-  const moves: Array<{ rec: typeof allRecs[0]; targetTeamId: string; targetTeamName: string }> = [
-    ...toMoveU7.map((rec) => ({ rec, targetTeamId: newElaU7Id!, targetTeamName: 'ela-u7' })),
-    ...toMoveU8.map((rec) => ({ rec, targetTeamId: elaU8.id, targetTeamName: 'ela-u8' })),
+  const moves: Array<{
+    rec: (typeof allRecs)[0]
+    targetTeamId: string
+    targetTeamName: string
+  }> = [
+    ...toMoveU7.map((rec) => ({
+      rec,
+      targetTeamId: newElaU7Id!,
+      targetTeamName: 'ela-u7',
+    })),
+    ...toMoveU8.map((rec) => ({
+      rec,
+      targetTeamId: elaU8.id,
+      targetTeamName: 'ela-u8',
+    })),
   ]
   for (const m of moves) {
     const uuid = m.rec.uuid
     if (!uuid) {
-      console.error(`✗ ${m.rec.slug}: missing uuid in listRecordings response, skipping`)
+      console.error(
+        `✗ ${m.rec.slug}: missing uuid in listRecordings response, skipping`
+      )
       continue
     }
-    process.stdout.write(`  PATCH ${m.rec.slug.padEnd(45)} → ${m.targetTeamName}: `)
+    process.stdout.write(
+      `  PATCH ${m.rec.slug.padEnd(45)} → ${m.targetTeamName}: `
+    )
     const assignRes = await assignRecordingToTeam(uuid, m.targetTeamId)
     if (assignRes.success) console.log('✓')
     else console.log(`✗ ${assignRes.message}`)
@@ -210,7 +256,9 @@ async function main() {
       console.log(`✗ logo fetch failed (${imgResp.status})`)
     } else {
       const imgBytes = Buffer.from(await imgResp.arrayBuffer())
-      const mimeType = imgResp.headers.get('content-type')?.split(';')[0]?.trim() || 'image/png'
+      const mimeType =
+        imgResp.headers.get('content-type')?.split(';')[0]?.trim() ||
+        'image/png'
       const upRes = await uploadTeamCrest({
         clubSlug: VEO_CLUB_SLUG,
         teamSlug: 'ela-u7',
@@ -218,7 +266,9 @@ async function main() {
         mimeType,
         filename: 'ela.png',
       })
-      console.log(upRes.success ? `✓ ${upRes.data?.crestUrl}` : `✗ ${upRes.message}`)
+      console.log(
+        upRes.success ? `✓ ${upRes.data?.crestUrl}` : `✗ ${upRes.message}`
+      )
     }
   }
 
@@ -238,6 +288,8 @@ async function main() {
 
 main().catch(async (e) => {
   console.error('Unhandled:', e)
-  try { await shutdownVeoSession() } catch {}
+  try {
+    await shutdownVeoSession()
+  } catch {}
   process.exit(1)
 })
