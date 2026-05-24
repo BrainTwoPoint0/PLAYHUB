@@ -7,7 +7,11 @@
 // upserts) instead of the real client.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { runSync, type RunSyncDeps, type VeoClientSurface } from '../orchestrator'
+import {
+  runSync,
+  type RunSyncDeps,
+  type VeoClientSurface,
+} from '../orchestrator'
 import type { ParseOutcome } from '../types'
 
 // ---------------------------------------------------------------------------
@@ -15,7 +19,15 @@ import type { ParseOutcome } from '../types'
 // ---------------------------------------------------------------------------
 
 class FakeSupabase {
-  subclubs = new Map<string, { subclub_slug: string; display_name: string; is_active: boolean; club_slug: string }>()
+  subclubs = new Map<
+    string,
+    {
+      subclub_slug: string
+      display_name: string
+      is_active: boolean
+      club_slug: string
+    }
+  >()
   assignments = new Map<string, any>() // key: `${league}:${slug}`
   runs = new Map<string, any>()
   nextRunId = 1
@@ -60,7 +72,10 @@ class FakeSupabase {
               maybeSingle: async () => {
                 if (c1 !== 'league_club_slug' || c2 !== 'recording_slug')
                   throw new Error(`unexpected assignments query ${c1}/${c2}`)
-                return { data: self.assignments.get(`${v1}:${v2}`) ?? null, error: null }
+                return {
+                  data: self.assignments.get(`${v1}:${v2}`) ?? null,
+                  error: null,
+                }
               },
             }),
           }),
@@ -74,7 +89,11 @@ class FakeSupabase {
             const row = Array.isArray(rowOrArray) ? rowOrArray[0] : rowOrArray
             const key = `${row.league_club_slug}:${row.recording_slug}`
             const existing = self.assignments.get(key) ?? {}
-            const merged = { ...existing, ...row, id: existing.id ?? `as-${self.assignments.size + 1}` }
+            const merged = {
+              ...existing,
+              ...row,
+              id: existing.id ?? `as-${self.assignments.size + 1}`,
+            }
             self.assignments.set(key, merged)
             const result = { data: [merged], error: null }
             // Thenable so `await .select()` resolves; keeps `.single()`
@@ -140,7 +159,10 @@ function makeVeo(overrides: Partial<VeoClientSurface> = {}): VeoClientSurface {
 // that returns canned outcomes per recording title.
 function makeParserFactory(
   outcomes: Map<string, ParseOutcome>,
-  llmCostByTitle: Map<string, { inputTokens: number; outputTokens: number; costUsd: number }> = new Map()
+  llmCostByTitle: Map<
+    string,
+    { inputTokens: number; outputTokens: number; costUsd: number }
+  > = new Map()
 ) {
   return () =>
     ({
@@ -158,13 +180,20 @@ import { parseRecording } from '../parser'
 vi.mock('../parser', async () => {
   return {
     parseRecording: vi.fn(),
-    buildDefaultDeps: () => ({ anthropicCreate: vi.fn(), now: () => new Date(), model: 'test' }),
+    buildDefaultDeps: () => ({
+      anthropicCreate: vi.fn(),
+      now: () => new Date(),
+      model: 'test',
+    }),
   }
 })
 
 const mockedParse = vi.mocked(parseRecording)
 
-function setupParse(outcomes: Map<string, ParseOutcome>, costs: Map<string, any> = new Map()) {
+function setupParse(
+  outcomes: Map<string, ParseOutcome>,
+  costs: Map<string, any> = new Map()
+) {
   mockedParse.mockImplementation(async (input) => {
     const o = outcomes.get(input.title)
     if (!o) throw new Error(`no canned outcome for title "${input.title}"`)
@@ -176,7 +205,11 @@ function makeDeps(supabase: FakeSupabase, veo: VeoClientSurface): RunSyncDeps {
   return {
     supabase: supabase as any,
     veo,
-    parserFactory: () => ({ anthropicCreate: vi.fn(), now: () => new Date(), model: 'test' }),
+    parserFactory: () => ({
+      anthropicCreate: vi.fn(),
+      now: () => new Date(),
+      model: 'test',
+    }),
   }
 }
 
@@ -195,33 +228,55 @@ describe('runSync orchestrator', () => {
     const veo = makeVeo({
       listClubTeams: vi.fn(async () => []),
       listRecordings: vi.fn(async () => [
-        { slug: 'rec-1', title: 'TAA vs JSFC', duration: 2700, match_date: '2026-05-10', team: null },
+        {
+          slug: 'rec-1',
+          title: 'TAA vs JSFC',
+          duration: 2700,
+          match_date: '2026-05-10',
+          team: null,
+        },
       ]),
     })
 
     setupParse(
       new Map([
-        ['TAA vs JSFC', {
-          kind: 'eligible',
-          parsed: {
-            home: { subclubSlug: 'taa', ageGroup: 'u9' },
-            away: { subclubSlug: 'jsfc', ageGroup: 'u9' },
-            method: 'rules', confidence: null, reasoning: null, llmAttemptedAt: null,
+        [
+          'TAA vs JSFC',
+          {
+            kind: 'eligible',
+            parsed: {
+              home: { subclubSlug: 'taa', ageGroup: 'u9' },
+              away: { subclubSlug: 'jsfc', ageGroup: 'u9' },
+              method: 'rules',
+              confidence: null,
+              reasoning: null,
+              llmAttemptedAt: null,
+            },
           },
-        }],
+        ],
       ])
     )
 
-    const r = await runSync({
-      leagueClubSlug: 'lyl', trigger: 'cron',
-      shareRecipientEmail: 'admin@example.com',
-    }, makeDeps(db, veo))
+    const r = await runSync(
+      {
+        leagueClubSlug: 'lyl',
+        trigger: 'cron',
+        shareRecipientEmail: 'admin@example.com',
+      },
+      makeDeps(db, veo)
+    )
 
     expect(r.status).toBe('succeeded')
     expect(r.counts).toMatchObject({
-      veoRecordingsSeen: 1, newRecordings: 1,
-      rulesParsed: 1, llmParsed: 0, unparseable: 0,
-      homeAssignments: 1, shareAccepts: 1, autoCorrections: 0, failures: 0,
+      veoRecordingsSeen: 1,
+      newRecordings: 1,
+      rulesParsed: 1,
+      llmParsed: 0,
+      unparseable: 0,
+      homeAssignments: 1,
+      shareAccepts: 1,
+      autoCorrections: 0,
+      failures: 0,
     })
     // Verify Veo writes happened. assignRecordingToTeam is called TWICE:
     // once for the original (home-team patch in step 6a), then again as the
@@ -245,8 +300,11 @@ describe('runSync orchestrator', () => {
     db.seedSubclub('lyl', 'taa', 'TAA')
     db.seedSubclub('lyl', 'jsfc', 'JSFC')
     db.assignments.set('lyl:rec-1', {
-      league_club_slug: 'lyl', recording_slug: 'rec-1', status: 'fully_assigned',
-      home_team_slug: 'taa-u9', away_team_uuid: 'team-id-jsfc-u9',
+      league_club_slug: 'lyl',
+      recording_slug: 'rec-1',
+      status: 'fully_assigned',
+      home_team_slug: 'taa-u9',
+      away_team_uuid: 'team-id-jsfc-u9',
       away_accepted_recording_uuid: 'accepted-slug',
       away_share_key: 'old-key',
     })
@@ -256,30 +314,46 @@ describe('runSync orchestrator', () => {
         { id: 'team-id-jsfc-u9', slug: 'jsfc-u9', name: 'JSFC U9' },
       ]),
       listRecordings: vi.fn(async () => [
-        { slug: 'rec-1', title: 'TAA vs JSFC', duration: 2700, match_date: '2026-05-10', team: 'TAA U9' },
+        {
+          slug: 'rec-1',
+          title: 'TAA vs JSFC',
+          duration: 2700,
+          match_date: '2026-05-10',
+          team: 'TAA U9',
+        },
       ]),
     })
 
     setupParse(
       new Map([
-        ['TAA vs JSFC', {
-          kind: 'eligible',
-          parsed: {
-            home: { subclubSlug: 'taa', ageGroup: 'u9' },
-            away: { subclubSlug: 'jsfc', ageGroup: 'u9' },
-            method: 'rules', confidence: null, reasoning: null, llmAttemptedAt: null,
+        [
+          'TAA vs JSFC',
+          {
+            kind: 'eligible',
+            parsed: {
+              home: { subclubSlug: 'taa', ageGroup: 'u9' },
+              away: { subclubSlug: 'jsfc', ageGroup: 'u9' },
+              method: 'rules',
+              confidence: null,
+              reasoning: null,
+              llmAttemptedAt: null,
+            },
           },
-        }],
+        ],
       ])
     )
 
-    const r = await runSync({
-      leagueClubSlug: 'lyl', trigger: 'cron',
-      shareRecipientEmail: 'admin@example.com',
-    }, makeDeps(db, veo))
+    const r = await runSync(
+      {
+        leagueClubSlug: 'lyl',
+        trigger: 'cron',
+        shareRecipientEmail: 'admin@example.com',
+      },
+      makeDeps(db, veo)
+    )
 
-    expect(r.counts.homeAssignments).toBe(0)  // already on correct team
-    expect(r.counts.shareAccepts).toBe(0)     // already away-assigned
+    expect(r.counts.homeAssignments).toBe(0) // already on correct team
+    expect(r.counts.shareAccepts).toBe(0) // already away-assigned
     expect(veo.assignRecordingToTeam).not.toHaveBeenCalled()
     expect(veo.createShareInvitation).not.toHaveBeenCalled()
     expect(veo.acceptShareInvitation).not.toHaveBeenCalled()
@@ -290,20 +364,33 @@ describe('runSync orchestrator', () => {
     db.seedSubclub('lyl', 'taa', 'TAA')
     db.seedSubclub('lyl', 'jsfc', 'JSFC')
     db.assignments.set('lyl:rec-1', {
-      league_club_slug: 'lyl', recording_slug: 'rec-1', status: 'operator_locked',
+      league_club_slug: 'lyl',
+      recording_slug: 'rec-1',
+      status: 'operator_locked',
     })
     const veo = makeVeo({
       listClubTeams: vi.fn(async () => []),
       listRecordings: vi.fn(async () => [
-        { slug: 'rec-1', title: 'TAA vs JSFC', duration: 2700, match_date: null, team: null },
+        {
+          slug: 'rec-1',
+          title: 'TAA vs JSFC',
+          duration: 2700,
+          match_date: null,
+          team: null,
+        },
       ]),
     })
 
-    setupParse(new Map())  // should never be called
+    setupParse(new Map()) // should never be called
 
-    const r = await runSync({
-      leagueClubSlug: 'lyl', trigger: 'cron', shareRecipientEmail: 'admin@example.com',
-    }, makeDeps(db, veo))
+    const r = await runSync(
+      {
+        leagueClubSlug: 'lyl',
+        trigger: 'cron',
+        shareRecipientEmail: 'admin@example.com',
+      },
+      makeDeps(db, veo)
+    )
 
     expect(r.counts.homeAssignments).toBe(0)
     expect(veo.getRecordingUUID).not.toHaveBeenCalled()
@@ -316,26 +403,43 @@ describe('runSync orchestrator', () => {
     const veo = makeVeo({
       listClubTeams: vi.fn(async () => []),
       listRecordings: vi.fn(async () => [
-        { slug: 'rec-1', title: 'ELA U11 C vs ELA U11 B', duration: 2700, match_date: null, team: null },
+        {
+          slug: 'rec-1',
+          title: 'ELA U11 C vs ELA U11 B',
+          duration: 2700,
+          match_date: null,
+          team: null,
+        },
       ]),
     })
 
     setupParse(
       new Map([
-        ['ELA U11 C vs ELA U11 B', {
-          kind: 'intra_team',
-          parsed: {
-            home: { subclubSlug: 'ela', ageGroup: 'u11' },
-            away: { subclubSlug: 'ela', ageGroup: 'u11' },
-            method: 'rules', confidence: null, reasoning: null, llmAttemptedAt: null,
+        [
+          'ELA U11 C vs ELA U11 B',
+          {
+            kind: 'intra_team',
+            parsed: {
+              home: { subclubSlug: 'ela', ageGroup: 'u11' },
+              away: { subclubSlug: 'ela', ageGroup: 'u11' },
+              method: 'rules',
+              confidence: null,
+              reasoning: null,
+              llmAttemptedAt: null,
+            },
           },
-        }],
+        ],
       ])
     )
 
-    const r = await runSync({
-      leagueClubSlug: 'lyl', trigger: 'cron', shareRecipientEmail: 'admin@example.com',
-    }, makeDeps(db, veo))
+    const r = await runSync(
+      {
+        leagueClubSlug: 'lyl',
+        trigger: 'cron',
+        shareRecipientEmail: 'admin@example.com',
+      },
+      makeDeps(db, veo)
+    )
 
     expect(r.counts.homeAssignments).toBe(1)
     expect(r.counts.shareAccepts).toBe(0)
@@ -350,7 +454,13 @@ describe('runSync orchestrator', () => {
     const veo = makeVeo({
       listClubTeams: vi.fn(async () => []),
       listRecordings: vi.fn(async () => [
-        { slug: 'long-1', title: 'Match 25 Apr 2026', duration: 60 * 90, match_date: null, team: null },
+        {
+          slug: 'long-1',
+          title: 'Match 25 Apr 2026',
+          duration: 60 * 90,
+          match_date: null,
+          team: null,
+        },
       ]),
     })
 
@@ -360,9 +470,14 @@ describe('runSync orchestrator', () => {
       ])
     )
 
-    const r = await runSync({
-      leagueClubSlug: 'lyl', trigger: 'cron', shareRecipientEmail: 'admin@example.com',
-    }, makeDeps(db, veo))
+    const r = await runSync(
+      {
+        leagueClubSlug: 'lyl',
+        trigger: 'cron',
+        shareRecipientEmail: 'admin@example.com',
+      },
+      makeDeps(db, veo)
+    )
 
     expect(r.status).toBe('succeeded')
     expect(r.counts.homeAssignments).toBe(0)
@@ -377,18 +492,32 @@ describe('runSync orchestrator', () => {
     const veo = makeVeo({
       listClubTeams: vi.fn(async () => []),
       listRecordings: vi.fn(async () => [
-        { slug: 'bad-1', title: 'Match 3 May 2026', duration: 2700, match_date: null, team: null },
+        {
+          slug: 'bad-1',
+          title: 'Match 3 May 2026',
+          duration: 2700,
+          match_date: null,
+          team: null,
+        },
       ]),
     })
     setupParse(
       new Map([
-        ['Match 3 May 2026', { kind: 'unparseable', reason: 'no team names in title' }],
+        [
+          'Match 3 May 2026',
+          { kind: 'unparseable', reason: 'no team names in title' },
+        ],
       ])
     )
 
-    const r = await runSync({
-      leagueClubSlug: 'lyl', trigger: 'cron', shareRecipientEmail: 'admin@example.com',
-    }, makeDeps(db, veo))
+    const r = await runSync(
+      {
+        leagueClubSlug: 'lyl',
+        trigger: 'cron',
+        shareRecipientEmail: 'admin@example.com',
+      },
+      makeDeps(db, veo)
+    )
 
     expect(r.counts.unparseable).toBe(1)
     expect(r.errors).toHaveLength(1)
@@ -409,25 +538,42 @@ describe('runSync orchestrator', () => {
       ]),
       listRecordings: vi.fn(async () => [
         // Currently assigned to "Wrong Team" — auto-correct should fire.
-        { slug: 'rec-1', title: 'TAA vs JSFC', duration: 2700, match_date: null, team: 'Wrong Team' },
+        {
+          slug: 'rec-1',
+          title: 'TAA vs JSFC',
+          duration: 2700,
+          match_date: null,
+          team: 'Wrong Team',
+        },
       ]),
     })
     setupParse(
       new Map([
-        ['TAA vs JSFC', {
-          kind: 'eligible',
-          parsed: {
-            home: { subclubSlug: 'taa', ageGroup: 'u9' },
-            away: { subclubSlug: 'jsfc', ageGroup: 'u9' },
-            method: 'rules', confidence: null, reasoning: null, llmAttemptedAt: null,
+        [
+          'TAA vs JSFC',
+          {
+            kind: 'eligible',
+            parsed: {
+              home: { subclubSlug: 'taa', ageGroup: 'u9' },
+              away: { subclubSlug: 'jsfc', ageGroup: 'u9' },
+              method: 'rules',
+              confidence: null,
+              reasoning: null,
+              llmAttemptedAt: null,
+            },
           },
-        }],
+        ],
       ])
     )
 
-    const r = await runSync({
-      leagueClubSlug: 'lyl', trigger: 'cron', shareRecipientEmail: 'admin@example.com',
-    }, makeDeps(db, veo))
+    const r = await runSync(
+      {
+        leagueClubSlug: 'lyl',
+        trigger: 'cron',
+        shareRecipientEmail: 'admin@example.com',
+      },
+      makeDeps(db, veo)
+    )
 
     expect(r.counts.autoCorrections).toBe(1)
     expect(r.counts.homeAssignments).toBe(1)
@@ -447,8 +593,20 @@ describe('runSync orchestrator', () => {
     const veo = makeVeo({
       listClubTeams: vi.fn(async () => []),
       listRecordings: vi.fn(async () => [
-        { slug: 'rec-1', title: 'TAA vs JSFC', duration: 2700, match_date: null, team: null },
-        { slug: 'rec-2', title: 'JSFC vs ELA', duration: 2700, match_date: null, team: null },
+        {
+          slug: 'rec-1',
+          title: 'TAA vs JSFC',
+          duration: 2700,
+          match_date: null,
+          team: null,
+        },
+        {
+          slug: 'rec-2',
+          title: 'JSFC vs ELA',
+          duration: 2700,
+          match_date: null,
+          team: null,
+        },
       ]),
       // The orchestrator passes details.title || recording.title into
       // input.title — our getRecordingUUID fake returns title=slug, so
@@ -461,32 +619,49 @@ describe('runSync orchestrator', () => {
 
     setupParse(
       new Map([
-        ['TAA vs JSFC', {
-          kind: 'eligible',
-          parsed: {
-            home: { subclubSlug: 'taa', ageGroup: 'u9' },
-            away: { subclubSlug: 'jsfc', ageGroup: 'u9' },
-            method: 'rules', confidence: null, reasoning: null, llmAttemptedAt: null,
+        [
+          'TAA vs JSFC',
+          {
+            kind: 'eligible',
+            parsed: {
+              home: { subclubSlug: 'taa', ageGroup: 'u9' },
+              away: { subclubSlug: 'jsfc', ageGroup: 'u9' },
+              method: 'rules',
+              confidence: null,
+              reasoning: null,
+              llmAttemptedAt: null,
+            },
           },
-        }],
-        ['JSFC vs ELA', {
-          kind: 'eligible',
-          parsed: {
-            home: { subclubSlug: 'jsfc', ageGroup: 'u10' },
-            away: { subclubSlug: 'ela', ageGroup: 'u10' },
-            method: 'rules', confidence: null, reasoning: null, llmAttemptedAt: null,
+        ],
+        [
+          'JSFC vs ELA',
+          {
+            kind: 'eligible',
+            parsed: {
+              home: { subclubSlug: 'jsfc', ageGroup: 'u10' },
+              away: { subclubSlug: 'ela', ageGroup: 'u10' },
+              method: 'rules',
+              confidence: null,
+              reasoning: null,
+              llmAttemptedAt: null,
+            },
           },
-        }],
+        ],
       ])
     )
 
-    const r = await runSync({
-      leagueClubSlug: 'lyl', trigger: 'cron', shareRecipientEmail: 'admin@example.com',
-    }, makeDeps(db, veo))
+    const r = await runSync(
+      {
+        leagueClubSlug: 'lyl',
+        trigger: 'cron',
+        shareRecipientEmail: 'admin@example.com',
+      },
+      makeDeps(db, veo)
+    )
 
     expect(r.status).toBe('partial')
     expect(r.counts.failures).toBe(1)
-    expect(r.counts.shareAccepts).toBe(1)  // only rec-1 share-accepted
+    expect(r.counts.shareAccepts).toBe(1) // only rec-1 share-accepted
     expect(r.errors).toHaveLength(1)
     expect(r.errors[0].recording_slug).toBe('rec-2')
     expect(r.errors[0].stage).toBe('share_accept')
@@ -504,30 +679,53 @@ describe('runSync orchestrator', () => {
       listRecordings: vi.fn(async () => [
         // Original + share-accepted copy of the same match. Only the
         // original should be planned.
-        { slug: 'rec-1', title: 'TAA vs JSFC', duration: 2700, match_date: null, team: null },
-        { slug: 'lyl-rec-1-accepted', title: 'TAA vs JSFC', duration: 2700, match_date: null, team: null },
+        {
+          slug: 'rec-1',
+          title: 'TAA vs JSFC',
+          duration: 2700,
+          match_date: null,
+          team: null,
+        },
+        {
+          slug: 'lyl-rec-1-accepted',
+          title: 'TAA vs JSFC',
+          duration: 2700,
+          match_date: null,
+          team: null,
+        },
       ]),
     })
 
     setupParse(
       new Map([
-        ['TAA vs JSFC', {
-          kind: 'eligible',
-          parsed: {
-            home: { subclubSlug: 'taa', ageGroup: 'u9' },
-            away: { subclubSlug: 'taa', ageGroup: 'u9' }, // intra-team for brevity
-            method: 'rules', confidence: null, reasoning: null, llmAttemptedAt: null,
+        [
+          'TAA vs JSFC',
+          {
+            kind: 'eligible',
+            parsed: {
+              home: { subclubSlug: 'taa', ageGroup: 'u9' },
+              away: { subclubSlug: 'taa', ageGroup: 'u9' }, // intra-team for brevity
+              method: 'rules',
+              confidence: null,
+              reasoning: null,
+              llmAttemptedAt: null,
+            },
           },
-        }],
+        ],
       ])
     )
 
-    const r = await runSync({
-      leagueClubSlug: 'lyl', trigger: 'cron', shareRecipientEmail: 'admin@example.com',
-    }, makeDeps(db, veo))
+    const r = await runSync(
+      {
+        leagueClubSlug: 'lyl',
+        trigger: 'cron',
+        shareRecipientEmail: 'admin@example.com',
+      },
+      makeDeps(db, veo)
+    )
 
     expect(r.counts.veoRecordingsSeen).toBe(2)
-    expect(r.counts.newRecordings).toBe(1)  // only the non-prefixed one
+    expect(r.counts.newRecordings).toBe(1) // only the non-prefixed one
     expect(db.assignments.size).toBe(1)
   })
 
@@ -538,8 +736,20 @@ describe('runSync orchestrator', () => {
     const veo = makeVeo({
       listClubTeams: vi.fn(async () => []),
       listRecordings: vi.fn(async () => [
-        { slug: 'rec-1', title: 'weird-1', duration: 2700, match_date: null, team: null },
-        { slug: 'rec-2', title: 'weird-2', duration: 2700, match_date: null, team: null },
+        {
+          slug: 'rec-1',
+          title: 'weird-1',
+          duration: 2700,
+          match_date: null,
+          team: null,
+        },
+        {
+          slug: 'rec-2',
+          title: 'weird-2',
+          duration: 2700,
+          match_date: null,
+          team: null,
+        },
       ]),
     })
 
@@ -552,7 +762,9 @@ describe('runSync orchestrator', () => {
           parsed: {
             home: { subclubSlug: 'taa', ageGroup: 'u9' },
             away: { subclubSlug: 'jsfc', ageGroup: 'u9' },
-            method: 'llm', confidence: 0.9, reasoning: 'Test reasoning',
+            method: 'llm',
+            confidence: 0.9,
+            reasoning: 'Test reasoning',
             llmAttemptedAt: new Date(),
           },
         },
@@ -560,9 +772,14 @@ describe('runSync orchestrator', () => {
       }
     })
 
-    const r = await runSync({
-      leagueClubSlug: 'lyl', trigger: 'cron', shareRecipientEmail: 'admin@example.com',
-    }, makeDeps(db, veo))
+    const r = await runSync(
+      {
+        leagueClubSlug: 'lyl',
+        trigger: 'cron',
+        shareRecipientEmail: 'admin@example.com',
+      },
+      makeDeps(db, veo)
+    )
 
     expect(r.counts.llmParsed).toBe(2)
     expect(r.llm.inputTokens).toBe(2000)

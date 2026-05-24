@@ -74,10 +74,15 @@ function findAgeIn(text: string): string | null {
 }
 
 /** Longest-first substring match against a subclub's aliases. */
-function findSubclubInSide(side: string, subclubs: SubclubRef[]): string | null {
+function findSubclubInSide(
+  side: string,
+  subclubs: SubclubRef[]
+): string | null {
   const lower = side.toLowerCase()
   const candidates = subclubs
-    .flatMap((sc) => sc.aliases.map((a) => ({ alias: a.toLowerCase(), slug: sc.slug })))
+    .flatMap((sc) =>
+      sc.aliases.map((a) => ({ alias: a.toLowerCase(), slug: sc.slug }))
+    )
     .sort((a, b) => b.alias.length - a.alias.length)
   for (const c of candidates) {
     if (lower.includes(c.alias)) return c.slug
@@ -87,10 +92,7 @@ function findSubclubInSide(side: string, subclubs: SubclubRef[]): string | null 
 
 /** Pure rules-only attempt. Returns null when the rules layer can't
  *  fully resolve (caller falls back to LLM). */
-function tryRules(
-  title: string,
-  subclubs: SubclubRef[]
-): ParsedMatch | null {
+function tryRules(title: string, subclubs: SubclubRef[]): ParsedMatch | null {
   const cleaned = stripPrefix(title)
   // Tolerate "vs ", "v ", "vs." — the period variant comes from LYL
   // admins typing prose-style titles.
@@ -148,7 +150,9 @@ function defaultAnthropicCreate(
   if (!cachedAnthropic) {
     const key = process.env.ANTHROPIC_API_KEY
     if (!key) {
-      throw new Error('ANTHROPIC_API_KEY not set — lyl-sync parser cannot LLM-fallback')
+      throw new Error(
+        'ANTHROPIC_API_KEY not set — lyl-sync parser cannot LLM-fallback'
+      )
     }
     cachedAnthropic = new Anthropic({ apiKey: key })
   }
@@ -224,7 +228,8 @@ Return the parsed result via the parse_match_title tool.`
     tools: [
       {
         name: 'parse_match_title',
-        description: 'Return the parsed home + away (subclub, age) and your confidence.',
+        description:
+          'Return the parsed home + away (subclub, age) and your confidence.',
         input_schema: {
           type: 'object',
           properties: {
@@ -260,8 +265,8 @@ Return the parsed result via the parse_match_title tool.`
 
   // Extract the tool_use block — Claude returns it in `content` alongside
   // any text. tool_choice forces it to be present.
-  const toolUse = response.content.find((b): b is Anthropic.Messages.ToolUseBlock =>
-    b.type === 'tool_use'
+  const toolUse = response.content.find(
+    (b): b is Anthropic.Messages.ToolUseBlock => b.type === 'tool_use'
   )
   if (!toolUse || toolUse.name !== 'parse_match_title') {
     return { parsed: null, cost }
@@ -280,11 +285,28 @@ Return the parsed result via the parse_match_title tool.`
   // rather than persist bad data).
   const validSubclubSlugs = new Set(subclubs.map((s) => s.slug))
   const validAges = new Set([
-    'u5', 'u6', 'u7', 'u8', 'u9', 'u10', 'u11', 'u12', 'u13', 'u14',
-    'u15', 'u16', 'u17', 'u18', 'u19', 'u20', 'u21',
+    'u5',
+    'u6',
+    'u7',
+    'u8',
+    'u9',
+    'u10',
+    'u11',
+    'u12',
+    'u13',
+    'u14',
+    'u15',
+    'u16',
+    'u17',
+    'u18',
+    'u19',
+    'u20',
+    'u21',
   ])
-  const homeSlugOk = !args.home_subclub_slug || validSubclubSlugs.has(args.home_subclub_slug)
-  const awaySlugOk = !args.away_subclub_slug || validSubclubSlugs.has(args.away_subclub_slug)
+  const homeSlugOk =
+    !args.home_subclub_slug || validSubclubSlugs.has(args.home_subclub_slug)
+  const awaySlugOk =
+    !args.away_subclub_slug || validSubclubSlugs.has(args.away_subclub_slug)
   const homeAgeOk = !args.home_age_group || validAges.has(args.home_age_group)
   const awayAgeOk = !args.away_age_group || validAges.has(args.away_age_group)
   if (!homeSlugOk || !awaySlugOk || !homeAgeOk || !awayAgeOk) {
@@ -293,14 +315,25 @@ Return the parsed result via the parse_match_title tool.`
   if (args.confidence < LLM_CONFIDENCE_THRESHOLD) {
     return { parsed: null, cost }
   }
-  if (!args.home_subclub_slug || !args.away_subclub_slug || !args.home_age_group || !args.away_age_group) {
+  if (
+    !args.home_subclub_slug ||
+    !args.away_subclub_slug ||
+    !args.home_age_group ||
+    !args.away_age_group
+  ) {
     return { parsed: null, cost }
   }
 
   return {
     parsed: {
-      home: { subclubSlug: args.home_subclub_slug, ageGroup: args.home_age_group },
-      away: { subclubSlug: args.away_subclub_slug, ageGroup: args.away_age_group },
+      home: {
+        subclubSlug: args.home_subclub_slug,
+        ageGroup: args.home_age_group,
+      },
+      away: {
+        subclubSlug: args.away_subclub_slug,
+        ageGroup: args.away_age_group,
+      },
       method: 'llm',
       confidence: args.confidence,
       reasoning: capReasoning(args.reasoning),
@@ -363,7 +396,10 @@ export async function parseRecording(
   // 3. LLM fallback (unless caller opted out).
   if (input.allowLlmFallback === false) {
     return {
-      outcome: { kind: 'unparseable', reason: 'rules failed; LLM fallback disabled' },
+      outcome: {
+        kind: 'unparseable',
+        reason: 'rules failed; LLM fallback disabled',
+      },
       llmCost: null,
     }
   }

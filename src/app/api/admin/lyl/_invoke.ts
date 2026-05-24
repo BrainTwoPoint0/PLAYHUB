@@ -29,7 +29,9 @@ export type InvokeResult =
   | { kind: 'unreachable'; message: string } // fetch threw / timed out
   | { kind: 'rejected'; status: number; body: string } // AWS or handler responded non-2xx
 
-export async function invokeLylSyncAsync(input: InvokeInput): Promise<InvokeResult> {
+export async function invokeLylSyncAsync(
+  input: InvokeInput
+): Promise<InvokeResult> {
   const lambdaUrl = process.env.LYL_SYNC_LAMBDA_URL
   const apiKey = process.env.LYL_SYNC_API_KEY
   if (!lambdaUrl || !apiKey) return { kind: 'not_configured' }

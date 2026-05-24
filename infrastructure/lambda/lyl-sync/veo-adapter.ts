@@ -41,7 +41,10 @@ export const veoAdapter: VeoClientSurface = {
     const r = await listClubsAndTeams()
     if (!r.success) throw new Error(`listClubsAndTeams: ${r.message}`)
     const club = r.data!.clubs.find((c) => c.slug === veoSlug)
-    if (!club) throw new Error(`Club ${veoSlug} not found in Veo (league slug "${clubSlug}" translated via VEO_CLUB_SLUG env)`)
+    if (!club)
+      throw new Error(
+        `Club ${veoSlug} not found in Veo (league slug "${clubSlug}" translated via VEO_CLUB_SLUG env)`
+      )
     return club.teams.map((t) => ({
       id: t.id,
       slug: t.slug,
@@ -86,7 +89,10 @@ export const veoAdapter: VeoClientSurface = {
   },
 
   createTeam: async (input) => {
-    const r = await createTeam({ ...input, clubSlug: toVeoSlug(input.clubSlug) })
+    const r = await createTeam({
+      ...input,
+      clubSlug: toVeoSlug(input.clubSlug),
+    })
     if (!r.success || !r.data) throw new Error(`createTeam: ${r.message}`)
     return { id: r.data.team.id, slug: r.data.team.slug }
   },
@@ -98,13 +104,18 @@ export const veoAdapter: VeoClientSurface = {
 
   createShareInvitation: async (recordingSlug, email) => {
     const r = await createShareInvitation({ recordingSlug, email })
-    if (!r.success || !r.data) throw new Error(`createShareInvitation: ${r.message}`)
+    if (!r.success || !r.data)
+      throw new Error(`createShareInvitation: ${r.message}`)
     return { key: r.data.invitation.key }
   },
 
   acceptShareInvitation: async (input) => {
-    const r = await acceptShareInvitation({ ...input, ownClubSlug: toVeoSlug(input.ownClubSlug) })
-    if (!r.success || !r.data) throw new Error(`acceptShareInvitation: ${r.message}`)
+    const r = await acceptShareInvitation({
+      ...input,
+      ownClubSlug: toVeoSlug(input.ownClubSlug),
+    })
+    if (!r.success || !r.data)
+      throw new Error(`acceptShareInvitation: ${r.message}`)
     return { slug: r.data.match.slug }
   },
 }

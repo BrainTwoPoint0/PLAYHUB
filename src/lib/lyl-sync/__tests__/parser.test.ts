@@ -6,11 +6,7 @@
 // smoke test will run during Stage D.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import {
-  parseRecording,
-  REASONING_MAX_BYTES,
-  type ParserDeps,
-} from '../parser'
+import { parseRecording, REASONING_MAX_BYTES, type ParserDeps } from '../parser'
 import type { SubclubRef, ParseOutcome } from '../types'
 
 // ---------------------------------------------------------------------------
@@ -20,22 +16,66 @@ import type { SubclubRef, ParseOutcome } from '../types'
 // Mirrors what the orchestrator loads from playhub_academy_subclubs.
 // Aliases match the actual title spellings observed in LYL Veo.
 const SUBCLUBS: SubclubRef[] = [
-  { slug: 'taa', displayName: 'TAA', aliases: ['The A Academy', 'The A academy', 'TAA'] },
+  {
+    slug: 'taa',
+    displayName: 'TAA',
+    aliases: ['The A Academy', 'The A academy', 'TAA'],
+  },
   { slug: 'ela', displayName: 'ELA', aliases: ['ELA'] },
   { slug: 'lfs', displayName: 'LFS', aliases: ['LFS'] },
-  { slug: 'rpt', displayName: 'RPT', aliases: ['Rugby Portobello Trust', 'RPT'] },
+  {
+    slug: 'rpt',
+    displayName: 'RPT',
+    aliases: ['Rugby Portobello Trust', 'RPT'],
+  },
   { slug: 'nsfc', displayName: 'N.S.F.C', aliases: ['N.S.F.C', 'NSFC'] },
   { slug: 'jsfc', displayName: 'JSFC', aliases: ['JSFC'] },
-  { slug: 'barnes-eagles', displayName: 'Barnes Eagles', aliases: ['Barnes Eagles'] },
-  { slug: 'champs-fc', displayName: 'Champs FC', aliases: ['Champs FC', 'Champs'] },
-  { slug: 'chosen-one', displayName: 'Chosen One', aliases: ['Chosen one FC', 'Chosen One'] },
-  { slug: 'london-thames', displayName: 'London Thames', aliases: ['London Thames'] },
-  { slug: 'national-harrow', displayName: 'National Harrow', aliases: ['National Harrow'] },
-  { slug: 'roehampton-elite', displayName: 'Roehampton Elite', aliases: ['Roehampton Elite', 'Roehampton'] },
+  {
+    slug: 'barnes-eagles',
+    displayName: 'Barnes Eagles',
+    aliases: ['Barnes Eagles'],
+  },
+  {
+    slug: 'champs-fc',
+    displayName: 'Champs FC',
+    aliases: ['Champs FC', 'Champs'],
+  },
+  {
+    slug: 'chosen-one',
+    displayName: 'Chosen One',
+    aliases: ['Chosen one FC', 'Chosen One'],
+  },
+  {
+    slug: 'london-thames',
+    displayName: 'London Thames',
+    aliases: ['London Thames'],
+  },
+  {
+    slug: 'national-harrow',
+    displayName: 'National Harrow',
+    aliases: ['National Harrow'],
+  },
+  {
+    slug: 'roehampton-elite',
+    displayName: 'Roehampton Elite',
+    aliases: ['Roehampton Elite', 'Roehampton'],
+  },
   { slug: 'storm-elite', displayName: 'Storm Elite', aliases: ['Storm Elite'] },
-  { slug: 'forzaskillz', displayName: 'Forzaskillz', aliases: ['Forzaskillz', 'Forza skillz', 'Forza Skillz'] },
-  { slug: 'rockslane-chiswick', displayName: 'Rockslane Chiswick', aliases: ['Rockslane Chiswick'] },
-  { slug: 'elite-london-academy', displayName: 'Elite London Academy', aliases: ['Elite London Academy', 'Elite London academy'] },
+  {
+    slug: 'forzaskillz',
+    displayName: 'Forzaskillz',
+    aliases: ['Forzaskillz', 'Forza skillz', 'Forza Skillz'],
+  },
+  {
+    slug: 'rockslane-chiswick',
+    displayName: 'Rockslane Chiswick',
+    aliases: ['Rockslane Chiswick'],
+  },
+  {
+    slug: 'elite-london-academy',
+    displayName: 'Elite London Academy',
+    aliases: ['Elite London Academy', 'Elite London academy'],
+  },
 ]
 
 const FROZEN_NOW = new Date('2026-05-17T12:00:00Z')
@@ -55,7 +95,9 @@ function makeDeps(overrides: Partial<ParserDeps> = {}): ParserDeps {
   }
 }
 
-function expectEligible(o: ParseOutcome): Extract<ParseOutcome, { kind: 'eligible' }> {
+function expectEligible(
+  o: ParseOutcome
+): Extract<ParseOutcome, { kind: 'eligible' }> {
   expect(o.kind).toBe('eligible')
   return o as Extract<ParseOutcome, { kind: 'eligible' }>
 }
@@ -161,19 +203,26 @@ describe('parseRecording — rules layer', () => {
       ageHome: 'u11',
       ageAway: 'u11',
     },
-  ])('parses common title shape: "$title"', async ({ title, home, away, ageHome, ageAway }) => {
-    const deps = makeDeps()
-    const r = await parseRecording({ title, durationSeconds: 2700 }, SUBCLUBS, deps)
-    const ok = expectEligible(r.outcome)
-    expect(ok.parsed.home).toEqual({ subclubSlug: home, ageGroup: ageHome })
-    expect(ok.parsed.away).toEqual({ subclubSlug: away, ageGroup: ageAway })
-    expect(ok.parsed.method).toBe('rules')
-    expect(ok.parsed.confidence).toBeNull()
-    expect(ok.parsed.llmAttemptedAt).toBeNull()
-    expect(r.llmCost).toBeNull()
-    // CRITICAL: rules-resolved titles must NOT call the LLM.
-    expect(deps.anthropicCreate).not.toHaveBeenCalled()
-  })
+  ])(
+    'parses common title shape: "$title"',
+    async ({ title, home, away, ageHome, ageAway }) => {
+      const deps = makeDeps()
+      const r = await parseRecording(
+        { title, durationSeconds: 2700 },
+        SUBCLUBS,
+        deps
+      )
+      const ok = expectEligible(r.outcome)
+      expect(ok.parsed.home).toEqual({ subclubSlug: home, ageGroup: ageHome })
+      expect(ok.parsed.away).toEqual({ subclubSlug: away, ageGroup: ageAway })
+      expect(ok.parsed.method).toBe('rules')
+      expect(ok.parsed.confidence).toBeNull()
+      expect(ok.parsed.llmAttemptedAt).toBeNull()
+      expect(r.llmCost).toBeNull()
+      // CRITICAL: rules-resolved titles must NOT call the LLM.
+      expect(deps.anthropicCreate).not.toHaveBeenCalled()
+    }
+  )
 
   it('handles mixed-age fixture: "Roehampton Elite (U10) vs ELA (U11)" → distinct per-side ages', async () => {
     const deps = makeDeps()
@@ -183,7 +232,10 @@ describe('parseRecording — rules layer', () => {
       deps
     )
     const ok = expectEligible(r.outcome)
-    expect(ok.parsed.home).toEqual({ subclubSlug: 'roehampton-elite', ageGroup: 'u10' })
+    expect(ok.parsed.home).toEqual({
+      subclubSlug: 'roehampton-elite',
+      ageGroup: 'u10',
+    })
     expect(ok.parsed.away).toEqual({ subclubSlug: 'ela', ageGroup: 'u11' })
   })
 
@@ -205,7 +257,10 @@ describe('parseRecording — rules layer', () => {
   it('strips Match-date prefix: "Match 10 May 2026 - Barnes Eagles vs Champs FC U8"', async () => {
     const deps = makeDeps()
     const r = await parseRecording(
-      { title: 'Match 10 May 2026 - Barnes Eagles vs Champs FC U8', durationSeconds: 2700 },
+      {
+        title: 'Match 10 May 2026 - Barnes Eagles vs Champs FC U8',
+        durationSeconds: 2700,
+      },
       SUBCLUBS,
       deps
     )
@@ -428,7 +483,11 @@ describe('parseRecording — LLM fallback', () => {
     const anthropicCreate = vi.fn()
     const deps = makeDeps({ anthropicCreate })
     const r = await parseRecording(
-      { title: 'weird unparseable thing', durationSeconds: 2700, allowLlmFallback: false },
+      {
+        title: 'weird unparseable thing',
+        durationSeconds: 2700,
+        allowLlmFallback: false,
+      },
       SUBCLUBS,
       deps
     )

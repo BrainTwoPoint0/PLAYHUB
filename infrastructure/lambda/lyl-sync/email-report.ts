@@ -28,7 +28,7 @@ const FROM = 'PLAYHUB Alerts <admin@playbacksports.ai>'
 interface RecordingActionRow {
   recording_slug: string
   recording_title: string | null
-  status: string                 // 'fully_assigned' | 'intra_team' | 'unparseable' | 'too_long' | 'failed'
+  status: string // 'fully_assigned' | 'intra_team' | 'unparseable' | 'too_long' | 'failed'
   home_team_slug: string | null
   away_team_slug: string | null
   away_accepted_recording_uuid: string | null
@@ -51,33 +51,55 @@ async function loadRunActions(
   try {
     const queryPromise = supabase
       .from('playhub_recording_assignments')
-      .select('recording_slug, recording_title, status, home_team_slug, away_team_slug, away_accepted_recording_uuid, failure_stage, last_error')
+      .select(
+        'recording_slug, recording_title, status, home_team_slug, away_team_slug, away_accepted_recording_uuid, failure_stage, last_error'
+      )
       .eq('last_sync_run_id', runId)
       .order('status', { ascending: true })
       .order('recording_title', { ascending: true })
     const deadlinePromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`loadRunActions deadline (${QUERY_DEADLINE_MS}ms) exceeded`)), QUERY_DEADLINE_MS)
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              `loadRunActions deadline (${QUERY_DEADLINE_MS}ms) exceeded`
+            )
+          ),
+        QUERY_DEADLINE_MS
+      )
     )
-    const { data, error } = (await Promise.race([queryPromise, deadlinePromise])) as Awaited<typeof queryPromise>
+    const { data, error } = (await Promise.race([
+      queryPromise,
+      deadlinePromise,
+    ])) as Awaited<typeof queryPromise>
     if (error) {
       console.warn('[lyl-sync] loadRunActions failed:', error.message)
       return []
     }
     return (data ?? []) as RecordingActionRow[]
   } catch (e) {
-    console.warn('[lyl-sync] loadRunActions threw:', e instanceof Error ? e.message : e)
+    console.warn(
+      '[lyl-sync] loadRunActions threw:',
+      e instanceof Error ? e.message : e
+    )
     return []
   }
 }
 
 function statusBadgeColor(status: string): string {
   switch (status) {
-    case 'fully_assigned': return '#10b981'  // green
-    case 'intra_team':     return '#3b82f6'  // blue
-    case 'too_long':       return '#6b7280'  // grey
-    case 'unparseable':    return '#f59e0b'  // amber
-    case 'failed':         return '#dc2626'  // red
-    default:               return '#b9baa3'
+    case 'fully_assigned':
+      return '#10b981' // green
+    case 'intra_team':
+      return '#3b82f6' // blue
+    case 'too_long':
+      return '#6b7280' // grey
+    case 'unparseable':
+      return '#f59e0b' // amber
+    case 'failed':
+      return '#dc2626' // red
+    default:
+      return '#b9baa3'
   }
 }
 
@@ -114,7 +136,9 @@ function renderActionsTable(rows: RecordingActionRow[]): string {
         <th style="text-align:left; padding:8px; color:#b9baa3;">Action</th>
       </tr></thead>
       <tbody>
-      ${trimmed.map((row) => `
+      ${trimmed
+        .map(
+          (row) => `
         <tr style="border-top:1px solid #2a2f2d; vertical-align:top;">
           <td style="padding:8px;">
             <span style="display:inline-block; padding:2px 8px; border-radius:10px; font-size:10px; font-family:monospace; background:${statusBadgeColor(row.status)}33; color:${statusBadgeColor(row.status)};">
@@ -127,7 +151,9 @@ function renderActionsTable(rows: RecordingActionRow[]): string {
           </td>
           <td style="padding:8px; color:#d6d5c9;">${describeAction(row)}</td>
         </tr>
-      `).join('')}
+      `
+        )
+        .join('')}
       ${rows.length > limit ? `<tr><td colspan="3" style="padding:8px; color:#6b7280; font-style:italic;">… ${rows.length - limit} more (see admin UI)</td></tr>` : ''}
       </tbody>
     </table>
@@ -143,11 +169,18 @@ function escapeHtml(input: string): string {
     .replace(/'/g, '&#39;')
 }
 
-function statusBanner(status: RunSyncResult['status']): { color: string; emoji: string; label: string } {
+function statusBanner(status: RunSyncResult['status']): {
+  color: string
+  emoji: string
+  label: string
+} {
   switch (status) {
-    case 'succeeded': return { color: '#10b981', emoji: '✓',  label: 'Succeeded' }
-    case 'partial':   return { color: '#f59e0b', emoji: '⚠️', label: 'Partial (some failures)' }
-    case 'failed':    return { color: '#dc2626', emoji: '⛔', label: 'Failed' }
+    case 'succeeded':
+      return { color: '#10b981', emoji: '✓', label: 'Succeeded' }
+    case 'partial':
+      return { color: '#f59e0b', emoji: '⚠️', label: 'Partial (some failures)' }
+    case 'failed':
+      return { color: '#dc2626', emoji: '⛔', label: 'Failed' }
   }
 }
 
@@ -166,22 +199,36 @@ interface SendInput {
   supabase?: SupabaseClient
 }
 
-export async function sendRunReportEmail({ result, trigger, leagueClubSlug, supabase }: SendInput): Promise<void> {
+export async function sendRunReportEmail({
+  result,
+  trigger,
+  leagueClubSlug,
+  supabase,
+}: SendInput): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY
   const to = process.env.LYL_REPORT_EMAIL
   if (!apiKey || !to) {
-    console.warn('[lyl-sync] RESEND_API_KEY or LYL_REPORT_EMAIL not set, skipping report email')
+    console.warn(
+      '[lyl-sync] RESEND_API_KEY or LYL_REPORT_EMAIL not set, skipping report email'
+    )
     return
   }
 
   const banner = statusBanner(result.status)
-  const subjectPrefix = result.status === 'succeeded' ? 'OK' : result.status === 'partial' ? 'PARTIAL' : 'FAILED'
+  const subjectPrefix =
+    result.status === 'succeeded'
+      ? 'OK'
+      : result.status === 'partial'
+        ? 'PARTIAL'
+        : 'FAILED'
   const subject = `[LYL sync · ${subjectPrefix}] ${result.counts.shareAccepts} shared, ${result.counts.homeAssignments} placed, ${result.counts.failures} failures`
 
   // Per-recording actions table (post-run state from the assignment table).
   // Best-effort — if the supabase client wasn't passed, or the query fails,
   // we omit this section silently rather than blocking the whole email.
-  const actionRows = supabase ? await loadRunActions(supabase, result.runId) : []
+  const actionRows = supabase
+    ? await loadRunActions(supabase, result.runId)
+    : []
   const actionsSection = supabase
     ? `
       <h3 style="color:#d6d5c9; font-size:14px; margin:24px 0 8px;">Per-recording actions</h3>
@@ -199,13 +246,18 @@ export async function sendRunReportEmail({ result, trigger, leagueClubSlug, supa
           <th style="text-align:left; padding:8px; color:#b9baa3;">Error</th>
         </tr></thead>
         <tbody>
-        ${result.errors.slice(0, 50).map((e) => `
+        ${result.errors
+          .slice(0, 50)
+          .map(
+            (e) => `
           <tr style="border-top:1px solid #2a2f2d;">
             <td style="padding:8px; color:#d6d5c9;">${escapeHtml(e.recording_title)}<br><span style="color:#6b7280; font-family:monospace; font-size:11px;">${escapeHtml(e.recording_slug)}</span></td>
             <td style="padding:8px; color:#f59e0b; font-family:monospace; font-size:11px;">${escapeHtml(e.stage)}</td>
             <td style="padding:8px; color:#d6d5c9;">${escapeHtml(e.error.slice(0, 300))}</td>
           </tr>
-        `).join('')}
+        `
+          )
+          .join('')}
         ${result.errors.length > 50 ? `<tr><td colspan="3" style="padding:8px; color:#6b7280; font-style:italic;">… ${result.errors.length - 50} more (see admin UI)</td></tr>` : ''}
         </tbody>
       </table>
@@ -263,7 +315,9 @@ export async function sendRunCrashEmail(
   const apiKey = process.env.RESEND_API_KEY
   const to = process.env.LYL_REPORT_EMAIL
   if (!apiKey || !to) {
-    console.warn('[lyl-sync] RESEND_API_KEY or LYL_REPORT_EMAIL not set, skipping crash email')
+    console.warn(
+      '[lyl-sync] RESEND_API_KEY or LYL_REPORT_EMAIL not set, skipping crash email'
+    )
     return
   }
   const message = error instanceof Error ? error.message : String(error)
@@ -299,17 +353,25 @@ async function postToResend(
     // Per cloud-infra review.
     const resp = await fetch(RESEND_ENDPOINT, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(10_000),
     })
     if (!resp.ok) {
       const text = await resp.text().catch(() => '')
-      console.error(`[lyl-sync] Resend API error: ${resp.status} ${text.slice(0, 500)}`)
+      console.error(
+        `[lyl-sync] Resend API error: ${resp.status} ${text.slice(0, 500)}`
+      )
     } else {
       console.log(`[lyl-sync] report email dispatched to ${body.to.join(',')}`)
     }
   } catch (err) {
-    console.error('[lyl-sync] Failed to send report email:', err instanceof Error ? err.message : err)
+    console.error(
+      '[lyl-sync] Failed to send report email:',
+      err instanceof Error ? err.message : err
+    )
   }
 }

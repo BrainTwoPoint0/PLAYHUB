@@ -73,8 +73,14 @@ export interface VeoClientSurface {
     gender: 'male' | 'female' | 'mixed'
     shortName: string
   }) => Promise<{ id: string; slug: string }>
-  assignRecordingToTeam: (recordingUUID: string, teamUUID: string) => Promise<void>
-  createShareInvitation: (recordingSlug: string, email: string) => Promise<{ key: string }>
+  assignRecordingToTeam: (
+    recordingUUID: string,
+    teamUUID: string
+  ) => Promise<void>
+  createShareInvitation: (
+    recordingSlug: string,
+    email: string
+  ) => Promise<{ key: string }>
   acceptShareInvitation: (input: {
     shareKey: string
     ownClubSlug: string
@@ -224,7 +230,10 @@ function buildVeoShortName(displayName: string): string {
 /** True for Veo recordings that are themselves share-accepted copies (Veo
  *  prefixes their slug with the source club slug). We never plan or store
  *  these — only the originals get an assignment row. */
-function isShareAcceptedCopy(recordingSlug: string, leagueClubSlug: string): boolean {
+function isShareAcceptedCopy(
+  recordingSlug: string,
+  leagueClubSlug: string
+): boolean {
   return recordingSlug.startsWith(`${leagueClubSlug}-`)
 }
 
@@ -234,7 +243,10 @@ function isShareAcceptedCopy(recordingSlug: string, leagueClubSlug: string): boo
  *  failure is known (subclub missing, Veo team create failed, etc.); the
  *  catch block reads `.stage` directly. */
 class StageError extends Error {
-  constructor(public readonly stage: FailureStage, message: string) {
+  constructor(
+    public readonly stage: FailureStage,
+    message: string
+  ) {
     super(message)
     this.name = 'StageError'
   }
@@ -303,7 +315,9 @@ export async function runSync(
     const sharePrefixClubSlug = input.veoClubSlug ?? input.leagueClubSlug
     const inScope = allRecordings
       .filter((r) => !isShareAcceptedCopy(r.slug, sharePrefixClubSlug))
-      .filter((r) => !input.onlyRecordingSlug || r.slug === input.onlyRecordingSlug)
+      .filter(
+        (r) => !input.onlyRecordingSlug || r.slug === input.onlyRecordingSlug
+      )
 
     const parserDeps = deps.parserFactory()
 
@@ -329,11 +343,16 @@ export async function runSync(
         //    and it was unparseable last time (don't re-bill on the same
         //    unparseable title across cron runs).
         const llmAlreadyFailedThisTitle =
-          existing?.status === 'unparseable' && existing.llm_attempted_at !== null
+          existing?.status === 'unparseable' &&
+          existing.llm_attempted_at !== null
         const allowLlmFallback = !llmAlreadyFailedThisTitle
 
         const parseResult = await parseRecording(
-          { title: recording.title, durationSeconds: recording.duration, allowLlmFallback },
+          {
+            title: recording.title,
+            durationSeconds: recording.duration,
+            allowLlmFallback,
+          },
           subclubRefs,
           parserDeps
         )
@@ -397,7 +416,10 @@ export async function runSync(
             `Unknown home subclub: ${parsed.home!.subclubSlug}`
           )
         }
-        const homeName = buildVeoTeamName(homeSubclub.display_name, parsed.home!.ageGroup)
+        const homeName = buildVeoTeamName(
+          homeSubclub.display_name,
+          parsed.home!.ageGroup
+        )
         let homeTeam = veoTeamByName.get(homeName)
         if (!homeTeam) {
           try {
@@ -408,7 +430,12 @@ export async function runSync(
               gender: 'male',
               shortName: buildVeoShortName(homeSubclub.display_name),
             })
-            homeTeam = { id: created.id, slug: created.slug, name: homeName, age_group: parsed.home!.ageGroup.toUpperCase() }
+            homeTeam = {
+              id: created.id,
+              slug: created.slug,
+              name: homeName,
+              age_group: parsed.home!.ageGroup.toUpperCase(),
+            }
             veoTeamBySlug.set(homeTeam.slug, homeTeam)
             veoTeamByName.set(homeName, homeTeam)
           } catch (err) {
@@ -458,7 +485,10 @@ export async function runSync(
             `Unknown away subclub: ${parsed.away!.subclubSlug}`
           )
         }
-        const awayName = buildVeoTeamName(awaySubclub.display_name, parsed.away!.ageGroup)
+        const awayName = buildVeoTeamName(
+          awaySubclub.display_name,
+          parsed.away!.ageGroup
+        )
         let awayTeam = veoTeamByName.get(awayName)
         if (!awayTeam) {
           try {
@@ -469,7 +499,12 @@ export async function runSync(
               gender: 'male',
               shortName: buildVeoShortName(awaySubclub.display_name),
             })
-            awayTeam = { id: created.id, slug: created.slug, name: awayName, age_group: parsed.away!.ageGroup.toUpperCase() }
+            awayTeam = {
+              id: created.id,
+              slug: created.slug,
+              name: awayName,
+              age_group: parsed.away!.ageGroup.toUpperCase(),
+            }
             veoTeamBySlug.set(awayTeam.slug, awayTeam)
             veoTeamByName.set(awayName, awayTeam)
           } catch (err) {
@@ -483,7 +518,8 @@ export async function runSync(
         // 9. Share+accept into AWAY team — skip if we already did it for
         //    this recording (existing row tracks away_accepted_recording_uuid).
         let awayShareKey = existing?.away_share_key ?? null
-        let awayAcceptedRecordingUuid = existing?.away_accepted_recording_uuid ?? null
+        let awayAcceptedRecordingUuid =
+          existing?.away_accepted_recording_uuid ?? null
         const alreadyAwayAssigned =
           existing?.away_team_uuid === awayTeam.id &&
           existing?.away_accepted_recording_uuid !== null
@@ -531,8 +567,13 @@ export async function runSync(
           //     via getRecordingUUID since acceptShareInvitation only
           //     returns the slug.
           try {
-            const acceptedDetails = await deps.veo.getRecordingUUID(accepted.slug)
-            await deps.veo.assignRecordingToTeam(acceptedDetails.id, awayTeam.id)
+            const acceptedDetails = await deps.veo.getRecordingUUID(
+              accepted.slug
+            )
+            await deps.veo.assignRecordingToTeam(
+              acceptedDetails.id,
+              awayTeam.id
+            )
           } catch (err) {
             throw new StageError(
               'away_force_assign',

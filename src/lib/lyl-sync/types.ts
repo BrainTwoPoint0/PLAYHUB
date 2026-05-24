@@ -25,10 +25,10 @@ export type FailureStage =
   | 'cleanup'
   // Fine-grained additions (2026-05-19) so the report tells ops exactly
   // which step blew up instead of a 'home_patch' catch-all.
-  | 'unknown_home_subclub'   // parser returned a subclub slug we don't have a row for
-  | 'unknown_away_subclub'   // same, away side
-  | 'team_create'            // Veo createTeam call failed (home OR away)
-  | 'away_force_assign'      // belt-and-braces assignRecordingToTeam after acceptShareInvitation failed
+  | 'unknown_home_subclub' // parser returned a subclub slug we don't have a row for
+  | 'unknown_away_subclub' // same, away side
+  | 'team_create' // Veo createTeam call failed (home OR away)
+  | 'away_force_assign' // belt-and-braces assignRecordingToTeam after acceptShareInvitation failed
 
 export type TriggerSource = 'cron' | 'manual' | 'api'
 
@@ -52,9 +52,9 @@ export interface ParsedMatch {
 /** Discriminated outcome from parseRecording — covers every status
  *  the orchestrator persists. */
 export type ParseOutcome =
-  | { kind: 'eligible'; parsed: ParsedMatch }   // both sides resolved
+  | { kind: 'eligible'; parsed: ParsedMatch } // both sides resolved
   | { kind: 'intra_team'; parsed: ParsedMatch } // home === away
-  | { kind: 'unparseable'; reason: string }     // rules + LLM both failed
+  | { kind: 'unparseable'; reason: string } // rules + LLM both failed
   | { kind: 'too_long'; durationSeconds: number }
 
 /** Token + cost accounting for a single LLM invocation. Aggregated into
@@ -69,8 +69,8 @@ export interface LlmCost {
  *  slug + the display name + every alias (the parser uses
  *  case-insensitive substring matching). */
 export interface SubclubRef {
-  slug: string         // 'taa'
-  displayName: string  // 'TAA'
+  slug: string // 'taa'
+  displayName: string // 'TAA'
   /** Title-casing variants we've seen in Veo titles: 'TAA', 'The A Academy',
    *  etc. Ordered longest-first so the substring match prefers the most
    *  specific spelling. */

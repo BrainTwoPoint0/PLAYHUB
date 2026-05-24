@@ -33,7 +33,8 @@ export async function PATCH(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { user } = await getAuthUserStrict()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user)
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await isPlatformAdmin(user.id))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
@@ -71,7 +72,10 @@ export async function PATCH(
       .maybeSingle()
     if (error) {
       // Don't leak Postgres error text — log server-side, generic to client.
-      console.error('PATCH /api/admin/lyl/recordings/[slug]: update failed', error)
+      console.error(
+        'PATCH /api/admin/lyl/recordings/[slug]: update failed',
+        error
+      )
       return NextResponse.json({ error: 'update_failed' }, { status: 500 })
     }
     if (!data) {
@@ -81,18 +85,30 @@ export async function PATCH(
   }
 
   // Override branch: all 4 fields required + allowlist-checked.
-  const homeSubclub = typeof b.home_subclub_slug === 'string' ? b.home_subclub_slug : null
-  const awaySubclub = typeof b.away_subclub_slug === 'string' ? b.away_subclub_slug : null
+  const homeSubclub =
+    typeof b.home_subclub_slug === 'string' ? b.home_subclub_slug : null
+  const awaySubclub =
+    typeof b.away_subclub_slug === 'string' ? b.away_subclub_slug : null
   const homeAge = typeof b.home_age_group === 'string' ? b.home_age_group : null
   const awayAge = typeof b.away_age_group === 'string' ? b.away_age_group : null
   if (!homeSubclub || !awaySubclub || !homeAge || !awayAge) {
     return NextResponse.json(
-      { error: 'missing_fields', message: 'all four of home_subclub_slug, away_subclub_slug, home_age_group, away_age_group required' },
+      {
+        error: 'missing_fields',
+        message:
+          'all four of home_subclub_slug, away_subclub_slug, home_age_group, away_age_group required',
+      },
       { status: 400 }
     )
   }
-  if (!SUBCLUB_SLUG_RE.test(homeSubclub) || !SUBCLUB_SLUG_RE.test(awaySubclub)) {
-    return NextResponse.json({ error: 'invalid_subclub_slug_shape' }, { status: 400 })
+  if (
+    !SUBCLUB_SLUG_RE.test(homeSubclub) ||
+    !SUBCLUB_SLUG_RE.test(awaySubclub)
+  ) {
+    return NextResponse.json(
+      { error: 'invalid_subclub_slug_shape' },
+      { status: 400 }
+    )
   }
   if (!AGE_GROUP_RE.test(homeAge) || !AGE_GROUP_RE.test(awayAge)) {
     return NextResponse.json({ error: 'invalid_age_group' }, { status: 400 })
@@ -108,10 +124,15 @@ export async function PATCH(
     .eq('is_active', true)
     .in('subclub_slug', [homeSubclub, awaySubclub])
   if (subclubsErr) {
-    console.error('PATCH /api/admin/lyl/recordings/[slug]: subclub check failed', subclubsErr)
+    console.error(
+      'PATCH /api/admin/lyl/recordings/[slug]: subclub check failed',
+      subclubsErr
+    )
     return NextResponse.json({ error: 'subclub_check_failed' }, { status: 500 })
   }
-  const found = new Set((subclubs as { subclub_slug: string }[]).map((s) => s.subclub_slug))
+  const found = new Set(
+    (subclubs as { subclub_slug: string }[]).map((s) => s.subclub_slug)
+  )
   if (!found.has(homeSubclub) || !found.has(awaySubclub)) {
     return NextResponse.json(
       {

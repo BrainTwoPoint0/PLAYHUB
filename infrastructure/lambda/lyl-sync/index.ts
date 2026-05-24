@@ -53,11 +53,15 @@ export async function handler(event: LambdaEvent) {
   // Supabase project.
   const supabaseUrl =
     process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-  if (!supabaseUrl) throw new Error('SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) must be set')
+  if (!supabaseUrl)
+    throw new Error('SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) must be set')
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error('SUPABASE_SERVICE_ROLE_KEY must be set')
   }
-  const supabase = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY)
+  const supabase = createClient(
+    supabaseUrl,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  )
 
   // Discriminate EventBridge (cron) vs Function URL (manual API call).
   // EventBridge events carry `source: "aws.events"`; URL invocations
@@ -69,19 +73,25 @@ export async function handler(event: LambdaEvent) {
 
   if (isFunctionUrl) {
     // Auth: x-api-key header. Anything wrong → 401.
-    const provided = event.headers?.['x-api-key'] || event.headers?.['X-Api-Key']
+    const provided =
+      event.headers?.['x-api-key'] || event.headers?.['X-Api-Key']
     if (!LAMBDA_API_KEY || provided !== LAMBDA_API_KEY) {
       return jsonResponse(401, { error: 'unauthorized' })
     }
     const body: ManualBody = event.body
-      ? JSON.parse(event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString() : event.body)
+      ? JSON.parse(
+          event.isBase64Encoded
+            ? Buffer.from(event.body, 'base64').toString()
+            : event.body
+        )
       : {}
     trigger = body.trigger ?? 'manual'
     createdBy = body.createdBy
     onlyRecordingSlug = body.onlyRecordingSlug
     if (trigger !== 'cron' && !createdBy) {
       return jsonResponse(400, {
-        error: 'createdBy required for manual/api triggers (DB CHECK chk_created_by_when_human_trigger)',
+        error:
+          'createdBy required for manual/api triggers (DB CHECK chk_created_by_when_human_trigger)',
       })
     }
   }
@@ -130,10 +140,16 @@ export async function handler(event: LambdaEvent) {
     console.error('lyl-sync: unhandled error', message)
     // Crash path — no RunSyncResult row was written, so the admin UI
     // wouldn't show this failure. Email is the only out-of-band signal.
-    await sendRunCrashEmail(err, { trigger, leagueClubSlug: LEAGUE_CLUB_SLUG }).catch(() => {})
+    await sendRunCrashEmail(err, {
+      trigger,
+      leagueClubSlug: LEAGUE_CLUB_SLUG,
+    }).catch(() => {})
     return isFunctionUrl
       ? jsonResponse(500, { error: 'internal_error', message })
-      : { statusCode: 500, body: JSON.stringify({ error: 'internal_error', message }) }
+      : {
+          statusCode: 500,
+          body: JSON.stringify({ error: 'internal_error', message }),
+        }
   } finally {
     // Always close the browser session — even after a thrown error.
     // Without this, the Lambda container's warm pool keeps a live

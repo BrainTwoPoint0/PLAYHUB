@@ -68,12 +68,37 @@ interface SyncRunRow {
 }
 
 const STATUS_FILTERS: AssignmentRow['status'][] = [
-  'pending', 'parsed', 'home_assigned', 'fully_assigned',
-  'operator_locked', 'unparseable', 'too_long', 'intra_team', 'failed',
+  'pending',
+  'parsed',
+  'home_assigned',
+  'fully_assigned',
+  'operator_locked',
+  'unparseable',
+  'too_long',
+  'intra_team',
+  'failed',
 ]
-const AGE_GROUPS = ['u5', 'u6', 'u7', 'u8', 'u9', 'u10', 'u11', 'u12', 'u13', 'u14', 'u15', 'u16', 'u17', 'u18']
+const AGE_GROUPS = [
+  'u5',
+  'u6',
+  'u7',
+  'u8',
+  'u9',
+  'u10',
+  'u11',
+  'u12',
+  'u13',
+  'u14',
+  'u15',
+  'u16',
+  'u17',
+  'u18',
+]
 
-const STATUS_LABELS: Record<AssignmentRow['status'], { label: string; tone: 'green' | 'amber' | 'red' | 'grey' | 'blue' }> = {
+const STATUS_LABELS: Record<
+  AssignmentRow['status'],
+  { label: string; tone: 'green' | 'amber' | 'red' | 'grey' | 'blue' }
+> = {
   pending: { label: 'Pending', tone: 'grey' },
   parsed: { label: 'Parsed', tone: 'blue' },
   home_assigned: { label: 'Home assigned', tone: 'amber' },
@@ -85,13 +110,14 @@ const STATUS_LABELS: Record<AssignmentRow['status'], { label: string; tone: 'gre
   failed: { label: 'Failed', tone: 'red' },
 }
 
-const TONE_COLORS: Record<'green' | 'amber' | 'red' | 'grey' | 'blue', string> = {
-  green: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  amber: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  red: 'bg-red-500/15 text-red-300 border-red-500/30',
-  grey: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
-  blue: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-}
+const TONE_COLORS: Record<'green' | 'amber' | 'red' | 'grey' | 'blue', string> =
+  {
+    green: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+    amber: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+    red: 'bg-red-500/15 text-red-300 border-red-500/30',
+    grey: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
+    blue: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+  }
 
 // ---------------------------------------------------------------------------
 // Component
@@ -103,12 +129,19 @@ export function LylRecordingsClient() {
   const [runs, setRuns] = useState<SyncRunRow[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = useState<AssignmentRow['status'] | 'all'>('all')
+  const [statusFilter, setStatusFilter] = useState<
+    AssignmentRow['status'] | 'all'
+  >('all')
   const [search, setSearch] = useState('')
-  const [overrideTarget, setOverrideTarget] = useState<AssignmentRow | null>(null)
+  const [overrideTarget, setOverrideTarget] = useState<AssignmentRow | null>(
+    null
+  )
   const [triggerBusy, setTriggerBusy] = useState(false)
   const [perRowBusy, setPerRowBusy] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
+  const [toast, setToast] = useState<{
+    kind: 'ok' | 'error'
+    text: string
+  } | null>(null)
 
   async function loadAll() {
     setLoadError(null)
@@ -177,14 +210,23 @@ export function LylRecordingsClient() {
       if (resp.status === 202) {
         setToast({ kind: 'ok', text: 'Sync queued. Watching for the run row…' })
       } else if (resp.status === 503) {
-        setToast({ kind: 'error', text: body.message ?? 'Lambda not configured' })
+        setToast({
+          kind: 'error',
+          text: body.message ?? 'Lambda not configured',
+        })
         setTriggerBusy(false)
       } else {
-        setToast({ kind: 'error', text: body.error ?? `Trigger failed (${resp.status})` })
+        setToast({
+          kind: 'error',
+          text: body.error ?? `Trigger failed (${resp.status})`,
+        })
         setTriggerBusy(false)
       }
     } catch (err) {
-      setToast({ kind: 'error', text: err instanceof Error ? err.message : 'network_error' })
+      setToast({
+        kind: 'error',
+        text: err instanceof Error ? err.message : 'network_error',
+      })
       setTriggerBusy(false)
     }
   }
@@ -192,17 +234,29 @@ export function LylRecordingsClient() {
   async function triggerOne(slug: string) {
     setPerRowBusy(slug)
     try {
-      const resp = await fetch(`/api/admin/lyl/recordings/${encodeURIComponent(slug)}/retrigger`, {
-        method: 'POST',
-      })
+      const resp = await fetch(
+        `/api/admin/lyl/recordings/${encodeURIComponent(slug)}/retrigger`,
+        {
+          method: 'POST',
+        }
+      )
       const body = await resp.json()
       if (resp.status === 202) {
-        setToast({ kind: 'ok', text: `Re-trigger queued for ${slug.slice(0, 32)}…` })
+        setToast({
+          kind: 'ok',
+          text: `Re-trigger queued for ${slug.slice(0, 32)}…`,
+        })
       } else {
-        setToast({ kind: 'error', text: body.error ?? `Failed (${resp.status})` })
+        setToast({
+          kind: 'error',
+          text: body.error ?? `Failed (${resp.status})`,
+        })
       }
     } catch (err) {
-      setToast({ kind: 'error', text: err instanceof Error ? err.message : 'network_error' })
+      setToast({
+        kind: 'error',
+        text: err instanceof Error ? err.message : 'network_error',
+      })
     } finally {
       setPerRowBusy(null)
       // No polling on per-row — just refetch once after a short delay.
@@ -224,13 +278,16 @@ export function LylRecordingsClient() {
         <div className="flex flex-wrap items-center gap-3">
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as AssignmentRow['status'] | 'all')}
+            onChange={(e) =>
+              setStatusFilter(e.target.value as AssignmentRow['status'] | 'all')
+            }
             className="bg-zinc-900 border border-zinc-700 rounded-md px-3 py-2 text-sm"
           >
             <option value="all">All statuses ({recordings.length})</option>
             {STATUS_FILTERS.map((s) => (
               <option key={s} value={s}>
-                {STATUS_LABELS[s].label} ({recordings.filter((r) => r.status === s).length})
+                {STATUS_LABELS[s].label} (
+                {recordings.filter((r) => r.status === s).length})
               </option>
             ))}
           </select>
@@ -246,7 +303,9 @@ export function LylRecordingsClient() {
         {loadError ? (
           <div className="rounded-md border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">
             Failed to load: {loadError}
-            <button onClick={loadAll} className="ml-3 underline">Retry</button>
+            <button onClick={loadAll} className="ml-3 underline">
+              Retry
+            </button>
           </div>
         ) : loading ? (
           <div className="text-zinc-400 text-sm">Loading…</div>
@@ -307,10 +366,13 @@ function Header({
   return (
     <div className="flex flex-wrap items-end justify-between gap-3 border-b border-zinc-800 pb-4">
       <div>
-        <p className="text-xs uppercase tracking-[0.28em] text-zinc-500">PLAYHUB Admin · LYL</p>
+        <p className="text-xs uppercase tracking-[0.28em] text-zinc-500">
+          PLAYHUB Admin · LYL
+        </p>
         <h1 className="text-2xl font-semibold mt-1">Recording assignments</h1>
         <p className="text-sm text-zinc-400 mt-1">
-          {totalRecordings} recordings tracked. Cron runs weekly Monday 06:00 UTC.
+          {totalRecordings} recordings tracked. Cron runs weekly Monday 06:00
+          UTC.
         </p>
       </div>
       <button
@@ -329,7 +391,9 @@ function RunsPanel({ runs }: { runs: SyncRunRow[] }) {
   if (runs.length === 0) {
     return (
       <div className="rounded-md border border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-400">
-        No sync runs yet. Click <strong className="text-zinc-200">Run sync now</strong> to start the first one.
+        No sync runs yet. Click{' '}
+        <strong className="text-zinc-200">Run sync now</strong> to start the
+        first one.
       </div>
     )
   }
@@ -337,28 +401,45 @@ function RunsPanel({ runs }: { runs: SyncRunRow[] }) {
   return (
     <div className="rounded-md border border-zinc-800 bg-zinc-900/40 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold text-zinc-200">Recent sync runs</h2>
-        <p className="text-xs text-zinc-500">Latest: {fmtRel(latest.started_at)}</p>
+        <h2 className="text-sm font-semibold text-zinc-200">
+          Recent sync runs
+        </h2>
+        <p className="text-xs text-zinc-500">
+          Latest: {fmtRel(latest.started_at)}
+        </p>
       </div>
       <div className="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {runs.slice(0, 6).map((r) => (
-          <div key={r.id} className="border border-zinc-800 rounded-md p-3 text-xs">
+          <div
+            key={r.id}
+            className="border border-zinc-800 rounded-md p-3 text-xs"
+          >
             <div className="flex items-center justify-between">
-              <span className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wider ${runStatusColor(r.status)}`}>
+              <span
+                className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wider ${runStatusColor(r.status)}`}
+              >
                 {r.status}
               </span>
               <span className="text-zinc-500">{r.trigger_source}</span>
             </div>
             <p className="text-zinc-400 mt-2">{fmtAbs(r.started_at)}</p>
             <dl className="grid grid-cols-2 gap-1 mt-2 text-zinc-300">
-              <dt className="text-zinc-500">Seen</dt><dd>{r.veo_recordings_seen ?? '—'}</dd>
-              <dt className="text-zinc-500">Rules</dt><dd>{r.rules_parsed ?? '—'}</dd>
-              <dt className="text-zinc-500">LLM</dt><dd>{r.llm_parsed ?? '—'}</dd>
-              <dt className="text-zinc-500">Unparseable</dt><dd>{r.unparseable ?? '—'}</dd>
-              <dt className="text-zinc-500">Home patched</dt><dd>{r.home_assignments ?? '—'}</dd>
-              <dt className="text-zinc-500">Shares</dt><dd>{r.share_accepts ?? '—'}</dd>
-              <dt className="text-zinc-500">Auto-fixes</dt><dd>{r.auto_corrections ?? '—'}</dd>
-              <dt className="text-zinc-500">Failures</dt><dd>{r.failures ?? '—'}</dd>
+              <dt className="text-zinc-500">Seen</dt>
+              <dd>{r.veo_recordings_seen ?? '—'}</dd>
+              <dt className="text-zinc-500">Rules</dt>
+              <dd>{r.rules_parsed ?? '—'}</dd>
+              <dt className="text-zinc-500">LLM</dt>
+              <dd>{r.llm_parsed ?? '—'}</dd>
+              <dt className="text-zinc-500">Unparseable</dt>
+              <dd>{r.unparseable ?? '—'}</dd>
+              <dt className="text-zinc-500">Home patched</dt>
+              <dd>{r.home_assignments ?? '—'}</dd>
+              <dt className="text-zinc-500">Shares</dt>
+              <dd>{r.share_accepts ?? '—'}</dd>
+              <dt className="text-zinc-500">Auto-fixes</dt>
+              <dd>{r.auto_corrections ?? '—'}</dd>
+              <dt className="text-zinc-500">Failures</dt>
+              <dd>{r.failures ?? '—'}</dd>
               {r.llm_cost_usd != null && (
                 <>
                   <dt className="text-zinc-500">LLM cost</dt>
@@ -406,41 +487,56 @@ function RecordingsTable({
               <tr key={row.id} className="hover:bg-zinc-900/50">
                 <td className="px-3 py-3 align-top">
                   <div className="text-zinc-100">{row.recording_title}</div>
-                  <div className="text-xs text-zinc-500 mt-1">{row.recording_slug}</div>
+                  <div className="text-xs text-zinc-500 mt-1">
+                    {row.recording_slug}
+                  </div>
                   {row.match_date && (
-                    <div className="text-xs text-zinc-500 mt-0.5">{fmtAbs(row.match_date)}</div>
+                    <div className="text-xs text-zinc-500 mt-0.5">
+                      {fmtAbs(row.match_date)}
+                    </div>
                   )}
                 </td>
                 <td className="px-3 py-3 align-top">
-                  {row.parsed_home_subclub_slug && row.parsed_away_subclub_slug ? (
+                  {row.parsed_home_subclub_slug &&
+                  row.parsed_away_subclub_slug ? (
                     <div className="text-xs">
                       <code className="text-zinc-200">
-                        {row.parsed_home_subclub_slug}-{row.parsed_home_age_group}
+                        {row.parsed_home_subclub_slug}-
+                        {row.parsed_home_age_group}
                       </code>
                       <span className="text-zinc-500 mx-1">vs</span>
                       <code className="text-zinc-200">
-                        {row.parsed_away_subclub_slug}-{row.parsed_away_age_group}
+                        {row.parsed_away_subclub_slug}-
+                        {row.parsed_away_age_group}
                       </code>
                     </div>
                   ) : (
                     <span className="text-xs text-zinc-500">—</span>
                   )}
                   {row.last_error && (
-                    <div className="text-xs text-red-300 mt-1 break-all">{row.last_error.slice(0, 200)}</div>
+                    <div className="text-xs text-red-300 mt-1 break-all">
+                      {row.last_error.slice(0, 200)}
+                    </div>
                   )}
                 </td>
                 <td className="px-3 py-3 align-top">
-                  <span className={`inline-block text-xs px-2 py-1 rounded border ${TONE_COLORS[tone.tone]}`}>
+                  <span
+                    className={`inline-block text-xs px-2 py-1 rounded border ${TONE_COLORS[tone.tone]}`}
+                  >
                     {tone.label}
                   </span>
                   {row.failure_stage && (
-                    <div className="text-xs text-zinc-500 mt-1">stage: {row.failure_stage}</div>
+                    <div className="text-xs text-zinc-500 mt-1">
+                      stage: {row.failure_stage}
+                    </div>
                   )}
                 </td>
                 <td className="px-3 py-3 align-top text-xs text-zinc-300">
                   {row.parse_method ?? '—'}
                   {row.parse_confidence != null && (
-                    <div className="text-zinc-500">{Math.round(row.parse_confidence * 100)}%</div>
+                    <div className="text-zinc-500">
+                      {Math.round(row.parse_confidence * 100)}%
+                    </div>
                   )}
                 </td>
                 <td className="px-3 py-3 align-top text-xs text-zinc-400">
@@ -492,16 +588,19 @@ function OverrideModal({
     setSaving(true)
     setError(null)
     try {
-      const resp = await fetch(`/api/admin/lyl/recordings/${encodeURIComponent(row.recording_slug)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          home_subclub_slug: homeSub,
-          home_age_group: homeAge,
-          away_subclub_slug: awaySub,
-          away_age_group: awayAge,
-        }),
-      })
+      const resp = await fetch(
+        `/api/admin/lyl/recordings/${encodeURIComponent(row.recording_slug)}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            home_subclub_slug: homeSub,
+            home_age_group: homeAge,
+            away_subclub_slug: awaySub,
+            away_age_group: awayAge,
+          }),
+        }
+      )
       const body = await resp.json()
       if (!resp.ok) throw new Error(body.error ?? `Failed (${resp.status})`)
       onSaved()
@@ -516,11 +615,14 @@ function OverrideModal({
     setSaving(true)
     setError(null)
     try {
-      const resp = await fetch(`/api/admin/lyl/recordings/${encodeURIComponent(row.recording_slug)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clear_override: true }),
-      })
+      const resp = await fetch(
+        `/api/admin/lyl/recordings/${encodeURIComponent(row.recording_slug)}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clear_override: true }),
+        }
+      )
       const body = await resp.json()
       if (!resp.ok) throw new Error(body.error ?? `Failed (${resp.status})`)
       onSaved()
@@ -532,30 +634,42 @@ function OverrideModal({
   }
 
   return (
-    <div className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
       <div
         className="bg-zinc-900 border border-zinc-700 rounded-lg max-w-2xl w-full p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-semibold text-zinc-100">Override assignment</h2>
-        <p className="text-xs text-zinc-500 mt-1 break-all">{row.recording_title}</p>
+        <h2 className="text-lg font-semibold text-zinc-100">
+          Override assignment
+        </h2>
+        <p className="text-xs text-zinc-500 mt-1 break-all">
+          {row.recording_title}
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           <SubclubAgePicker
             label="Home team"
             subclubs={subclubs}
-            subclub={homeSub} setSubclub={setHomeSub}
-            age={homeAge} setAge={setHomeAge}
+            subclub={homeSub}
+            setSubclub={setHomeSub}
+            age={homeAge}
+            setAge={setHomeAge}
           />
           <SubclubAgePicker
             label="Away team"
             subclubs={subclubs}
-            subclub={awaySub} setSubclub={setAwaySub}
-            age={awayAge} setAge={setAwayAge}
+            subclub={awaySub}
+            setSubclub={setAwaySub}
+            age={awayAge}
+            setAge={setAwayAge}
           />
         </div>
         <p className="text-xs text-zinc-500 mt-3">
-          Saving sets <code>parse_method=manual</code> and <code>status=operator_locked</code>.
-          The cron will skip this recording on future runs until you clear the override.
+          Saving sets <code>parse_method=manual</code> and{' '}
+          <code>status=operator_locked</code>. The cron will skip this recording
+          on future runs until you clear the override.
         </p>
         {error && (
           <div className="text-xs text-red-300 mt-3 border border-red-500/40 bg-red-500/10 p-2 rounded">
@@ -571,7 +685,10 @@ function OverrideModal({
             Clear override (cron resumes control)
           </button>
           <div className="flex gap-2">
-            <button onClick={onClose} className="text-xs text-zinc-400 hover:text-zinc-200 px-3 py-1.5">
+            <button
+              onClick={onClose}
+              className="text-xs text-zinc-400 hover:text-zinc-200 px-3 py-1.5"
+            >
               Cancel
             </button>
             <button
@@ -591,17 +708,23 @@ function OverrideModal({
 function SubclubAgePicker({
   label,
   subclubs,
-  subclub, setSubclub,
-  age, setAge,
+  subclub,
+  setSubclub,
+  age,
+  setAge,
 }: {
   label: string
   subclubs: SubclubOption[]
-  subclub: string; setSubclub: (s: string) => void
-  age: string; setAge: (s: string) => void
+  subclub: string
+  setSubclub: (s: string) => void
+  age: string
+  setAge: (s: string) => void
 }) {
   return (
     <div>
-      <label className="text-xs uppercase tracking-wider text-zinc-500">{label}</label>
+      <label className="text-xs uppercase tracking-wider text-zinc-500">
+        {label}
+      </label>
       <select
         value={subclub}
         onChange={(e) => setSubclub(e.target.value)}
@@ -609,7 +732,9 @@ function SubclubAgePicker({
       >
         <option value="">— select subclub —</option>
         {subclubs.map((s) => (
-          <option key={s.subclub_slug} value={s.subclub_slug}>{s.display_name} ({s.subclub_slug})</option>
+          <option key={s.subclub_slug} value={s.subclub_slug}>
+            {s.display_name} ({s.subclub_slug})
+          </option>
         ))}
       </select>
       <select
@@ -619,7 +744,9 @@ function SubclubAgePicker({
       >
         <option value="">— age group —</option>
         {AGE_GROUPS.map((a) => (
-          <option key={a} value={a}>{a.toUpperCase()}</option>
+          <option key={a} value={a}>
+            {a.toUpperCase()}
+          </option>
         ))}
       </select>
     </div>
@@ -633,10 +760,15 @@ function SubclubAgePicker({
 function fmtAbs(iso: string): string {
   try {
     return new Date(iso).toLocaleString(undefined, {
-      year: 'numeric', month: 'short', day: '2-digit',
-      hour: '2-digit', minute: '2-digit',
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
     })
-  } catch { return iso }
+  } catch {
+    return iso
+  }
 }
 
 function fmtRel(iso: string): string {
@@ -655,9 +787,13 @@ function fmtRel(iso: string): string {
 
 function runStatusColor(s: SyncRunRow['status']): string {
   switch (s) {
-    case 'succeeded': return 'bg-emerald-500/20 text-emerald-200 border border-emerald-500/30'
-    case 'partial':   return 'bg-amber-500/20 text-amber-200 border border-amber-500/30'
-    case 'failed':    return 'bg-red-500/20 text-red-200 border border-red-500/30'
-    case 'running':   return 'bg-sky-500/20 text-sky-200 border border-sky-500/30'
+    case 'succeeded':
+      return 'bg-emerald-500/20 text-emerald-200 border border-emerald-500/30'
+    case 'partial':
+      return 'bg-amber-500/20 text-amber-200 border border-amber-500/30'
+    case 'failed':
+      return 'bg-red-500/20 text-red-200 border border-red-500/30'
+    case 'running':
+      return 'bg-sky-500/20 text-sky-200 border border-sky-500/30'
   }
 }

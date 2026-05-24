@@ -13,7 +13,8 @@ const MAX_LIMIT = 100
 
 export async function GET(request: NextRequest) {
   const { user } = await getAuthUserStrict()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user)
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await isPlatformAdmin(user.id))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }

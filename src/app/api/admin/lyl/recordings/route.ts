@@ -16,7 +16,8 @@ const LEAGUE_CLUB_SLUG = 'lyl'
 
 export async function GET(_request: NextRequest) {
   const { user } = await getAuthUserStrict()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user)
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await isPlatformAdmin(user.id))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
@@ -49,12 +50,24 @@ export async function GET(_request: NextRequest) {
   // (Postgres error text can leak column/constraint names — matches the
   // 2026-03-01 hardening sweep applied across the rest of PLAYHUB).
   if (assignmentsResult.error) {
-    console.error('GET /api/admin/lyl/recordings: assignments lookup failed', assignmentsResult.error)
-    return NextResponse.json({ error: 'recordings_lookup_failed' }, { status: 500 })
+    console.error(
+      'GET /api/admin/lyl/recordings: assignments lookup failed',
+      assignmentsResult.error
+    )
+    return NextResponse.json(
+      { error: 'recordings_lookup_failed' },
+      { status: 500 }
+    )
   }
   if (subclubsResult.error) {
-    console.error('GET /api/admin/lyl/recordings: subclubs lookup failed', subclubsResult.error)
-    return NextResponse.json({ error: 'subclubs_lookup_failed' }, { status: 500 })
+    console.error(
+      'GET /api/admin/lyl/recordings: subclubs lookup failed',
+      subclubsResult.error
+    )
+    return NextResponse.json(
+      { error: 'subclubs_lookup_failed' },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json({

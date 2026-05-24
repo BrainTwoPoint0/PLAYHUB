@@ -36,7 +36,9 @@ function makeResult(overrides: Partial<RunSyncResult> = {}): RunSyncResult {
 let fetchMock: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
-  fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => '' })
+  fetchMock = vi
+    .fn()
+    .mockResolvedValue({ ok: true, status: 200, text: async () => '' })
   vi.stubGlobal('fetch', fetchMock)
   process.env.RESEND_API_KEY = 'test_re_key'
   process.env.LYL_REPORT_EMAIL = 'admin@example.com'
@@ -50,7 +52,11 @@ afterEach(() => {
 
 describe('sendRunReportEmail', () => {
   it('uses OK subject prefix for succeeded runs', async () => {
-    await sendRunReportEmail({ result: makeResult(), trigger: 'cron', leagueClubSlug: 'lyl' })
+    await sendRunReportEmail({
+      result: makeResult(),
+      trigger: 'cron',
+      leagueClubSlug: 'lyl',
+    })
     expect(fetchMock).toHaveBeenCalledOnce()
     const body = JSON.parse(fetchMock.mock.calls[0][1].body)
     expect(body.subject).toContain('[LYL sync · OK]')
@@ -58,7 +64,10 @@ describe('sendRunReportEmail', () => {
 
   it('uses PARTIAL prefix when status=partial', async () => {
     await sendRunReportEmail({
-      result: makeResult({ status: 'partial', counts: { ...makeResult().counts, failures: 2 } }),
+      result: makeResult({
+        status: 'partial',
+        counts: { ...makeResult().counts, failures: 2 },
+      }),
       trigger: 'cron',
       leagueClubSlug: 'lyl',
     })
@@ -81,12 +90,14 @@ describe('sendRunReportEmail', () => {
     await sendRunReportEmail({
       result: makeResult({
         status: 'partial',
-        errors: [{
-          recording_slug: 'rec-1',
-          recording_title: '<script>alert(1)</script>',
-          stage: 'home_assign',
-          error: 'Veo said "<not found>"',
-        }],
+        errors: [
+          {
+            recording_slug: 'rec-1',
+            recording_title: '<script>alert(1)</script>',
+            stage: 'home_assign',
+            error: 'Veo said "<not found>"',
+          },
+        ],
       }),
       trigger: 'cron',
       leagueClubSlug: 'lyl',
@@ -118,27 +129,47 @@ describe('sendRunReportEmail', () => {
 
   it('no-ops when RESEND_API_KEY is missing', async () => {
     delete process.env.RESEND_API_KEY
-    await sendRunReportEmail({ result: makeResult(), trigger: 'cron', leagueClubSlug: 'lyl' })
+    await sendRunReportEmail({
+      result: makeResult(),
+      trigger: 'cron',
+      leagueClubSlug: 'lyl',
+    })
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('no-ops when LYL_REPORT_EMAIL is missing', async () => {
     delete process.env.LYL_REPORT_EMAIL
-    await sendRunReportEmail({ result: makeResult(), trigger: 'cron', leagueClubSlug: 'lyl' })
+    await sendRunReportEmail({
+      result: makeResult(),
+      trigger: 'cron',
+      leagueClubSlug: 'lyl',
+    })
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('does not throw when fetch rejects', async () => {
     fetchMock.mockRejectedValueOnce(new Error('network down'))
     await expect(
-      sendRunReportEmail({ result: makeResult(), trigger: 'cron', leagueClubSlug: 'lyl' })
+      sendRunReportEmail({
+        result: makeResult(),
+        trigger: 'cron',
+        leagueClubSlug: 'lyl',
+      })
     ).resolves.toBeUndefined()
   })
 
   it('does not throw on non-200 Resend response', async () => {
-    fetchMock.mockResolvedValueOnce({ ok: false, status: 401, text: async () => 'bad key' })
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      text: async () => 'bad key',
+    })
     await expect(
-      sendRunReportEmail({ result: makeResult(), trigger: 'cron', leagueClubSlug: 'lyl' })
+      sendRunReportEmail({
+        result: makeResult(),
+        trigger: 'cron',
+        leagueClubSlug: 'lyl',
+      })
     ).resolves.toBeUndefined()
   })
 })
@@ -146,7 +177,10 @@ describe('sendRunReportEmail', () => {
 describe('sendRunCrashEmail', () => {
   it('uses CRASHED subject prefix and truncates long messages to 80 chars', async () => {
     const longMessage = 'crashed because '.repeat(20) // ~320 chars
-    await sendRunCrashEmail(new Error(longMessage), { trigger: 'cron', leagueClubSlug: 'lyl' })
+    await sendRunCrashEmail(new Error(longMessage), {
+      trigger: 'cron',
+      leagueClubSlug: 'lyl',
+    })
     const body = JSON.parse(fetchMock.mock.calls[0][1].body)
     expect(body.subject.startsWith('[LYL sync · CRASHED] ')).toBe(true)
     // Subject body (after prefix) is the message truncated to 80 chars
@@ -155,14 +189,20 @@ describe('sendRunCrashEmail', () => {
   })
 
   it('handles non-Error throwables', async () => {
-    await sendRunCrashEmail('a string was thrown', { trigger: 'manual', leagueClubSlug: 'lyl' })
+    await sendRunCrashEmail('a string was thrown', {
+      trigger: 'manual',
+      leagueClubSlug: 'lyl',
+    })
     const body = JSON.parse(fetchMock.mock.calls[0][1].body)
     expect(body.subject).toContain('a string was thrown')
   })
 
   it('no-ops when env vars missing', async () => {
     delete process.env.RESEND_API_KEY
-    await sendRunCrashEmail(new Error('x'), { trigger: 'cron', leagueClubSlug: 'lyl' })
+    await sendRunCrashEmail(new Error('x'), {
+      trigger: 'cron',
+      leagueClubSlug: 'lyl',
+    })
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })

@@ -16,7 +16,8 @@ export async function POST(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { user } = await getAuthUserStrict()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user)
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await isPlatformAdmin(user.id))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
@@ -37,7 +38,8 @@ export async function POST(
     return NextResponse.json(
       {
         error: 'sync_lambda_not_configured',
-        message: 'LYL_SYNC_LAMBDA_URL or LYL_SYNC_API_KEY env var missing — deploy the Lambda first',
+        message:
+          'LYL_SYNC_LAMBDA_URL or LYL_SYNC_API_KEY env var missing — deploy the Lambda first',
       },
       { status: 503, headers: { 'x-request-id': requestId } }
     )

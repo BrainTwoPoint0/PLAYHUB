@@ -149,15 +149,23 @@ export async function upsertAssignment(
   // Merge Veo-side assignment columns only when explicitly supplied —
   // a partial update (e.g. just patched home) shouldn't clobber the
   // away_* fields written by an earlier phase.
-  if ('home_team_uuid' in input) row.home_team_uuid = input.home_team_uuid ?? null
-  if ('home_team_slug' in input) row.home_team_slug = input.home_team_slug ?? null
-  if ('home_assigned_at' in input) row.home_assigned_at = input.home_assigned_at ?? null
-  if ('away_team_uuid' in input) row.away_team_uuid = input.away_team_uuid ?? null
-  if ('away_team_slug' in input) row.away_team_slug = input.away_team_slug ?? null
-  if ('away_assigned_at' in input) row.away_assigned_at = input.away_assigned_at ?? null
-  if ('away_share_key' in input) row.away_share_key = input.away_share_key ?? null
+  if ('home_team_uuid' in input)
+    row.home_team_uuid = input.home_team_uuid ?? null
+  if ('home_team_slug' in input)
+    row.home_team_slug = input.home_team_slug ?? null
+  if ('home_assigned_at' in input)
+    row.home_assigned_at = input.home_assigned_at ?? null
+  if ('away_team_uuid' in input)
+    row.away_team_uuid = input.away_team_uuid ?? null
+  if ('away_team_slug' in input)
+    row.away_team_slug = input.away_team_slug ?? null
+  if ('away_assigned_at' in input)
+    row.away_assigned_at = input.away_assigned_at ?? null
+  if ('away_share_key' in input)
+    row.away_share_key = input.away_share_key ?? null
   if ('away_accepted_recording_uuid' in input)
-    row.away_accepted_recording_uuid = input.away_accepted_recording_uuid ?? null
+    row.away_accepted_recording_uuid =
+      input.away_accepted_recording_uuid ?? null
 
   // defaultToNull: false → on conflict, columns NOT in `row` keep their
   // existing values (vs being clobbered to null). Critical for our
