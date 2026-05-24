@@ -473,7 +473,9 @@ export async function createTeam(
       return {
         success: false,
         message: `Failed to create team "${input.name}": ${res.status} ${
-          typeof res.body === 'string' ? res.body.slice(0, 200) : JSON.stringify(res.body).slice(0, 200)
+          typeof res.body === 'string'
+            ? res.body.slice(0, 200)
+            : JSON.stringify(res.body).slice(0, 200)
         }`,
       }
     }
@@ -518,7 +520,12 @@ export async function createTeam(
 // pass safe inputs, but these functions are exported and reusable;
 // the next caller might not. Per 2026-05-17 security review.
 const VEO_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,80}$/
-const ALLOWED_CREST_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+const ALLOWED_CREST_MIME = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+])
 
 export async function uploadTeamCrest(input: {
   clubSlug: string
@@ -536,7 +543,10 @@ export async function uploadTeamCrest(input: {
   // we lock to safe raster formats so a stray image/svg+xml can't get
   // through and become an XSS surface elsewhere.
   if (!ALLOWED_CREST_MIME.has(input.mimeType)) {
-    return { success: false, message: `uploadTeamCrest: mime "${input.mimeType}" not in allowlist` }
+    return {
+      success: false,
+      message: `uploadTeamCrest: mime "${input.mimeType}" not in allowlist`,
+    }
   }
   const ext = input.mimeType.split('/')[1] || 'png'
   const filename = input.filename ?? `crest.${ext}`
@@ -557,7 +567,10 @@ export async function uploadTeamCrest(input: {
       // Strip non-printable bytes from the preview — if Veo echoes the
       // upload payload back in an error response, we don't want raw
       // image bytes corrupting our logs.
-      const rawPreview = typeof res.body === 'string' ? res.body.slice(0, 300) : JSON.stringify(res.body).slice(0, 300)
+      const rawPreview =
+        typeof res.body === 'string'
+          ? res.body.slice(0, 300)
+          : JSON.stringify(res.body).slice(0, 300)
       const preview = rawPreview.replace(/[^\x20-\x7e]/g, '?')
       return {
         success: false,
@@ -567,7 +580,8 @@ export async function uploadTeamCrest(input: {
     // Veo returns the asset URL as a JSON-quoted string body (not an
     // object). Strip the surrounding quotes if present.
     const raw = typeof res.body === 'string' ? res.body.trim() : ''
-    const crestUrl = raw.startsWith('"') && raw.endsWith('"') ? raw.slice(1, -1) : raw
+    const crestUrl =
+      raw.startsWith('"') && raw.endsWith('"') ? raw.slice(1, -1) : raw
     // Validate the returned URL is actually a Veo asset — protects any
     // downstream code that persists / renders this URL from an
     // unexpected Veo response redirecting to an arbitrary host.
@@ -613,7 +627,10 @@ export async function assignRecordingToTeam(
         message: `Failed to assign recording ${recordingUUID} → team ${teamUUID ?? '<unassigned>'}: ${res.status}`,
       }
     }
-    const body = parseBody(res.body) as { id: string; team: string | null } | null
+    const body = parseBody(res.body) as {
+      id: string
+      team: string | null
+    } | null
     return {
       success: true,
       message: `Assigned recording ${recordingUUID} → team ${teamUUID ?? '<unassigned>'}`,
@@ -745,7 +762,9 @@ export async function acceptShareInvitation(
       return {
         success: false,
         message: `Failed to accept share ${input.shareKey.slice(0, 8)}…: ${res.status} ${
-          typeof res.body === 'string' ? res.body.slice(0, 200) : JSON.stringify(res.body).slice(0, 200)
+          typeof res.body === 'string'
+            ? res.body.slice(0, 200)
+            : JSON.stringify(res.body).slice(0, 200)
         }`,
       }
     }

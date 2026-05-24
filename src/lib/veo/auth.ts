@@ -87,7 +87,9 @@ function isTokenValid(): boolean {
  * Netlify's `next build` to resolve it (and fail), so we gate the
  * import behind the runtime check.
  */
-async function buildLaunchOpts(): Promise<Parameters<typeof chromium.launch>[0]> {
+async function buildLaunchOpts(): Promise<
+  Parameters<typeof chromium.launch>[0]
+> {
   if (!process.env.AWS_LAMBDA_FUNCTION_NAME) {
     return { headless: true }
   }
@@ -100,8 +102,12 @@ async function buildLaunchOpts(): Promise<Parameters<typeof chromium.launch>[0]>
   // the Lambda bundle (infrastructure/lambda/veo-sync/) not in
   // PLAYHUB's root deps. The Function-constructed import is evaluated
   // at runtime by V8, not at build time by webpack.
-  const dynamicImport = new Function('m', 'return import(m)') as (m: string) => Promise<unknown>
-  const mod = (await dynamicImport('@sparticuz/chromium')) as { default?: unknown }
+  const dynamicImport = new Function('m', 'return import(m)') as (
+    m: string
+  ) => Promise<unknown>
+  const mod = (await dynamicImport('@sparticuz/chromium')) as {
+    default?: unknown
+  }
   const sparticuz = mod.default ?? mod
   // Narrow the shape so TypeScript doesn't complain (we know what
   // sparticuz exports — args is a string[], executablePath() is async).
@@ -331,10 +337,13 @@ export async function getVeoSession(): Promise<VeoSession> {
     // Reject anything weird at the call boundary — these payloads ship to
     // a third-party API, and a malformed buffer / missing mime type would
     // either 400 silently or upload an unviewable asset.
-    if (!parts.length) throw new Error('apiMultipart: at least one part required')
+    if (!parts.length)
+      throw new Error('apiMultipart: at least one part required')
     for (const p of parts) {
       if (!p.name || !p.filename || !p.mimeType || !Buffer.isBuffer(p.buffer)) {
-        throw new Error(`apiMultipart: malformed part "${p.name}" — name/filename/mimeType/buffer all required`)
+        throw new Error(
+          `apiMultipart: malformed part "${p.name}" — name/filename/mimeType/buffer all required`
+        )
       }
       if (p.buffer.length === 0) {
         throw new Error(`apiMultipart: part "${p.name}" buffer is empty`)
@@ -345,7 +354,9 @@ export async function getVeoSession(): Promise<VeoSession> {
       // When this graduates to Lambda, switch to page.context().request.post()
       // which streams via CDP binary channel instead of through V8 strings.
       if (p.buffer.length > 5_000_000) {
-        throw new Error(`apiMultipart: part "${p.name}" exceeds 5MB cap (${p.buffer.length} bytes)`)
+        throw new Error(
+          `apiMultipart: part "${p.name}" exceeds 5MB cap (${p.buffer.length} bytes)`
+        )
       }
     }
 
@@ -366,7 +377,9 @@ export async function getVeoSession(): Promise<VeoSession> {
       async ({ url, method, parts, bearer, csrf }) => {
         const fd = new FormData()
         for (const part of parts) {
-          const blob = new Blob([new Uint8Array(part.bytes)], { type: part.mimeType })
+          const blob = new Blob([new Uint8Array(part.bytes)], {
+            type: part.mimeType,
+          })
           fd.append(part.name, blob, part.filename)
         }
         // NOTE: do NOT set Content-Type — the browser must set it so the

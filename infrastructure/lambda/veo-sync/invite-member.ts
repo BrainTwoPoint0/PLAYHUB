@@ -20,12 +20,14 @@
 import { createClient } from '@supabase/supabase-js'
 import { getVeoSession, invitePlayerToTeam } from './veo-scraper'
 
-const ADMIN_ALERT_EMAIL = process.env.ADMIN_ALERT_EMAIL || 'admin@playbacksports.ai'
+const ADMIN_ALERT_EMAIL =
+  process.env.ADMIN_ALERT_EMAIL || 'admin@playbacksports.ai'
 const FROM_EMAIL = 'PLAYHUB Alerts <admin@playbacksports.ai>'
 const RESEND_ENDPOINT = 'https://api.resend.com/emails'
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,80}$/
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export interface InviteMemberInput {
@@ -41,7 +43,12 @@ export interface InviteMemberInput {
 }
 
 export interface InviteMemberResult {
-  status: 'success' | 'already_provisioned' | 'sub_not_found' | 'invalid_input' | 'invite_failed'
+  status:
+    | 'success'
+    | 'already_provisioned'
+    | 'sub_not_found'
+    | 'invalid_input'
+    | 'invite_failed'
   subId: string
   message: string
 }
@@ -55,10 +62,15 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;')
 }
 
-async function sendAdminFailureEmail(input: InviteMemberInput, errorMessage: string): Promise<void> {
+async function sendAdminFailureEmail(
+  input: InviteMemberInput,
+  errorMessage: string
+): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) {
-    console.warn('[invite-member] RESEND_API_KEY not set — skipping admin failure email')
+    console.warn(
+      '[invite-member] RESEND_API_KEY not set — skipping admin failure email'
+    )
     return
   }
   const subject = `[Academy provisioning · FAILED] ${input.email} → ${input.veoClubSlug}/${input.veoTeamSlug}`
@@ -91,18 +103,33 @@ async function sendAdminFailureEmail(input: InviteMemberInput, errorMessage: str
   try {
     const resp = await fetch(RESEND_ENDPOINT, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: FROM_EMAIL, to: [ADMIN_ALERT_EMAIL], subject, html }),
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: FROM_EMAIL,
+        to: [ADMIN_ALERT_EMAIL],
+        subject,
+        html,
+      }),
       signal: AbortSignal.timeout(10_000),
     })
     if (!resp.ok) {
       const text = await resp.text().catch(() => '')
-      console.error(`[invite-member] Resend API error: ${resp.status} ${text.slice(0, 200)}`)
+      console.error(
+        `[invite-member] Resend API error: ${resp.status} ${text.slice(0, 200)}`
+      )
     } else {
-      console.log(`[invite-member] failure email dispatched to ${ADMIN_ALERT_EMAIL}`)
+      console.log(
+        `[invite-member] failure email dispatched to ${ADMIN_ALERT_EMAIL}`
+      )
     }
   } catch (err) {
-    console.error('[invite-member] failure email dispatch threw:', err instanceof Error ? err.message : err)
+    console.error(
+      '[invite-member] failure email dispatch threw:',
+      err instanceof Error ? err.message : err
+    )
   }
 }
 
@@ -160,7 +187,9 @@ export async function runProvisionRetrySweep(): Promise<{
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
   const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
-  const skipWindowCutoff = new Date(Date.now() - SWEEP_SKIP_WINDOW_MS).toISOString()
+  const skipWindowCutoff = new Date(
+    Date.now() - SWEEP_SKIP_WINDOW_MS
+  ).toISOString()
 
   const { data: rows, error } = await supabase
     .from('playhub_academy_subscriptions')
@@ -222,7 +251,10 @@ export async function runProvisionRetrySweep(): Promise<{
       // Skip rows attempted in the last 15min — covers in-flight Lambda
       // invocations AND lets a recently-crashed Lambda's failure email
       // land before we re-attempt. Per cloud-infra review B2.
-      if (row.provision_attempted_at && row.provision_attempted_at > skipWindowCutoff) {
+      if (
+        row.provision_attempted_at &&
+        row.provision_attempted_at > skipWindowCutoff
+      ) {
         skipped++
         continue
       }
@@ -322,7 +354,9 @@ async function resolveVeoTeamForRow(
     .eq('club_slug', clubSlug)
     .eq('team_slug', teamSlug)
     .eq('is_active', true)
-  teamQ = subclubSlug ? teamQ.eq('subclub_slug', subclubSlug) : teamQ.is('subclub_slug', null)
+  teamQ = subclubSlug
+    ? teamQ.eq('subclub_slug', subclubSlug)
+    : teamQ.is('subclub_slug', null)
   const { data: team } = await teamQ.maybeSingle()
   if (!team?.veo_team_slug) return null
 
@@ -370,13 +404,25 @@ export async function runInviteMember(
   // which already validates, but defense-in-depth at the Lambda boundary
   // protects against any future caller passing bad data.
   if (input.subId !== undefined && !UUID_RE.test(input.subId)) {
-    return { status: 'invalid_input', subId: input.subId, message: 'invalid subId shape (expected uuid)' }
+    return {
+      status: 'invalid_input',
+      subId: input.subId,
+      message: 'invalid subId shape (expected uuid)',
+    }
   }
   if (!SLUG_RE.test(input.veoClubSlug) || !SLUG_RE.test(input.veoTeamSlug)) {
-    return { status: 'invalid_input', subId: input.subId ?? '', message: 'invalid veo slug shape' }
+    return {
+      status: 'invalid_input',
+      subId: input.subId ?? '',
+      message: 'invalid veo slug shape',
+    }
   }
   if (!EMAIL_RE.test(input.email) || input.email.length > 320) {
-    return { status: 'invalid_input', subId: input.subId ?? '', message: 'invalid email shape' }
+    return {
+      status: 'invalid_input',
+      subId: input.subId ?? '',
+      message: 'invalid email shape',
+    }
   }
 
   const supabase = createClient(
@@ -394,13 +440,25 @@ export async function runInviteMember(
       .maybeSingle()
     if (loadErr) {
       console.error('[invite-member] loadSub failed:', loadErr.message)
-      return { status: 'invalid_input', subId: input.subId, message: `loadSub failed: ${loadErr.message}` }
+      return {
+        status: 'invalid_input',
+        subId: input.subId,
+        message: `loadSub failed: ${loadErr.message}`,
+      }
     }
     if (!row) {
-      return { status: 'sub_not_found', subId: input.subId, message: `subscription ${input.subId} not found` }
+      return {
+        status: 'sub_not_found',
+        subId: input.subId,
+        message: `subscription ${input.subId} not found`,
+      }
     }
     if (row.provisioned_at) {
-      return { status: 'already_provisioned', subId: input.subId, message: 'already provisioned, skipping' }
+      return {
+        status: 'already_provisioned',
+        subId: input.subId,
+        message: 'already provisioned, skipping',
+      }
     }
     // Bump attempt counter + stamp the attempt time BEFORE the actual call
     // so we have a record even if the Lambda crashes mid-invite.
@@ -422,7 +480,8 @@ export async function runInviteMember(
   // primary webhook path (single invite), we own the session lifecycle.
   let inviteOutcome: { success: boolean; message: string }
   const ownsSession = !opts.session
-  let session: Awaited<ReturnType<typeof getVeoSession>> | null = opts.session ?? null
+  let session: Awaited<ReturnType<typeof getVeoSession>> | null =
+    opts.session ?? null
   try {
     if (!session) {
       session = await getVeoSession()
@@ -481,7 +540,11 @@ export async function runInviteMember(
     )
     // Loud failure — admin@playbacksports.ai sees the email within ~1 min.
     await sendAdminFailureEmail(input, inviteOutcome.message)
-    return { status: 'invite_failed', subId: input.subId ?? '', message: inviteOutcome.message }
+    return {
+      status: 'invite_failed',
+      subId: input.subId ?? '',
+      message: inviteOutcome.message,
+    }
   }
 
   // Success — flip provisioned_at + clear the error column (DB-tied invites only).
@@ -525,5 +588,9 @@ export async function runInviteMember(
       adhoc: !input.subId,
     })
   )
-  return { status: 'success', subId: input.subId ?? '', message: inviteOutcome.message }
+  return {
+    status: 'success',
+    subId: input.subId ?? '',
+    message: inviteOutcome.message,
+  }
 }

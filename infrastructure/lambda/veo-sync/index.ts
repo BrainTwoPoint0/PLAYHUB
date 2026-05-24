@@ -33,7 +33,13 @@ const CLUB_SLUGS = (process.env.CLUB_SLUGS || 'cfa,sefa')
 const SYNC_MODE = (process.env.SYNC_MODE || 'dry-run') as 'dry-run' | 'execute'
 
 interface EventPayload {
-  action?: 'cache-sync' | 'cleanup-sync' | 'privacy-sync' | 'content-precache' | 'invite-member' | 'provision-retry'
+  action?:
+    | 'cache-sync'
+    | 'cleanup-sync'
+    | 'privacy-sync'
+    | 'content-precache'
+    | 'invite-member'
+    | 'provision-retry'
   clubSlug?: string // Optional: sync only this club (for manual triggers)
   // invite-member-only fields. Lambda dispatched async from PLAYHUB's
   // Stripe webhook + admin re-invite + post-claim retry endpoints.
@@ -625,7 +631,8 @@ export const handler = async (
         statusCode: 400,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          error: 'invite-member requires veoClubSlug, veoTeamSlug, email (subId optional)',
+          error:
+            'invite-member requires veoClubSlug, veoTeamSlug, email (subId optional)',
         }),
       }
     }

@@ -114,10 +114,9 @@ export async function GET(request: NextRequest) {
     // a quote / newline in the filename can corrupt the response header).
     const downloadFlag = request.nextUrl.searchParams.get('download')
     if (downloadFlag === '1') {
-      const rawName = request.nextUrl.searchParams.get('filename') || 'video.mp4'
-      const safeName = rawName
-        .replace(/[^A-Za-z0-9._-]/g, '_')
-        .slice(0, 120)
+      const rawName =
+        request.nextUrl.searchParams.get('filename') || 'video.mp4'
+      const safeName = rawName.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120)
       headers.set('Content-Disposition', `attachment; filename="${safeName}"`)
     }
 

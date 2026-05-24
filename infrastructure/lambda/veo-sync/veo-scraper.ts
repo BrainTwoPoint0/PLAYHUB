@@ -694,7 +694,11 @@ export async function invitePlayerToTeam(
   )
   const data = parseBody(res.body)
   if (res.status === 201) {
-    return { success: true, message: `Invitation sent to ${email}`, status: 201 }
+    return {
+      success: true,
+      message: `Invitation sent to ${email}`,
+      status: 201,
+    }
   }
   // 200 + populated `existing_invitations` = already pending. Treat as
   // success so retries are idempotent (Stripe webhook replay, manual
@@ -709,9 +713,7 @@ export async function invitePlayerToTeam(
   // Strip non-printable bytes from error body — Veo occasionally returns
   // multipart-form-encoded error pages whose raw bytes would corrupt the
   // CloudWatch log line.
-  const preview = res.body
-    .slice(0, 300)
-    .replace(/[^\x20-\x7e]/g, '?')
+  const preview = res.body.slice(0, 300).replace(/[^\x20-\x7e]/g, '?')
   return {
     success: false,
     message: `Failed to invite ${email}: ${res.status} ${preview}`,
