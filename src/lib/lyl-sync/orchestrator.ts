@@ -25,10 +25,12 @@ import {
   getAssignment,
   upsertAssignment,
   listSubclubs,
+  listAssignments,
   type AssignmentRow,
   type SubclubRow,
 } from './db'
 import { parseRecording, buildDefaultDeps as buildParserDeps } from './parser'
+import { auditRecordingContent, type AuditResult } from './audit'
 import type {
   FailureStage,
   ParsedMatch,
@@ -54,6 +56,14 @@ export interface VeoRecording {
   team?: string | null // Veo returns the TEAM NAME here (not UUID — see Veo client tests)
   // Veo may omit (undefined) or explicitly null this field; mirror both.
   match_date?: string | null
+  // Metadata Veo returns for a recording. NOTE: these do NOT reliably indicate
+  // whether a share-copy has playable footage — a copy inherits the parent's
+  // metadata, so they read "ready" even when empty. The share-time gate uses
+  // getRecordingContent (real video/period counts) instead. Kept here only for
+  // completeness / any future use. `processing_status` is a JSON object, not a
+  // string. (See getRecordingContentCounts + processing-status.ts.)
+  processing_status?: unknown
+  thumbnail?: string | null
 }
 
 export interface VeoClientSurface {
@@ -77,6 +87,16 @@ export interface VeoClientSurface {
     recordingUUID: string,
     teamUUID: string
   ) => Promise<void>
+  /** Delete a recording (match) by slug. Used by the cleanup path to remove
+   *  empty share-copies created before the source finished processing. */
+  deleteRecording: (recordingSlug: string) => Promise<void>
+  /** Count real video segments + periods for a recording — the GROUND TRUTH
+   *  for "has playable footage". `{videos:0, periods:0}` = no content (the
+   *  thumbnail/processing_status/duration fields all lie for share-copies).
+   *  Used by the share-time gate (probe the source) + the audit. */
+  getRecordingContent: (
+    recordingSlug: string
+  ) => Promise<{ videos: number; periods: number }>
   createShareInvitation: (
     recordingSlug: string,
     email: string
@@ -90,6 +110,15 @@ export interface VeoClientSurface {
     end: string
     opponentClubName: string
   }) => Promise<{ slug: string }>
+}
+
+/** True when a recording has no playable footage — the reliable broken/empty
+ *  signal. See getRecordingContentCounts for why metadata fields don't work. */
+export function hasNoContent(counts: {
+  videos: number
+  periods: number
+}): boolean {
+  return counts.videos === 0 && counts.periods === 0
 }
 
 // ---------------------------------------------------------------------------
@@ -129,8 +158,16 @@ export interface RunSyncResult {
     homeAssignments: number
     shareAccepts: number
     autoCorrections: number
+    /** Recordings whose home was filed but whose away-share was DEFERRED
+     *  because the source video hadn't finished processing on Veo yet. Not a
+     *  failure — the next cron run re-shares once the source is ready. */
+    deferredAwaitingContent: number
     failures: number
   }
+  /** Content audit computed at end-of-run: empty share-copies, deferred
+   *  originals (waiting on Veo processing), and stuck originals. Drives the
+   *  email report's "needs attention" section. */
+  audit: AuditResult
   llm: {
     inputTokens: number
     outputTokens: number
@@ -283,6 +320,7 @@ export async function runSync(
   let homeAssignments = 0
   let shareAccepts = 0
   let autoCorrections = 0
+  let deferredAwaitingContent = 0
   let failures = 0
   let llmInputTokens = 0
   let llmOutputTokens = 0
@@ -290,6 +328,11 @@ export async function runSync(
   const errors: RunSyncResult['errors'] = []
 
   let overallStatus: 'succeeded' | 'partial' | 'failed' = 'succeeded'
+  let auditResult: AuditResult = {
+    emptyShareCopies: [],
+    awayPending: [],
+    emptyOriginals: [],
+  }
 
   try {
     // 1. Load subclubs (parser catalog) + current Veo team list (slug → UUID lookup).
@@ -477,6 +520,45 @@ export async function runSync(
           continue
         }
 
+        // 7b. Content-readiness gate. Never share into the away folder until
+        //     the SOURCE recording actually has playable footage on Veo.
+        //     Sharing a still-uploading recording produces an away-folder copy
+        //     that has no video (empty "NOT SET" entry) — and it stays broken
+        //     even after the source later finishes, because the copy is a
+        //     stale snapshot. We check GROUND TRUTH (real /videos/ + /periods/
+        //     segments) — NOT processing_status/thumbnail/duration, which a
+        //     share-copy inherits from the parent and which read "ready" even
+        //     when there's no content (confirmed empirically 2026-05-31).
+        //
+        //     The home original is already filed (step 6, safe), so we leave
+        //     the row at 'home_assigned' and let the next cron re-evaluate it;
+        //     once the source has footage, the share proceeds normally. Skip
+        //     the gate if the away copy was already accepted on a prior run.
+        const awayAlreadyAccepted =
+          existing?.away_accepted_recording_uuid != null
+        const sourceContent = awayAlreadyAccepted
+          ? { videos: 1, periods: 1 } // not consulted; avoid an extra probe
+          : await deps.veo.getRecordingContent(recording.slug)
+        if (!awayAlreadyAccepted && hasNoContent(sourceContent)) {
+          await upsertAssignment(deps.supabase, {
+            league_club_slug: input.leagueClubSlug,
+            recording_slug: recording.slug,
+            recording_uuid: details.id,
+            recording_title: recording.title,
+            match_date: recording.match_date ?? null,
+            duration_seconds: recording.duration,
+            status: 'home_assigned',
+            parsed,
+            home_team_uuid: homeTeam.id,
+            home_team_slug: homeTeam.slug,
+            home_assigned_at: new Date().toISOString(),
+            last_sync_run_id: runId,
+          })
+          deferredAwaitingContent++
+          if (!existing) newRecordings++
+          continue
+        }
+
         // 8. Resolve / create the AWAY team.
         const awaySubclub = subclubBySlug.get(parsed.away!.subclubSlug)
         if (!awaySubclub) {
@@ -647,6 +729,28 @@ export async function runSync(
         }
       }
     }
+
+    // End-of-run content audit. Uses the recordings already fetched + the
+    // freshly-upserted assignment rows, so it reflects this run's state.
+    // Drives the email report's "needs attention" section (empty copies,
+    // deferred-awaiting-content, stuck). Read-only; best-effort.
+    try {
+      const assignmentsNow = await listAssignments(
+        deps.supabase,
+        input.leagueClubSlug
+      )
+      auditResult = await auditRecordingContent(
+        allRecordings,
+        sharePrefixClubSlug,
+        assignmentsNow,
+        deps.veo.getRecordingContent
+      )
+    } catch (auditErr) {
+      console.error(
+        'lyl-sync: end-of-run audit failed (non-fatal)',
+        auditErr instanceof Error ? auditErr.message : String(auditErr)
+      )
+    }
   } catch (err) {
     overallStatus = 'failed'
     errors.push({
@@ -686,8 +790,10 @@ export async function runSync(
       homeAssignments,
       shareAccepts,
       autoCorrections,
+      deferredAwaitingContent,
       failures,
     },
+    audit: auditResult,
     llm: {
       inputTokens: llmInputTokens,
       outputTokens: llmOutputTokens,

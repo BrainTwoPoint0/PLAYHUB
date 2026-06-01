@@ -330,3 +330,50 @@ export async function listSubclubs(
   if (error) throw new Error(`listSubclubs failed: ${error.message}`)
   return (data as SubclubRow[] | null) ?? []
 }
+
+/** All assignment rows for a league — used by the content audit to
+ *  cross-reference Veo recordings against what we believe we placed. */
+export async function listAssignments(
+  supabase: SupabaseClient,
+  leagueClubSlug: string
+): Promise<AssignmentRow[]> {
+  const { data, error } = await supabase
+    .from('playhub_recording_assignments')
+    .select('*')
+    .eq('league_club_slug', leagueClubSlug)
+  if (error) throw new Error(`listAssignments failed: ${error.message}`)
+  return (data as AssignmentRow[] | null) ?? []
+}
+
+/** Re-arm the away-share for a recording after cleaning up a broken
+ *  share-copy. Nulls every away_* field and drops the row back to
+ *  'home_assigned' so the next cron run re-shares — but only once the
+ *  source reports content-ready (the orchestrator gate enforces that).
+ *  Requires home_assigned_at to already be set (CHECK chk_home_assigned_at_required);
+ *  a row that reached 'fully_assigned' always has it. */
+export async function resetAwayAssignment(
+  supabase: SupabaseClient,
+  leagueClubSlug: string,
+  recordingSlug: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('playhub_recording_assignments')
+    .update({
+      status: 'home_assigned',
+      away_team_uuid: null,
+      away_team_slug: null,
+      away_assigned_at: null,
+      away_share_key: null,
+      away_accepted_recording_uuid: null,
+      // Clear any prior failure markers — the CHECK chk_failure_stage_only_on_failed
+      // requires failure_stage IS NULL for any non-'failed' status, so leaving a
+      // stale failure_stage here would make this UPDATE violate the constraint
+      // and throw (which, post-delete, would strand the row). See cleanup review.
+      failure_stage: null,
+      last_error: null,
+      last_processed_at: new Date().toISOString(),
+    })
+    .eq('league_club_slug', leagueClubSlug)
+    .eq('recording_slug', recordingSlug)
+  if (error) throw new Error(`resetAwayAssignment failed: ${error.message}`)
+}

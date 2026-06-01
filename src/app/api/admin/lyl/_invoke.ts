@@ -21,6 +21,10 @@ export interface InvokeInput {
   requestId: string
   /** If set, scopes the run to a single recording. */
   onlyRecordingSlug?: string
+  /** Which Lambda job to run. Defaults to 'sync'. */
+  action?: 'sync' | 'cleanup'
+  /** cleanup only: actually delete (true) vs dry-run report (false). */
+  apply?: boolean
 }
 
 export type InvokeResult =
@@ -52,9 +56,11 @@ export async function invokeLylSyncAsync(
         'X-Request-Id': input.requestId,
       },
       body: JSON.stringify({
+        action: input.action ?? 'sync',
         trigger: input.trigger,
         createdBy: input.createdBy,
         onlyRecordingSlug: input.onlyRecordingSlug,
+        apply: input.apply,
       }),
       signal: controller.signal,
     })

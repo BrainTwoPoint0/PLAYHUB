@@ -29,6 +29,7 @@ interface AssignmentRow {
   parse_reasoning: string | null
   home_team_slug: string | null
   away_team_slug: string | null
+  away_accepted_recording_uuid: string | null
   status:
     | 'pending'
     | 'parsed'
@@ -137,6 +138,7 @@ export function LylRecordingsClient() {
     null
   )
   const [triggerBusy, setTriggerBusy] = useState(false)
+  const [cleanupBusy, setCleanupBusy] = useState(false)
   const [perRowBusy, setPerRowBusy] = useState<string | null>(null)
   const [toast, setToast] = useState<{
     kind: 'ok' | 'error'
@@ -231,6 +233,46 @@ export function LylRecordingsClient() {
     }
   }
 
+  async function triggerCleanup(apply: boolean) {
+    if (
+      apply &&
+      !window.confirm(
+        'Delete every empty share-copy (entry without video) and re-arm its original for the next sync? This deletes recordings in Veo.'
+      )
+    ) {
+      return
+    }
+    setCleanupBusy(true)
+    try {
+      const resp = await fetch('/api/admin/lyl/cleanup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apply }),
+      })
+      const body = await resp.json()
+      if (resp.status === 202) {
+        setToast({
+          kind: 'ok',
+          text: apply
+            ? 'Cleanup started — a summary email will follow.'
+            : 'Cleanup dry-run started — a report email will follow.',
+        })
+      } else {
+        setToast({
+          kind: 'error',
+          text: body.message ?? body.error ?? `Cleanup failed (${resp.status})`,
+        })
+      }
+    } catch (err) {
+      setToast({
+        kind: 'error',
+        text: err instanceof Error ? err.message : 'network_error',
+      })
+    } finally {
+      setCleanupBusy(false)
+    }
+  }
+
   async function triggerOne(slug: string) {
     setPerRowBusy(slug)
     try {
@@ -274,6 +316,12 @@ export function LylRecordingsClient() {
         />
 
         <RunsPanel runs={runs} />
+
+        <NeedsAttentionPanel
+          recordings={recordings}
+          cleanupBusy={cleanupBusy}
+          onCleanup={triggerCleanup}
+        />
 
         <div className="flex flex-wrap items-center gap-3">
           <select
@@ -383,6 +431,77 @@ function Header({
       >
         {runningSync ? 'Sync queued… (watching)' : 'Run sync now'}
       </button>
+    </div>
+  )
+}
+
+/** Surfaces recordings whose home is filed but whose away-share hasn't landed
+ *  — the deferred/stuck buckets (derived cheaply from the assignment rows the
+ *  page already loaded). The precise "empty share-copy" detection needs live
+ *  Veo data, so it runs in the cleanup Lambda; the button triggers it and a
+ *  summary email follows. Dry-run reports without deleting; Apply deletes the
+ *  empty copies and re-arms their originals for the next sync. */
+function NeedsAttentionPanel({
+  recordings,
+  cleanupBusy,
+  onCleanup,
+}: {
+  recordings: AssignmentRow[]
+  cleanupBusy: boolean
+  onCleanup: (apply: boolean) => void
+}) {
+  // home_assigned with no completed away-share = away pending (deferred while
+  // the source finishes processing, or stuck if it's been a while).
+  const pendingAway = recordings.filter(
+    (r) => r.status === 'home_assigned' && !r.away_accepted_recording_uuid
+  )
+  return (
+    <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold text-amber-200">
+            Content cleanup
+          </h2>
+          <p className="text-xs text-zinc-400 mt-0.5">
+            {pendingAway.length === 0
+              ? 'No away-shares pending. Run a dry-run to scan Veo for empty copies.'
+              : `${pendingAway.length} recording${pendingAway.length === 1 ? '' : 's'} filed at home, away-share pending (waiting on Veo processing, or stuck).`}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => onCleanup(false)}
+            disabled={cleanupBusy}
+            className="px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50"
+          >
+            {cleanupBusy ? 'Working…' : 'Scan (dry-run)'}
+          </button>
+          <button
+            onClick={() => onCleanup(true)}
+            disabled={cleanupBusy}
+            className="px-3 py-1.5 rounded-md text-xs font-medium bg-amber-600/80 hover:bg-amber-600 text-white disabled:opacity-50"
+          >
+            {cleanupBusy ? 'Working…' : 'Delete empty copies'}
+          </button>
+        </div>
+      </div>
+      {pendingAway.length > 0 && (
+        <ul className="mt-3 space-y-1 text-xs text-zinc-300 max-h-40 overflow-y-auto">
+          {pendingAway.slice(0, 20).map((r) => (
+            <li key={r.id} className="flex gap-2">
+              <span className="text-zinc-500 font-mono">
+                {r.recording_slug.slice(0, 28)}
+              </span>
+              <span>{r.recording_title}</span>
+            </li>
+          ))}
+          {pendingAway.length > 20 && (
+            <li className="text-zinc-500 italic">
+              … {pendingAway.length - 20} more
+            </li>
+          )}
+        </ul>
+      )}
     </div>
   )
 }

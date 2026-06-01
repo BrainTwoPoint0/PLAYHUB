@@ -11,9 +11,14 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { runSync } from '../../../src/lib/lyl-sync/orchestrator'
+import { runContentCleanup } from '../../../src/lib/lyl-sync/cleanup'
 import { buildDefaultDeps as buildParserDeps } from '../../../src/lib/lyl-sync/parser'
 import { veoAdapter, shutdownVeo } from './veo-adapter'
-import { sendRunReportEmail, sendRunCrashEmail } from './email-report'
+import {
+  sendRunReportEmail,
+  sendRunCrashEmail,
+  sendCleanupReportEmail,
+} from './email-report'
 
 const LEAGUE_CLUB_SLUG = process.env.LEAGUE_CLUB_SLUG || 'lyl'
 const SHARE_RECIPIENT_EMAIL =
@@ -39,11 +44,16 @@ interface FunctionUrlEvent {
 type LambdaEvent = EventBridgeEvent & FunctionUrlEvent
 
 interface ManualBody {
+  /** Which job to run. 'sync' (default) runs the assignment sync; 'cleanup'
+   *  finds + deletes empty share-copies and re-arms their originals. */
+  action?: 'sync' | 'cleanup'
   trigger?: 'manual' | 'api'
   /** Caller's auth user id; required for non-cron triggers per DB CHECK. */
   createdBy?: string
   /** Limit run to a single recording (re-trigger from admin UI). */
   onlyRecordingSlug?: string
+  /** cleanup only: when true, actually delete; otherwise dry-run report. */
+  apply?: boolean
 }
 
 export async function handler(event: LambdaEvent) {
@@ -70,6 +80,8 @@ export async function handler(event: LambdaEvent) {
   let trigger: 'cron' | 'manual' | 'api' = 'cron'
   let createdBy: string | undefined
   let onlyRecordingSlug: string | undefined
+  let action: 'sync' | 'cleanup' = 'sync'
+  let cleanupApply = false
 
   if (isFunctionUrl) {
     // Auth: x-api-key header. Anything wrong → 401.
@@ -88,6 +100,8 @@ export async function handler(event: LambdaEvent) {
     trigger = body.trigger ?? 'manual'
     createdBy = body.createdBy
     onlyRecordingSlug = body.onlyRecordingSlug
+    action = body.action ?? 'sync'
+    cleanupApply = body.apply === true
     if (trigger !== 'cron' && !createdBy) {
       return jsonResponse(400, {
         error:
@@ -97,6 +111,31 @@ export async function handler(event: LambdaEvent) {
   }
 
   try {
+    // Cleanup action: find + remove empty share-copies, re-arm originals.
+    // Always runs through the Lambda (Veo mutations need Playwright/Chromium,
+    // which Netlify lacks). The sweep has its own wall-clock deadline guard
+    // (see cleanup.ts) so it can't crash against the Lambda 600s wall.
+    if (action === 'cleanup') {
+      const cleanup = await runContentCleanup(
+        {
+          leagueClubSlug: LEAGUE_CLUB_SLUG,
+          veoClubSlug: process.env.VEO_CLUB_SLUG || LEAGUE_CLUB_SLUG,
+          apply: cleanupApply,
+        },
+        { supabase, veo: veoAdapter }
+      )
+      await sendCleanupReportEmail({
+        result: cleanup,
+        trigger,
+        leagueClubSlug: LEAGUE_CLUB_SLUG,
+      }).catch((emailErr) => {
+        console.error('lyl-sync: cleanup email dispatch failed', emailErr)
+      })
+      return isFunctionUrl
+        ? jsonResponse(200, cleanup)
+        : { statusCode: 200, body: JSON.stringify(cleanup) }
+    }
+
     const result = await runSync(
       {
         leagueClubSlug: LEAGUE_CLUB_SLUG,

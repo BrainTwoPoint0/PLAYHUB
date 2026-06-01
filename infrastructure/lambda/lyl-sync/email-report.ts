@@ -16,6 +16,8 @@
 // arbitrary content, so we treat everything as untrusted.
 
 import type { RunSyncResult } from '../../../src/lib/lyl-sync/orchestrator'
+import type { AuditResult } from '../../../src/lib/lyl-sync/audit'
+import type { CleanupResult } from '../../../src/lib/lyl-sync/cleanup'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails'
@@ -160,6 +162,55 @@ function renderActionsTable(rows: RecordingActionRow[]): string {
   `
 }
 
+/** "Needs attention" section: empty share-copies (broken — entry without
+ *  content), deferred originals (waiting on Veo processing), and stuck
+ *  originals (source ready but away never landed). Rendered in both the
+ *  sync-run email and the cleanup-run email. */
+function renderAuditSection(audit?: AuditResult): string {
+  // Defensive: a partial/legacy result may lack the audit field — the email
+  // is a courtesy and must never throw.
+  if (!audit) return ''
+  const { emptyShareCopies, awayPending } = audit
+  const total = emptyShareCopies.length + awayPending.length
+  if (total === 0) {
+    return `<h3 style="color:#d6d5c9; font-size:14px; margin:24px 0 8px;">Content audit</h3>
+      <p style="color:#10b981; font-size:14px;">No empty copies, nothing pending. ✅</p>`
+  }
+  const list = (
+    label: string,
+    color: string,
+    items: Array<{ title: string; slug: string }>
+  ) =>
+    items.length
+      ? `<p style="color:${color}; font-size:13px; margin:12px 0 4px;"><strong>${escapeHtml(label)} (${items.length})</strong></p>
+         <ul style="margin:0; padding-left:18px; color:#d6d5c9; font-size:12px;">
+           ${items
+             .slice(0, 50)
+             .map(
+               (i) =>
+                 `<li>${escapeHtml(i.title || '(no title)')} <span style="color:#6b7280; font-family:monospace;">${escapeHtml(i.slug)}</span></li>`
+             )
+             .join('')}
+           ${items.length > 50 ? `<li style="color:#6b7280; font-style:italic;">… ${items.length - 50} more</li>` : ''}
+         </ul>`
+      : ''
+  return `
+    <h3 style="color:#d6d5c9; font-size:14px; margin:24px 0 8px;">Content audit — needs attention</h3>
+    <div style="padding:12px 16px; background:#1a1f1d; border-radius:6px;">
+      ${list(
+        'Empty share-copies (broken — verified no footage)',
+        '#dc2626',
+        emptyShareCopies.map((c) => ({ title: c.title, slug: c.copySlug }))
+      )}
+      ${list(
+        'Away-share pending (home filed, away not yet completed)',
+        '#f59e0b',
+        awayPending.map((a) => ({ title: a.title, slug: a.recordingSlug }))
+      )}
+    </div>
+  `
+}
+
 function escapeHtml(input: string): string {
   return input
     .replace(/&/g, '&amp;')
@@ -284,8 +335,11 @@ export async function sendRunReportEmail({
           <tr><td style="padding:6px 8px; color:#b9baa3;">Home placements</td><td style="padding:6px 8px; color:#d6d5c9; text-align:right;">${fmtCount(result.counts.homeAssignments)}</td></tr>
           <tr><td style="padding:6px 8px; color:#b9baa3;">Share-with-opponent accepts</td><td style="padding:6px 8px; color:#d6d5c9; text-align:right;">${fmtCount(result.counts.shareAccepts)}</td></tr>
           <tr><td style="padding:6px 8px; color:#b9baa3;">Auto-corrections</td><td style="padding:6px 8px; color:#d6d5c9; text-align:right;">${fmtCount(result.counts.autoCorrections)}</td></tr>
+          <tr><td style="padding:6px 8px; color:#b9baa3;">Away-share deferred (awaiting Veo processing)</td><td style="padding:6px 8px; color:${result.counts.deferredAwaitingContent > 0 ? '#f59e0b' : '#d6d5c9'}; text-align:right;">${fmtCount(result.counts.deferredAwaitingContent)}</td></tr>
           <tr><td style="padding:6px 8px; color:#b9baa3;">Failures</td><td style="padding:6px 8px; color:${result.counts.failures > 0 ? '#dc2626' : '#d6d5c9'}; text-align:right;">${fmtCount(result.counts.failures)}</td></tr>
         </table>
+
+        ${renderAuditSection(result.audit)}
 
         <h3 style="color:#d6d5c9; font-size:14px; margin:24px 0 8px;">LLM usage</h3>
         <table style="width:100%; border-collapse:collapse; font-size:13px;">
@@ -335,6 +389,71 @@ export async function sendRunCrashEmail(
         <p style="margin-top:32px; padding-top:16px; border-top:1px solid #2a2f2d; font-size:12px; color:#6b7280;">
           The orchestrator threw before completing — no run summary row was written.
           Check CloudWatch logs for full context.
+        </p>
+      </div>
+    </div>
+  `
+  await postToResend(apiKey, { from: FROM, to: [to], subject, html })
+}
+
+/** Cleanup-run summary email. Fired after the Lambda 'cleanup' action so the
+ *  admin (who triggered an async invoke and got a 202) learns the outcome. */
+export async function sendCleanupReportEmail({
+  result,
+  trigger,
+  leagueClubSlug,
+}: {
+  result: CleanupResult
+  trigger: 'cron' | 'manual' | 'api'
+  leagueClubSlug: string
+}): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY
+  const to = process.env.LYL_REPORT_EMAIL
+  if (!apiKey || !to) {
+    console.warn(
+      '[lyl-sync] RESEND_API_KEY or LYL_REPORT_EMAIL not set, skipping cleanup email'
+    )
+    return
+  }
+  const subject = `[LYL cleanup · ${result.applied ? 'APPLIED' : 'DRY-RUN'}] ${result.cleaned.length} removed, ${result.failed.length} failed, ${result.audit.emptyShareCopies.length} empty found`
+  const failedTable = result.failed.length
+    ? `<h3 style="color:#d6d5c9; font-size:14px; margin:24px 0 8px;">Delete failures</h3>
+       <ul style="margin:0; padding-left:18px; color:#d6d5c9; font-size:12px;">
+         ${result.failed
+           .slice(0, 50)
+           .map(
+             (f) =>
+               `<li><span style="font-family:monospace;">${escapeHtml(f.copySlug)}</span> — <em style="color:#dc2626;">${escapeHtml(f.error.slice(0, 200))}</em></li>`
+           )
+           .join('')}
+       </ul>`
+    : ''
+  const skippedNote = result.skippedDueToDeadline.length
+    ? `<p style="color:#f59e0b; font-size:13px;">⏱ ${result.skippedDueToDeadline.length} empty copies skipped (sweep hit the wall-clock deadline) — re-run cleanup to finish.</p>`
+    : ''
+  const abortNote = result.abortedTooMany
+    ? `<p style="color:#dc2626; font-size:14px; font-weight:600;">⛔ Aborted — the audit flagged more empty copies than the safety cap allows. Nothing was deleted. Investigate before re-running (possible Veo outage / audit misfire).</p>`
+    : ''
+  const ineligibleNote = result.skippedNotEligible.length
+    ? `<p style="color:#b9baa3; font-size:13px;">${result.skippedNotEligible.length} empty copies not eligible for delete (within grace window or orphaned) — left in place.</p>`
+    : ''
+  const html = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#0a100d; color:#d6d5c9; padding:32px 16px;">
+      <div style="max-width:640px; margin:0 auto;">
+        <h1 style="font-size:20px; color:#d6d5c9; margin:0 0 8px;">LYL content cleanup</h1>
+        <p style="font-size:12px; color:#b9baa3; margin:0 0 24px;">League: <code>${escapeHtml(leagueClubSlug)}</code> · Trigger: <code>${escapeHtml(trigger)}</code> · Mode: <code>${result.applied ? 'apply' : 'dry-run'}</code></p>
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+          <tr><td style="padding:6px 8px; color:#b9baa3;">Empty copies found</td><td style="padding:6px 8px; color:#d6d5c9; text-align:right;">${result.audit.emptyShareCopies.length}</td></tr>
+          <tr><td style="padding:6px 8px; color:#b9baa3;">Deleted + re-armed</td><td style="padding:6px 8px; color:#10b981; text-align:right;">${result.cleaned.length}</td></tr>
+          <tr><td style="padding:6px 8px; color:#b9baa3;">Delete failures</td><td style="padding:6px 8px; color:${result.failed.length ? '#dc2626' : '#d6d5c9'}; text-align:right;">${result.failed.length}</td></tr>
+        </table>
+        ${abortNote}
+        ${ineligibleNote}
+        ${skippedNote}
+        ${renderAuditSection(result.audit)}
+        ${failedTable}
+        <p style="margin-top:32px; padding-top:16px; border-top:1px solid #2a2f2d; font-size:12px; color:#6b7280;">
+          PLAYHUB admin · LYL content cleanup · ${new Date().toISOString()}
         </p>
       </div>
     </div>

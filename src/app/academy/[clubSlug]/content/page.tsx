@@ -23,6 +23,7 @@ import {
   Download,
 } from 'lucide-react'
 import { DatePicker, MultiSelect } from '@braintwopoint0/playback-commons/ui'
+import { parseProcessingStatus } from '@/lib/veo/processing-status'
 
 // ============================================================================
 // Types
@@ -100,18 +101,6 @@ function formatDate(dateStr: string): string {
     })
   } catch {
     return dateStr
-  }
-}
-
-/** Parse processing_status which may be JSON like {"status":"uploading","label":"Uploading"} or a plain string */
-function parseProcessingStatus(raw?: string): string | null {
-  if (!raw || raw === 'done' || raw === '{}') return null
-  try {
-    const parsed = JSON.parse(raw)
-    if (parsed.status === 'done') return null
-    return parsed.label || parsed.status || null
-  } catch {
-    return raw === 'done' ? null : raw
   }
 }
 

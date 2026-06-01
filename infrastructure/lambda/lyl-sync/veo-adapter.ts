@@ -17,6 +17,8 @@ import {
   assignRecordingToTeam,
   createShareInvitation,
   acceptShareInvitation,
+  deleteRecording,
+  getRecordingContentCounts,
 } from '../../../src/lib/veo/client'
 import { shutdownVeoSession } from '../../../src/lib/veo/auth'
 import type { VeoClientSurface } from '../../../src/lib/lyl-sync/orchestrator'
@@ -63,6 +65,10 @@ export const veoAdapter: VeoClientSurface = {
       duration: rec.duration,
       team: rec.team ?? null,
       match_date: rec.match_date,
+      // Content-readiness signals: the orchestrator gates the away-share on
+      // these so it never creates an empty copy of a still-processing source.
+      processing_status: rec.processing_status ?? null,
+      thumbnail: rec.thumbnail ?? null,
     }))
   },
 
@@ -100,6 +106,18 @@ export const veoAdapter: VeoClientSurface = {
   assignRecordingToTeam: async (recordingUUID, teamUUID) => {
     const r = await assignRecordingToTeam(recordingUUID, teamUUID)
     if (!r.success) throw new Error(`assignRecordingToTeam: ${r.message}`)
+  },
+
+  deleteRecording: async (recordingSlug) => {
+    const r = await deleteRecording(recordingSlug)
+    if (!r.success) throw new Error(`deleteRecording: ${r.message}`)
+  },
+
+  getRecordingContent: async (recordingSlug) => {
+    const r = await getRecordingContentCounts(recordingSlug)
+    if (!r.success || !r.data)
+      throw new Error(`getRecordingContentCounts: ${r.message}`)
+    return r.data
   },
 
   createShareInvitation: async (recordingSlug, email) => {

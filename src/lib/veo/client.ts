@@ -822,6 +822,41 @@ export async function deleteTeam(
 }
 
 /**
+ * Delete a recording (match) by its slug.
+ *
+ * Used to clean up "entry-without-content" share-copies — away-folder copies
+ * that Veo created before the source finished processing, leaving an empty
+ * "NOT SET" entry with no playable video. Mirrors deleteTeam: DELETE against
+ * the match resource, accepting Veo's standard 204 (or 200) success.
+ *
+ * NOTE: this is a destructive op. Callers must resolve the slug to a genuine
+ * empty share-copy first (see lyl-sync/audit.ts) — never delete originals.
+ */
+export async function deleteRecording(matchSlug: string): Promise<VeoResult> {
+  // Defense-in-depth: validate the slug shape before interpolating into the
+  // DELETE path (matches uploadTeamCrest's VEO_SLUG_RE guard). Today's callers
+  // pass Veo-API-derived slugs, but a future caller passing '../' or '' must
+  // not reach a destructive request. Veo share-copy slugs are longer than the
+  // 80-char team-slug cap, so allow a wider bound here.
+  if (!/^[a-z0-9][a-z0-9-]{0,200}$/.test(matchSlug)) {
+    return { success: false, message: `Invalid recording slug: ${matchSlug}` }
+  }
+  return withSession(async (session) => {
+    const res = await session.api('DELETE', `/api/app/matches/${matchSlug}/`)
+    if (res.status !== 204 && res.status !== 200) {
+      return {
+        success: false,
+        message: `Failed to delete recording ${matchSlug}: ${res.status} - ${res.body.substring(0, 200)}`,
+      }
+    }
+    return {
+      success: true,
+      message: `Deleted recording ${matchSlug}`,
+    }
+  })
+}
+
+/**
  * List team members
  */
 export async function listTeamMembers(
@@ -1053,6 +1088,43 @@ export async function removeMembersInBulk(
     }
 
     return results
+  })
+}
+
+/**
+ * Count the actual video segments + periods a recording has.
+ *
+ * This is the GROUND TRUTH for "does this recording have playable footage" —
+ * unlike `processing_status`/`thumbnail`/`duration`, which a share-copy
+ * inherits from its parent's metadata and which therefore read "ready" even
+ * when the copy has no video (created before the source finished uploading).
+ * Empirically (2026-05-31): a healthy LYL recording returns videos≈3 +
+ * periods≈2; a broken share-copy returns videos=0 + periods=0 while still
+ * reporting is_accessible=true, processing_status={}, a thumbnail and a
+ * duration. `{videos:0, periods:0}` is the reliable "no content" signal.
+ *
+ * Two sequential GETs on the cached session (NOT concurrent — Veo's single
+ * Playwright session doesn't tolerate parallel page.evaluate calls).
+ */
+export async function getRecordingContentCounts(
+  matchSlug: string
+): Promise<VeoResult<{ videos: number; periods: number }>> {
+  return withSession(async (session) => {
+    const v = await session.api('GET', `/api/app/matches/${matchSlug}/videos/`)
+    const p = await session.api('GET', `/api/app/matches/${matchSlug}/periods/`)
+    const count = (status: number, body: string): number => {
+      if (status !== 200) return 0
+      const parsed = parseBody(body)
+      return Array.isArray(parsed) ? parsed.length : 0
+    }
+    return {
+      success: true,
+      message: 'Content counts retrieved',
+      data: {
+        videos: count(v.status, v.body),
+        periods: count(p.status, p.body),
+      },
+    }
   })
 }
 

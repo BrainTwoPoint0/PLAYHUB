@@ -67,6 +67,9 @@ class FakeSupabase {
     if (table === 'playhub_recording_assignments') {
       return {
         select: () => ({
+          // First .eq(league_club_slug, x). Two shapes branch from here:
+          //   - .eq(recording_slug, y).maybeSingle()  → getAssignment
+          //   - await (no second .eq)                 → listAssignments
           eq: (c1: string, v1: any) => ({
             eq: (c2: string, v2: any) => ({
               maybeSingle: async () => {
@@ -78,6 +81,26 @@ class FakeSupabase {
                 }
               },
             }),
+            // listAssignments: select('*').eq('league_club_slug', x) then await.
+            then(resolve: any) {
+              if (c1 !== 'league_club_slug')
+                throw new Error(`unexpected assignments list query ${c1}`)
+              const rows = [...self.assignments.values()].filter(
+                (r) => r.league_club_slug === v1
+              )
+              resolve({ data: rows, error: null })
+            },
+          }),
+        }),
+        // resetAwayAssignment: update(patch).eq().eq()
+        update: (patch: any) => ({
+          eq: (c1: string, v1: any) => ({
+            eq: async (c2: string, v2: any) => {
+              const key = `${v1}:${v2}`
+              const existing = self.assignments.get(key)
+              if (existing) self.assignments.set(key, { ...existing, ...patch })
+              return { error: null }
+            },
           }),
         }),
         upsert: (rowOrArray: any) => ({
@@ -149,6 +172,10 @@ function makeVeo(overrides: Partial<VeoClientSurface> = {}): VeoClientSurface {
       slug: input.name.toLowerCase().replace(/\s+/g, '-'),
     })),
     assignRecordingToTeam: vi.fn(async () => {}),
+    deleteRecording: vi.fn(async () => {}),
+    // Default: source HAS footage → gate lets the share proceed. Tests that
+    // exercise the deferral override this to return {videos:0, periods:0}.
+    getRecordingContent: vi.fn(async () => ({ videos: 3, periods: 2 })),
     createShareInvitation: vi.fn(async () => ({ key: 'share-key-abc' })),
     acceptShareInvitation: vi.fn(async () => ({ slug: 'accepted-slug' })),
     ...overrides,
@@ -234,6 +261,8 @@ describe('runSync orchestrator', () => {
           duration: 2700,
           match_date: '2026-05-10',
           team: null,
+          processing_status: 'done',
+          thumbnail: 'https://veo.test/thumb.jpg',
         },
       ]),
     })
@@ -276,6 +305,7 @@ describe('runSync orchestrator', () => {
       homeAssignments: 1,
       shareAccepts: 1,
       autoCorrections: 0,
+      deferredAwaitingContent: 0,
       failures: 0,
     })
     // Verify Veo writes happened. assignRecordingToTeam is called TWICE:
@@ -544,6 +574,8 @@ describe('runSync orchestrator', () => {
           duration: 2700,
           match_date: null,
           team: 'Wrong Team',
+          processing_status: 'done',
+          thumbnail: 'https://veo.test/thumb.jpg',
         },
       ]),
     })
@@ -599,6 +631,8 @@ describe('runSync orchestrator', () => {
           duration: 2700,
           match_date: null,
           team: null,
+          processing_status: 'done',
+          thumbnail: 'https://veo.test/thumb.jpg',
         },
         {
           slug: 'rec-2',
@@ -606,6 +640,8 @@ describe('runSync orchestrator', () => {
           duration: 2700,
           match_date: null,
           team: null,
+          processing_status: 'done',
+          thumbnail: 'https://veo.test/thumb.jpg',
         },
       ]),
       // The orchestrator passes details.title || recording.title into
@@ -742,6 +778,8 @@ describe('runSync orchestrator', () => {
           duration: 2700,
           match_date: null,
           team: null,
+          processing_status: 'done',
+          thumbnail: 'https://veo.test/thumb.jpg',
         },
         {
           slug: 'rec-2',
@@ -749,6 +787,8 @@ describe('runSync orchestrator', () => {
           duration: 2700,
           match_date: null,
           team: null,
+          processing_status: 'done',
+          thumbnail: 'https://veo.test/thumb.jpg',
         },
       ]),
     })
@@ -785,5 +825,182 @@ describe('runSync orchestrator', () => {
     expect(r.llm.inputTokens).toBe(2000)
     expect(r.llm.outputTokens).toBe(100)
     expect(r.llm.costUsd).toBeCloseTo(0.0025, 6)
+  })
+
+  it('content-readiness gate: source has NO footage → files home, DEFERS away-share', async () => {
+    const db = new FakeSupabase()
+    db.seedSubclub('lyl', 'taa', 'TAA')
+    db.seedSubclub('lyl', 'jsfc', 'JSFC')
+    const veo = makeVeo({
+      listClubTeams: vi.fn(async () => []),
+      listRecordings: vi.fn(async () => [
+        {
+          slug: 'rec-1',
+          title: 'TAA vs JSFC',
+          duration: 2700,
+          match_date: null,
+          team: null,
+        },
+      ]),
+      // Source has no real video segments/periods yet — sharing now would
+      // create an empty away copy. Gate must defer.
+      getRecordingContent: vi.fn(async () => ({ videos: 0, periods: 0 })),
+    })
+    setupParse(
+      new Map([
+        [
+          'TAA vs JSFC',
+          {
+            kind: 'eligible',
+            parsed: {
+              home: { subclubSlug: 'taa', ageGroup: 'u9' },
+              away: { subclubSlug: 'jsfc', ageGroup: 'u9' },
+              method: 'rules',
+              confidence: null,
+              reasoning: null,
+              llmAttemptedAt: null,
+            },
+          },
+        ],
+      ])
+    )
+
+    const r = await runSync(
+      {
+        leagueClubSlug: 'lyl',
+        trigger: 'cron',
+        shareRecipientEmail: 'admin@example.com',
+      },
+      makeDeps(db, veo)
+    )
+
+    expect(r.status).toBe('succeeded')
+    expect(r.counts.deferredAwaitingContent).toBe(1)
+    expect(r.counts.shareAccepts).toBe(0)
+    expect(r.counts.homeAssignments).toBe(1) // home original IS filed
+    // Away-share machinery never runs.
+    expect(veo.createShareInvitation).not.toHaveBeenCalled()
+    expect(veo.acceptShareInvitation).not.toHaveBeenCalled()
+    // Row parked at home_assigned for the next cron to re-evaluate.
+    const row = db.assignments.get('lyl:rec-1')
+    expect(row.status).toBe('home_assigned')
+    expect(row.home_team_uuid).toMatch(/^team-id-/)
+    expect(row.home_assigned_at).toBeTruthy()
+    expect(row.away_accepted_recording_uuid ?? null).toBeNull()
+  })
+
+  it('content-readiness gate: partial content (videos but 0 periods) still SHARES', async () => {
+    // hasNoContent requires BOTH videos and periods to be 0 — a source with
+    // any footage proceeds.
+    const db = new FakeSupabase()
+    db.seedSubclub('lyl', 'taa', 'TAA')
+    db.seedSubclub('lyl', 'jsfc', 'JSFC')
+    const veo = makeVeo({
+      listClubTeams: vi.fn(async () => []),
+      listRecordings: vi.fn(async () => [
+        {
+          slug: 'rec-1',
+          title: 'TAA vs JSFC',
+          duration: 2700,
+          match_date: null,
+          team: null,
+        },
+      ]),
+      getRecordingContent: vi.fn(async () => ({ videos: 3, periods: 0 })),
+    })
+    setupParse(
+      new Map([
+        [
+          'TAA vs JSFC',
+          {
+            kind: 'eligible',
+            parsed: {
+              home: { subclubSlug: 'taa', ageGroup: 'u9' },
+              away: { subclubSlug: 'jsfc', ageGroup: 'u9' },
+              method: 'rules',
+              confidence: null,
+              reasoning: null,
+              llmAttemptedAt: null,
+            },
+          },
+        ],
+      ])
+    )
+
+    const r = await runSync(
+      {
+        leagueClubSlug: 'lyl',
+        trigger: 'cron',
+        shareRecipientEmail: 'admin@example.com',
+      },
+      makeDeps(db, veo)
+    )
+
+    expect(r.counts.deferredAwaitingContent).toBe(0)
+    expect(r.counts.shareAccepts).toBe(1)
+    expect(db.assignments.get('lyl:rec-1').status).toBe('fully_assigned')
+  })
+
+  it('content-readiness gate: shares anyway if away already accepted (idempotent re-run, source momentarily not ready)', async () => {
+    const db = new FakeSupabase()
+    db.seedSubclub('lyl', 'taa', 'TAA')
+    db.seedSubclub('lyl', 'jsfc', 'JSFC')
+    db.assignments.set('lyl:rec-1', {
+      league_club_slug: 'lyl',
+      recording_slug: 'rec-1',
+      status: 'fully_assigned',
+      home_team_slug: 'taa-u9',
+      away_team_uuid: 'team-id-jsfc-u9',
+      away_accepted_recording_uuid: 'accepted-slug',
+      away_share_key: 'old-key',
+    })
+    const veo = makeVeo({
+      listClubTeams: vi.fn(async () => [
+        { id: 'team-id-taa-u9', slug: 'taa-u9', name: 'TAA U9' },
+        { id: 'team-id-jsfc-u9', slug: 'jsfc-u9', name: 'JSFC U9' },
+      ]),
+      listRecordings: vi.fn(async () => [
+        {
+          slug: 'rec-1',
+          title: 'TAA vs JSFC',
+          duration: 2700,
+          match_date: null,
+          team: 'TAA U9',
+          processing_status: '{"status":"uploading"}', // not ready, but away already done
+          thumbnail: '',
+        },
+      ]),
+    })
+    setupParse(
+      new Map([
+        [
+          'TAA vs JSFC',
+          {
+            kind: 'eligible',
+            parsed: {
+              home: { subclubSlug: 'taa', ageGroup: 'u9' },
+              away: { subclubSlug: 'jsfc', ageGroup: 'u9' },
+              method: 'rules',
+              confidence: null,
+              reasoning: null,
+              llmAttemptedAt: null,
+            },
+          },
+        ],
+      ])
+    )
+
+    const r = await runSync(
+      {
+        leagueClubSlug: 'lyl',
+        trigger: 'cron',
+        shareRecipientEmail: 'admin@example.com',
+      },
+      makeDeps(db, veo)
+    )
+
+    // Gate skipped because the away copy already exists; no NEW deferral.
+    expect(r.counts.deferredAwaitingContent).toBe(0)
+    expect(db.assignments.get('lyl:rec-1').status).toBe('fully_assigned')
   })
 })
