@@ -19,6 +19,7 @@ import {
   acceptShareInvitation,
   deleteRecording,
   getRecordingContentCounts,
+  getRecordingCamera,
 } from '../../../src/lib/veo/client'
 import { shutdownVeoSession } from '../../../src/lib/veo/auth'
 import type { VeoClientSurface } from '../../../src/lib/lyl-sync/orchestrator'
@@ -69,6 +70,8 @@ export const veoAdapter: VeoClientSurface = {
       // these so it never creates an empty copy of a still-processing source.
       processing_status: rec.processing_status ?? null,
       thumbnail: rec.thumbnail ?? null,
+      // Safety signal: an original has a camera; a share-copy has none.
+      camera: rec.camera ?? null,
     }))
   },
 
@@ -118,6 +121,13 @@ export const veoAdapter: VeoClientSurface = {
     if (!r.success || !r.data)
       throw new Error(`getRecordingContentCounts: ${r.message}`)
     return r.data
+  },
+
+  getRecordingCamera: async (recordingSlug) => {
+    const r = await getRecordingCamera(recordingSlug)
+    if (!r.success || !r.data)
+      throw new Error(`getRecordingCamera: ${r.message}`)
+    return r.data.camera
   },
 
   createShareInvitation: async (recordingSlug, email) => {

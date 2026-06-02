@@ -176,6 +176,7 @@ function makeVeo(overrides: Partial<VeoClientSurface> = {}): VeoClientSurface {
     // Default: source HAS footage → gate lets the share proceed. Tests that
     // exercise the deferral override this to return {videos:0, periods:0}.
     getRecordingContent: vi.fn(async () => ({ videos: 3, periods: 2 })),
+    getRecordingCamera: vi.fn(async () => null),
     createShareInvitation: vi.fn(async () => ({ key: 'share-key-abc' })),
     acceptShareInvitation: vi.fn(async () => ({ slug: 'accepted-slug' })),
     ...overrides,

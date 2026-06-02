@@ -64,6 +64,9 @@ export interface VeoRecording {
   // string. (See getRecordingContentCounts + processing-status.ts.)
   processing_status?: unknown
   thumbnail?: string | null
+  /** Camera UUID, or null/"NOT SET" for share-copies. An ORIGINAL always has a
+   *  camera. Load-bearing safety signal — never delete a recording with one. */
+  camera?: string | null
 }
 
 export interface VeoClientSurface {
@@ -97,6 +100,10 @@ export interface VeoClientSurface {
   getRecordingContent: (
     recordingSlug: string
   ) => Promise<{ videos: number; periods: number }>
+  /** Authoritative camera read (from match detail) — null = no camera (a
+   *  share-copy). The cleanup uses this as the final guard: never delete a
+   *  recording with a camera set. */
+  getRecordingCamera: (recordingSlug: string) => Promise<string | null>
   createShareInvitation: (
     recordingSlug: string,
     email: string
@@ -536,10 +543,20 @@ export async function runSync(
         //     the gate if the away copy was already accepted on a prior run.
         const awayAlreadyAccepted =
           existing?.away_accepted_recording_uuid != null
-        const sourceContent = awayAlreadyAccepted
-          ? { videos: 1, periods: 1 } // not consulted; avoid an extra probe
-          : await deps.veo.getRecordingContent(recording.slug)
-        if (!awayAlreadyAccepted && hasNoContent(sourceContent)) {
+        let deferForContent = false
+        if (!awayAlreadyAccepted) {
+          try {
+            deferForContent = hasNoContent(
+              await deps.veo.getRecordingContent(recording.slug)
+            )
+          } catch {
+            // Probe failed (transient Veo error). Conservatively DEFER rather
+            // than risk sharing a source whose footage we couldn't confirm —
+            // the next cron retries. Fail-safe: never share on uncertainty.
+            deferForContent = true
+          }
+        }
+        if (deferForContent) {
           await upsertAssignment(deps.supabase, {
             league_club_slug: input.leagueClubSlug,
             recording_slug: recording.slug,
@@ -743,7 +760,11 @@ export async function runSync(
         allRecordings,
         sharePrefixClubSlug,
         assignmentsNow,
-        deps.veo.getRecordingContent
+        deps.veo.getRecordingContent,
+        // Cron stays lean: report awayPending (DB-derived) but skip the
+        // per-copy content probes. Empty-copy detection is on-demand via the
+        // standalone script / admin cleanup, where latency doesn't matter.
+        { probeCopies: false }
       )
     } catch (auditErr) {
       console.error(

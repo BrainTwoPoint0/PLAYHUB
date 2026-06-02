@@ -5,7 +5,9 @@ import type { VeoRecording } from '../orchestrator'
 const VEO = 'london-youth-league'
 
 // Minimal supabase fake: listAssignments reads, resetAwayAssignment writes.
-function makeSupabase(assignmentRows: any[]) {
+// failReset=true makes the reset UPDATE return an error (simulates a reset
+// failing AFTER a successful delete — the stranded-row hazard).
+function makeSupabase(assignmentRows: any[], failReset = false) {
   const resets: Array<{ league: string; slug: string }> = []
   const supabase: any = {
     from: (table: string) => {
@@ -24,6 +26,7 @@ function makeSupabase(assignmentRows: any[]) {
         update: (_patch: any) => ({
           eq: (_c1: string, v1: string) => ({
             eq: async (_c2: string, v2: string) => {
+              if (failReset) return { error: { message: 'db blip' } }
               resets.push({ league: v1, slug: v2 })
               return { error: null }
             },
@@ -70,6 +73,7 @@ describe('runContentCleanup', () => {
           listRecordings: async () => recordings,
           deleteRecording,
           getRecordingContent: makeGetContent(recordings.map((r) => r.slug)),
+          getRecordingCamera: async () => null,
         },
       }
     )
@@ -105,6 +109,7 @@ describe('runContentCleanup', () => {
           listRecordings: async () => recordings,
           deleteRecording,
           getRecordingContent: makeGetContent(recordings.map((r) => r.slug)),
+          getRecordingCamera: async () => null,
         },
       }
     )
@@ -140,6 +145,7 @@ describe('runContentCleanup', () => {
           listRecordings: async () => recordings,
           deleteRecording,
           getRecordingContent: makeGetContent(recordings.map((r) => r.slug)),
+          getRecordingCamera: async () => null,
         },
       }
     )
@@ -161,6 +167,7 @@ describe('runContentCleanup', () => {
           listRecordings: async () => recordings,
           deleteRecording: del,
           getRecordingContent: makeGetContent(recordings.map((r) => r.slug)),
+          getRecordingCamera: async () => null,
         },
       }
     )
@@ -175,6 +182,7 @@ describe('runContentCleanup', () => {
           listRecordings: async () => recordings,
           deleteRecording: del,
           getRecordingContent: makeGetContent(recordings.map((r) => r.slug)),
+          getRecordingCamera: async () => null,
         },
       }
     )
@@ -202,6 +210,7 @@ describe('runContentCleanup', () => {
           listRecordings: async () => recordings,
           deleteRecording,
           getRecordingContent: makeGetContent(recordings.map((r) => r.slug)),
+          getRecordingCamera: async () => null,
         },
       }
     )
@@ -227,6 +236,7 @@ describe('runContentCleanup', () => {
           listRecordings: async () => recordings,
           deleteRecording,
           getRecordingContent: makeGetContent(recordings.map((r) => r.slug)),
+          getRecordingCamera: async () => null,
         },
       }
     )
@@ -264,10 +274,117 @@ describe('runContentCleanup', () => {
           listRecordings: async () => recordings,
           deleteRecording,
           getRecordingContent: makeGetContent(recordings.map((r) => r.slug)),
+          getRecordingCamera: async () => null,
         },
       }
     )
     // start=0; first iter now()=100 > 50 → both skipped.
     expect(r.skippedDueToDeadline.length).toBeGreaterThan(0)
+  })
+
+  it('delete succeeds but reset fails → deletedButNotReset (not failed), not re-armed', async () => {
+    const recordings = [rec({ slug: `${VEO}-copy-1`, thumbnail: '' })]
+    const assignments = [
+      {
+        league_club_slug: 'lyl',
+        recording_slug: 'rec-1',
+        away_accepted_recording_uuid: `${VEO}-copy-1`,
+        away_assigned_at: '2026-05-17T00:00:00Z',
+        status: 'fully_assigned',
+      },
+    ]
+    const { supabase, resets } = makeSupabase(assignments, /* failReset */ true)
+    const deleteRecording = vi.fn(async () => {})
+    const r = await runContentCleanup(
+      { leagueClubSlug: 'lyl', veoClubSlug: VEO, apply: true, minAgeMs: 0 },
+      {
+        supabase,
+        veo: {
+          listRecordings: async () => recordings,
+          deleteRecording,
+          getRecordingContent: makeGetContent([`${VEO}-copy-1`]),
+          getRecordingCamera: async () => null,
+        },
+      }
+    )
+    expect(deleteRecording).toHaveBeenCalledTimes(1) // delete DID happen
+    expect(r.cleaned).toHaveLength(0)
+    expect(r.failed).toHaveLength(0) // NOT lumped into retry-safe failures
+    expect(r.deletedButNotReset).toHaveLength(1)
+    expect(r.deletedButNotReset[0]).toMatchObject({
+      copySlug: `${VEO}-copy-1`,
+      originalRecordingSlug: 'rec-1',
+    })
+    expect(resets).toHaveLength(0) // reset never recorded (it threw)
+  })
+
+  it('SAFETY: refuses to delete a slug that reports a camera at the live check', async () => {
+    // Even if a content-empty copy slipped through to the delete loop, the
+    // live camera guard must stop it — never delete a recording with a camera.
+    const recordings = [rec({ slug: `${VEO}-copy-1`, thumbnail: '' })]
+    const { supabase } = makeSupabase([])
+    const deleteRecording = vi.fn(async () => {})
+    const r = await runContentCleanup(
+      { leagueClubSlug: 'lyl', veoClubSlug: VEO, apply: true, minAgeMs: 0 },
+      {
+        supabase,
+        veo: {
+          listRecordings: async () => recordings,
+          deleteRecording,
+          getRecordingContent: makeGetContent([`${VEO}-copy-1`]),
+          // Live check says this has a camera → it's an original → REFUSE.
+          getRecordingCamera: async () => 'cam-uuid-123',
+        },
+      }
+    )
+    expect(deleteRecording).not.toHaveBeenCalled()
+    expect(r.refusedHasCamera).toEqual([`${VEO}-copy-1`])
+    expect(r.cleaned).toHaveLength(0)
+  })
+
+  it('SAFETY: refuses to delete when the live camera check ERRORS (fail safe)', async () => {
+    const recordings = [rec({ slug: `${VEO}-copy-1`, thumbnail: '' })]
+    const { supabase } = makeSupabase([])
+    const deleteRecording = vi.fn(async () => {})
+    const r = await runContentCleanup(
+      { leagueClubSlug: 'lyl', veoClubSlug: VEO, apply: true, minAgeMs: 0 },
+      {
+        supabase,
+        veo: {
+          listRecordings: async () => recordings,
+          deleteRecording,
+          getRecordingContent: makeGetContent([`${VEO}-copy-1`]),
+          getRecordingCamera: async () => {
+            throw new Error('detail probe 503')
+          },
+        },
+      }
+    )
+    expect(deleteRecording).not.toHaveBeenCalled()
+    expect(r.refusedHasCamera).toEqual([`${VEO}-copy-1`])
+  })
+
+  it('fail-safe: a copy whose content probe THROWS is never flagged/deleted', async () => {
+    const recordings = [rec({ slug: `${VEO}-flaky`, thumbnail: '' })]
+    const { supabase } = makeSupabase([])
+    const deleteRecording = vi.fn(async () => {})
+    const r = await runContentCleanup(
+      { leagueClubSlug: 'lyl', veoClubSlug: VEO, apply: true, minAgeMs: 0 },
+      {
+        supabase,
+        veo: {
+          listRecordings: async () => recordings,
+          deleteRecording,
+          getRecordingCamera: async () => null,
+          // Transient Veo error on the probe — must NOT become a delete target.
+          getRecordingContent: async () => {
+            throw new Error('content probe non-200: videos=503 periods=503')
+          },
+        },
+      }
+    )
+    expect(r.audit.emptyShareCopies).toHaveLength(0)
+    expect(deleteRecording).not.toHaveBeenCalled()
+    expect(r.cleaned).toHaveLength(0)
   })
 })

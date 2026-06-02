@@ -431,6 +431,12 @@ export async function sendCleanupReportEmail({
   const skippedNote = result.skippedDueToDeadline.length
     ? `<p style="color:#f59e0b; font-size:13px;">⏱ ${result.skippedDueToDeadline.length} empty copies skipped (sweep hit the wall-clock deadline) — re-run cleanup to finish.</p>`
     : ''
+  const cameraNote = result.refusedHasCamera.length
+    ? `<p style="color:#dc2626; font-size:14px; font-weight:600;">🛑 ${result.refusedHasCamera.length} deletion(s) REFUSED — recording has a camera set (it's an original / master footage). Investigate why it was flagged: ${result.refusedHasCamera.map((s) => escapeHtml(s)).join(', ')}</p>`
+    : ''
+  const strandedNote = result.deletedButNotReset.length
+    ? `<p style="color:#dc2626; font-size:14px; font-weight:600;">⛔ ${result.deletedButNotReset.length} copy(ies) were DELETED but their originating row could NOT be re-armed — the cron will not re-share these. Manually re-trigger: ${result.deletedButNotReset.map((d) => escapeHtml(d.originalRecordingSlug ?? d.copySlug)).join(', ')}</p>`
+    : ''
   const abortNote = result.abortedTooMany
     ? `<p style="color:#dc2626; font-size:14px; font-weight:600;">⛔ Aborted — the audit flagged more empty copies than the safety cap allows. Nothing was deleted. Investigate before re-running (possible Veo outage / audit misfire).</p>`
     : ''
@@ -447,6 +453,8 @@ export async function sendCleanupReportEmail({
           <tr><td style="padding:6px 8px; color:#b9baa3;">Deleted + re-armed</td><td style="padding:6px 8px; color:#10b981; text-align:right;">${result.cleaned.length}</td></tr>
           <tr><td style="padding:6px 8px; color:#b9baa3;">Delete failures</td><td style="padding:6px 8px; color:${result.failed.length ? '#dc2626' : '#d6d5c9'}; text-align:right;">${result.failed.length}</td></tr>
         </table>
+        ${cameraNote}
+        ${strandedNote}
         ${abortNote}
         ${ineligibleNote}
         ${skippedNote}

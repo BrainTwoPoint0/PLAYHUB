@@ -10,9 +10,10 @@
  * that already exist.
  *
  * What it reports (via lib/lyl-sync/audit.ts):
- *   - Empty share-copies   — broken away copies to delete + re-share.
- *   - Deferred originals    — home filed, away waiting on Veo processing (OK).
- *   - Stuck originals       — source ready but away never landed (investigate).
+ *   - Empty share-copies — broken away copies (verified 0 videos + 0 periods)
+ *     to delete + re-share. NEVER includes a recording with a camera set.
+ *   - Empty originals    — failed/pending camera uploads (REPORT ONLY).
+ *   - Away-share pending — home filed, away not yet completed.
  *
  * Usage:
  *   Dry-run (default — report only, no deletes):
@@ -32,6 +33,7 @@ import {
   listRecordings as veoListRecordings,
   deleteRecording as veoDeleteRecording,
   getRecordingContentCounts as veoContentCounts,
+  getRecordingCamera as veoCamera,
 } from '../src/lib/veo/client'
 import { shutdownVeoSession } from '../src/lib/veo/auth'
 import { runContentCleanup, type CleanupVeo } from '../src/lib/lyl-sync/cleanup'
@@ -100,11 +102,18 @@ const veo: CleanupVeo = {
       match_date: rec.match_date,
       processing_status: rec.processing_status ?? null,
       thumbnail: rec.thumbnail ?? null,
+      camera: rec.camera ?? null,
     }))
   },
   deleteRecording: async (slug: string): Promise<void> => {
     const r = await veoDeleteRecording(slug)
     if (!r.success) throw new Error(`deleteRecording: ${r.message}`)
+  },
+  getRecordingCamera: async (slug: string) => {
+    const r = await veoCamera(slug)
+    if (!r.success || !r.data)
+      throw new Error(`getRecordingCamera: ${r.message}`)
+    return r.data.camera
   },
   getRecordingContent: async (slug: string) => {
     const r = await veoContentCounts(slug)
@@ -190,8 +199,23 @@ async function main() {
       for (const s of result.skippedNotEligible)
         console.log(`  – ${s.copySlug} — ${s.reason}`)
     }
+    if (result.refusedHasCamera.length) {
+      console.log(
+        `\n🛑 REFUSED to delete (camera set — original/master footage): ${result.refusedHasCamera.length}`
+      )
+      for (const s of result.refusedHasCamera) console.log(`  🛑 ${s}`)
+    }
+    if (result.deletedButNotReset.length) {
+      console.log(
+        `\n⛔ DELETED but NOT re-armed (manual re-trigger needed — cron won't re-share): ${result.deletedButNotReset.length}`
+      )
+      for (const d of result.deletedButNotReset)
+        console.log(
+          `  ! ${d.copySlug} → original ${d.originalRecordingSlug ?? '(orphan)'} — ${d.error}`
+        )
+    }
     if (result.failed.length) {
-      console.log(`\nFailed deletes: ${result.failed.length}`)
+      console.log(`\nFailed deletes (retry-safe): ${result.failed.length}`)
       for (const f of result.failed)
         console.log(`  ✗ ${f.copySlug} — ${f.error}`)
     }

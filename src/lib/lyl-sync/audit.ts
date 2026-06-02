@@ -70,6 +70,12 @@ function isShareAcceptedCopy(slug: string, veoClubSlug: string): boolean {
   return slug.startsWith(`${veoClubSlug}-`)
 }
 
+/** True if the recording has a camera assigned — i.e. it's an ORIGINAL.
+ *  Never a delete candidate. Veo reports "NOT SET" as null/empty. */
+function hasCamera(r: VeoRecording): boolean {
+  return typeof r.camera === 'string' && r.camera.length > 0
+}
+
 /**
  * Classify the current Veo recordings + our assignment rows.
  *
@@ -84,8 +90,12 @@ export async function auditRecordingContent(
   veoClubSlug: string,
   assignments: AssignmentRow[],
   getContent: ContentChecker,
-  opts: { probeOriginals?: boolean } = {}
+  opts: { probeOriginals?: boolean; probeCopies?: boolean } = {}
 ): Promise<AuditResult> {
+  // probeCopies defaults true (the on-demand cleanup/script path). The weekly
+  // cron sets it false to skip ~1 probe-pair per share-copy — empty-copy
+  // detection is an on-demand concern, and the gate already prevents new ones.
+  const probeCopies = opts.probeCopies !== false
   // Tie a share-copy slug back to its originating assignment (+ away_assigned_at).
   const originalByCopySlug = new Map<
     string,
@@ -102,25 +112,39 @@ export async function auditRecordingContent(
   // Never treat a known ORIGINAL as a copy (guards a prefix collision).
   const originalSlugs = new Set(assignments.map((a) => a.recording_slug))
 
-  // Candidate copies: prefixed slug, not a known original. Probe each for
-  // real content; an empty (0 videos AND 0 periods) copy is broken.
+  // Candidate copies: prefixed slug, NOT a known original, AND no camera set.
+  // The camera guard is the load-bearing safety rule — an ORIGINAL always has
+  // a camera; a share-copy never does. We never classify a camera-bearing
+  // recording as a deletable copy, no matter what its slug looks like. (The
+  // cleanup re-verifies camera live right before deleting, too.)
   const candidates = recordings.filter(
     (r) =>
-      isShareAcceptedCopy(r.slug, veoClubSlug) && !originalSlugs.has(r.slug)
+      isShareAcceptedCopy(r.slug, veoClubSlug) &&
+      !originalSlugs.has(r.slug) &&
+      !hasCamera(r)
   )
   const emptyShareCopies: EmptyShareCopy[] = []
-  for (const r of candidates) {
-    const counts = await getContent(r.slug)
-    if (!hasNoContent(counts)) continue
-    const orig = originalByCopySlug.get(r.slug)
-    emptyShareCopies.push({
-      copySlug: r.slug,
-      title: r.title,
-      videos: counts.videos,
-      periods: counts.periods,
-      originalRecordingSlug: orig?.recordingSlug ?? null,
-      originalAwayAssignedAt: orig?.awayAssignedAt ?? null,
-    })
+  if (probeCopies) {
+    for (const r of candidates) {
+      let counts: { videos: number; periods: number }
+      try {
+        counts = await getContent(r.slug)
+      } catch {
+        // Probe failed (transient Veo error / 404). Fail SAFE: do NOT classify
+        // as empty — never make a delete target out of an unverifiable probe.
+        continue
+      }
+      if (!hasNoContent(counts)) continue
+      const orig = originalByCopySlug.get(r.slug)
+      emptyShareCopies.push({
+        copySlug: r.slug,
+        title: r.title,
+        videos: counts.videos,
+        periods: counts.periods,
+        originalRecordingSlug: orig?.recordingSlug ?? null,
+        originalAwayAssignedAt: orig?.awayAssignedAt ?? null,
+      })
+    }
   }
 
   // Away-share pending: home filed, no completed away-share. DB-derived only.
@@ -138,7 +162,12 @@ export async function auditRecordingContent(
       (r) => !isShareAcceptedCopy(r.slug, veoClubSlug)
     )
     for (const r of originals) {
-      const counts = await getContent(r.slug)
+      let counts: { videos: number; periods: number }
+      try {
+        counts = await getContent(r.slug)
+      } catch {
+        continue // probe failed — skip (report-only bucket; never acted on)
+      }
       if (hasNoContent(counts)) {
         emptyOriginals.push({ recordingSlug: r.slug, title: r.title })
       }

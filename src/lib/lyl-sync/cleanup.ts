@@ -24,7 +24,10 @@ import type { VeoClientSurface } from './orchestrator'
 /** Subset of the Veo client surface the cleanup needs. */
 export type CleanupVeo = Pick<
   VeoClientSurface,
-  'listRecordings' | 'deleteRecording' | 'getRecordingContent'
+  | 'listRecordings'
+  | 'deleteRecording'
+  | 'getRecordingContent'
+  | 'getRecordingCamera'
 >
 
 export interface CleanupInput {
@@ -70,8 +73,24 @@ export interface CleanupResult {
   audit: AuditResult
   /** Empty copies successfully deleted + reset. */
   cleaned: Array<{ copySlug: string; originalRecordingSlug: string | null }>
-  /** Empty copies that errored (left in place for the next sweep). */
+  /** Empty copies whose DELETE errored (left in place — safe to retry). */
   failed: Array<{ copySlug: string; error: string }>
+  /** Copies that WERE deleted in Veo but whose originating row could not be
+   *  re-armed (resetAwayAssignment threw). The away folder is now empty and
+   *  the row still reads fully_assigned, so the cron WON'T re-share — a human
+   *  must re-arm it. Surfaced loudly + distinctly from `failed` (which is
+   *  retry-safe) because this state does NOT self-heal. */
+  deletedButNotReset: Array<{
+    copySlug: string
+    originalRecordingSlug: string | null
+    error: string
+  }>
+  /** Copies the final live camera-check refused to delete because a camera was
+   *  set (it's an ORIGINAL, or we couldn't confirm it isn't). Hard safety stop:
+   *  we NEVER delete a recording with a camera. Should be empty in practice
+   *  (the audit already excludes camera-bearing recordings) — a non-empty list
+   *  means something upstream misclassified and is worth investigating. */
+  refusedHasCamera: string[]
   /** Empty copies not attempted because the deadline was hit. */
   skippedDueToDeadline: string[]
   /** Empty copies skipped because they're too new (within the grace window)
@@ -107,6 +126,8 @@ export async function runContentCleanup(
 
   const cleaned: CleanupResult['cleaned'] = []
   const failed: CleanupResult['failed'] = []
+  const deletedButNotReset: CleanupResult['deletedButNotReset'] = []
+  const refusedHasCamera: string[] = []
   const skippedDueToDeadline: string[] = []
   const skippedNotEligible: CleanupResult['skippedNotEligible'] = []
   let abortedTooMany = false
@@ -127,6 +148,8 @@ export async function runContentCleanup(
         audit,
         cleaned,
         failed,
+        deletedButNotReset,
+        refusedHasCamera,
         skippedDueToDeadline,
         skippedNotEligible,
         abortedTooMany,
@@ -153,29 +176,59 @@ export async function runContentCleanup(
         })
         continue
       }
+      // FINAL SAFETY GUARD (authoritative, live): never delete a recording
+      // that has a camera set — that's an ORIGINAL / master footage. The audit
+      // already excludes camera-bearing recordings, but we re-read it fresh
+      // right before the irreversible delete. If the camera is set, OR we
+      // can't confirm it's unset (probe error → throws), REFUSE.
+      try {
+        const camera = await deps.veo.getRecordingCamera(copy.copySlug)
+        if (camera) {
+          refusedHasCamera.push(copy.copySlug)
+          continue
+        }
+      } catch {
+        // Couldn't confirm camera is unset → fail safe, do not delete.
+        refusedHasCamera.push(copy.copySlug)
+        continue
+      }
       // Per-item isolation — one bad delete must not abort the sweep.
+      // Delete first, then re-arm. These are NOT atomic, so split the two
+      // failure modes: a failed DELETE is retry-safe (copy still there); a
+      // delete that SUCCEEDS but whose reset throws strands the row (copy gone,
+      // row still fully_assigned → cron never re-shares) and needs a human.
       try {
         await deps.veo.deleteRecording(copy.copySlug)
-        // Re-arm the originating assignment so the next cron re-shares once
-        // the source is ready. Skip when we couldn't tie the copy to an
-        // original (orphan) — there's nothing to reset.
-        if (copy.originalRecordingSlug) {
-          await resetAwayAssignment(
-            deps.supabase,
-            input.leagueClubSlug,
-            copy.originalRecordingSlug
-          )
-        }
-        cleaned.push({
-          copySlug: copy.copySlug,
-          originalRecordingSlug: copy.originalRecordingSlug,
-        })
       } catch (err) {
         failed.push({
           copySlug: copy.copySlug,
           error: err instanceof Error ? err.message : String(err),
         })
+        continue
       }
+      // Delete succeeded. Re-arm the originating assignment so the next cron
+      // re-shares once the source is ready. Orphans (no tied original) have
+      // nothing to reset.
+      if (copy.originalRecordingSlug) {
+        try {
+          await resetAwayAssignment(
+            deps.supabase,
+            input.leagueClubSlug,
+            copy.originalRecordingSlug
+          )
+        } catch (err) {
+          deletedButNotReset.push({
+            copySlug: copy.copySlug,
+            originalRecordingSlug: copy.originalRecordingSlug,
+            error: err instanceof Error ? err.message : String(err),
+          })
+          continue
+        }
+      }
+      cleaned.push({
+        copySlug: copy.copySlug,
+        originalRecordingSlug: copy.originalRecordingSlug,
+      })
     }
   }
 
@@ -183,6 +236,8 @@ export async function runContentCleanup(
     audit,
     cleaned,
     failed,
+    deletedButNotReset,
+    refusedHasCamera,
     skippedDueToDeadline,
     skippedNotEligible,
     abortedTooMany,

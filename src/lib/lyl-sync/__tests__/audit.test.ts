@@ -121,6 +121,15 @@ describe('auditRecordingContent', () => {
     expect(r.emptyShareCopies).toHaveLength(0)
   })
 
+  it('NEVER flags a copy that has a camera set (camera => original — safety rule)', async () => {
+    const slug = `${VEO}-has-camera`
+    const recordings = [rec({ slug, camera: 'cam-uuid-999' })]
+    const getContent = contentMap([slug]) // would say "empty" IF probed
+    const r = await auditRecordingContent(recordings, VEO, [], getContent)
+    expect(r.emptyShareCopies).toHaveLength(0)
+    expect(getContent).not.toHaveBeenCalled() // excluded before probing
+  })
+
   it('only probes candidate share-copies (bounded cost), not originals', async () => {
     const copy = `${VEO}-c1`
     const recordings = [rec({ slug: 'orig-1' }), rec({ slug: copy })]
@@ -152,6 +161,25 @@ describe('auditRecordingContent', () => {
     expect(r.emptyOriginals.map((o) => o.recordingSlug)).toEqual(['orig-empty'])
     // Originals are never delete targets — they only appear in emptyOriginals.
     expect(r.emptyShareCopies).toHaveLength(0)
+  })
+
+  it('probeCopies:false skips copy probing (cron-lean path) but still reports awayPending', async () => {
+    const copy = `${VEO}-c1`
+    const recordings = [rec({ slug: copy })]
+    const assignments = [
+      assignment({ recording_slug: 'rec-1', status: 'home_assigned' }),
+    ]
+    const getContent = contentMap([copy]) // would flag the copy IF probed
+    const r = await auditRecordingContent(
+      recordings,
+      VEO,
+      assignments,
+      getContent,
+      { probeCopies: false }
+    )
+    expect(getContent).not.toHaveBeenCalled()
+    expect(r.emptyShareCopies).toHaveLength(0)
+    expect(r.awayPending.map((a) => a.recordingSlug)).toEqual(['rec-1'])
   })
 
   it('reports home_assigned rows without a completed away-share as awayPending', async () => {

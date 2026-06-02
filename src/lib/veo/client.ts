@@ -53,6 +53,10 @@ export interface VeoRecording {
   /** Veo's structured assignment: a team UUID (not slug) or null when
    *  unassigned. Used for idempotent re-runs of the assignment pipeline. */
   team?: string | null
+  /** Camera UUID, or null/"NOT SET" for share-copies. An ORIGINAL always has a
+   *  camera; a share-copy never does. Load-bearing safety signal: NEVER delete
+   *  a recording with a camera set (it's an original / master footage). */
+  camera?: string | null
 }
 
 export interface VeoVideo {
@@ -392,7 +396,7 @@ export async function listRecordings(
   return withSession(async (session) => {
     const res = await session.api(
       'GET',
-      `/api/app/clubs/${clubSlug}/recordings/?filter=own&fields=privacy&fields=title&fields=slug&fields=duration&fields=thumbnail&fields=uuid&fields=match_date&fields=home_team&fields=away_team&fields=home_score&fields=away_score&fields=processing_status&fields=team&page_size=200`
+      `/api/app/clubs/${clubSlug}/recordings/?filter=own&fields=privacy&fields=title&fields=slug&fields=duration&fields=thumbnail&fields=uuid&fields=match_date&fields=home_team&fields=away_team&fields=home_score&fields=away_score&fields=processing_status&fields=team&fields=camera&page_size=200`
     )
 
     if (res.status !== 200) {
@@ -1112,19 +1116,52 @@ export async function getRecordingContentCounts(
   return withSession(async (session) => {
     const v = await session.api('GET', `/api/app/matches/${matchSlug}/videos/`)
     const p = await session.api('GET', `/api/app/matches/${matchSlug}/periods/`)
-    const count = (status: number, body: string): number => {
-      if (status !== 200) return 0
+    // CRITICAL: a non-200 on EITHER probe (transient 5xx/429, or a 404 for a
+    // since-deleted recording) must NOT be read as "0 content". Return
+    // success:false so callers treat it as "couldn't determine", not "empty" —
+    // otherwise a Veo blip could classify a healthy copy as broken and (on the
+    // apply path) delete it. Both the gate and the audit fail safe on this.
+    if (v.status !== 200 || p.status !== 200) {
+      return {
+        success: false,
+        message: `content probe non-200: videos=${v.status} periods=${p.status}`,
+      }
+    }
+    const len = (body: string): number => {
       const parsed = parseBody(body)
       return Array.isArray(parsed) ? parsed.length : 0
     }
     return {
       success: true,
       message: 'Content counts retrieved',
-      data: {
-        videos: count(v.status, v.body),
-        periods: count(p.status, p.body),
-      },
+      data: { videos: len(v.body), periods: len(p.body) },
     }
+  })
+}
+
+/**
+ * Read a recording's camera assignment authoritatively from match detail.
+ * Returns the camera UUID, or null when none is set ("NOT SET" — i.e. a
+ * share-copy). This is the final safety check before any destructive delete:
+ * a recording with a camera is an ORIGINAL and must NEVER be deleted.
+ * Returns success:false on a non-200 so callers fail safe (treat unknown as
+ * "might be an original" and refuse to delete).
+ */
+export async function getRecordingCamera(
+  matchSlug: string
+): Promise<VeoResult<{ camera: string | null }>> {
+  return withSession(async (session) => {
+    const res = await session.api('GET', `/api/app/matches/${matchSlug}/`)
+    if (res.status !== 200) {
+      return {
+        success: false,
+        message: `Failed to read camera for ${matchSlug}: ${res.status}`,
+      }
+    }
+    const data = parseBody(res.body) as { camera?: unknown } | null
+    const raw = data?.camera
+    const camera = typeof raw === 'string' && raw.length > 0 ? raw : null
+    return { success: true, message: 'Camera read', data: { camera } }
   })
 }
 
