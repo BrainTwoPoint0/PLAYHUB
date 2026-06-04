@@ -143,7 +143,13 @@ async function spiideoFetch(endpoint: string, options: RequestInit = {}) {
     throw new Error(`Spiideo API error: ${response.status}`)
   }
 
-  return response.json()
+  // Some endpoints return 202/204 with an empty body (notably the
+  // create-output POST and the delete-output DELETE). Calling
+  // response.json() on an empty body throws "Unexpected end of JSON
+  // input", which silently broke the stuck-output auto-recovery. Tolerate
+  // empty/non-JSON bodies by returning null.
+  const text = await response.text()
+  return text ? JSON.parse(text) : null
 }
 
 async function getFinishedGames(): Promise<Game[]> {
@@ -162,10 +168,25 @@ async function getOutputs(productionId: string): Promise<Output[]> {
 }
 
 async function createDownloadOutput(productionId: string): Promise<Output> {
-  return spiideoFetch(`/v1/productions/${productionId}/outputs`, {
+  await spiideoFetch(`/v1/productions/${productionId}/outputs`, {
     method: 'POST',
     body: JSON.stringify({ outputType: 'download' }),
   })
+  // The POST returns 202 Accepted with an empty body and creates the
+  // output asynchronously, so re-fetch the outputs list to resolve the new
+  // object (callers rely on its `id` for the progress poll). Retry briefly
+  // to absorb read-after-write lag. The POST side-effect persists
+  // regardless — a later cron run will still discover the output via
+  // getOutputs (assumes a single download output per production).
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const outputs = await getOutputs(productionId)
+    const created = outputs.find((o) => o.outputType === 'download')
+    if (created) return created
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+  }
+  throw new Error(
+    `Created download output not found for production ${productionId}`
+  )
 }
 
 async function deleteOutput(outputId: string): Promise<void> {
@@ -176,13 +197,23 @@ async function getOutputProgress(
   outputId: string
 ): Promise<{ progress: number }> {
   const progress = await spiideoFetch(`/v1/outputs/${outputId}/progress`)
-  return {
-    progress: typeof progress === 'number' ? progress : progress.progress,
+  if (typeof progress === 'number') {
+    return { progress }
   }
+  // Treat a null/empty or unexpected body as 0% rather than throwing. This
+  // poll runs inside the retry ladder — a flaky progress response must stay
+  // in the attempt-counting loop (so the game advances toward GIVE_UP)
+  // instead of escaping to syncGame's catch, which would leave it stuck
+  // without ever incrementing sync_attempts.
+  return { progress: progress?.progress ?? 0 }
 }
 
 async function getDownloadUri(outputId: string): Promise<string> {
-  return spiideoFetch(`/v1/outputs/${outputId}/download-uri`)
+  const uri = await spiideoFetch(`/v1/outputs/${outputId}/download-uri`)
+  if (!uri || typeof uri !== 'string') {
+    throw new Error(`Empty download-uri response for output ${outputId}`)
+  }
+  return uri
 }
 
 // Get all scenes for scene name lookup
