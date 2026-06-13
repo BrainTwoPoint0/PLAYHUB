@@ -35,8 +35,12 @@ resource "aws_s3_bucket_versioning" "recordings" {
 #   90-365 days → Glacier Instant Retrieval    — 83% cheaper, millisecond access
 #   365+ days   → Glacier Flexible Retrieval   — 84% cheaper, 3-5 hour retrieval
 #
-# Recordings older than 1 year are rarely accessed but kept for legal/archival.
-# If a customer needs an old recording, 3-5 hour retrieval is acceptable.
+# Recordings rest at Glacier Instant Retrieval from day 90 — still
+# millisecond GetObject, so signed playback URLs keep working forever.
+# (A previous 365-day Glacier Flexible tier was removed 2026-06-13: it made
+# objects unreadable via plain signed GETs — InvalidObjectState — which
+# breaks Clutch rally-clip browsing and match playback for year-old
+# recordings the UI still lists. The storage saving was ~$0.0004/GB/mo.)
 # ----------------------------------------------------------------------------
 
 resource "aws_s3_bucket_lifecycle_configuration" "recordings" {
@@ -60,12 +64,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "recordings" {
     transition {
       days          = 90
       storage_class = "GLACIER_IR"
-    }
-
-    # After 1 year: move to Glacier Flexible Retrieval (84% cheaper, 3-5hr access)
-    transition {
-      days          = 365
-      storage_class = "GLACIER"
     }
   }
 

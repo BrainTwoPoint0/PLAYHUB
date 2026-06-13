@@ -119,6 +119,8 @@ export async function GET(
       file_size_bytes,
       transferred_at,
       spiideo_game_id,
+      clutch_video_id,
+      clutch_match_stats,
       is_billable,
       billable_amount,
       collected_by,

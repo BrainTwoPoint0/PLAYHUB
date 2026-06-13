@@ -266,11 +266,12 @@ resource "aws_cloudwatch_metric_alarm" "sync_lambda_timeout" {
 # disabled, or silently drifting. If nothing invokes the Lambda for
 # 30 min (two 15-min cron windows), something's wrong with the schedule.
 #
-# `treat_missing_data = "missing"` (not "breaching") so a freshly
-# deployed alarm doesn't phantom-page before the first cron tick has
-# populated any datapoints. Once the Lambda has been invoked at least
-# once the alarm behaves as intended — a zero-invocations window
-# registers as a breaching datapoint, not a missing one.
+# Lambda publishes NO Invocations datapoint for idle periods — the metric
+# goes MISSING, it does not go to zero. With `treat_missing_data =
+# "missing"` the alarm parked in INSUFFICIENT_DATA and could never notify
+# (latent defect since 2026-04-20). "breaching" makes a silent schedule
+# actually page; the one-time cost is a phantom page right after a fresh
+# deploy until the first cron tick, which clears via ok_actions.
 # ----------------------------------------------------------------------------
 resource "aws_cloudwatch_metric_alarm" "sync_lambda_no_invocations" {
   alarm_name          = "${var.project_name}-sync-lambda-no-invocations"
@@ -282,7 +283,7 @@ resource "aws_cloudwatch_metric_alarm" "sync_lambda_no_invocations" {
   statistic           = "Sum"
   threshold           = 1
   alarm_description   = "Sync Lambda has not been invoked for 30 minutes — EventBridge rule may be disabled or deleted"
-  treat_missing_data  = "missing"
+  treat_missing_data  = "breaching"
 
   dimensions = {
     FunctionName = aws_lambda_function.sync_recordings.function_name

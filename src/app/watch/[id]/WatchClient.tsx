@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react'
 import { ShareRecordingModal } from '@/components/ShareRecordingModal'
+import ClutchPanel from './ClutchPanel'
 import {
   Card,
   CardContent,
@@ -100,6 +101,7 @@ interface Recording {
   durationSeconds: number | null
   shareToken: string | null
   thumbnailUrl: string | null
+  isClutch?: boolean
 }
 
 interface WatchClientProps {
@@ -544,6 +546,12 @@ export default function WatchClient({
               </div>
             )}
           </div>
+
+          {/* Clutch AI extras (padel): stats, player labeling, rally clips.
+              Renders nothing for non-clutch recordings. */}
+          {recording.isClutch && (
+            <ClutchPanel recordingId={recording.id} canLabel={canTag} />
+          )}
 
           {/* Match info card — denser than before. Date / pitch / duration /
               competition all surfaced; description below. */}

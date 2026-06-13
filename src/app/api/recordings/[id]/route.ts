@@ -226,7 +226,9 @@ export async function DELETE(
   const serviceClient = createServiceClient()
   const { data: recording } = await (serviceClient as any)
     .from('playhub_match_recordings')
-    .select('organization_id, s3_key, s3_bucket, spiideo_game_id')
+    .select(
+      'organization_id, s3_key, s3_bucket, spiideo_game_id, clutch_video_id, status'
+    )
     .eq('id', id)
     .single()
 
@@ -271,6 +273,22 @@ export async function DELETE(
       console.error(
         'Failed to delete Spiideo game (continuing with S3/DB delete):',
         spiideoErr
+      )
+    }
+  }
+
+  // Cancel a still-scheduled Clutch recording so the camera slot frees up.
+  // No tombstone needed: the clutch-sync Lambda only polls rows we created,
+  // so a deleted row can never resync. Best-effort — a failed cancel just
+  // means the camera records an unsold session.
+  if (recording.clutch_video_id && recording.status === 'scheduled') {
+    try {
+      const { cancelVideo } = await import('@/lib/clutch/client')
+      await cancelVideo(recording.clutch_video_id)
+    } catch (clutchErr) {
+      console.error(
+        'Failed to cancel Clutch recording (continuing with DB delete):',
+        clutchErr
       )
     }
   }

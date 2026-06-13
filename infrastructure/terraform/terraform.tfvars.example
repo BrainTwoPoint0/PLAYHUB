@@ -14,6 +14,10 @@ sync_api_key  = "your-sync-api-key-here"
 # Alert email (you'll need to confirm subscription via email)
 alert_email = "admin@playbacksports.ai"
 
+# Clutch Sync Lambda (padel cameras) — auth is the Clutch account login
+clutch_email    = "your-clutch-account-email"
+clutch_password = "your-clutch-account-password"
+
 # CloudFront Signed URLs (required for main.tf)
 # Generate with: openssl genrsa -out private_key.pem 2048
 #                openssl rsa -in private_key.pem -pubout -out public_key.pem

@@ -1,9 +1,10 @@
 // POST /api/streaming/spiideo/connect - Create Spiideo game + MediaLive channel in one step
 // Can either connect to existing game (gameId) OR create new game (with schedule details)
 
-import { getAuthUser } from '@/lib/supabase/server'
+import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
+import { isPlatformAdmin } from '@/lib/admin/auth'
 import {
   getGame,
   createGame,
@@ -33,6 +34,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
+  // Scenes live in a SHARED Spiideo account — the mapping table is the
+  // tenant boundary. A scene (whether passed directly or reached via an
+  // existing gameId) must be mapped to THIS venue; the zero-mappings
+  // fallback is platform-admin-only, same as the venue scheduling routes.
+  const serviceClient = createServiceClient()
+  const { data: mappings } = await (serviceClient as any)
+    .from('playhub_scene_venue_mapping')
+    .select('scene_id, provider')
+    .eq('organization_id', venueId)
+
+  const allowUnmapped =
+    (mappings || []).length === 0 && (await isPlatformAdmin(user.id))
+  const sceneAllowed = (sceneId: string | undefined) =>
+    allowUnmapped ||
+    (mappings || []).some(
+      (m: any) =>
+        m.scene_id === sceneId && (m.provider || 'spiideo') === 'spiideo'
+    )
+
   try {
     const config = getAccountConfig()
 
@@ -48,6 +68,12 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         )
       }
+      if (!sceneAllowed(game.sceneId)) {
+        return NextResponse.json(
+          { error: 'Game is not on a camera mapped to this venue' },
+          { status: 403 }
+        )
+      }
       gameId = game.id
       gameTitle = game.title
     }
@@ -58,6 +84,12 @@ export async function POST(request: NextRequest) {
       body.scheduledStartTime &&
       body.scheduledStopTime
     ) {
+      if (!sceneAllowed(body.sceneId)) {
+        return NextResponse.json(
+          { error: 'Scene not mapped to this venue' },
+          { status: 403 }
+        )
+      }
       const newGame = await createGame({
         accountId: config.accountId!,
         title: body.title,

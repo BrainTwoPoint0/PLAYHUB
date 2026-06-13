@@ -155,6 +155,42 @@ export async function getFileMetadata(s3Key: string): Promise<{
   }
 }
 
+/**
+ * Read and parse a JSON object from S3. Returns null when the object does
+ * not exist or is unparseable (legitimate absence / corrupt index — callers
+ * degrade). Any OTHER S3 failure (outage, credentials) is rethrown so an
+ * infrastructure problem surfaces as a 5xx instead of masquerading as
+ * "no data".
+ */
+export async function getJsonObject<T = unknown>(
+  s3Key: string
+): Promise<T | null> {
+  let text: string | undefined
+  try {
+    const response = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: S3_BUCKET,
+        Key: s3Key,
+      })
+    )
+    text = await response.Body?.transformToString()
+  } catch (err: any) {
+    const notFound =
+      err?.name === 'NoSuchKey' ||
+      err?.name === 'NotFound' ||
+      err?.$metadata?.httpStatusCode === 404
+    if (notFound) return null
+    throw err
+  }
+  if (!text) return null
+  try {
+    return JSON.parse(text) as T
+  } catch (err) {
+    console.error(`Corrupt JSON object at ${s3Key}:`, err)
+    return null
+  }
+}
+
 // ============================================================================
 // Signed URL Functions
 // ============================================================================

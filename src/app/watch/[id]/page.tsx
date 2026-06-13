@@ -245,6 +245,7 @@ export default async function WatchPage({
         durationSeconds: recording.duration_seconds,
         shareToken: recording.share_token,
         thumbnailUrl: recording.thumbnail_url,
+        isClutch: !!recording.clutch_video_id,
       }}
       resumeSeconds={resumeSeconds}
       videoUrl={videoUrl}

@@ -1,9 +1,13 @@
-// POST /api/venue/[venueId]/spiideo/games - Schedule a new recording in Spiideo
+// POST /api/venue/[venueId]/spiideo/games - Schedule a new recording
+// (Spiideo or Clutch, resolved per camera mapping; URL keeps its historical name)
 
 import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
+import { isPlatformAdmin } from '@/lib/admin/auth'
 import { scheduleRecording } from '@/lib/spiideo/schedule-recording'
+import { scheduleClutchRecording } from '@/lib/clutch/schedule-recording'
+import { ClutchConflictError } from '@/lib/clutch/client'
 
 export async function POST(
   request: NextRequest,
@@ -58,15 +62,24 @@ export async function POST(
 
   const serviceClient = createServiceClient()
 
-  // Verify scene is mapped to this venue (or allow if no mappings exist)
+  // Verify scene is mapped to this venue and resolve which provider owns
+  // the camera. Cameras live in a SHARED Spiideo account, so scheduling on
+  // an unmapped scene is a cross-tenant action — only platform admins may
+  // do it (initial venue setup), and the fallback is Spiideo-only: Clutch
+  // devices must always be explicitly mapped.
   const { data: mappings } = await (serviceClient as any)
     .from('playhub_scene_venue_mapping')
-    .select('scene_id')
+    .select('scene_id, provider')
     .eq('organization_id', venueId)
 
-  if (mappings && mappings.length > 0) {
-    const mappedSceneIds = mappings.map((m: any) => m.scene_id)
-    if (!mappedSceneIds.includes(sceneId)) {
+  let provider: 'spiideo' | 'clutch' = 'spiideo'
+  const mapping = (mappings || []).find((m: any) => m.scene_id === sceneId)
+  if (mapping) {
+    provider = mapping.provider === 'clutch' ? 'clutch' : 'spiideo'
+  } else {
+    const allowUnmapped =
+      (mappings || []).length === 0 && (await isPlatformAdmin(user.id))
+    if (!allowUnmapped) {
       return NextResponse.json(
         { error: 'Scene not mapped to this venue' },
         { status: 403 }
@@ -185,9 +198,8 @@ export async function POST(
   }
 
   try {
-    const result = await scheduleRecording({
+    const sharedInput = {
       venueId,
-      sceneId,
       sceneName: pitchName || 'Pitch',
       durationMinutes,
       title,
@@ -196,11 +208,10 @@ export async function POST(
       // Admin-scheduled recordings are always venue-collected. The QR/Stripe
       // self-service flow (`/api/start/[cameraId]`) is the only path that
       // sets collected_by = 'playhub'.
-      collectedBy: 'venue',
+      collectedBy: 'venue' as const,
       isBillable: isBillable ?? true,
       billableAmount,
       accessEmails,
-      sport,
       homeTeam,
       awayTeam,
       startBufferMs: 0,
@@ -209,8 +220,30 @@ export async function POST(
       marketplaceEnabled,
       priceAmount: priceAmount ? Number(priceAmount) : undefined,
       priceCurrency,
-      graphicPackageId: resolvedGraphicPackageId,
       ownerOrgId,
+    }
+
+    if (provider === 'clutch') {
+      // Clutch Cams are padel-only; graphic packages are a Spiideo concept.
+      const result = await scheduleClutchRecording({
+        ...sharedInput,
+        sceneId,
+        sport: 'padel',
+      })
+
+      return NextResponse.json({
+        success: true,
+        videoId: result.videoId,
+        recordingId: result.recordingId,
+        message: 'Recording scheduled successfully',
+      })
+    }
+
+    const result = await scheduleRecording({
+      ...sharedInput,
+      sceneId,
+      sport,
+      graphicPackageId: resolvedGraphicPackageId,
     })
 
     return NextResponse.json({
@@ -221,12 +254,26 @@ export async function POST(
       message: 'Recording scheduled successfully',
     })
   } catch (error) {
+    if (error instanceof ClutchConflictError) {
+      // conflictingIds may belong to bookings made directly in the Clutch
+      // app by other parties — log them for staff, never return them.
+      console.warn(
+        `Clutch schedule conflict for venue ${venueId}:`,
+        error.conflictingIds
+      )
+      return NextResponse.json(
+        {
+          error:
+            'Time slot conflicts with an existing recording on this camera (it may have been booked directly in the Clutch app)',
+          code: 'SCHEDULE_CONFLICT',
+        },
+        { status: 409 }
+      )
+    }
+    // Provider/DB error internals stay in server logs only.
     console.error('Failed to schedule recording:', error)
     return NextResponse.json(
-      {
-        error: 'Failed to schedule recording',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
+      { error: 'Failed to schedule recording' },
       { status: 500 }
     )
   }

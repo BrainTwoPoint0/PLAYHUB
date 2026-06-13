@@ -29,6 +29,7 @@ import {
 import { LoadingSpinner } from '@/components/ui/loading'
 import { HlsPlayer } from '@/components/streaming/HlsPlayer'
 import { AuditHistory } from '@/components/venue/AuditHistory'
+import { ClutchVenueStats } from '@/components/venue/ClutchVenueStats'
 
 interface Recording {
   id: string
@@ -43,6 +44,16 @@ interface Recording {
   s3_key?: string
   file_size_bytes?: number
   spiideo_game_id?: string
+  clutch_video_id?: string | null
+  clutch_match_stats?: {
+    match_time_minutes?: number
+    match_time_in_play_minutes?: number
+    avg_rally_shots?: number
+    avg_rally_seconds?: number
+    longest_rally_shots?: number
+    longest_rally_seconds?: number
+    players?: number
+  } | null
   is_billable?: boolean
   billable_amount?: number
   collected_by?: string
@@ -114,6 +125,7 @@ interface GroupDashboardData {
 interface Scene {
   id: string
   name: string
+  provider?: 'spiideo' | 'clutch'
 }
 
 interface Admin {
@@ -408,6 +420,7 @@ export default function VenueManagementPage() {
   const [savingEdit, setSavingEdit] = useState(false)
   const [togglingBillable, setTogglingBillable] = useState<string | null>(null)
   const [editingAmountId, setEditingAmountId] = useState<string | null>(null)
+  const [expandedClutchId, setExpandedClutchId] = useState<string | null>(null)
   const [editingAmountValue, setEditingAmountValue] = useState('')
   const [deletingRecording, setDeletingRecording] = useState<string | null>(
     null
@@ -2566,7 +2579,9 @@ export default function VenueManagementPage() {
                                 <SelectContent>
                                   {scenes.map((scene) => (
                                     <SelectItem key={scene.id} value={scene.id}>
-                                      {scene.name}
+                                      {scene.provider === 'clutch'
+                                        ? `${scene.name} (padel)`
+                                        : scene.name}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
@@ -2912,9 +2927,13 @@ export default function VenueManagementPage() {
                             className={`w-full sm:w-auto ${primaryBtnClass}`}
                             onClick={() => {
                               setShowStreamScheduleForm(true)
-                              // Set default scene if available
-                              if (scenes.length > 0 && !streamSceneId) {
-                                setStreamSceneId(scenes[0].id)
+                              // Default to the first streamable scene —
+                              // live streaming is Spiideo-only
+                              const streamable = scenes.find(
+                                (s) => s.provider !== 'clutch'
+                              )
+                              if (streamable && !streamSceneId) {
+                                setStreamSceneId(streamable.id)
                               }
                             }}
                           >
@@ -2953,11 +2972,17 @@ export default function VenueManagementPage() {
                                   <SelectValue placeholder="Select pitch..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {scenes.map((scene) => (
-                                    <SelectItem key={scene.id} value={scene.id}>
-                                      {scene.name}
-                                    </SelectItem>
-                                  ))}
+                                  {/* Live streaming is Spiideo-only */}
+                                  {scenes
+                                    .filter((s) => s.provider !== 'clutch')
+                                    .map((scene) => (
+                                      <SelectItem
+                                        key={scene.id}
+                                        value={scene.id}
+                                      >
+                                        {scene.name}
+                                      </SelectItem>
+                                    ))}
                                 </SelectContent>
                               </Select>
                             </div>
@@ -3237,6 +3262,9 @@ export default function VenueManagementPage() {
           </>
         )}
 
+        {/* Padel analytics (Clutch venues only — self-hiding) */}
+        <ClutchVenueStats venueId={venueId} />
+
         {/* Recordings List */}
         <div className="rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
           <div className="p-6">
@@ -3354,6 +3382,11 @@ export default function VenueManagementPage() {
                               {recording.ownerOrgName}
                             </span>
                           )}
+                          {recording.clutch_video_id && (
+                            <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 flex-shrink-0">
+                              Padel
+                            </span>
+                          )}
                         </div>
                         <p className="text-sm text-muted-foreground">
                           {recording.pitch_name && `${recording.pitch_name} | `}
@@ -3446,6 +3479,30 @@ export default function VenueManagementPage() {
                         )}
                       </div>
                       <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
+                        {recording.clutch_match_stats && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            aria-expanded={expandedClutchId === recording.id}
+                            className={
+                              expandedClutchId === recording.id
+                                ? 'border-emerald-400/40 text-emerald-300'
+                                : outlineBtnClass
+                            }
+                            onClick={() =>
+                              setExpandedClutchId(
+                                expandedClutchId === recording.id
+                                  ? null
+                                  : recording.id
+                              )
+                            }
+                          >
+                            Stats{' '}
+                            <span aria-hidden="true">
+                              {expandedClutchId === recording.id ? '▴' : '▾'}
+                            </span>
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"
@@ -3503,6 +3560,94 @@ export default function VenueManagementPage() {
                         </Button>
                       </div>
                     </div>
+                    {/* Clutch padel stats drill-in */}
+                    {expandedClutchId === recording.id &&
+                      recording.clutch_match_stats && (
+                        <div className="mt-3 pt-3 border-t border-border space-y-3">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                            <div className="p-3 bg-muted rounded-lg">
+                              <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
+                                Match time
+                              </p>
+                              <p className="text-[var(--timberwolf)] font-medium">
+                                {recording.clutch_match_stats
+                                  .match_time_minutes != null
+                                  ? `${Math.round(recording.clutch_match_stats.match_time_minutes)} min`
+                                  : '—'}
+                              </p>
+                            </div>
+                            <div className="p-3 bg-muted rounded-lg">
+                              <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
+                                In play
+                              </p>
+                              <p className="text-[var(--timberwolf)] font-medium">
+                                {recording.clutch_match_stats
+                                  .match_time_in_play_minutes != null
+                                  ? `${Math.round(recording.clutch_match_stats.match_time_in_play_minutes)} min`
+                                  : '—'}
+                              </p>
+                            </div>
+                            <div className="p-3 bg-muted rounded-lg">
+                              <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
+                                Avg rally
+                              </p>
+                              <p className="text-[var(--timberwolf)] font-medium">
+                                {recording.clutch_match_stats.avg_rally_shots !=
+                                null
+                                  ? `${recording.clutch_match_stats.avg_rally_shots} shots`
+                                  : '—'}
+                                {recording.clutch_match_stats
+                                  .avg_rally_seconds != null && (
+                                  <span className="text-muted-foreground">
+                                    {' '}
+                                    ·{' '}
+                                    {Math.round(
+                                      recording.clutch_match_stats
+                                        .avg_rally_seconds
+                                    )}
+                                    s
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                            <div className="p-3 bg-muted rounded-lg">
+                              <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
+                                Longest rally
+                              </p>
+                              <p className="text-[var(--timberwolf)] font-medium">
+                                {recording.clutch_match_stats
+                                  .longest_rally_shots != null
+                                  ? `${recording.clutch_match_stats.longest_rally_shots} shots`
+                                  : '—'}
+                                {recording.clutch_match_stats
+                                  .longest_rally_seconds != null && (
+                                  <span className="text-muted-foreground">
+                                    {' '}
+                                    ·{' '}
+                                    {Math.round(
+                                      recording.clutch_match_stats
+                                        .longest_rally_seconds
+                                    )}
+                                    s
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={outlineBtnClass}
+                            onClick={() =>
+                              router.push(
+                                `/watch/${recording.id}?from=venue:${venueId}`
+                              )
+                            }
+                          >
+                            Watch &amp; full stats →
+                          </Button>
+                        </div>
+                      )}
                     {editingListingId === recording.id && (
                       <div className="mt-3 pt-3 border-t border-border flex flex-col sm:flex-row sm:items-center gap-2">
                         <div className="flex items-center gap-2 flex-wrap">
