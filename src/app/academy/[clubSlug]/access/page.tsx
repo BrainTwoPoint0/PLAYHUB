@@ -818,10 +818,10 @@ export default function AcademyAccessPage() {
                           <div className="text-sm text-[var(--timberwolf)]/90 truncate">
                             {sub.name || 'Unknown'}
                           </div>
-                          <div className="text-[11px] text-muted-foreground/40 truncate">
-                            {sub.email}
+                          <div className="text-[11px] text-muted-foreground/40 truncate flex items-center gap-1.5">
+                            <span className="truncate">{sub.email}</span>
                             {sub.registrationTeam && (
-                              <span className="ml-2 text-muted-foreground/25">
+                              <span className="flex-shrink-0 px-1.5 py-0.5 rounded-full bg-white/[0.06] text-[var(--timberwolf)]/70">
                                 {sub.registrationTeam}
                               </span>
                             )}

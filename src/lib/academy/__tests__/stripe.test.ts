@@ -92,6 +92,7 @@ import {
   getAcademySummary,
   getAcademySubscribers,
   getAcademyRevenue,
+  buildRegistrationTeamMap,
   clearCache,
 } from '../stripe'
 
@@ -599,5 +600,73 @@ describe('getAcademyRevenue', () => {
 
     expect(revenue.totalRevenue).toBe(5000)
     expect(revenue.invoiceCount).toBe(1)
+  })
+})
+
+describe('buildRegistrationTeamMap', () => {
+  it('maps stripe_subscription_id → registration_team (the specific value wins)', () => {
+    const map = buildRegistrationTeamMap([
+      {
+        stripe_subscription_id: 'sub_123',
+        registration_team: 'roehampton-elite-u7',
+        registration_subclub: 'roehampton-elite',
+      },
+    ])
+    expect(map.get('sub_123')).toBe('roehampton-elite-u7')
+  })
+
+  it('falls back to registration_subclub when team is null', () => {
+    const map = buildRegistrationTeamMap([
+      {
+        stripe_subscription_id: 'sub_1',
+        registration_team: null,
+        registration_subclub: 'ela',
+      },
+    ])
+    expect(map.get('sub_1')).toBe('ela')
+  })
+
+  it('skips rows with no subscription id or no team', () => {
+    const map = buildRegistrationTeamMap([
+      { stripe_subscription_id: null, registration_team: 'x', registration_subclub: null },
+      { stripe_subscription_id: 'sub_2', registration_team: null, registration_subclub: null },
+      { stripe_subscription_id: '  ', registration_team: 'y', registration_subclub: null },
+    ])
+    expect(map.size).toBe(0)
+  })
+
+  it('keeps siblings on a shared inbox distinct (keyed by subscription, not email)', () => {
+    // One parent email, two children on different age-group teams — each has
+    // its own Stripe subscription. Keying by subscription id keeps them apart;
+    // an email-keyed map would collapse them and mislabel one.
+    const map = buildRegistrationTeamMap([
+      {
+        stripe_subscription_id: 'sub_u7',
+        registration_team: 'roehampton-elite-u7',
+        registration_subclub: 'roehampton-elite',
+      },
+      {
+        stripe_subscription_id: 'sub_u9',
+        registration_team: 'roehampton-elite-u9',
+        registration_subclub: 'roehampton-elite',
+      },
+    ])
+    expect(map.get('sub_u7')).toBe('roehampton-elite-u7')
+    expect(map.get('sub_u9')).toBe('roehampton-elite-u9')
+  })
+
+  it('resolves DB team over a non-null Stripe value when the sub id is present', () => {
+    // Mirrors the route precedence: dbTeamBySubId.get(id) ?? sub.registrationTeam.
+    const map = buildRegistrationTeamMap([
+      {
+        stripe_subscription_id: 'sub_x',
+        registration_team: 'magic-fc-u11',
+        registration_subclub: 'magic-fc',
+      },
+    ])
+    const stripeDerived = 'some-legacy-team'
+    expect(map.get('sub_x') ?? stripeDerived).toBe('magic-fc-u11')
+    // Missing id → fall back to the Stripe-derived value.
+    expect(map.get('sub_missing') ?? stripeDerived).toBe('some-legacy-team')
   })
 })

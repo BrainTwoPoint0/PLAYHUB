@@ -47,10 +47,12 @@ const HAIKU_OUTPUT_PER_MTOK = 5.0
 // Rules-layer helpers
 // =============================================================================
 
-/** Drop date prefixes like "Match 10 May 2026 -", "10/05 -", "Match 17 May". */
+/** Drop date prefixes like "Match 10 May 2026 -", "Match 10 May -" (no year),
+ *  "10/05 -", "Match 17 May". The year is optional — operators frequently omit
+ *  it ("Match 10 May - Barnes Eagles vs Champs FC"). */
 function stripPrefix(title: string): string {
   return title
-    .replace(/^\s*Match\s+\d{1,2}\s+\w+\s+\d{4}\s*[-:–]\s*/i, '')
+    .replace(/^\s*Match\s+\d{1,2}\s+\w+(?:\s+\d{4})?\s*[-:–]\s*/i, '')
     .replace(/^\s*\d{1,2}\/\d{1,2}\s*[-:–]?\s*/, '')
 }
 
@@ -91,8 +93,20 @@ function findSubclubInSide(
 }
 
 /** Pure rules-only attempt. Returns null when the rules layer can't
- *  fully resolve (caller falls back to LLM). */
-function tryRules(title: string, subclubs: SubclubRef[]): ParsedMatch | null {
+ *  fully resolve (caller falls back to LLM).
+ *
+ *  `teamHint` is the recording's CURRENT Veo team folder (e.g.
+ *  "Barnes Eagles U8"), if any. Operators routinely file a recording into
+ *  one team's folder but title it without an age ("Barnes Eagles vs Champs
+ *  FC"). The folder name carries the age the title omits, so we use it as a
+ *  last-resort age source. Youth home/away share an age group, so one hint
+ *  fills both sides. We only read the AGE from the hint — never the team
+ *  identity (that always comes from the title). */
+function tryRules(
+  title: string,
+  subclubs: SubclubRef[],
+  teamHint?: string
+): ParsedMatch | null {
   const cleaned = stripPrefix(title)
   // Tolerate "vs ", "v ", "vs." — the period variant comes from LYL
   // admins typing prose-style titles.
@@ -107,13 +121,16 @@ function tryRules(title: string, subclubs: SubclubRef[]): ParsedMatch | null {
 
   // Per-side age extraction. Search the SIDE's raw text (still has its
   // kit-colour parens + trailing age qualifier), then fall back to the
-  // other side's age, then to the title-overall age — handles
-  // "X vs Y (U10)" (both sides U10) AND "X (U10) vs Y (U11)" (mixed age).
+  // other side's age, then to the title-overall age, then to the age
+  // embedded in the operator's current folder placement — handles
+  // "X vs Y (U10)" (both sides U10), "X (U10) vs Y (U11)" (mixed age), AND
+  // "X vs Y" filed under a "… U8" folder (age-less title, recovered).
+  const hintAge = teamHint ? findAgeIn(teamHint) : null
   const homeAgeExplicit = findAgeIn(homeRaw)
   const awayAgeExplicit = findAgeIn(awayRaw)
   const titleAge = findAgeIn(title)
-  const homeAge = homeAgeExplicit ?? awayAgeExplicit ?? titleAge
-  const awayAge = awayAgeExplicit ?? homeAgeExplicit ?? titleAge
+  const homeAge = homeAgeExplicit ?? awayAgeExplicit ?? titleAge ?? hintAge
+  const awayAge = awayAgeExplicit ?? homeAgeExplicit ?? titleAge ?? hintAge
 
   // Need ALL four pieces resolved for the rules layer to claim a hit.
   if (!homeSlug || !awaySlug || !homeAge || !awayAge) return null
@@ -350,6 +367,10 @@ Return the parsed result via the parse_match_title tool.`
 export interface ParseRecordingInput {
   title: string
   durationSeconds: number
+  /** Current Veo team folder the recording sits in (e.g. "Barnes Eagles U8"),
+   *  if any. Used by the rules layer purely as a last-resort age source when
+   *  the title omits the age group — never for team identity. */
+  teamHint?: string
   /** Whether to invoke the LLM when rules fail. Default true. Set false
    *  for re-runs that should respect a previous llm_attempted_at without
    *  re-billing. */
@@ -377,7 +398,7 @@ export async function parseRecording(
   }
 
   // 2. Rules-first.
-  const ruleHit = tryRules(input.title, subclubs)
+  const ruleHit = tryRules(input.title, subclubs, input.teamHint)
   if (ruleHit) {
     // Intra-team check happens AFTER parse (handles ELA U11 C vs ELA
     // U11 B style scrimmages). When home === away (slug + age both

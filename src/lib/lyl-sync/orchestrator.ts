@@ -209,7 +209,11 @@ const SUBCLUB_ALIASES: Record<string, string[]> = {
   // bridge. Add both directions of the substring relationship where
   // either form appears in real LYL titles.
   ela: ['Elite London Academy'],
-  taa: ['The A Academy', 'The A academy'],
+  // 'A Academy' is intentionally greedy — operators drop the leading "The".
+  // It's safe today (no other LYL club name contains the substring "a academy";
+  // "Elite London Academy" has "n academy"). RE-AUDIT if a club ending in
+  // "…a Academy" is ever onboarded, as the bare alias would shadow it.
+  taa: ['The A Academy', 'The A academy', 'A Academy', 'A academy'],
   rpt: ['Rugby Portobello Trust', 'Rugby Portobello'],
   'champs-fc': ['Champs FC', 'Champs'],
   nsfc: ['NSFC', 'N.S.F.C', 'N S F C'],
@@ -218,6 +222,11 @@ const SUBCLUB_ALIASES: Record<string, string[]> = {
   forzaskillz: ['Forzaskillz', 'Forza Skillz', 'ForzaSkillz'],
   'london-thames': ['London Thames', 'London Thames FC'],
   'national-harrow': ['National Harrow', 'National Harrow FC'],
+  // Veo titles say just "Magic" while the DB stores "Magic FC".
+  'magic-fc': ['Magic', 'Magic FC', 'Magic Football Club'],
+  // XNP brands itself by the abbreviation, which matches the display name
+  // directly — listed here only to make the bridge explicit for ops.
+  xnp: ['XNP'],
 }
 
 /** Build the SubclubRef catalog the parser uses, from DB display names.
@@ -401,6 +410,9 @@ export async function runSync(
           {
             title: recording.title,
             durationSeconds: recording.duration,
+            // Current Veo folder (e.g. "Barnes Eagles U8") rescues the age
+            // when an operator filed the recording but titled it without one.
+            teamHint: recording.team ?? undefined,
             allowLlmFallback,
           },
           subclubRefs,

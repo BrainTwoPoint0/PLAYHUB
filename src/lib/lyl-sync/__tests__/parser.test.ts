@@ -19,7 +19,7 @@ const SUBCLUBS: SubclubRef[] = [
   {
     slug: 'taa',
     displayName: 'TAA',
-    aliases: ['The A Academy', 'The A academy', 'TAA'],
+    aliases: ['The A Academy', 'The A academy', 'A Academy', 'A academy', 'TAA'],
   },
   { slug: 'ela', displayName: 'ELA', aliases: ['ELA'] },
   { slug: 'lfs', displayName: 'LFS', aliases: ['LFS'] },
@@ -267,6 +267,92 @@ describe('parseRecording — rules layer', () => {
     const ok = expectEligible(r.outcome)
     expect(ok.parsed.home!.subclubSlug).toBe('barnes-eagles')
     expect(ok.parsed.away!.subclubSlug).toBe('champs-fc')
+  })
+
+  it('strips YEAR-LESS Match-date prefix: "Match 10 May - Barnes Eagles vs Champs FC U8"', async () => {
+    const deps = makeDeps()
+    const r = await parseRecording(
+      {
+        title: 'Match 10 May - Barnes Eagles vs Champs FC U8',
+        durationSeconds: 2700,
+      },
+      SUBCLUBS,
+      deps
+    )
+    const ok = expectEligible(r.outcome)
+    expect(ok.parsed.home!.subclubSlug).toBe('barnes-eagles')
+    expect(ok.parsed.away!.subclubSlug).toBe('champs-fc')
+    expect(deps.anthropicCreate).not.toHaveBeenCalled()
+  })
+
+  it('matches "A Academy" to taa (operator drops the leading "The"): "RPT U8 VS A Academy U8"', async () => {
+    const deps = makeDeps()
+    const r = await parseRecording(
+      { title: 'RPT U8 VS A Academy U8', durationSeconds: 2700 },
+      SUBCLUBS,
+      deps
+    )
+    const ok = expectEligible(r.outcome)
+    expect(ok.parsed.home).toEqual({ subclubSlug: 'rpt', ageGroup: 'u8' })
+    expect(ok.parsed.away).toEqual({ subclubSlug: 'taa', ageGroup: 'u8' })
+    expect(deps.anthropicCreate).not.toHaveBeenCalled()
+  })
+
+  it('recovers a MISSING age from the current Veo folder (teamHint): "Forza skillz vs Barnes Eagles" filed under "Barnes Eagles U8"', async () => {
+    const deps = makeDeps()
+    const r = await parseRecording(
+      {
+        title: '10/05 Forza skillz vs Barnes Eagles',
+        durationSeconds: 2700,
+        teamHint: 'Barnes Eagles U8',
+      },
+      SUBCLUBS,
+      deps
+    )
+    const ok = expectEligible(r.outcome)
+    // Age comes from the folder; both youth sides share it.
+    expect(ok.parsed.home).toEqual({ subclubSlug: 'forzaskillz', ageGroup: 'u8' })
+    expect(ok.parsed.away).toEqual({ subclubSlug: 'barnes-eagles', ageGroup: 'u8' })
+    expect(ok.parsed.method).toBe('rules')
+    expect(deps.anthropicCreate).not.toHaveBeenCalled()
+  })
+
+  it('an EXPLICIT title age still wins over the folder hint', async () => {
+    const deps = makeDeps()
+    const r = await parseRecording(
+      {
+        title: 'Barnes Eagles U10 vs Champs FC U10',
+        durationSeconds: 2700,
+        teamHint: 'Barnes Eagles U8', // stale/wrong folder must not override
+      },
+      SUBCLUBS,
+      deps
+    )
+    const ok = expectEligible(r.outcome)
+    expect(ok.parsed.home!.ageGroup).toBe('u10')
+    expect(ok.parsed.away!.ageGroup).toBe('u10')
+  })
+
+  it('an age-less title with NO folder hint stays unparseable (never invents an age)', async () => {
+    // Without a hint the rules layer must NOT guess — it falls through to the
+    // LLM (mocked here to also decline), landing unparseable.
+    const deps = makeDeps({
+      anthropicCreate: vi.fn(async () =>
+        makeToolUseResponse({
+          home_subclub_slug: 'barnes-eagles',
+          home_age_group: null,
+          away_subclub_slug: 'champs-fc',
+          away_age_group: null,
+          confidence: 0.5,
+        })
+      ),
+    })
+    const r = await parseRecording(
+      { title: 'Barnes Eagles vs Champs FC', durationSeconds: 2700 },
+      SUBCLUBS,
+      deps
+    )
+    expectUnparseable(r.outcome)
   })
 
   it('detects intra-team scrimmage: "ELA U11 C vs ELA U11 B"', async () => {

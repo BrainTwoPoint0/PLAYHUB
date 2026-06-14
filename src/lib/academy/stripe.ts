@@ -64,6 +64,47 @@ export interface AcademyRevenue {
   invoiceCount: number
 }
 
+// Row shape from playhub_academy_subscriptions used to recover the team a
+// parent chose at checkout.
+export interface RegistrationTeamRow {
+  stripe_subscription_id: string | null
+  registration_team: string | null
+  registration_subclub: string | null
+}
+
+/**
+ * Build a stripe_subscription_id → team-label map from
+ * playhub_academy_subscriptions rows.
+ *
+ * Why this exists: getAcademySubscribers() can only recover the team from a
+ * Stripe checkout session's legacy `teamname` custom field, which the
+ * Payment-Link clubs (SEFA/CFA) use. The unified academy checkout (LYL) passes
+ * the team via Stripe `metadata.team_slug` instead — invisible to that path —
+ * but the webhook persists it to playhub_academy_subscriptions. Reading it
+ * back here lets the access view show the team for those subscribers too.
+ *
+ * Keyed by stripe_subscription_id (UNIQUE + immutable on both sides), NOT by
+ * email: a parent can change their email in the Stripe portal (breaking an
+ * email join) and family inboxes are routinely shared across siblings on
+ * different age-group teams (an email join would collapse them and mislabel
+ * one). The subscription id is the only stable 1:1 correlation key.
+ *
+ * Prefers registration_team (most specific, e.g. "roehampton-elite-u7"),
+ * falling back to registration_subclub. Rows without a subscription id or any
+ * team are skipped.
+ */
+export function buildRegistrationTeamMap(
+  rows: readonly RegistrationTeamRow[]
+): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const row of rows) {
+    const subId = (row.stripe_subscription_id ?? '').trim()
+    const team = row.registration_team ?? row.registration_subclub
+    if (subId && team) map.set(subId, team)
+  }
+  return map
+}
+
 // ============================================================================
 // Cache (in-memory, 5-minute TTL)
 // ============================================================================

@@ -10,6 +10,7 @@ import { getCachedClubData } from '@/lib/veo/cache'
 import {
   getAcademySubscribers,
   getSubscribersByProduct,
+  buildRegistrationTeamMap,
   clearCache,
 } from '@/lib/academy/stripe'
 
@@ -66,11 +67,31 @@ export async function GET(
     const productIds = getAllProductIds(club)
     const additionalIds = productIds.slice(1) // skip primary (fetched via clubSlug)
 
-    const [cachedRes, primaryRes, additionalRes] = await Promise.allSettled([
-      getCachedClubData(clubSlug),
-      getAcademySubscribers(clubSlug),
-      Promise.all(additionalIds.map((pid) => getSubscribersByProduct(pid))),
-    ])
+    const [cachedRes, primaryRes, additionalRes, dbTeamRes] =
+      await Promise.allSettled([
+        getCachedClubData(clubSlug),
+        getAcademySubscribers(clubSlug),
+        Promise.all(additionalIds.map((pid) => getSubscribersByProduct(pid))),
+        // Registration teams for unified-checkout clubs (LYL): they pass the
+        // team via Stripe metadata, invisible to the subscriber path above,
+        // but the webhook persists it to playhub_academy_subscriptions. Read
+        // it back here so the team shows for those subscribers. Keyed by
+        // stripe_subscription_id (not email — see buildRegistrationTeamMap).
+        // Runs in the fan-out (not sequentially after it) so it's off the
+        // warm-Stripe-cache critical path. NON-CRITICAL: deliberately kept out
+        // of the 500 ladder below — on failure we fall back to the Stripe-
+        // derived team.
+        (async () => {
+          const serviceClient = createServiceClient() as any
+          const { data: dbSubs } = await serviceClient
+            .from('playhub_academy_subscriptions')
+            .select(
+              'stripe_subscription_id, registration_team, registration_subclub'
+            )
+            .eq('club_slug', clubSlug)
+          return buildRegistrationTeamMap(dbSubs ?? [])
+        })(),
+      ])
 
     // Log every rejection up front — when multiple legs fail, the first-
     // rejection-wins branch ladder below would otherwise swallow the others
@@ -80,6 +101,7 @@ export async function GET(
       ['getCachedClubData', cachedRes],
       ['getAcademySubscribers', primaryRes],
       ['getSubscribersByProduct', additionalRes],
+      ['registrationTeams', dbTeamRes],
     ] as const) {
       if (res.status === 'rejected') {
         const msg =
@@ -139,6 +161,13 @@ export async function GET(
     // Merge all subscribers, dedup by email (keep first/best match)
     const subscribers = [...primarySubs, ...additionalSubs.flat()]
 
+    // Non-critical leg (see fan-out above): fall back to the Stripe-derived
+    // team on failure. Rejection is already logged in the loop above.
+    const dbTeamBySubId =
+      dbTeamRes.status === 'fulfilled'
+        ? dbTeamRes.value
+        : new Map<string, string>()
+
     if (!cachedData) {
       return NextResponse.json(
         {
@@ -177,7 +206,8 @@ export async function GET(
           subsByEmail.set(email, {
             status: sub.status,
             isScholarship: sub.isScholarship,
-            registrationTeam: sub.registrationTeam,
+            registrationTeam:
+              dbTeamBySubId.get(sub.subscriptionId) ?? sub.registrationTeam,
           })
         }
       }
@@ -258,7 +288,8 @@ export async function GET(
           name: sub.customerName ?? null,
           status: sub.status,
           isScholarship: sub.isScholarship,
-          registrationTeam: sub.registrationTeam,
+          registrationTeam:
+            dbTeamBySubId.get(sub.subscriptionId) ?? sub.registrationTeam,
         })
       }
     }
