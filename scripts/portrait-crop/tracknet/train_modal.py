@@ -29,6 +29,7 @@ image = (
         "torch==2.1.1", "torchvision==0.16.1", "opencv-python==4.8.1.78",
         "numpy==1.26.2", "pandas==2.1.3", "pyyaml==6.0.1", "tqdm==4.66.1",
         "tensorboardX==2.6.2.2", "matplotlib==3.8.2", "torchsummary==1.5.1",
+        "albumentations==1.3.1", "scikit-image==0.22.0",
     )
     .add_local_dir(str(ROOT / "vendor"), "/work/vendor")
     .add_local_dir(str(ROOT / "dataset"), "/work/dataset")
@@ -44,6 +45,11 @@ def train(epochs: int = 20, imgsz_h: int = 720, imgsz_w: int = 1280,
     import subprocess
 
     os.chdir("/work/vendor")
+    # best.pt/last.pt save to {project}=/out/runs (volume, correct). The vendor's
+    # checkpoint save (train.py:156) wrongly prefixes ABS_ROOT to an absolute ckpt
+    # dir → /work/vendor//out/runs/checkpoint and never creates it. Pre-create it.
+    Path("/out/runs").mkdir(parents=True, exist_ok=True)
+    Path("/work/vendor/out/runs/checkpoint").mkdir(parents=True, exist_ok=True)
     # Point the mounted match.yaml at the container dataset path.
     yp = Path("/work/dataset/match.yaml")
     body = "\n".join(l for l in yp.read_text().splitlines() if not l.startswith("path:"))
@@ -55,8 +61,11 @@ def train(epochs: int = 20, imgsz_h: int = 720, imgsz_w: int = 1280,
     if weights:
         cmd += ["--weights", weights]
     print("RUN:", " ".join(cmd), flush=True)
-    subprocess.run(cmd, check=True)
-    vol.commit()
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    print("===== train.py STDOUT (tail) =====\n" + (res.stdout or "")[-6000:], flush=True)
+    print("===== train.py STDERR (tail) =====\n" + (res.stderr or "")[-6000:], flush=True)
+    vol.commit()  # persist any weights saved to /out before raising on failure
+    res.check_returncode()
     print("Done — weights under the 'tracknet-weights' volume at /out/runs", flush=True)
 
 

@@ -114,9 +114,10 @@ function detectBall(videoPath: string): DetectionResult {
         maxBuffer: 10 * 1024 * 1024,
       })
 
-  // Python script outputs JSON to stdout, logs to stderr
-  const lines = output.trim().split('\n')
-  const jsonLine = lines[lines.length - 1] // Last line is the JSON
+  // A CROP_RAW_JSON cache file is the full JSON (may be multi-line, e.g.
+  // Modal-generated). Detector stdout interleaves logs, so the JSON is the last
+  // line. Parse whichever applies.
+  const jsonLine = cacheFile ? output : output.trim().split('\n').pop()!
   const raw: {
     positions: Array<{
       time: number

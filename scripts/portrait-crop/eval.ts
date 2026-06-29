@@ -142,9 +142,11 @@ function runDetection(
   if (useModal) {
     const modalUrl = process.env.NEXT_PUBLIC_MODAL_CROP_URL
     if (!modalUrl) throw new Error('NEXT_PUBLIC_MODAL_CROP_URL not set')
+    const sharedSecret = process.env.MODAL_SHARED_SECRET
+    if (!sharedSecret) throw new Error('MODAL_SHARED_SECRET not set')
     // Match Modal's 10-min function timeout; curl gets one extra minute of slack.
     const result = execSync(
-      `curl -s --max-time 660 -X POST "${modalUrl}" --data-binary @"${videoPath}" -H "Content-Type: application/octet-stream"`,
+      `curl -s --max-time 660 -X POST "${modalUrl}" --data-binary @"${videoPath}" -H "Content-Type: application/octet-stream" -H "X-Modal-Auth: ${sharedSecret}"`,
       { maxBuffer: 50 * 1024 * 1024, timeout: 700_000 }
     )
     return JSON.parse(result.toString())
@@ -293,9 +295,18 @@ function detectionRecallAtPrecision(
   const hits: { conf: number; matched: boolean }[] = []
   const matchedGt = new Set<number>()
 
+  // Only judge detections within the labeled GT time range. Otherwise, on a
+  // partially-labeled clip (GT truncated via --max-frame), every detection in the
+  // unlabeled span is counted as a false positive — tanking precision and forcing
+  // recall@p to ~0. We have no ground truth there, so those detections are ignored.
+  const gtTimes = gt.frames.map((f) => f.t)
+  const gtMinT = Math.min(...gtTimes)
+  const gtMaxT = Math.max(...gtTimes)
+
   // Sort detections by confidence desc for greedy matching.
   const ballDets = detections
     .filter((d) => d.source === 'ball')
+    .filter((d) => d.time >= gtMinT - labelStep && d.time <= gtMaxT + labelStep)
     .slice()
     .sort((a, b) => b.conf - a.conf)
 
