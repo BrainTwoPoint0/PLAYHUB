@@ -1,5 +1,13 @@
 {
   "clip_id": "veo_20250927_cfa_u9_freekick_01",
+  "match_id": "20250927-cfa-u9-yellow-vs-valley-green-ba185d64",
+  "source": "veo_academy_cfa",
+  "provenance": {
+    "method": "human_label",
+    "cvat_export": "veo_20250927_cfa_u9_freekick_01.xml",
+    "stamped_at": "2026-06-29T13:36:21.598Z",
+    "note": "backfilled seed label"
+  },
   "dense": true,
   "label_fps": 29.97002997002997,
   "source_fps": 29.97002997002997,

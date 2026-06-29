@@ -1,5 +1,13 @@
 {
   "clip_id": "veo_20260505_sefa_u19_goal_01",
+  "match_id": "20260505-training-soccer-elite-fa-u19-vfc429e3",
+  "source": "veo_academy_sefa",
+  "provenance": {
+    "method": "human_label",
+    "cvat_export": "veo_20260505_sefa_u19_goal_01.xml",
+    "stamped_at": "2026-06-29T13:36:21.598Z",
+    "note": "backfilled seed label"
+  },
   "dense": true,
   "label_fps": 29.97002997002997,
   "source_fps": 29.97002997002997,

@@ -1,5 +1,13 @@
 {
   "clip_id": "veo_20260502_passage_01",
+  "match_id": "20260502-untitled-recording-2026-05-02_12-04-05-ve3415dd",
+  "source": "veo_academy",
+  "provenance": {
+    "method": "human_label",
+    "cvat_export": "veo_20260502_passage_01.xml",
+    "stamped_at": "2026-06-29T13:36:21.598Z",
+    "note": "backfilled seed label"
+  },
   "dense": true,
   "label_fps": 29.97002997002997,
   "source_fps": 29.97002997002997,
