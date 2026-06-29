@@ -238,6 +238,8 @@ const SG_POLY_ORDER = 2
 // brief airborne loft the ball is genuinely undetectable (~10%), so it may leave
 // frame for ~1s — but it stays in frame the rest of the time (open play).
 const FRAME_CENTER_X = SRC_W / 2 // 960 — fallback before the first ball
+const TELEPORT_PX = 350 // reject implausible ball jumps (distractor teleports) — hold instead...
+const REACQUIRE_FRAMES = 5 // ...unless the far position persists this many frames (real relocation)
 
 /**
  * Savitzky-Golay smoothing with boundary-adaptive (asymmetric) windows.
@@ -458,8 +460,27 @@ function smoothPositions(
   // Follow the ball (and its Kalman-tracked continuation). HOLD the last ball
   // position when the ball is lost — do NOT drift to cluster/center.
   let lastX = positions[0]?.x ?? FRAME_CENTER_X
+  let pendingX: number | null = null // a far candidate awaiting confirmation
+  let pendingCount = 0
   const rawPositions = positions.map((p) => {
-    if (p.source === 'ball' || p.source === 'tracked') lastX = p.x
+    if (p.source === 'ball' || p.source === 'tracked') {
+      if (Math.abs(p.x - lastX) <= TELEPORT_PX) {
+        lastX = p.x // normal motion — follow
+        pendingX = null
+        pendingCount = 0
+      } else if (pendingX !== null && Math.abs(p.x - pendingX) <= TELEPORT_PX) {
+        pendingCount++ // a far position that keeps appearing — likely a real relocation
+        pendingX = p.x
+        if (pendingCount >= REACQUIRE_FRAMES) {
+          lastX = p.x
+          pendingX = null
+          pendingCount = 0
+        }
+      } else {
+        pendingX = p.x // first big jump — treat as a distractor, HOLD lastX
+        pendingCount = 1
+      }
+    }
     const cx = Math.round(lastX - CROP_W / 2)
     return {
       time: p.time,
