@@ -21,7 +21,7 @@ import os
 
 # Bumped on breaking changes to the response schema so routes can correlate
 # a job with the Modal code that produced it.
-MODAL_APP_VERSION = "2026.06.29.1"  # 10fps detection (was 25) — editor auto-crop latency
+MODAL_APP_VERSION = "2026.06.29.2"  # 25fps detection — accuracy (fast-play keyframes)
 
 app = modal.App("playhub")
 
@@ -171,11 +171,13 @@ async def portrait_crop_process(request: fastapi.Request):
 
         import time as _time
         t0 = _time.monotonic()
-        # Sample at 10fps. The crop's Savitzky-Golay smoothing + the editor's
-        # keyframe interpolation reconstruct a smooth track between samples, so
-        # 10fps is plenty for crop position while cutting detection ~2.5x vs 25fps
-        # — the per-clip latency that gates the editor's auto-crop UX.
-        result = detect_ball(tmp_path, output_fps=10.0)
+        # Sample at 25fps for accuracy. 10fps lost fast plays where the ball is
+        # briefly lost (Kalman drifts the wrong way before re-acquiring) — e.g. a
+        # quick switch of play producing a missing keyframe. 25fps gives ~2.5x more
+        # re-acquisition chances; the wait (~75-90s) is acceptable for an occasional
+        # "post this goal" action behind the editor's detection overlay, and the
+        # result is cached so every later open of the same clip is instant.
+        result = detect_ball(tmp_path, output_fps=25.0)
         modal_inference_ms = int((_time.monotonic() - t0) * 1000)
 
         # Extend the response schema so downstream routes can persist

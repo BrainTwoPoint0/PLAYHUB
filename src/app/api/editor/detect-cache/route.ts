@@ -12,6 +12,11 @@ import {
 
 export const dynamic = 'force-dynamic'
 
+// The detector version whose cached detections are still valid. A bump here (e.g.
+// 10fps -> 25fps for fast-play accuracy) supersedes older cached rows: they re-detect
+// on next open and re-cache. Keep in sync with modal_app.py's MODAL_APP_VERSION.
+const CURRENT_DETECTION_VERSION = '2026.06.29.2'
+
 export async function GET(request: NextRequest) {
   try {
     const { user } = await getAuthUser()
@@ -43,6 +48,12 @@ export async function GET(request: NextRequest) {
     }
     if (!data) {
       return NextResponse.json({ cached: false }, { status: 404 })
+    }
+
+    // Stale detector version → treat as a miss so the editor re-detects with the
+    // current model (e.g. the 25fps accuracy pass) and re-caches.
+    if (data.modal_app_version !== CURRENT_DETECTION_VERSION) {
+      return NextResponse.json({ cached: false, stale: true }, { status: 404 })
     }
 
     // Return the stored detection as-is (same shape as the Modal response) so the
