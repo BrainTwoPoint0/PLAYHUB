@@ -4,6 +4,7 @@ import {
   rdpSimplify,
   detectSceneCuts,
   filterZigzags,
+  filterSustainedDistractor,
 } from '../simplify'
 import type { CropKeyframe } from '../types'
 
@@ -15,6 +16,49 @@ function kf(
 ): CropKeyframe {
   return { time, x, source, confidence }
 }
+
+// Keyframe with bbox area + un-clamped ball-x (for the distractor-size discriminator).
+function kfA(
+  time: number,
+  ballX: number,
+  area: number,
+  conf = 0.8
+): CropKeyframe {
+  const x = Math.max(0, Math.min(1312, ballX - 304))
+  return { time, x, source: 'ai_ball', confidence: conf, area, ballX }
+}
+
+// Test the discriminator in isolation (downstream RDP/dedup legitimately merge small
+// movements, which would confound an end-to-end assertion).
+describe('filterSustainedDistractor (smaller ball on another pitch)', () => {
+  it('drops a sustained run of small, off-trajectory detections', () => {
+    const kfs: CropKeyframe[] = []
+    for (let i = 0; i < 12; i++) kfs.push(kfA(i * 0.1, 500 + i * 5, 176)) // real ball
+    for (let i = 0; i < 10; i++) kfs.push(kfA(1.2 + i * 0.1, 1540, 26)) // distractor: small + displaced
+    for (let i = 0; i < 6; i++) kfs.push(kfA(2.2 + i * 0.1, 560 + i * 5, 176)) // back to real
+    const result = filterSustainedDistractor(kfs)
+    expect(result.every((k) => (k.ballX ?? 0) !== 1540)).toBe(true)
+    expect(result.length).toBe(18) // 28 in − 10 distractor frames
+  })
+
+  it('keeps a REAL ball that recedes gradually (size shrinks, stays on line)', () => {
+    const kfs: CropKeyframe[] = []
+    for (let i = 0; i < 12; i++) kfs.push(kfA(i * 0.1, 500, 176))
+    const areas = [160, 140, 120, 105, 92, 80, 72, 66, 60, 56]
+    areas.forEach((a, i) => kfs.push(kfA(1.2 + i * 0.1, 520 + i * 8, a)))
+    const result = filterSustainedDistractor(kfs)
+    expect(result.length).toBe(kfs.length) // nothing culled — gradual recede stays on line
+  })
+
+  it('keeps small detections that stay ON the trajectory (real far ball mid-clip)', () => {
+    const kfs: CropKeyframe[] = []
+    for (let i = 0; i < 8; i++) kfs.push(kfA(i * 0.1, 400 + i * 30, 176))
+    for (let i = 0; i < 10; i++) kfs.push(kfA(0.8 + i * 0.1, 640 + i * 30, 60)) // small but on-line
+    for (let i = 0; i < 8; i++) kfs.push(kfA(1.8 + i * 0.1, 940 + i * 30, 176))
+    const result = filterSustainedDistractor(kfs)
+    expect(result.length).toBe(kfs.length) // on-trajectory small ball survives the displacement gate
+  })
+})
 
 describe('detectSceneCuts', () => {
   it('detects large x jumps as scene cuts', () => {

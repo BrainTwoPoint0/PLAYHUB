@@ -10,6 +10,13 @@ const DEFAULTS = {
   OUTLIER_JUMP_THRESHOLD: 200, // ...and this much deviation = outlier
   TELEPORT_PX: 350, // px — a single-frame jump beyond this that reverts (deviates from
   // both neighbors while they agree) is a distractor ball, rejected regardless of confidence
+  // Sustained distractor-ball rejection (a ball on another pitch — farther, ~7x smaller —
+  // tracked for a stretch). All three gates must hold so a genuinely-far REAL ball survives.
+  SIZE_DROP_RATIO: 0.45, // area below this × trailing-median = size-suspect
+  SIZE_MEDIAN_WINDOW: 25, // trailing real-area ai_ball detections for the median
+  SIZE_MIN_REAL_REFS: 5, // need this many real-area refs or don't cull (weak evidence)
+  DISTRACTOR_DISPLACE_PX: 120, // ball-x deviation from the on-trajectory interpolation
+  DISTRACTOR_MIN_FRAMES: 8, // a run must be at least this long (above the spike domain)
   RDP_TOLERANCE: 90, // px — how much deviation to tolerate in simplification
   ZIGZAG_THRESHOLD: 130, // px — direction reversals smaller than this get removed
   NEAR_DUPLICATE_TIME: 0.8, // seconds — merge points closer than this...
@@ -33,6 +40,11 @@ const SCENE_CUT_MARGIN = DEFAULTS.SCENE_CUT_MARGIN
 const OUTLIER_CONF_THRESHOLD = DEFAULTS.OUTLIER_CONF_THRESHOLD
 const OUTLIER_JUMP_THRESHOLD = DEFAULTS.OUTLIER_JUMP_THRESHOLD
 const TELEPORT_PX = DEFAULTS.TELEPORT_PX
+const SIZE_DROP_RATIO = DEFAULTS.SIZE_DROP_RATIO
+const SIZE_MEDIAN_WINDOW = DEFAULTS.SIZE_MEDIAN_WINDOW
+const SIZE_MIN_REAL_REFS = DEFAULTS.SIZE_MIN_REAL_REFS
+const DISTRACTOR_DISPLACE_PX = DEFAULTS.DISTRACTOR_DISPLACE_PX
+const DISTRACTOR_MIN_FRAMES = DEFAULTS.DISTRACTOR_MIN_FRAMES
 
 /**
  * Detect scene cuts from keyframe jumps and explicit scene_changes.
@@ -185,6 +197,89 @@ function filterOutliers(keyframes: CropKeyframe[]): CropKeyframe[] {
 
     return true
   })
+}
+
+/**
+ * Reject SUSTAINED distractor-ball segments — a ball on another pitch (farther, hence
+ * much smaller) that the tracker locked onto for a stretch. The single-frame spike rule
+ * can't catch it: consecutive keyframes ARE the distractor, so neighbours agree. Three
+ * gates, ALL required, so a genuinely-far REAL ball survives:
+ *   1. size-suspect — real bbox area < SIZE_DROP_RATIO × trailing median real-ball area
+ *   2. off-trajectory — ball-x deviates > DISTRACTOR_DISPLACE_PX from the interpolation
+ *      between the real-sized anchors bracketing the run
+ *   3. sustained — the contiguous suspect run is ≥ DISTRACTOR_MIN_FRAMES
+ * Qualifying runs are dropped; downstream gap-fill spans them (better than the crop
+ * sitting on the wrong pitch). A real far ball shrinks GRADUALLY (the trailing median
+ * follows it down, never tripping gate 1) and stays ON its line (never tripping gate 2).
+ */
+export function filterSustainedDistractor(
+  keyframes: CropKeyframe[]
+): CropKeyframe[] {
+  if (keyframes.length < DISTRACTOR_MIN_FRAMES + 2) return keyframes
+
+  // Trailing median of recent NON-suspect real-ball areas. Excluding suspects is the
+  // crux: a long distractor run must not feed its own small areas into the median, or it
+  // would normalise itself and stop being flagged partway through. A gradually-receding
+  // REAL ball IS added (each step stays above the ratio), so the median follows it down
+  // — that's what keeps a genuinely-far ball from being culled.
+  const recent: number[] = []
+  const median = (): number | null => {
+    if (recent.length < SIZE_MIN_REAL_REFS) return null // weak evidence — don't cull
+    const a = [...recent].sort((x, y) => x - y)
+    const mid = Math.floor(a.length / 2)
+    return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2
+  }
+
+  const suspect = keyframes.map((k) => {
+    if (k.source !== 'ai_ball' || typeof k.area !== 'number' || k.area <= 0)
+      return false
+    const med = median()
+    const isSuspect = med !== null && k.area < SIZE_DROP_RATIO * med
+    if (!isSuspect) {
+      recent.push(k.area)
+      if (recent.length > SIZE_MEDIAN_WINDOW) recent.shift()
+    }
+    return isSuspect
+  })
+
+  const ax = (k: CropKeyframe) => (typeof k.ballX === 'number' ? k.ballX : k.x)
+  const drop = new Array<boolean>(keyframes.length).fill(false)
+
+  let i = 0
+  while (i < keyframes.length) {
+    if (!suspect[i]) {
+      i++
+      continue
+    }
+    let j = i
+    while (j + 1 < keyframes.length && suspect[j + 1]) j++
+
+    if (j - i + 1 >= DISTRACTOR_MIN_FRAMES) {
+      const before = i - 1 >= 0 ? keyframes[i - 1] : null
+      const after = j + 1 < keyframes.length ? keyframes[j + 1] : null
+      const devs: number[] = []
+      for (let r = i; r <= j; r++) {
+        const k = keyframes[r]
+        let expected: number | null = null
+        if (before && after) {
+          const span = after.time - before.time || 1
+          expected =
+            ax(before) +
+            (ax(after) - ax(before)) * ((k.time - before.time) / span)
+        } else if (before) expected = ax(before)
+        else if (after) expected = ax(after)
+        if (expected !== null) devs.push(Math.abs(ax(k) - expected))
+      }
+      devs.sort((a, b) => a - b)
+      const medDev = devs.length ? devs[Math.floor(devs.length / 2)] : 0
+      if (medDev > DISTRACTOR_DISPLACE_PX) {
+        for (let r = i; r <= j; r++) drop[r] = true
+      }
+    }
+    i = j + 1
+  }
+
+  return keyframes.filter((_, idx) => !drop[idx])
 }
 
 /**
@@ -810,8 +905,13 @@ export function simplifyCropKeyframes(
   // Step 1: Filter outliers
   const filtered = filterOutliers(aiKfs)
 
+  // Step 1.5: Reject sustained distractor-ball segments (a smaller ball on another
+  // pitch tracked for a stretch). Before scene-cut detection so a distractor run can't
+  // manufacture a fake cut. The spike rule can't catch this — neighbours agree.
+  const deDistracted = filterSustainedDistractor(filtered)
+
   // Step 2: Filter clusters that deviate from surrounding ball detections
-  const clusterFiltered = filterSuspiciousClusters(filtered)
+  const clusterFiltered = filterSuspiciousClusters(deDistracted)
 
   // Step 2b: Dead zone — collapse jittery cluster sequences and rapid-fire ball bursts
   const deadZoned = filterDeadZone(clusterFiltered)

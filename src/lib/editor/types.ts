@@ -58,6 +58,8 @@ export interface CropKeyframe {
   x: number // crop left edge (0 to SOURCE_WIDTH - CROP_WIDTH)
   source: 'ai_ball' | 'ai_tracked' | 'ai_cluster' | 'user'
   confidence: number
+  area?: number // bbox px² for real ai_ball detections; undefined for tracked/cluster/hold
+  ballX?: number // un-clamped ball-centre x (cropX clamps at edges, hiding displacement)
 }
 
 export const SOURCE_WIDTH = 1920
@@ -86,6 +88,9 @@ export function detectionsToCropKeyframes(
             : ('ai_cluster' as const),
       // Clusters use player centroid — less reliable than ball detection
       confidence: p.source === 'cluster' ? 0.4 : p.conf,
+      // Carry bbox area (distractor-ball discriminator) + un-clamped x (trajectory test).
+      area: p.w && p.h ? p.w * p.h : undefined,
+      ballX: p.x,
     }))
 }
 
