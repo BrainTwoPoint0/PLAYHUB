@@ -1,5 +1,13 @@
 {
   "clip_id": "veo_20240918_goalkick_01",
+  "match_id": "20240918-match-18-sep-2024-20de1d37",
+  "source": "veo_academy",
+  "provenance": {
+    "method": "human_label",
+    "cvat_export": "veo_20240918_goalkick_01.xml",
+    "stamped_at": "2026-06-29T13:36:21.598Z",
+    "note": "backfilled seed label"
+  },
   "dense": true,
   "label_fps": 29.97002997002997,
   "source_fps": 29.97002997002997,

@@ -1,5 +1,13 @@
 {
   "clip_id": "veo_20260506_hb_cupfinal_goal_01",
+  "match_id": "20260506-hollands-blair-u23-vs-ta-cup-final-v471daec",
+  "source": "veo_academy_hollands_blair",
+  "provenance": {
+    "method": "human_label",
+    "cvat_export": "veo_20260506_hb_cupfinal_goal_01.xml",
+    "stamped_at": "2026-06-29T13:36:21.598Z",
+    "note": "backfilled seed label"
+  },
   "dense": true,
   "label_fps": 29.97002997002997,
   "source_fps": 29.97002997002997,

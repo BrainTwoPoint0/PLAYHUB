@@ -170,8 +170,32 @@ const inferredLabelFps = dense
       Math.round(sourceFps / Math.max(1, frames[1].frame - frames[0].frame))
     : 5
 
+// Stamp provenance from the manifest so each label is self-describing: match_id
+// (the by-match leakage-guard key), source (per-source oracle reporting), and how
+// it was produced. A correction that lands here is then a leak-safe training label.
+const manifestPath = path.join(path.dirname(outPath!), '..', 'manifest.json')
+let matchId = clipId!
+let source = 'unknown'
+try {
+  const mani = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+  const entry = (mani.clips || []).find((c: { id: string }) => c.id === clipId)
+  if (entry) {
+    matchId = entry.match_id ?? clipId!
+    source = entry.source ?? 'unknown'
+  }
+} catch {
+  /* manifest optional — fall back to clip_id / unknown */
+}
+
 const output = {
   clip_id: clipId,
+  match_id: matchId,
+  source,
+  provenance: {
+    method: 'human_override',
+    cvat_export: path.basename(cvatPath!),
+    stamped_at: new Date().toISOString(),
+  },
   dense,
   label_fps: inferredLabelFps,
   source_fps: sourceFps,

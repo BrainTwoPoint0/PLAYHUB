@@ -61,6 +61,7 @@ image = (
         "numpy",
         "scipy",
         "sahi",
+        "supervision==0.26.1",
         "fastapi[standard]",
     )
     .add_local_file(

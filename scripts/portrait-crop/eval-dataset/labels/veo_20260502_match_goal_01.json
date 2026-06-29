@@ -1,1 +1,259 @@
-{"clip_id":"veo_20260502_match_goal_01","dense":true,"label_fps":29.97002997002997,"source_fps":29.97002997002997,"frames":[{"frame":587,"t":19.586,"ball":{"x":792,"y":502,"visible":true}},{"frame":588,"t":19.62,"ball":{"x":794,"y":502,"visible":true}},{"frame":589,"t":19.653,"ball":{"x":801,"y":504,"visible":true}},{"frame":590,"t":19.686,"ball":{"x":804,"y":505,"visible":true}},{"frame":591,"t":19.72,"ball":{"x":808,"y":506,"visible":true}},{"frame":592,"t":19.753,"ball":{"x":810,"y":506,"visible":true}},{"frame":593,"t":19.786,"ball":{"x":812,"y":506,"visible":true}},{"frame":594,"t":19.82,"ball":{"x":819,"y":507,"visible":true}},{"frame":595,"t":19.853,"ball":{"x":821,"y":508,"visible":true}},{"frame":596,"t":19.887,"ball":{"x":823,"y":508,"visible":true}},{"frame":597,"t":19.92,"ball":{"x":827,"y":509,"visible":true}},{"frame":598,"t":19.953,"ball":{"x":830,"y":509,"visible":true}},{"frame":599,"t":19.987,"ball":{"x":833,"y":510,"visible":true}},{"frame":600,"t":20.02,"ball":{"x":837,"y":511,"visible":true}},{"frame":601,"t":20.053,"ball":{"x":840,"y":511,"visible":true}},{"frame":602,"t":20.087,"ball":{"x":844,"y":512,"visible":true}},{"frame":603,"t":20.12,"ball":{"x":848,"y":512,"visible":true}},{"frame":604,"t":20.153,"ball":{"x":852,"y":513,"visible":true}},{"frame":605,"t":20.187,"ball":{"x":855,"y":514,"visible":true}},{"frame":606,"t":20.22,"ball":{"x":858,"y":515,"visible":true}},{"frame":607,"t":20.254,"ball":{"x":861,"y":516,"visible":true}},{"frame":608,"t":20.287,"ball":{"x":865,"y":517,"visible":true}},{"frame":609,"t":20.32,"ball":{"x":869,"y":518,"visible":true}},{"frame":610,"t":20.354,"ball":{"x":872,"y":519,"visible":true}},{"frame":611,"t":20.387,"ball":{"x":876,"y":519,"visible":true}},{"frame":612,"t":20.42,"ball":{"x":879,"y":519,"visible":true}},{"frame":613,"t":20.454,"ball":{"x":882,"y":520,"visible":true}}]}
+{
+  "clip_id": "veo_20260502_match_goal_01",
+  "match_id": "20260502-match-2-may-2026-v0f8747f",
+  "source": "veo_academy",
+  "provenance": {
+    "method": "human_label",
+    "cvat_export": "veo_20260502_match_goal_01.xml",
+    "stamped_at": "2026-06-29T13:36:21.598Z",
+    "note": "backfilled seed label"
+  },
+  "dense": true,
+  "label_fps": 29.97002997002997,
+  "source_fps": 29.97002997002997,
+  "frames": [
+    {
+      "frame": 587,
+      "t": 19.586,
+      "ball": {
+        "x": 792,
+        "y": 502,
+        "visible": true
+      }
+    },
+    {
+      "frame": 588,
+      "t": 19.62,
+      "ball": {
+        "x": 794,
+        "y": 502,
+        "visible": true
+      }
+    },
+    {
+      "frame": 589,
+      "t": 19.653,
+      "ball": {
+        "x": 801,
+        "y": 504,
+        "visible": true
+      }
+    },
+    {
+      "frame": 590,
+      "t": 19.686,
+      "ball": {
+        "x": 804,
+        "y": 505,
+        "visible": true
+      }
+    },
+    {
+      "frame": 591,
+      "t": 19.72,
+      "ball": {
+        "x": 808,
+        "y": 506,
+        "visible": true
+      }
+    },
+    {
+      "frame": 592,
+      "t": 19.753,
+      "ball": {
+        "x": 810,
+        "y": 506,
+        "visible": true
+      }
+    },
+    {
+      "frame": 593,
+      "t": 19.786,
+      "ball": {
+        "x": 812,
+        "y": 506,
+        "visible": true
+      }
+    },
+    {
+      "frame": 594,
+      "t": 19.82,
+      "ball": {
+        "x": 819,
+        "y": 507,
+        "visible": true
+      }
+    },
+    {
+      "frame": 595,
+      "t": 19.853,
+      "ball": {
+        "x": 821,
+        "y": 508,
+        "visible": true
+      }
+    },
+    {
+      "frame": 596,
+      "t": 19.887,
+      "ball": {
+        "x": 823,
+        "y": 508,
+        "visible": true
+      }
+    },
+    {
+      "frame": 597,
+      "t": 19.92,
+      "ball": {
+        "x": 827,
+        "y": 509,
+        "visible": true
+      }
+    },
+    {
+      "frame": 598,
+      "t": 19.953,
+      "ball": {
+        "x": 830,
+        "y": 509,
+        "visible": true
+      }
+    },
+    {
+      "frame": 599,
+      "t": 19.987,
+      "ball": {
+        "x": 833,
+        "y": 510,
+        "visible": true
+      }
+    },
+    {
+      "frame": 600,
+      "t": 20.02,
+      "ball": {
+        "x": 837,
+        "y": 511,
+        "visible": true
+      }
+    },
+    {
+      "frame": 601,
+      "t": 20.053,
+      "ball": {
+        "x": 840,
+        "y": 511,
+        "visible": true
+      }
+    },
+    {
+      "frame": 602,
+      "t": 20.087,
+      "ball": {
+        "x": 844,
+        "y": 512,
+        "visible": true
+      }
+    },
+    {
+      "frame": 603,
+      "t": 20.12,
+      "ball": {
+        "x": 848,
+        "y": 512,
+        "visible": true
+      }
+    },
+    {
+      "frame": 604,
+      "t": 20.153,
+      "ball": {
+        "x": 852,
+        "y": 513,
+        "visible": true
+      }
+    },
+    {
+      "frame": 605,
+      "t": 20.187,
+      "ball": {
+        "x": 855,
+        "y": 514,
+        "visible": true
+      }
+    },
+    {
+      "frame": 606,
+      "t": 20.22,
+      "ball": {
+        "x": 858,
+        "y": 515,
+        "visible": true
+      }
+    },
+    {
+      "frame": 607,
+      "t": 20.254,
+      "ball": {
+        "x": 861,
+        "y": 516,
+        "visible": true
+      }
+    },
+    {
+      "frame": 608,
+      "t": 20.287,
+      "ball": {
+        "x": 865,
+        "y": 517,
+        "visible": true
+      }
+    },
+    {
+      "frame": 609,
+      "t": 20.32,
+      "ball": {
+        "x": 869,
+        "y": 518,
+        "visible": true
+      }
+    },
+    {
+      "frame": 610,
+      "t": 20.354,
+      "ball": {
+        "x": 872,
+        "y": 519,
+        "visible": true
+      }
+    },
+    {
+      "frame": 611,
+      "t": 20.387,
+      "ball": {
+        "x": 876,
+        "y": 519,
+        "visible": true
+      }
+    },
+    {
+      "frame": 612,
+      "t": 20.42,
+      "ball": {
+        "x": 879,
+        "y": 519,
+        "visible": true
+      }
+    },
+    {
+      "frame": 613,
+      "t": 20.454,
+      "ball": {
+        "x": 882,
+        "y": 520,
+        "visible": true
+      }
+    }
+  ]
+}

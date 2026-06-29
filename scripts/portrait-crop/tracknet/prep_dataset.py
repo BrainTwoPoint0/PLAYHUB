@@ -27,6 +27,12 @@ OUT = ROOT / "dataset"
 
 manifest = json.loads((ED / "manifest.json").read_text())
 holdout = set(manifest.get("frozen_holdout", []))
+# match_id groups same-recording clips. The split is BY MATCH (GroupKFold-style):
+# a holdout clip's ENTIRE match is excluded from train, else same-match frames
+# (often the same possession seconds apart) leak across the train/val boundary and
+# fake a passing gate. Falls back to clip_id for any clip not in the manifest.
+match_of = {c["id"]: c.get("match_id", c["id"]) for c in manifest.get("clips", [])}
+holdout_matches = {match_of.get(c, c) for c in holdout}
 
 
 def prep_clip(clip_id: str, split: str):
@@ -66,13 +72,26 @@ def prep_clip(clip_id: str, split: str):
 
 
 labeled = sorted(p.stem for p in LABELS.glob("*.json"))
-train_ids = [c for c in labeled if c not in holdout]
 val_ids = [c for c in labeled if c in holdout]
+# Exclude any clip whose MATCH is in the holdout (not just the holdout clip itself).
+train_ids, leaked = [], []
+for c in labeled:
+    if c in holdout:
+        continue
+    if match_of.get(c, c) in holdout_matches:
+        leaked.append(c)  # same match as a holdout clip — must NOT train on it
+    else:
+        train_ids.append(c)
 print(f"Building TrackNetV2 dataset → {OUT}\n(frozen_holdout = {sorted(holdout)})\n")
+if leaked:
+    print(f"EXCLUDED from train (same match as a holdout clip): {leaked}\n")
 print("TRAIN:")
 train = [c for c in (prep_clip(c, "train") for c in train_ids) if c]
 print("VAL (frozen holdout):")
 val = [c for c in (prep_clip(c, "val") for c in val_ids) if c]
+# Leakage guard: no match_id may appear in both train and val.
+overlap = {match_of.get(c, c) for c in train} & {match_of.get(c, c) for c in val}
+assert not overlap, f"LEAKAGE: match(es) {overlap} span train and val — fix manifest match_id"
 
 yaml = (f"path: {OUT}\ntrain:\n" + "".join(f"  - match/images/{c}\n" for c in train)
         + "val:\n" + "".join(f"  - match/images/{c}\n" for c in val))
