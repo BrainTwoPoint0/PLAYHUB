@@ -1,11 +1,18 @@
 /**
  * POST /api/editor/render
  *
- * Renders the portrait MP4 for a saved crop job via the Modal `render_portrait`
- * endpoint, uploads the result to Supabase Storage, updates the job row, and
- * returns a short-lived signed URL the client can use to download.
+ * Renders the portrait MP4 via the Modal `render_portrait` endpoint, uploads the
+ * result to Supabase Storage, and returns a short-lived signed download URL.
  *
- * Body: { jobId }
+ * Two modes:
+ *   { jobId }                                  → render a SAVED crop job (loads
+ *                                                keyframes from the DB, updates the
+ *                                                job row to 'rendered').
+ *   { videoUrl, keyframes, sceneChanges?, highlightId? }
+ *                                              → DIRECT render of the current edit
+ *                                                (academy flow, which has no saved
+ *                                                job because it has no recordingId).
+ *
  * Returns: { signedUrl, expiresAt, storagePath }
  */
 
@@ -16,9 +23,11 @@ import {
   getAuthUserStrict,
 } from '@/lib/supabase/server'
 import {
-  VIDEO_URL_ALLOWED_HOSTS,
   requirePortraitCropEnabled,
+  validateVideoUrl,
   ValidationError,
+  SOURCE_WIDTH,
+  MAX_KEYFRAMES_PER_JOB,
 } from '@/lib/editor/validation'
 import type { CropClient } from '@/lib/editor/db-types'
 
@@ -31,6 +40,134 @@ const STORAGE_BUCKET = 'portrait-crops'
 const SIGNED_URL_TTL_SECONDS = 60 * 60 // 1 hour
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const MAX_SOURCE_BYTES = 750 * 1024 * 1024 // cap the in-memory source fetch (OOM guard)
+
+type ModalKeyframe = { time_seconds: number; x_pixels: number }
+
+/**
+ * SSRF-guard the source URL, fetch it, render via Modal, and return the MP4
+ * bytes. Shared by both modes so the security-critical fetch/render path has a
+ * single implementation. Throws ValidationError (422) on a bad/disallowed URL.
+ */
+async function renderViaModal(
+  sourceUrl: string,
+  keyframes: ModalKeyframe[],
+  sceneChanges: number[]
+): Promise<ArrayBuffer> {
+  // SSRF guard — single source of truth (same allowlist/policy as the save path;
+  // returns the validated https URL or throws ValidationError 403).
+  const safeUrl = validateVideoUrl(sourceUrl)
+
+  const modalUrl = process.env.NEXT_PUBLIC_MODAL_RENDER_URL
+  const modalSecret = process.env.MODAL_SHARED_SECRET
+  if (!modalUrl || !modalSecret) {
+    throw new ValidationError('Render endpoint not configured', 500)
+  }
+
+  const srcRes = await fetch(safeUrl, {
+    redirect: 'error', // refuse redirects — closes the allowlist-bypass vector
+    headers: { 'User-Agent': 'PLAYHUB/render' },
+  })
+  if (!srcRes.ok) {
+    throw new ValidationError(`Failed to fetch source (${srcRes.status})`, 502)
+  }
+  // Bound the in-memory buffer — the allowlist constrains host, not object size.
+  const advertised = Number(srcRes.headers.get('content-length') ?? 0)
+  if (advertised > MAX_SOURCE_BYTES) {
+    throw new ValidationError('Source video too large', 413)
+  }
+  const srcBuffer = await srcRes.arrayBuffer()
+  if (srcBuffer.byteLength > MAX_SOURCE_BYTES) {
+    throw new ValidationError('Source video too large', 413)
+  }
+
+  const form = new FormData()
+  form.append(
+    'video',
+    new Blob([srcBuffer], { type: 'video/mp4' }),
+    'source.mp4'
+  )
+  form.append('keyframes', JSON.stringify(keyframes))
+  form.append('scene_changes', JSON.stringify(sceneChanges ?? []))
+
+  const modalRes = await fetch(modalUrl, {
+    method: 'POST',
+    body: form,
+    headers: { 'X-Modal-Auth': modalSecret },
+  })
+  if (!modalRes.ok) {
+    const detail = await modalRes.text().catch(() => '')
+    console.error(
+      '[editor/render] modal error',
+      modalRes.status,
+      detail.slice(0, 200)
+    )
+    throw new ValidationError('Render failed', 502)
+  }
+  const rendered = await modalRes.arrayBuffer()
+  if (rendered.byteLength < 100 * 1024) {
+    // Sanity — a successful render should be larger than a thumbnail.
+    throw new ValidationError('Render produced an unusably small output', 502)
+  }
+  return rendered
+}
+
+/** Upload the rendered MP4 (service-role — the bucket has no authenticated
+ *  INSERT policy) and mint a short-lived signed download URL. */
+async function uploadAndSign(buffer: ArrayBuffer, storagePath: string) {
+  const service = createServiceClient()
+  const { error: upErr } = await service.storage
+    .from(STORAGE_BUCKET)
+    .upload(storagePath, buffer, { contentType: 'video/mp4', upsert: true })
+  if (upErr) {
+    console.error('[editor/render] upload error:', upErr.message)
+    throw new ValidationError('Upload failed', 500)
+  }
+  const { data: signed, error: signErr } = await service.storage
+    .from(STORAGE_BUCKET)
+    // download:true sets Content-Disposition: attachment so a cross-origin click
+    // downloads the MP4 instead of navigating to it.
+    .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS, { download: true })
+  if (signErr || !signed) {
+    console.error('[editor/render] sign error:', signErr?.message)
+    throw new ValidationError('Could not create download URL', 500)
+  }
+  return {
+    signedUrl: signed.signedUrl,
+    storagePath,
+    expiresAt: new Date(
+      Date.now() + SIGNED_URL_TTL_SECONDS * 1000
+    ).toISOString(),
+  }
+}
+
+/** Validate a user-supplied keyframe list into the Modal shape. */
+function parseDirectKeyframes(raw: unknown): ModalKeyframe[] {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw new ValidationError('keyframes required', 422)
+  }
+  if (raw.length > MAX_KEYFRAMES_PER_JOB) {
+    throw new ValidationError('too many keyframes', 422)
+  }
+  const parsed = raw.map((kf, i) => {
+    const t = (kf as { time_seconds?: unknown }).time_seconds
+    const x = (kf as { x_pixels?: unknown }).x_pixels
+    if (typeof t !== 'number' || !Number.isFinite(t) || t < 0) {
+      throw new ValidationError(`keyframes[${i}].time_seconds invalid`, 422)
+    }
+    if (typeof x !== 'number' || !Number.isFinite(x)) {
+      throw new ValidationError(`keyframes[${i}].x_pixels invalid`, 422)
+    }
+    // Clamp x into the source frame, matching the save path's bounds.
+    return {
+      time_seconds: t,
+      x_pixels: Math.min(SOURCE_WIDTH, Math.max(0, Math.round(x))),
+    }
+  })
+  // Modal interpolation assumes ascending time (the save path enforces this).
+  parsed.sort((a, b) => a.time_seconds - b.time_seconds)
+  return parsed
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,19 +178,61 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient()
     await requirePortraitCropEnabled(supabase)
+    const sb = supabase as unknown as CropClient
 
-    let body: { jobId?: unknown }
+    let body: {
+      jobId?: unknown
+      videoUrl?: unknown
+      keyframes?: unknown
+      sceneChanges?: unknown
+      highlightId?: unknown
+    }
     try {
-      body = (await request.json()) as { jobId?: unknown }
+      body = await request.json()
     } catch {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
+
+    // Require exactly one mode selector (mirrors the save route's XOR).
+    if (body.jobId == null && body.videoUrl == null) {
+      return NextResponse.json(
+        {
+          error: 'Provide either jobId (saved job) or videoUrl (direct render)',
+        },
+        { status: 400 }
+      )
+    }
+
+    // ───── Direct mode: render the current edit (academy flow, no saved job).
+    //       jobId takes precedence if both are somehow sent. ─────
+    if (body.jobId == null && typeof body.videoUrl === 'string') {
+      const keyframes = parseDirectKeyframes(body.keyframes)
+      const sceneChanges = Array.isArray(body.sceneChanges)
+        ? (body.sceneChanges.filter((n) => typeof n === 'number') as number[])
+        : []
+      const hid =
+        typeof body.highlightId === 'string' &&
+        body.highlightId.trim().length > 0 &&
+        body.highlightId.length <= 200
+          ? body.highlightId.trim().replace(/[^a-zA-Z0-9_-]/g, '')
+          : null
+      const rendered = await renderViaModal(
+        body.videoUrl,
+        keyframes,
+        sceneChanges
+      )
+      // Key by highlight when known (re-renders overwrite in place); else a unique
+      // per-render path so a live signed URL can't serve a later render's bytes.
+      const storagePath = `${user.id}/adhoc-${hid ?? crypto.randomUUID()}.mp4`
+      const result = await uploadAndSign(rendered, storagePath)
+      return NextResponse.json(result)
+    }
+
+    // ───── Saved-job mode: render a persisted crop job ─────
     if (typeof body.jobId !== 'string' || !UUID_RE.test(body.jobId)) {
       return NextResponse.json({ error: 'Invalid jobId' }, { status: 400 })
     }
     const jobId = body.jobId
-
-    const sb = supabase as unknown as CropClient
 
     // 1. Load job + keyframes (RLS scopes to caller's own rows).
     const { data: job, error: jobErr } = await sb
@@ -86,9 +265,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 2. Resolve the source video URL. Recording-linked jobs pull from
-    // playhub_match_recordings (RLS gated by org membership); ad-hoc jobs
-    // use the stored video_url.
+    // 2. Resolve the source video URL (recording-linked or ad-hoc).
     let sourceUrl: string | null = job.video_url
     if (job.recording_id) {
       const { data: recording, error: recErr } = await sb
@@ -112,142 +289,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 3. SSRF guard on source URL — must match the same allowlist the route
-    // validator applied at save time, and must be https on the default port.
-    let parsed: URL
-    try {
-      parsed = new URL(sourceUrl)
-    } catch {
-      return NextResponse.json(
-        { error: 'Source URL is invalid' },
-        { status: 422 }
-      )
-    }
-    if (parsed.protocol !== 'https:') {
-      return NextResponse.json(
-        { error: 'Source URL must be https' },
-        { status: 422 }
-      )
-    }
-    if (parsed.port && parsed.port !== '443') {
-      return NextResponse.json(
-        { error: 'Source URL port not allowed' },
-        { status: 422 }
-      )
-    }
-    if (!VIDEO_URL_ALLOWED_HOSTS.includes(parsed.hostname)) {
-      return NextResponse.json(
-        { error: `Source URL host not allowed: ${parsed.hostname}` },
-        { status: 422 }
-      )
-    }
-
-    // 4. Download source → POST to Modal render → receive MP4.
-    const modalUrl = process.env.NEXT_PUBLIC_MODAL_RENDER_URL
-    const modalSecret = process.env.MODAL_SHARED_SECRET
-    if (!modalUrl || !modalSecret) {
-      return NextResponse.json(
-        { error: 'Render endpoint not configured' },
-        { status: 500 }
-      )
-    }
-
-    const srcRes = await fetch(parsed.toString(), {
-      redirect: 'error', // refuse redirects — closes the allowlist-bypass vector
-      headers: { 'User-Agent': 'PLAYHUB/render' },
-    })
-    if (!srcRes.ok) {
-      return NextResponse.json(
-        { error: `Failed to fetch source (${srcRes.status})` },
-        { status: 502 }
-      )
-    }
-    const srcBuffer = await srcRes.arrayBuffer()
-
-    const form = new FormData()
-    form.append(
-      'video',
-      new Blob([srcBuffer], { type: 'video/mp4' }),
-      'source.mp4'
+    // 3. Render (SSRF guard + Modal) + upload + sign.
+    const rendered = await renderViaModal(
+      sourceUrl,
+      keyframes.map((kf) => ({
+        time_seconds: kf.time_seconds,
+        x_pixels: kf.x_pixels,
+      })),
+      (job.scene_changes as number[]) ?? []
     )
-    form.append(
-      'keyframes',
-      JSON.stringify(
-        keyframes.map((kf) => ({
-          time_seconds: kf.time_seconds,
-          x_pixels: kf.x_pixels,
-        }))
-      )
-    )
-    form.append('scene_changes', JSON.stringify(job.scene_changes ?? []))
+    const result = await uploadAndSign(rendered, `${user.id}/${job.id}.mp4`)
 
-    const modalRes = await fetch(modalUrl, {
-      method: 'POST',
-      body: form,
-      headers: { 'X-Modal-Auth': modalSecret },
-    })
-    if (!modalRes.ok) {
-      const detail = await modalRes.text().catch(() => '')
-      console.error(
-        '[editor/render] modal error',
-        modalRes.status,
-        detail.slice(0, 200)
-      )
-      return NextResponse.json({ error: 'Render failed' }, { status: 502 })
-    }
-    const renderedBuffer = await modalRes.arrayBuffer()
-    if (renderedBuffer.byteLength < 100 * 1024) {
-      // Sanity — a successful render should be larger than a thumbnail.
-      return NextResponse.json(
-        { error: 'Render produced an unusably small output' },
-        { status: 502 }
-      )
-    }
-
-    // 5. Upload to Supabase Storage. Service-role because no INSERT policy
-    //    exists for authenticated on the portrait-crops bucket (writes are
-    //    intentionally server-mediated to keep signed-URL lifetimes short).
-    const storagePath = `${user.id}/${job.id}.mp4`
-    const service = createServiceClient()
-    const { error: upErr } = await service.storage
-      .from(STORAGE_BUCKET)
-      .upload(storagePath, renderedBuffer, {
-        contentType: 'video/mp4',
-        upsert: true,
-      })
-    if (upErr) {
-      console.error('[editor/render] upload error:', upErr.message)
-      return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
-    }
-
-    // 6. Short-lived signed URL for the client to download.
-    const { data: signed, error: signErr } = await service.storage
-      .from(STORAGE_BUCKET)
-      .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS)
-    if (signErr || !signed) {
-      console.error('[editor/render] sign error:', signErr?.message)
-      return NextResponse.json(
-        { error: 'Could not create download URL' },
-        { status: 500 }
-      )
-    }
-
-    // 7. Update job row (rendered status + path). Caller's own session — RLS
-    //    guarantees only the creator can flip their own job. If this fails
-    //    the storage upload still succeeded; the client-side `storagePath`
-    //    in the response is the authoritative pointer so the job row drift
-    //    is recoverable on the next save/load round-trip.
+    // 4. Update job row (rendered status + path). Log-only on failure.
     const { error: updErr } = await sb
       .from('playhub_crop_jobs')
-      .update({ status: 'rendered', output_storage_path: storagePath })
+      .update({ status: 'rendered', output_storage_path: result.storagePath })
       .eq('id', job.id)
       .eq('user_id', user.id)
     if (updErr) {
       console.warn('[editor/render] job status update failed:', updErr.message)
     }
 
-    // 8. Feedback audit: exported action, no keyframes snapshot (that already
-    //    exists on the last save). Failures here are log-only.
     const { error: fbErr } = await sb.from('playhub_crop_feedback').insert({
       job_id: job.id,
       user_id: user.id,
@@ -258,13 +320,7 @@ export async function POST(request: NextRequest) {
       console.warn('[editor/render] feedback insert failed:', fbErr.message)
     }
 
-    return NextResponse.json({
-      signedUrl: signed.signedUrl,
-      storagePath,
-      expiresAt: new Date(
-        Date.now() + SIGNED_URL_TTL_SECONDS * 1000
-      ).toISOString(),
-    })
+    return NextResponse.json(result)
   } catch (err: unknown) {
     if (err instanceof ValidationError) {
       return NextResponse.json({ error: err.message }, { status: err.status })

@@ -104,6 +104,7 @@ export default function EditorPage() {
   const [saving, setSaving] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [rendering, setRendering] = useState(false)
   const videoFileRef = useRef<File | null>(null)
   const videoUrlRef = useRef<string | null>(null) // for cleanup on unmount
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -227,15 +228,19 @@ export default function EditorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recordingId])
 
-  /* ───────── beforeunload warning ───────── */
+  /* ───────── beforeunload warning — only when there are UNSAVED edits ───────── */
   useEffect(() => {
-    if (keyframes.length === 0) return
     const handler = (e: BeforeUnloadEvent) => {
+      // Read the dirty ref live so we warn only on unsaved changes, not merely
+      // "has keyframes". returnValue is required for Chrome to show the prompt;
+      // preventDefault alone is a no-op.
+      if (!sessionDirtyRef.current) return
       e.preventDefault()
+      e.returnValue = ''
     }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
-  }, [keyframes.length])
+  }, [])
 
   /* ───────── undo/redo ───────── */
   const updateKeyframes = useCallback(
@@ -731,6 +736,67 @@ export default function EditorPage() {
     a.click()
     URL.revokeObjectURL(url)
   }, [keyframes, videoFilename])
+
+  /* ───────── Render the portrait MP4 (the deliverable) ───────── */
+  const handleRender = useCallback(async () => {
+    if (rendering || keyframes.length === 0) return
+    const sourceUrl = searchParams.get('videoUrl')
+    if (!sourceUrl) {
+      setErrorMessage('No source video to render')
+      return
+    }
+    setRendering(true)
+    setErrorMessage('')
+    try {
+      // Respect the trim range, same as the keyframe export.
+      const start = trimStart
+      const end = trimEnd || duration
+      const trimmed =
+        start > 0 || trimEnd > 0
+          ? keyframes.filter((kf) => kf.time >= start && kf.time <= end)
+          : keyframes
+      const res = await fetch('/api/editor/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          videoUrl: sourceUrl,
+          keyframes: trimmed.map((kf) => ({
+            time_seconds: kf.time,
+            x_pixels: kf.x,
+          })),
+          sceneChanges,
+          highlightId: searchParams.get('highlightId') ?? undefined,
+        }),
+      })
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(data.error || `Render failed (${res.status})`)
+      }
+      const { signedUrl } = (await res.json()) as { signedUrl: string }
+      // Force-download the finished clip (the signed URL is Content-Disposition: attachment).
+      const a = document.createElement('a')
+      a.href = signedUrl
+      a.download = videoFilename.replace(/\.[^.]+$/, '_portrait.mp4')
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    } catch (err) {
+      setErrorMessage(
+        err instanceof Error ? err.message : 'Could not render the clip'
+      )
+    } finally {
+      setRendering(false)
+    }
+  }, [
+    rendering,
+    keyframes,
+    searchParams,
+    trimStart,
+    trimEnd,
+    duration,
+    sceneChanges,
+    videoFilename,
+  ])
 
   /* ───────── Phase 3: save keyframes to Supabase via /api/editor/save ───────── */
   const canPersist = portraitCropEnabled === true && Boolean(recordingId)
@@ -1344,15 +1410,35 @@ export default function EditorPage() {
             </button>
           )}
 
-          {/* Export */}
+          {/* Render — produce the portrait MP4 (the deliverable, primary action) */}
+          <button
+            onClick={handleRender}
+            disabled={rendering || keyframes.length === 0}
+            aria-busy={rendering}
+            aria-label={
+              rendering ? 'Rendering clip' : 'Render the portrait clip'
+            }
+            className="flex items-center gap-1.5 rounded-md px-3 py-2 min-h-[36px] text-sm font-medium text-[var(--night)] bg-[var(--timberwolf)] transition-colors hover:bg-white disabled:opacity-40 disabled:hover:bg-[var(--timberwolf)]"
+            title="Render the portrait clip"
+          >
+            {rendering ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Download size={14} />
+            )}
+            <span className="hidden sm:inline">
+              {rendering ? 'Rendering…' : 'Render clip'}
+            </span>
+          </button>
+
+          {/* Export raw keyframe data — advanced/dev affordance */}
           <button
             onClick={handleExport}
             disabled={keyframes.length === 0}
-            className="flex items-center gap-1.5 rounded px-2 py-2 min-h-[36px] transition-colors hover:bg-white/5 disabled:opacity-30"
-            title="Export keyframes"
+            className="hidden sm:flex rounded p-2 min-h-[36px] min-w-[36px] items-center justify-center text-[var(--ash-grey)] transition-colors hover:bg-[var(--timberwolf)]/[0.06] hover:text-[var(--timberwolf)] disabled:opacity-30"
+            title="Export keyframe data (JSON)"
           >
-            <Download size={13} />
-            <span className="hidden sm:inline">Export</span>
+            <FileJson size={13} />
           </button>
 
           {/* Keyboard shortcuts — hidden on mobile */}
