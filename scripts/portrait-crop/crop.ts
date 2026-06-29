@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url'
 import {
   existsSync,
   statSync,
+  readFileSync,
   writeFileSync,
   readdirSync,
   mkdirSync,
@@ -28,9 +29,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const SRC_W = 1920
 const SRC_H = 1080
 
-// Portrait 9:16 crop from source
-const CROP_W = Math.round(SRC_H * (9 / 16)) // 608px (at source height)
-const CROP_MAX_X = SRC_W - CROP_W // 1312 — max x offset
+// Portrait 9:16 crop — ZOOMED into the action band. A full-height crop (ZOOM=1)
+// leaves the players a tiny sliver in a sea of empty grass + sky; ZOOM>1 tightens
+// the window so the action fills the vertical frame. The window is positioned
+// vertically on the action band (cluster_y) at render time.
+const ZOOM = Number(process.env.CROP_ZOOM) || 1.0 // 1.0 = no zoom (full height); override per-clip via CROP_ZOOM
+const CROP_H = Math.round(SRC_H / ZOOM) // full height at ZOOM=1; tighter window above 1
+const CROP_W = Math.round((CROP_H * 9) / 16) // 304 — 9:16 width
+const CROP_MAX_X = SRC_W - CROP_W // max x offset
+const CROP_MAX_Y = SRC_H - CROP_H // max y offset
 
 // Output dimensions
 const OUT_W = 1080
@@ -68,6 +75,7 @@ interface BallPosition {
   y: number // pixels (0-1080)
   conf: number // 0-1
   source: 'ball' | 'tracked' | 'cluster' | 'none'
+  clusterX?: number // player-cluster centroid x (action region) for the center-biased reframe
 }
 
 interface Candidate {
@@ -87,6 +95,7 @@ interface DetectionResult {
   positions: BallPosition[]
   sceneChanges: number[] // timestamps where camera angle switches
   allCandidates: FrameCandidates[] // all detections per frame for trajectory selection
+  actionBandY: number // median player-cluster y (vertical center of the action) for the crop
 }
 
 function detectBall(videoPath: string): DetectionResult {
@@ -94,10 +103,16 @@ function detectBall(videoPath: string): DetectionResult {
   const start = Date.now()
 
   const scriptPath = resolve(__dirname, 'detect_ball.py')
-  const output = execSync(
-    `python3 "${scriptPath}" "${videoPath}" --fps ${DETECT_FPS}`,
-    { encoding: 'utf-8', timeout: 10 * 60 * 1000, maxBuffer: 10 * 1024 * 1024 }
-  )
+  // CROP_RAW_JSON lets us render from cached detections (skip the ~minutes-long
+  // YOLO pass) — useful for A/B rendering the same clip across pipeline changes.
+  const cacheFile = process.env.CROP_RAW_JSON
+  const output = cacheFile
+    ? readFileSync(cacheFile, 'utf-8')
+    : execSync(`python3 "${scriptPath}" "${videoPath}" --fps ${DETECT_FPS}`, {
+        encoding: 'utf-8',
+        timeout: 10 * 60 * 1000,
+        maxBuffer: 10 * 1024 * 1024,
+      })
 
   // Python script outputs JSON to stdout, logs to stderr
   const lines = output.trim().split('\n')
@@ -114,6 +129,7 @@ function detectBall(videoPath: string): DetectionResult {
     }>
     scene_changes: number[]
     all_candidates: Array<{ time: number; detections: Candidate[] }>
+    frame_clusters?: Array<{ time: number; cx: number; cy: number }>
   } = JSON.parse(jsonLine)
 
   const allCandidates: FrameCandidates[] = raw.all_candidates.map((f) => ({
@@ -123,6 +139,21 @@ function detectBall(videoPath: string): DetectionResult {
 
   // Norfair handles tracking, occlusion interpolation, and velocity-based outlier rejection.
   // We just filter out "none" positions (no detection and no tracker prediction).
+  // Player-cluster centroid per frame (the action region) — keyed by ms time,
+  // which matches positions exactly since both come from the same source frames.
+  const clusterByTime = new Map<number, number>()
+  const clusterYs: number[] = []
+  for (const fc of raw.frame_clusters || []) {
+    if (fc.cx >= 0) clusterByTime.set(Math.round(fc.time * 1000), fc.cx)
+    if (fc.cy >= 0) clusterYs.push(fc.cy)
+  }
+  // Vertical center of the action band: median player-cluster y (robust to a
+  // stray far-side player). Falls back to a sensible action-band fraction.
+  clusterYs.sort((a, b) => a - b)
+  const actionBandY = clusterYs.length
+    ? clusterYs[Math.floor(clusterYs.length / 2)]
+    : SRC_H * 0.55
+
   const positions: BallPosition[] = raw.positions
     .filter((p) => p.x >= 0)
     .map((p) => ({
@@ -132,6 +163,7 @@ function detectBall(videoPath: string): DetectionResult {
       conf: p.conf,
       source: (p.source ||
         (p.w > 0 ? 'ball' : 'cluster')) as BallPosition['source'],
+      clusterX: clusterByTime.get(Math.round(p.time * 1000)),
     }))
 
   const totalFrames = raw.positions.length
@@ -150,7 +182,42 @@ function detectBall(videoPath: string): DetectionResult {
     )
   }
 
-  return { positions, sceneChanges: raw.scene_changes, allCandidates }
+  // Human-in-the-loop: a CVAT-corrected ball track (labels JSON) overrides the
+  // detector WITHIN the labeled time window — hand-polish the hard airborne /
+  // clearance moments the detector can't see. Detector still drives everywhere
+  // outside the window. Enable with CROP_BALL_LABELS=path/to/labels.json.
+  let finalPositions = positions
+  const labelsFile = process.env.CROP_BALL_LABELS
+  if (labelsFile && existsSync(labelsFile)) {
+    const gt = JSON.parse(readFileSync(labelsFile, 'utf-8'))
+    const human: BallPosition[] = (gt.frames || [])
+      .filter((f: { ball?: { visible?: boolean } }) => f.ball?.visible)
+      .map((f: { t: number; ball: { x: number; y: number } }) => ({
+        time: f.t,
+        x: f.ball.x,
+        y: f.ball.y,
+        conf: 1,
+        source: 'ball' as const,
+      }))
+    if (human.length) {
+      const lo = Math.min(...human.map((h) => h.time))
+      const hi = Math.max(...human.map((h) => h.time))
+      finalPositions = [
+        ...positions.filter((p) => p.time < lo || p.time > hi),
+        ...human,
+      ].sort((a, b) => a.time - b.time)
+      console.log(
+        `  Human-corrected ball: ${human.length} positions for t=${lo.toFixed(1)}–${hi.toFixed(1)}s (overriding detector)`
+      )
+    }
+  }
+
+  return {
+    positions: finalPositions,
+    sceneChanges: raw.scene_changes,
+    allCandidates,
+    actionBandY,
+  }
 }
 
 // ── Camera Path Smoothing ───────────────────────────────────────────
@@ -160,9 +227,19 @@ function detectBall(videoPath: string): DetectionResult {
 // Pipeline: Norfair positions → interpolate to per-frame → segment at
 // discontinuities → symmetric SG per segment → blend transitions → speed clamp
 
-const MAX_PAN_PX_PER_SEC = 1000
+const MAX_PAN_PX_PER_SEC = 450 // (was 1000) tighter pan — no whip-pans on a center-biased crop
 const CENTER_CROP_X = Math.round(CROP_MAX_X / 2)
 const SG_POLY_ORDER = 2
+
+// ── Crop driver ─────────────────────────────────────────────────────
+// Follow the ball (and its Kalman-tracked continuation); HOLD the last position
+// when the ball is lost, rather than drift to the cluster/center. The product
+// owner wants the ball IN FRAME, so we do NOT center-bias away from it. During a
+// brief airborne loft the ball is genuinely undetectable (~10%), so it may leave
+// frame for ~1s — but it stays in frame the rest of the time (open play).
+const FRAME_CENTER_X = SRC_W / 2 // 960 — fallback before the first ball
+const TELEPORT_PX = 350 // reject implausible ball jumps (distractor teleports) — hold instead...
+const REACQUIRE_FRAMES = 5 // ...unless the far position persists this many frames (real relocation)
 
 /**
  * Savitzky-Golay smoothing with boundary-adaptive (asymmetric) windows.
@@ -376,12 +453,41 @@ function smoothPositions(
 
   positions.sort((a, b) => a.time - b.time)
 
-  // Convert detected positions to crop offsets (center the detection in crop)
-  const rawPositions = positions.map((p) => ({
-    time: p.time,
-    cropX: Math.max(0, Math.min(CROP_MAX_X, Math.round(p.x - CROP_W / 2))),
-    source: p.source,
-  }))
+  // Convert positions to crop offsets via the center-biased action-region blend:
+  // ball (only when confidently a 'ball') → player-cluster centroid → pulled toward
+  // frame center. A lost/low-conf/airborne ball drops out, so the crop holds the
+  // action instead of chasing the ball off-frame.
+  // Follow the ball (and its Kalman-tracked continuation). HOLD the last ball
+  // position when the ball is lost — do NOT drift to cluster/center.
+  let lastX = positions[0]?.x ?? FRAME_CENTER_X
+  let pendingX: number | null = null // a far candidate awaiting confirmation
+  let pendingCount = 0
+  const rawPositions = positions.map((p) => {
+    if (p.source === 'ball' || p.source === 'tracked') {
+      if (Math.abs(p.x - lastX) <= TELEPORT_PX) {
+        lastX = p.x // normal motion — follow
+        pendingX = null
+        pendingCount = 0
+      } else if (pendingX !== null && Math.abs(p.x - pendingX) <= TELEPORT_PX) {
+        pendingCount++ // a far position that keeps appearing — likely a real relocation
+        pendingX = p.x
+        if (pendingCount >= REACQUIRE_FRAMES) {
+          lastX = p.x
+          pendingX = null
+          pendingCount = 0
+        }
+      } else {
+        pendingX = p.x // first big jump — treat as a distractor, HOLD lastX
+        pendingCount = 1
+      }
+    }
+    const cx = Math.round(lastX - CROP_W / 2)
+    return {
+      time: p.time,
+      cropX: Number.isFinite(cx) ? Math.max(0, Math.min(CROP_MAX_X, cx)) : CENTER_CROP_X,
+      source: p.source,
+    }
+  })
 
   console.log(
     `  Smoothing ${rawPositions.length} detections with segmented SG (symmetric, offline)`
@@ -577,7 +683,8 @@ function runCrop(
   inputPath: string,
   outputPath: string,
   cropXPerFrame: number[],
-  fps: number
+  fps: number,
+  cropY: number
 ) {
   console.log('  Cropping to portrait...')
   const start = Date.now()
@@ -589,7 +696,7 @@ function runCrop(
 
   // sendcmd must come before the target filter in the chain. Target by
   // filter name ("crop") — only one crop filter in this chain, so unambiguous.
-  const filter = `sendcmd=f='${cmdFile}',crop=${CROP_W}:${SRC_H}:${initialX}:0,scale=${OUT_W}:${OUT_H}`
+  const filter = `sendcmd=f='${cmdFile}',crop=${CROP_W}:${CROP_H}:${initialX}:${cropY},scale=${OUT_W}:${OUT_H}`
 
   try {
     execSync(
@@ -609,7 +716,8 @@ function runDebugPreview(
   inputPath: string,
   debugPath: string,
   cropXPerFrame: number[],
-  fps: number
+  fps: number,
+  cropY: number
 ) {
   console.log('  Generating debug preview...')
 
@@ -622,8 +730,8 @@ function runDebugPreview(
   const filter = [
     `split[dark][bright]`,
     `[dark]colorchannelmixer=0.3:0:0:0:0:0.3:0:0:0:0:0.3:0[d]`,
-    `[bright]crop=${CROP_W}:${SRC_H}:'${cropExpr}':0[b]`,
-    `[d][b]overlay=x='${cropExpr}':y=0`,
+    `[bright]crop=${CROP_W}:${CROP_H}:'${cropExpr}':${cropY}[b]`,
+    `[d][b]overlay=x='${cropExpr}':y=${cropY}`,
   ].join(';')
 
   execSync(
@@ -816,12 +924,17 @@ async function processClip(
       assessTracking(positions, cropXPerFrame, fps, duration)
     }
 
-    // 4. Crop to portrait
-    runCrop(inputPath, outputPath, cropXPerFrame, fps)
+    // 4. Crop to portrait — vertically centered on the action band (fixed per clip)
+    const cropY = Math.max(
+      0,
+      Math.min(CROP_MAX_Y, Math.round(detection.actionBandY - CROP_H / 2))
+    )
+    console.log(`  Zoom ${ZOOM}x → crop ${CROP_W}x${CROP_H} at y=${cropY} (action band ${Math.round(detection.actionBandY)})`)
+    runCrop(inputPath, outputPath, cropXPerFrame, fps, cropY)
 
     // 5. Debug preview
     if (debug && debugPath) {
-      runDebugPreview(inputPath, debugPath, cropXPerFrame, fps)
+      runDebugPreview(inputPath, debugPath, cropXPerFrame, fps, cropY)
     }
   } catch (err) {
     result.status = 'error'

@@ -18,8 +18,10 @@ source field: "ball" = YOLO detection, "tracked" = Kalman prediction, "cluster" 
 import sys
 import json
 import os
+import math
 import cv2
 import numpy as np
+import supervision as sv
 from ultralytics import YOLO
 from norfair import Detection, Tracker
 from norfair.filter import OptimizedKalmanFilterFactory
@@ -27,6 +29,26 @@ from norfair.filter import OptimizedKalmanFilterFactory
 SCENE_CHANGE_THRESHOLD = 0.4
 MAX_BALL_AREA = 3000
 MIN_BALL_AREA = 20
+SKY_CUTOFF_FRAC = 0.0   # discard ball candidates above this frame fraction. 0 = OFF.
+                        # (was 0.15 — it deleted the AIRBORNE ball, which flies in the
+                        #  top band, before the DP could select it. See engine-plan 2026-06-27.)
+
+# Motion proposals: recover the airborne/blurred ball that appearance-based YOLO
+# can't see (it's the one thing MOVING vs a near-static background). Double-frame
+# differencing → small moving blobs → extra candidates the Viterbi DP can select.
+MOTION_PROPOSALS = False    # DISABLED 2026-06-27: raw motion is high-recall/zero-precision —
+                            # makes the airborne ball present (oracle 10%→100%) but every moving
+                            # thing gets the same conf, so the DP picks slow distractors over the
+                            # fast ball AND it regressed working clips (hero goal 86→61). Proved the
+                            # thesis (airborne ball = motion-recoverable); the real fix is a LEARNED
+                            # temporal detector (TOTNet/TrackNet). Code kept for gated/future use.
+MOTION_DIFF_THRESH = 35     # per-pixel intensity delta (0-255) counted as motion
+MOTION_CONF = 0.25          # modest — only wins where YOLO is absent; DP arbitrates
+MOTION_MIN_AREA = 8         # blob PIXEL count (airborne ball is tiny/distant)
+MOTION_MAX_AREA = 500       # blob PIXEL count (reject player/limb-sized motion)
+MOTION_EXTENT_MIN = 0.5     # filled-px / bbox-area — ball is a compact disk; rejects sparse grass/speckle
+MOTION_AR_MAX = 2.5         # max aspect ratio (symmetric); rejects elongated limb streaks
+MOTION_MAX_PER_FRAME = 80   # cap (keep largest blobs) to bound DP cost on busy clips
 BALL_CLUSTER_BOOST_DIST = 400
 MIN_BALL_CONFIDENCE = 0.35         # Below this = likely false positive, ignore detection
 
@@ -58,6 +80,95 @@ BIDIR_KALMAN_RATIO = 0.5      # if >50% of gap is tracked, keep Kalman
 
 # Early confidence gate
 EARLY_CONF_GATE = 0.5   # Min confidence for first 5 detections
+
+# Recenter-on-loss (Phase 1.1): when the ball is lost, hold the last known
+# position briefly, then ease the crop back toward frame center so it doesn't
+# stay pinned to an edge (e.g. the ball vanishing into the net after a goal).
+# last_valid_pos is preserved untouched so re-acquisition is unaffected.
+HOLD_GRACE_SEC = 1.0       # hold the last position this long before recentering
+RECENTER_DUR_SEC = 2.0     # ease to frame center over this duration
+
+# Post-goal hold (Phase 1.2): if the ball is lost right after a fast shot toward
+# the goal it's nearest, hold on that spot (ball in the net + celebration) for a
+# few seconds before the recenter above kicks in.
+POSTGOAL_HOLD_SEC = 4.0    # hold on the goal location this long after a shot
+# NOTE: px/s threshold is calibrated for the current ~1080p detection width; it
+# scales with frame width, so re-tune (ideally express as a fraction of frame_w)
+# if the pipeline input resolution changes.
+POSTGOAL_SHOT_VEL = 350.0  # px/s — min ball speed toward goal to count as a shot
+REAL_GAP_MAX_SEC = 0.2     # max gap between consecutive real frames to trust velocity
+
+
+def recentered_hold_x(held_x, lost_dur, frame_w):
+    """Held ball x eased toward frame center as the lost duration grows."""
+    center = frame_w / 2.0
+    if lost_dur <= HOLD_GRACE_SEC:
+        return held_x
+    u = min(1.0, (lost_dur - HOLD_GRACE_SEC) / max(1e-6, RECENTER_DUR_SEC))
+    s = u * u * (3.0 - 2.0 * u)  # smoothstep ease
+    return held_x + (center - held_x) * s
+
+
+def maybe_goal_hold_until(last_valid_pos, last_real_vx, lost_start, frame_w):
+    """Hold deadline if the ball was lost just after a fast shot toward the goal
+    it's nearest; else None so the recenter ease applies.
+
+    Predicate is "lost in the outer half while moving outward" — a conservative
+    proxy for "heading into the nearest goal." A dead-center loss (x == frame_w/2)
+    or a ball still in its own half won't trigger; that's intentional (only hold
+    when the ball is lost near the goal it's attacking)."""
+    if last_valid_pos is None or abs(last_real_vx) < POSTGOAL_SHOT_VEL:
+        return None
+    toward_right = last_real_vx > 0 and last_valid_pos["x"] > frame_w / 2
+    toward_left = last_real_vx < 0 and last_valid_pos["x"] < frame_w / 2
+    if toward_right or toward_left:
+        return lost_start + POSTGOAL_HOLD_SEC
+    return None
+
+
+def hold_position_x(last_valid_pos, time_sec, lost_start, goal_hold_until, frame_w):
+    """Held x: pure hold on the goal spot during a post-goal window, else ease
+    toward frame center (Phase 1.1)."""
+    if goal_hold_until is not None and time_sec < goal_hold_until:
+        return last_valid_pos["x"]
+    return recentered_hold_x(last_valid_pos["x"], time_sec - lost_start, frame_w)
+
+
+def _extract_candidates(dets, frame_w, frame_h):
+    """Apply pitch-geometry filters to sv.Detections → (ball_candidates, person_xs).
+
+    Parses the full-frame YOLO pass via supervision. Coordinates are widened to
+    float before any arithmetic so results are bit-identical to the prior
+    tolist()-based loop.
+    """
+    ball_candidates = []
+    person_xs = []
+    person_ys = []
+    for xyxy, conf, cls in zip(dets.xyxy, dets.confidence, dets.class_id):
+        x1, y1, x2, y2 = (float(c) for c in xyxy)
+        conf = float(conf)
+        cls = int(cls)
+        cx = (x1 + x2) / 2
+        cy = (y1 + y2) / 2
+        w = x2 - x1
+        h = y2 - y1
+
+        if cls == CLASS_PLAYER:
+            if 200 < cy < 900:  # On the pitch
+                person_xs.append(cx)
+                person_ys.append(cy)
+
+        elif cls == CLASS_BALL:
+            area = w * h
+            if not (MIN_BALL_AREA <= area <= MAX_BALL_AREA):
+                continue
+            if cy < frame_h * SKY_CUTOFF_FRAC:
+                continue
+            if cx <= 10 or cx >= frame_w - 10:
+                continue  # Edge detection — likely false positive
+            ball_candidates.append({"x": cx, "y": cy, "w": w, "h": h, "conf": conf})
+
+    return ball_candidates, person_xs, person_ys
 
 
 def run_sahi_fallback(model, frame, frame_h):
@@ -107,10 +218,54 @@ def run_sahi_fallback(model, frame, frame_h):
         area = w * h
         conf = pred.score.value
         frame_w = frame.shape[1]
-        if MIN_BALL_AREA <= area <= MAX_BALL_AREA and cy >= frame_h * 0.15 and conf >= MIN_BALL_CONFIDENCE and 10 < cx < frame_w - 10:
+        if MIN_BALL_AREA <= area <= MAX_BALL_AREA and cy >= frame_h * SKY_CUTOFF_FRAC and conf >= MIN_BALL_CONFIDENCE and 10 < cx < frame_w - 10:
             candidates.append({"x": cx, "y": cy, "w": w, "h": h, "conf": conf})
 
     return candidates
+
+
+_MOTION_KERNEL = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+
+
+def motion_candidates(gray2, gray1, gray0, frame_w, frame_h):
+    """Double-difference ball proposals. A blob that moved CONSISTENTLY across 3
+    consecutive frames (gray2→gray1→gray0) is localized at the middle frame
+    (gray1) by AND-ing the two abs-diffs (removes ghost trails). This recovers
+    the airborne/motion-blurred ball that appearance YOLO misses — against a
+    near-static background, the moving ball is the signal even when its texture
+    is invisible (white-on-white). Returns candidates in full-frame coords with a
+    modest conf; the DP only selects them where they form a consistent arc, and
+    its trajectory cost rejects off-arc motion noise (limbs, grass, shadows)."""
+    g2 = cv2.GaussianBlur(gray2, (3, 3), 0)
+    g1 = cv2.GaussianBlur(gray1, (3, 3), 0)
+    g0 = cv2.GaussianBlur(gray0, (3, 3), 0)
+    m = cv2.bitwise_and((cv2.absdiff(g1, g2) > MOTION_DIFF_THRESH).astype(np.uint8),
+                        (cv2.absdiff(g0, g1) > MOTION_DIFF_THRESH).astype(np.uint8))
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, _MOTION_KERNEL)
+    n, _, stats, centroids = cv2.connectedComponentsWithStats(m, connectivity=8)
+    cands = []
+    for i in range(1, n):
+        w = int(stats[i, cv2.CC_STAT_WIDTH])
+        h = int(stats[i, cv2.CC_STAT_HEIGHT])
+        pix = int(stats[i, cv2.CC_STAT_AREA])
+        if not (MOTION_MIN_AREA <= pix <= MOTION_MAX_AREA):
+            continue
+        if pix / max(w * h, 1) < MOTION_EXTENT_MIN:   # extent: ball is a compact disk
+            continue
+        ar = w / max(h, 1)
+        if ar < 1.0 / MOTION_AR_MAX or ar > MOTION_AR_MAX:
+            continue
+        cx, cy = float(centroids[i][0]), float(centroids[i][1])
+        if cx <= 10 or cx >= frame_w - 10 or cy < frame_h * SKY_CUTOFF_FRAC:
+            continue
+        cands.append({"x": cx, "y": cy, "w": float(w), "h": float(h),
+                      "pix": pix, "conf": MOTION_CONF, "source": "motion"})
+    if len(cands) > MOTION_MAX_PER_FRAME:
+        cands.sort(key=lambda c: c["pix"], reverse=True)
+        cands = cands[:MOTION_MAX_PER_FRAME]
+    for c in cands:
+        del c["pix"]
+    return cands
 
 
 def detect_ball(video_path: str, output_fps: float = 25.0) -> dict:
@@ -122,10 +277,12 @@ def detect_ball(video_path: str, output_fps: float = 25.0) -> dict:
     """
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    model_path = os.path.join(script_dir, "yolov8m_forzasys_soccer.pt")
+    # BALL_WEIGHTS env overrides the weights file (for benchmarking fine-tunes).
+    weights = os.environ.get("BALL_WEIGHTS", "yolov8m_forzasys_soccer.pt")
+    model_path = weights if os.path.isabs(weights) else os.path.join(script_dir, weights)
 
     if not os.path.exists(model_path):
-        print(f"Error: Forzasys model not found at {model_path}", file=sys.stderr)
+        print(f"Error: model not found at {model_path}", file=sys.stderr)
         print("Download from: https://github.com/forzasys-students/SportsVision-YOLO", file=sys.stderr)
         sys.exit(1)
 
@@ -155,11 +312,15 @@ def detect_ball(video_path: str, output_fps: float = 25.0) -> dict:
     # --- Phase 1: YOLO inference + candidate scoring (expensive, cached) ---
     per_frame_data = []  # List of {time_sec, best_ball, frame_w, frame_h}
     scene_changes = []
+    all_cands = []  # raw YOLO ball candidates per frame (diagnostic: filter vs detector)
     prev_hist = None
     recent_ball_xs = []
     consecutive_misses = 0
     frame_idx = 0
     yolo_ball_count = 0
+    prev_gray = None    # for motion proposals (double-difference 3-frame window)
+    prev2_gray = None
+    motion_count = 0
 
     while True:
         ret, frame = cap.read()
@@ -187,37 +348,27 @@ def detect_ball(video_path: str, output_fps: float = 25.0) -> dict:
                 scene_changes.append(round(time_sec, 3))
         prev_hist = hist
 
+        # --- Motion proposals for the PREVIOUS frame (double-diff localizes the
+        # moving ball at the middle of the 3-frame window). Attach to the last
+        # appended entry (t-1); modest conf so the DP only takes them on a real arc.
+        if MOTION_PROPOSALS and prev_gray is not None and prev2_gray is not None and per_frame_data:
+            mcands = motion_candidates(prev2_gray, prev_gray, gray, frame.shape[1], frame.shape[0])
+            if mcands:
+                per_frame_data[-1]["candidates"].extend(mcands)
+                motion_count += len(mcands)
+                mt = round(per_frame_data[-1]["time_sec"], 3)
+                for _m in mcands:
+                    all_cands.append({"time": mt, "x": round(_m["x"]), "y": round(_m["y"]), "conf": _m["conf"], "source": "motion"})
+
         # Single inference for both ball and players
         result = model.predict(frame, conf=0.1, imgsz=1280, verbose=False)
 
         frame_h = frame.shape[0]
         frame_w = frame.shape[1]
-        ball_candidates = []
-        person_xs = []
-
-        for i in range(len(result[0].boxes)):
-            cls = int(result[0].boxes.cls[i])
-            conf = float(result[0].boxes.conf[i])
-            x1, y1, x2, y2 = result[0].boxes.xyxy[i].tolist()
-            cx = (x1 + x2) / 2
-            cy = (y1 + y2) / 2
-            w = x2 - x1
-            h = y2 - y1
-
-            if cls == CLASS_PLAYER:
-                if 200 < cy < 900:  # On the pitch
-                    person_xs.append(cx)
-
-            elif cls == CLASS_BALL:
-                area = w * h
-                if MIN_BALL_AREA <= area <= MAX_BALL_AREA:
-                    if cy < frame_h * 0.15:
-                        continue
-                    if cx <= 10 or cx >= frame_w - 10:
-                        continue  # Edge detection — likely false positive
-                    ball_candidates.append({
-                        "x": cx, "y": cy, "w": w, "h": h, "conf": conf
-                    })
+        dets = sv.Detections.from_ultralytics(result[0])
+        ball_candidates, person_xs, person_ys = _extract_candidates(dets, frame_w, frame_h)
+        for _b in ball_candidates:  # diagnostic: capture every raw candidate pre-filter
+            all_cands.append({"time": round(time_sec, 3), "x": round(_b["x"]), "y": round(_b["y"]), "conf": round(_b["conf"], 3)})
 
         # --- Conditional SAHI fallback ---
         if not ball_candidates:
@@ -231,41 +382,19 @@ def detect_ball(video_path: str, output_fps: float = 25.0) -> dict:
         else:
             consecutive_misses = 0
 
-        # Player cluster centroid (for ball scoring)
+        # Player cluster centroid (for the DP region prior — which match is ours)
         cluster_x = -1
+        cluster_y = -1
         if len(person_xs) >= 3:
             cluster_x = sum(person_xs) / len(person_xs)
+            cluster_y = sum(person_ys) / len(person_ys)
 
-        # --- Score ball candidates ---
-        best_ball = None
-        if ball_candidates:
-            for b in ball_candidates:
-                score = b["conf"]
-                if cluster_x >= 0:
-                    dist = abs(b["x"] - cluster_x)
-                    if dist <= BALL_CLUSTER_BOOST_DIST:
-                        proximity_bonus = 0.15 * (1.0 - dist / BALL_CLUSTER_BOOST_DIST)
-                        score += proximity_bonus
-                b["score"] = score
-
-            valid = [b for b in ball_candidates if b["score"] > 0.2 and b["conf"] >= MIN_BALL_CONFIDENCE]
-            if valid:
-                best_ball = max(valid, key=lambda b: b["score"])
-
-        # --- Early confidence gate ---
-        if best_ball and len(recent_ball_xs) < 5 and best_ball["conf"] < EARLY_CONF_GATE:
-            best_ball = None
-
-        # --- IQR outlier filter ---
-        if best_ball and len(recent_ball_xs) >= 5:
-            sorted_xs = sorted(recent_ball_xs)
-            q1 = sorted_xs[len(sorted_xs) // 4]
-            q3 = sorted_xs[3 * len(sorted_xs) // 4]
-            iqr = q3 - q1
-            lower = q1 - IQR_MULTIPLIER * max(iqr, IQR_MIN_SPREAD)
-            upper = q3 + IQR_MULTIPLIER * max(iqr, IQR_MIN_SPREAD)
-            if best_ball["x"] < lower or best_ball["x"] > upper:
-                best_ball = None
+        # --- Select best candidate (Step-1 validation: anti-signal filters
+        # removed — cluster-proximity boost, MIN_BALL_CONFIDENCE, early-conf gate,
+        # and IQR-on-x all suppressed hard-mode true positives (the IQR literally
+        # rejected the fast shot). Trajectory selection (Viterbi DP) replaces them
+        # next. See engine-improvement-plan 2026-06-27). ---
+        best_ball = max(ball_candidates, key=lambda b: b["conf"]) if ball_candidates else None
 
         if best_ball:
             recent_ball_xs.append(best_ball["x"])
@@ -276,6 +405,9 @@ def detect_ball(video_path: str, output_fps: float = 25.0) -> dict:
         per_frame_data.append({
             "time_sec": time_sec,
             "best_ball": best_ball,
+            "candidates": list(ball_candidates),
+            "cluster_x": cluster_x,
+            "cluster_y": cluster_y,
             "frame_w": frame_w,
             "frame_h": frame_h,
         })
@@ -284,6 +416,8 @@ def detect_ball(video_path: str, output_fps: float = 25.0) -> dict:
         if total_so_far % 5 == 0 or total_so_far <= 5:
             print(f"\r  YOLO: {total_so_far} frames, {yolo_ball_count} ball detections ({100*yolo_ball_count/max(total_so_far,1):.0f}%)", end="", file=sys.stderr)
 
+        prev2_gray = prev_gray
+        prev_gray = gray
         frame_idx += 1
 
     cap.release()
@@ -301,6 +435,7 @@ def detect_ball(video_path: str, output_fps: float = 25.0) -> dict:
     else:
         print(f"  Kalman R={kalman_r} (detection rate {100*detection_rate:.0f}%)", file=sys.stderr)
 
+    per_frame_data = select_trajectory(per_frame_data)
     positions, stats = _run_tracking(per_frame_data, kalman_r)
 
     total = len(positions)
@@ -316,7 +451,100 @@ def detect_ball(video_path: str, output_fps: float = 25.0) -> dict:
     frame_w = per_frame_data[0]["frame_w"] if per_frame_data else 1920
     positions = ballistic_fill(positions, frame_w)
 
-    return {"positions": positions, "scene_changes": scene_changes, "all_candidates": []}
+    frame_clusters = [{"time": round(fd["time_sec"], 3), "cx": fd.get("cluster_x", -1), "cy": fd.get("cluster_y", -1)} for fd in per_frame_data]
+    return {"positions": positions, "scene_changes": scene_changes, "all_candidates": all_cands, "frame_clusters": frame_clusters}
+
+
+# --- Trajectory selection (Viterbi DP over per-frame candidates) ----------------
+DP_SIGMA = 60.0            # px tolerance on the constant-velocity prediction, per nominal frame
+DP_OCCLUSION_COST = 3.0    # cost of routing through the miss/coast node (per frame)
+DP_REGION_WEIGHT = 0.0     # soft penalty for candidates far OUTSIDE the play region (region prior)
+DP_REGION_RADIUS = 700.0   # px — deadband: candidates within this of the player cluster pay nothing
+DP_REGION_SCALE = 500.0    # px — distance beyond the radius at which the penalty = DP_REGION_WEIGHT
+DP_REGION_CAP = 3.0        # max region penalty (a long clearance isn't punished into a miss)
+
+
+def select_trajectory(per_frame_data: list) -> list:
+    """Pick the globally most-consistent ball trajectory from the per-frame
+    candidates via a Viterbi min-cost path (track-before-detect). State per frame
+    = each ball candidate + a MISS node. The MISS node is a *coast* node: it
+    carries the last REAL observation (position, velocity, time) so a short
+    occlusion / airborne gap is bridged by the constant-velocity prediction
+    instead of re-acquiring any candidate for free. Node cost = -log(conf) (+ a
+    soft region penalty for candidates far outside the play region; miss = OCC).
+    Transition cost = squared deviation from the predicted position, with the
+    tolerance growing with the elapsed gap (so it is fps-robust and forgiving
+    across occlusions). Writes the chosen candidate (or None) to each frame's
+    "best_ball"."""
+    n = len(per_frame_data)
+    if n == 0:
+        return per_frame_data
+
+    # states[t] = candidate dicts followed by a MISS sentinel (None)
+    states = [list(fd.get("candidates") or []) + [None] for fd in per_frame_data]
+    clusters = [(fd.get("cluster_x", -1), fd.get("cluster_y", -1)) for fd in per_frame_data]
+    times = [fd["time_sec"] for fd in per_frame_data]
+    base_dt = max((times[-1] - times[0]) / (n - 1), 1e-3) if n > 1 else 0.04
+
+    def node_cost(s, t):
+        if s is None:
+            return DP_OCCLUSION_COST
+        c = -math.log(max(s["conf"], 1e-3))
+        cx, cy = clusters[t]
+        if DP_REGION_WEIGHT and cx >= 0:
+            d = math.hypot(s["x"] - cx, s["y"] - cy)
+            if d > DP_REGION_RADIUS:
+                c += DP_REGION_WEIGHT * min((d - DP_REGION_RADIUS) / DP_REGION_SCALE, DP_REGION_CAP)
+        return c
+
+    INF = float("inf")
+    # dp[t][j] = (cost, prev_i, vx, vy, lrx, lry, lrt)  — lr* = last REAL observation
+    dp = [[(INF, -1, 0.0, 0.0, -1.0, -1.0, 0.0) for _ in st] for st in states]
+    for j, s in enumerate(states[0]):
+        lx, ly = (-1.0, -1.0) if s is None else (s["x"], s["y"])
+        dp[0][j] = (node_cost(s, 0), -1, 0.0, 0.0, lx, ly, times[0])
+
+    for t in range(1, n):
+        tj = times[t]
+        prev = dp[t - 1]
+        for j, sj in enumerate(states[t]):
+            ncj = node_cost(sj, t)
+            best = (INF, -1, 0.0, 0.0, -1.0, -1.0, tj)
+            for i in range(len(prev)):
+                pc, _, vx, vy, lrx, lry, lrt = prev[i]
+                if pc >= INF:
+                    continue
+                if sj is None:
+                    # coast — carry the last real observation forward unchanged
+                    cand = (pc + ncj, i, vx, vy, lrx, lry, lrt)
+                elif lrx < 0:
+                    cand = (pc + ncj, i, 0.0, 0.0, sj["x"], sj["y"], tj)  # first acquisition — free
+                else:
+                    elapsed = max(tj - lrt, 1e-3)
+                    px, py = lrx + vx * elapsed, lry + vy * elapsed
+                    sig = DP_SIGMA * (elapsed / base_dt)          # tolerance grows with the gap
+                    trans = ((sj["x"] - px) ** 2 + (sj["y"] - py) ** 2) / (2.0 * sig * sig)
+                    nvx, nvy = (sj["x"] - lrx) / elapsed, (sj["y"] - lry) / elapsed
+                    cand = (pc + trans + ncj, i, nvx, nvy, sj["x"], sj["y"], tj)
+                if cand[0] < best[0]:
+                    best = cand
+            dp[t][j] = best
+
+    j = min(range(len(states[n - 1])), key=lambda k: dp[n - 1][k][0])
+    chosen = [None] * n
+    for t in range(n - 1, -1, -1):
+        s = states[t][j]
+        chosen[t] = None if s is None else s
+        j = dp[t][j][1]
+        if j < 0 and t > 0:
+            print(f"  Trajectory DP: WARNING backtrack broke at t={t}", file=sys.stderr)
+            break
+
+    miss = sum(1 for c in chosen if c is None)
+    for t in range(n):
+        per_frame_data[t]["best_ball"] = chosen[t]
+    print(f"  Trajectory DP: {n - miss}/{n} frames selected, {miss} miss", file=sys.stderr)
+    return per_frame_data
 
 
 def _run_tracking(per_frame_data: list, kalman_r: float) -> tuple:
@@ -336,6 +564,11 @@ def _run_tracking(per_frame_data: list, kalman_r: float) -> tuple:
     positions = []
     stats = {"ball": 0, "tracked": 0, "cluster": 0, "hold": 0, "none": 0}
     last_valid_pos = None
+    lost_start = None        # time the current lost-ball run began (for recenter easing)
+    prev_real_x = None       # previous real (ball/tracked) x — for shot velocity
+    prev_real_t = None
+    last_real_vx = 0.0       # signed px/s of the most recent real ball motion
+    goal_hold_until = None   # hold on the goal spot (no recenter) until this time
 
     for fd in per_frame_data:
         time_sec = fd["time_sec"]
@@ -382,9 +615,12 @@ def _run_tracking(per_frame_data: list, kalman_r: float) -> tuple:
 
         elif best_ball and not tracked_objects:
             if last_valid_pos and abs(best_ball["x"] - last_valid_pos["x"]) > 500:
+                if lost_start is None:
+                    lost_start = time_sec
+                    goal_hold_until = maybe_goal_hold_until(last_valid_pos, last_real_vx, lost_start, frame_w)
                 positions.append({
                     "time": round(time_sec, 3),
-                    "x": last_valid_pos["x"],
+                    "x": round(hold_position_x(last_valid_pos, time_sec, lost_start, goal_hold_until, frame_w)),
                     "y": last_valid_pos["y"],
                     "w": 0, "h": 0,
                     "conf": 0.3,
@@ -420,9 +656,12 @@ def _run_tracking(per_frame_data: list, kalman_r: float) -> tuple:
                 last_valid_pos = pos
                 stats["tracked"] += 1
             elif last_valid_pos is not None:
+                if lost_start is None:
+                    lost_start = time_sec
+                    goal_hold_until = maybe_goal_hold_until(last_valid_pos, last_real_vx, lost_start, frame_w)
                 positions.append({
                     "time": round(time_sec, 3),
-                    "x": last_valid_pos["x"],
+                    "x": round(hold_position_x(last_valid_pos, time_sec, lost_start, goal_hold_until, frame_w)),
                     "y": last_valid_pos["y"],
                     "w": 0, "h": 0,
                     "conf": 0.3,
@@ -440,9 +679,12 @@ def _run_tracking(per_frame_data: list, kalman_r: float) -> tuple:
                 stats["none"] += 1
 
         elif last_valid_pos is not None:
+            if lost_start is None:
+                lost_start = time_sec
+                goal_hold_until = maybe_goal_hold_until(last_valid_pos, last_real_vx, lost_start, frame_w)
             positions.append({
                 "time": round(time_sec, 3),
-                "x": last_valid_pos["x"],
+                "x": round(hold_position_x(last_valid_pos, time_sec, lost_start, goal_hold_until, frame_w)),
                 "y": last_valid_pos["y"],
                 "w": 0, "h": 0,
                 "conf": 0.3,
@@ -460,6 +702,22 @@ def _run_tracking(per_frame_data: list, kalman_r: float) -> tuple:
                 "source": "cluster"
             })
             stats["cluster"] += 1
+
+        # Real-emit bookkeeping (single reset point for lost/goal state). Shot
+        # velocity is only trusted across genuinely *consecutive* real frames: a
+        # non-real frame breaks the run (resets prev_real) so the next
+        # re-acquisition can't compute a bogus cross-gap velocity (review B1).
+        p = positions[-1]
+        if p["source"] in ("ball", "tracked"):
+            if prev_real_t is not None and 0 < (p["time"] - prev_real_t) <= REAL_GAP_MAX_SEC:
+                last_real_vx = (p["x"] - prev_real_x) / (p["time"] - prev_real_t)
+            else:
+                last_real_vx = 0.0
+            prev_real_x, prev_real_t = p["x"], p["time"]
+            lost_start = None
+            goal_hold_until = None
+        else:
+            prev_real_x, prev_real_t = None, None  # break the velocity run on loss
 
     return positions, stats
 

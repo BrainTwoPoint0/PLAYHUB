@@ -46,6 +46,11 @@ const videoPath = arg('video')
 const clipId = arg('clip-id')
 const outPath = arg('out')
 const dense = process.argv.includes('--dense')
+// Truncate GT to a verified frame range — for clips labeled densely only up to
+// a stopping point (frames past it still hold uncorrected detector boxes).
+const maxFrame = arg('max-frame')
+  ? parseInt(arg('max-frame')!, 10)
+  : Number.POSITIVE_INFINITY
 
 if (!cvatPath || !videoPath || !clipId || !outPath) {
   console.error(
@@ -134,6 +139,7 @@ if (allBoxes.length === 0) {
 const seen = new Set<number>()
 const filtered: CvatBox[] = []
 for (const b of allBoxes) {
+  if (b.frame > maxFrame) continue
   if (!dense && !b.keyframe) continue
   if (seen.has(b.frame)) continue
   seen.add(b.frame)

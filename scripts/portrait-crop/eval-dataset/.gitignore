@@ -1,3 +1,12 @@
 results/*
 !results/pin.json
 !results/README.md
+cvat-imports/
+cvat-exports/
+# Clip videos + generated artefacts are reproducible (manifest URLs + download-clips.ts);
+# the committed asset is labels/*.json (the grassroots ball-track ground truth).
+clips/*.mp4
+clips/*_raw.json
+clips/*_portrait.mp4
+clips/*_debug.mp4
+clips/*_review.json

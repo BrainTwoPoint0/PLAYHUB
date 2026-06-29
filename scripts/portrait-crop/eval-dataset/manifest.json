@@ -1,7 +1,7 @@
 {
   "$schema": "./manifest.schema.json",
-  "version": 1,
-  "frozen_holdout": [],
+  "version": 2,
+  "frozen_holdout": ["veo_20260506_hb_cupfinal_goal_01"],
   "clips": [
     {
       "id": "veo_20260502_goal_01",
@@ -179,6 +179,34 @@
         "notes": "Goal-kick from 2024-09-18 — old, verify against Roboflow before labeling. Stands in for the 'keeper long ball' edge case."
       },
       "notes": "veo_match=20240918-match-18-sep-2024-20de1d37, highlight_id=051aab26-93cf-41f1-9033-8b2a59386de2, start=1536, url=https://c.veocdn.com/99d16727-0566-4c19-b05a-61bd57c61a3f/highlight-v2/051aab26-93cf-41f1-9033-8b2a59386de2_1727793249.724764/video.mp4"
+    },
+    {
+      "id": "GOAL_EDGE_01",
+      "file": "GOAL_EDGE_01.mp4",
+      "category": "goal",
+      "subcategory": "goal_at_edge",
+      "label_fps": 5,
+      "source": "TBD_KARIM_PICKS_DURING_SPRINT",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "clean",
+        "notes": "PLACEHOLDER — Karim picks during sprint: a goal where the ball crosses into the net NEAR A FRAME EDGE (last visible ball x < 300 or > 1620 of 1920). This is the case that separates Phase 1.2 post-goal-hold (hold on the goal at the edge) from 1.1 recenter (drift to center) — 002331 couldn't prove 1.2 because its goal sat near center."
+      },
+      "notes": "Selection: scrub goal-tagged highlights for a goal whose mouth sits near the LEFT or RIGHT edge of the panorama. Skip rather than mislabel if none surface."
+    },
+    {
+      "id": "GOAL_EDGE_02",
+      "file": "GOAL_EDGE_02.mp4",
+      "category": "goal",
+      "subcategory": "goal_at_edge",
+      "label_fps": 5,
+      "source": "TBD_KARIM_PICKS_DURING_SPRINT",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "clean",
+        "notes": "PLACEHOLDER — second goal-at-edge clip, OPPOSITE side from GOAL_EDGE_01 if possible (one left-goal, one right-goal) to exercise both toward_left and toward_right branches of maybe_goal_hold_until."
+      },
+      "notes": "See GOAL_EDGE_01 selection criterion. Opposite-edge example preferred."
     },
     {
       "id": "CURSED_01_lens_flare",

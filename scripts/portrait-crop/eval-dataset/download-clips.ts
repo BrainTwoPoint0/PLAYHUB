@@ -14,8 +14,9 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { execSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 
-const HERE = __dirname
+const HERE = path.dirname(fileURLToPath(import.meta.url))
 const CLIPS_DIR = path.join(HERE, 'clips')
 const MANIFEST = path.join(HERE, 'manifest.json')
 
