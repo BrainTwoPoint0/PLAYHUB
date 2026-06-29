@@ -1581,8 +1581,8 @@ export default function EditorPage() {
                   {processingStatus || 'Finding the ball…'}
                 </p>
                 <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-[var(--ash-grey)]">
-                  This usually takes about 15 seconds. You&rsquo;ll be able to
-                  adjust everything after.
+                  This can take up to about half a minute. You&rsquo;ll be able
+                  to adjust everything after.
                 </p>
                 <div className="mt-4 h-0.5 w-48 overflow-hidden rounded-full bg-[var(--timberwolf)]/10">
                   <motion.div

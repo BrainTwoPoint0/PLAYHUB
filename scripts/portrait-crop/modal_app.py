@@ -128,7 +128,11 @@ def _ffprobe_fingerprint(path: str) -> dict:
 # 25fps detection + SAHI 640 slices on low-detection clips can push T4 past
 # Modal's 150s web-endpoint sync limit. A10G (~3x faster) keeps all 10 eval
 # clips comfortably under 150s at ~$0.002/clip — still negligible.
-@app.function(image=image, gpu="A10G", timeout=600, secrets=[_secret])
+# scaledown_window keeps the container warm for 10 min after a request so
+# back-to-back clips in an editing session skip the ~20-40s cold start (the first
+# clip after a long idle still pays it; min_containers=1 would remove that too, at
+# always-on GPU cost — a product decision, not defaulted here).
+@app.function(image=image, gpu="A10G", timeout=600, scaledown_window=600, secrets=[_secret])
 @modal.fastapi_endpoint(method="POST")
 async def portrait_crop_process(request: fastapi.Request):
     """Accept raw video bytes, return ball positions JSON."""
