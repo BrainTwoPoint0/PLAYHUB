@@ -183,6 +183,21 @@ describe('simplifyCropKeyframes', () => {
     expect(result.every((k) => k.x !== 1200)).toBe(true)
   })
 
+  it('filters HIGH-confidence distractor spikes (wrong-ball teleport)', () => {
+    // A confident detection of a DIFFERENT ball (e.g. an adjacent pitch): the x leaps
+    // ~1000px away and snaps straight back. Pre-fix this passed the confidence gate
+    // and was promoted to a fake scene cut → a violent crop snap.
+    const keyframes = [
+      kf(0, 500, 'ai_ball', 0.8),
+      kf(0.2, 520, 'ai_ball', 0.8),
+      kf(0.4, 1540, 'ai_ball', 0.85), // high-conf, +1020 then -1020 — physically impossible
+      kf(0.6, 540, 'ai_ball', 0.8),
+      kf(0.8, 560, 'ai_ball', 0.8),
+    ]
+    const result = simplifyCropKeyframes(keyframes, [])
+    expect(result.every((k) => k.x !== 1540)).toBe(true)
+  })
+
   it('preserves keyframes in high-velocity gaps that RDP would flatten', () => {
     // Start and end at similar x, but big movement in between
     // Use wider spacing to avoid near-duplicate and scene-cut removal

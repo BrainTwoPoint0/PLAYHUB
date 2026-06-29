@@ -1164,7 +1164,7 @@ export default function EditorPage() {
 
   return (
     <div
-      className="flex h-[100dvh] flex-col overflow-hidden select-none"
+      className="relative flex h-[100dvh] flex-col overflow-hidden select-none"
       style={{
         background: 'var(--editor-bg, #060b08)',
         touchAction: 'manipulation',
@@ -1207,6 +1207,17 @@ export default function EditorPage() {
           if (f) handleOutroFile(f)
         }}
       />
+
+      {/* Detection lock — while the AI runs there are no keyframes yet, so block all
+          editor interaction (play, scrub, render, keyframes, export). The video
+          overlay communicates why; browser back still escapes. */}
+      {processing && (
+        <div
+          className="absolute inset-0 z-50 cursor-wait"
+          aria-hidden="true"
+          onContextMenu={(e) => e.preventDefault()}
+        />
+      )}
 
       {/* ── TOP BAR ── */}
       <div

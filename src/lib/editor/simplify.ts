@@ -8,6 +8,8 @@ const DEFAULTS = {
   SCENE_CUT_MARGIN: 1.2, // seconds — remove AI keyframes within this of a scene cut
   OUTLIER_CONF_THRESHOLD: 0.4, // below this confidence...
   OUTLIER_JUMP_THRESHOLD: 200, // ...and this much deviation = outlier
+  TELEPORT_PX: 350, // px — a single-frame jump beyond this that reverts (deviates from
+  // both neighbors while they agree) is a distractor ball, rejected regardless of confidence
   RDP_TOLERANCE: 90, // px — how much deviation to tolerate in simplification
   ZIGZAG_THRESHOLD: 130, // px — direction reversals smaller than this get removed
   NEAR_DUPLICATE_TIME: 0.8, // seconds — merge points closer than this...
@@ -30,6 +32,7 @@ const SCENE_CUT_WINDOW = DEFAULTS.SCENE_CUT_WINDOW
 const SCENE_CUT_MARGIN = DEFAULTS.SCENE_CUT_MARGIN
 const OUTLIER_CONF_THRESHOLD = DEFAULTS.OUTLIER_CONF_THRESHOLD
 const OUTLIER_JUMP_THRESHOLD = DEFAULTS.OUTLIER_JUMP_THRESHOLD
+const TELEPORT_PX = DEFAULTS.TELEPORT_PX
 
 /**
  * Detect scene cuts from keyframe jumps and explicit scene_changes.
@@ -134,11 +137,27 @@ function filterOutliers(keyframes: CropKeyframe[]): CropKeyframe[] {
     if (i === 0 || i === keyframes.length - 1) return true
     if (kf.source === 'user' || kf.source === 'ai_cluster') return true
 
+    const prev = keyframes[i - 1]
+    const next = keyframes[i + 1]
+
+    // Physically-impossible spike: the position leaps away from BOTH neighbours by
+    // more than a ball can move between frames while the neighbours agree — it jumps
+    // out and snaps back. That's a distractor (another pitch's ball, a bright object),
+    // never a real fast play or scene cut (those move and STAY, so `next` follows the
+    // jump). Reject REGARDLESS of confidence — a confident detection of the wrong ball
+    // is still wrong. Without this, a high-conf distractor passed the confidence gate
+    // below and was promoted to a fake scene cut → a violent crop snap.
+    if (
+      Math.abs(kf.x - prev.x) >= TELEPORT_PX &&
+      Math.abs(kf.x - next.x) >= TELEPORT_PX &&
+      Math.abs(next.x - prev.x) < TELEPORT_PX
+    ) {
+      return false
+    }
+
     if (kf.confidence >= OUTLIER_CONF_THRESHOLD) return true
 
     // Check deviation from immediate neighbors
-    const prev = keyframes[i - 1]
-    const next = keyframes[i + 1]
     const expectedX =
       prev.x +
       ((next.x - prev.x) * (kf.time - prev.time)) / (next.time - prev.time || 1)
