@@ -44,6 +44,6 @@ echo "staged $staged pre-annotation(s)"
 #    cvat-batch-create.sh skips clips whose task already exists.
 : "${CVAT_AUTH:?set CVAT_AUTH=user:pass to create CVAT tasks (or use --dry-run)}"
 echo "=== creating CVAT tasks ==="
-"$HERE/cvat-batch-create.sh"
+bash "$HERE/cvat-batch-create.sh"
 echo "=== loop ready: correct the flagged clips in CVAT → export to cvat-exports/ →"
 echo "    cvat-to-labels.ts stamps each as a leak-safe label. ==="
