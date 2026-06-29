@@ -51,6 +51,15 @@ export interface FeatureFlagRow {
   updated_by: string | null
 }
 
+export interface CropDetectionRow {
+  veo_highlight_id: string
+  detection: Record<string, unknown>
+  modal_inference_ms: number | null
+  modal_app_version: string | null
+  created_at: string
+  updated_at: string
+}
+
 type Insert<T> = Partial<T> & { [k in keyof T]?: T[k] | null }
 
 export interface CropDatabase {
@@ -96,6 +105,11 @@ export interface CropDatabase {
         Row: FeatureFlagRow
         Insert: Insert<FeatureFlagRow>
         Update: Insert<FeatureFlagRow>
+      }
+      playhub_crop_detections: {
+        Row: CropDetectionRow
+        Insert: Insert<CropDetectionRow>
+        Update: Insert<CropDetectionRow>
       }
     }
   }

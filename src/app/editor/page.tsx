@@ -409,26 +409,16 @@ export default function EditorPage() {
   }, [videoUrl])
 
   /* ───────── GPU processing ───────── */
-  const processVideoFile = useCallback(async (file: File) => {
-    setProcessing(true)
-    setErrorMessage('')
-    setProcessingStatus('Uploading to GPU...')
-    try {
-      setProcessingStatus('Detecting ball positions on GPU...')
-      const res = await fetch('/api/editor/process', {
-        method: 'POST',
-        body: file,
-      })
-
-      if (res.status === 401) {
-        throw new Error('Sign in required to use ball detection')
-      }
-      if (res.status === 413) {
-        throw new Error('Video is too large (max 500MB)')
-      }
-      if (!res.ok) throw new Error('Processing failed')
-      const detection = await res.json()
-
+  // Apply a detection result to editor state. Shared by live detection and the
+  // shared-cache hit path so both produce identical keyframes.
+  const applyDetection = useCallback(
+    (detection: {
+      positions?: Parameters<typeof detectionsToCropKeyframes>[0]['positions']
+      scene_changes?: number[]
+      codec_fingerprint?: Record<string, unknown> | null
+      modal_inference_ms?: number | null
+      modal_app_version?: string | null
+    }) => {
       const positions = detection.positions || []
       const sceneChangesData = detection.scene_changes || []
       // Capture metadata so save() can persist it alongside the keyframes.
@@ -456,17 +446,46 @@ export default function EditorPage() {
         `${simplified.length} keyframes from ${positions.length} detections`
       )
       setTimeout(() => setProcessingStatus(''), 5000)
-    } catch (err) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : 'Processing failed — try importing keyframes manually'
-      setErrorMessage(msg)
-      setProcessingStatus('')
-    } finally {
-      setProcessing(false)
-    }
-  }, [])
+    },
+    []
+  )
+
+  const processVideoFile = useCallback(
+    async (file: File) => {
+      setProcessing(true)
+      setErrorMessage('')
+      setProcessingStatus('Uploading to GPU...')
+      try {
+        setProcessingStatus('Detecting ball positions on GPU...')
+        // Pass highlightId so the route seeds the shared cache on success —
+        // the next viewer of this highlight skips the Modal run entirely.
+        const hid = searchParams.get('highlightId')
+        const res = await fetch(
+          `/api/editor/process${hid ? `?highlightId=${encodeURIComponent(hid)}` : ''}`,
+          { method: 'POST', body: file }
+        )
+
+        if (res.status === 401) {
+          throw new Error('Sign in required to use ball detection')
+        }
+        if (res.status === 413) {
+          throw new Error('Video is too large (max 500MB)')
+        }
+        if (!res.ok) throw new Error('Processing failed')
+        applyDetection(await res.json())
+      } catch (err) {
+        const msg =
+          err instanceof Error
+            ? err.message
+            : 'Processing failed — try importing keyframes manually'
+        setErrorMessage(msg)
+        setProcessingStatus('')
+      } finally {
+        setProcessing(false)
+      }
+    },
+    [applyDetection, searchParams]
+  )
 
   /* ───────── file handlers ───────── */
   const validateAndImportVideo = useCallback(
@@ -558,6 +577,56 @@ export default function EditorPage() {
       )
     }
   }, [processing, processVideoFile, keyframes.length, videoUrl, videoFilename])
+
+  // Auto-crop on open: try the shared content cache first (instant), else run
+  // live detection. Drives the academy "open in editor" flow (autoDetect=1).
+  const autoCropFiredRef = useRef(false)
+  const tryAutoCrop = useCallback(async () => {
+    if (processing || keyframes.length > 0) return
+    const hid = searchParams.get('highlightId')
+    if (hid) {
+      try {
+        setProcessing(true)
+        setProcessingStatus('Loading ball track…')
+        const res = await fetch(
+          `/api/editor/detect-cache?highlightId=${encodeURIComponent(hid)}`,
+          { cache: 'no-store' }
+        )
+        if (res.ok) {
+          applyDetection(await res.json())
+          setProcessing(false)
+          return
+        }
+      } catch {
+        // cache miss / error → fall through to live detection below
+      }
+      setProcessing(false)
+    }
+    handleDetectBall()
+  }, [
+    processing,
+    keyframes.length,
+    searchParams,
+    applyDetection,
+    handleDetectBall,
+  ])
+
+  // Fire auto-crop once, after the video URL is set and the feature gate resolves.
+  useEffect(() => {
+    if (autoCropFiredRef.current) return
+    if (searchParams.get('autoDetect') !== '1') return
+    if (!videoUrl || !portraitCropEnabled) return
+    if (processing || keyframes.length > 0) return
+    autoCropFiredRef.current = true
+    tryAutoCrop()
+  }, [
+    videoUrl,
+    portraitCropEnabled,
+    processing,
+    keyframes.length,
+    searchParams,
+    tryAutoCrop,
+  ])
 
   const handleImportKeyframes = useCallback((file: File) => {
     if (file.size > 50 * 1024 * 1024) {

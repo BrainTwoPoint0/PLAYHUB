@@ -297,7 +297,10 @@ function HighlightCard({
       videoUrl,
       title: `${tag} — ${formatDuration(highlight.start)}`,
       from: 'academy',
+      autoDetect: '1', // run the crop automatically on open
     })
+    // highlightId keys the shared detection cache so repeat opens are instant.
+    if (highlight.id) params.set('highlightId', highlight.id)
     router.push(`/editor?${params.toString()}`)
   }
 
