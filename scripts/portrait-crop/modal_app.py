@@ -21,7 +21,7 @@ import os
 
 # Bumped on breaking changes to the response schema so routes can correlate
 # a job with the Modal code that produced it.
-MODAL_APP_VERSION = "2026.06.29.3"  # 25fps + DP velocity gate (reject distractor teleports)
+MODAL_APP_VERSION = "2026.06.30.1"  # 25fps, clean DP (reverted velocity gate — it degraded tracking)
 
 app = modal.App("playhub")
 

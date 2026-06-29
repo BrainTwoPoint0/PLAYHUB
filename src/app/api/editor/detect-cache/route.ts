@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
 // The detector version whose cached detections are still valid. A bump here (e.g.
 // 10fps -> 25fps for fast-play accuracy) supersedes older cached rows: they re-detect
 // on next open and re-cache. Keep in sync with modal_app.py's MODAL_APP_VERSION.
-const CURRENT_DETECTION_VERSION = '2026.06.29.3'
+const CURRENT_DETECTION_VERSION = '2026.06.30.1'
 
 export async function GET(request: NextRequest) {
   try {

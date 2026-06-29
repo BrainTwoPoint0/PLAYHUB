@@ -17,11 +17,6 @@ const DEFAULTS = {
   SIZE_MIN_REAL_REFS: 5, // need this many real-area refs or don't cull (weak evidence)
   DISTRACTOR_DISPLACE_PX: 120, // ball-x deviation from the on-trajectory interpolation
   DISTRACTOR_MIN_FRAMES: 8, // a run must be at least this long (above the spike domain)
-  // Return-excursion rejection: a same-size distractor reached after the real ball is
-  // briefly lost — the track jumps out, holds, and jumps BACK near where it left (the real
-  // ball barely moved). Caught by the jump-out/jump-back + return signature, not size/speed.
-  EXCURSION_RETURN_PX: 250, // before & after the run must agree within this (the track returned)
-  EXCURSION_MAX_FRAMES: 200, // don't treat most-of-the-clip (~8s) as an excursion
   RDP_TOLERANCE: 90, // px — how much deviation to tolerate in simplification
   ZIGZAG_THRESHOLD: 130, // px — direction reversals smaller than this get removed
   NEAR_DUPLICATE_TIME: 0.8, // seconds — merge points closer than this...
@@ -50,8 +45,6 @@ const SIZE_MEDIAN_WINDOW = DEFAULTS.SIZE_MEDIAN_WINDOW
 const SIZE_MIN_REAL_REFS = DEFAULTS.SIZE_MIN_REAL_REFS
 const DISTRACTOR_DISPLACE_PX = DEFAULTS.DISTRACTOR_DISPLACE_PX
 const DISTRACTOR_MIN_FRAMES = DEFAULTS.DISTRACTOR_MIN_FRAMES
-const EXCURSION_RETURN_PX = DEFAULTS.EXCURSION_RETURN_PX
-const EXCURSION_MAX_FRAMES = DEFAULTS.EXCURSION_MAX_FRAMES
 
 /**
  * Detect scene cuts from keyframe jumps and explicit scene_changes.
@@ -280,60 +273,6 @@ export function filterSustainedDistractor(
       devs.sort((a, b) => a - b)
       const medDev = devs.length ? devs[Math.floor(devs.length / 2)] : 0
       if (medDev > DISTRACTOR_DISPLACE_PX) {
-        for (let r = i; r <= j; r++) drop[r] = true
-      }
-    }
-    i = j + 1
-  }
-
-  return keyframes.filter((_, idx) => !drop[idx])
-}
-
-/**
- * Reject RETURN-EXCURSIONS — a same-size distractor reached AFTER the real ball is briefly
- * lost (Kalman coast), so the implied speed is plausible and the size / spike / velocity gates
- * all miss it. Signature: the track JUMPS out (>TELEPORT_PX), holds a displaced plateau, then
- * JUMPS BACK to within EXCURSION_RETURN_PX of where it left — the real ball barely moved, so
- * the detour is the wrong ball. A real play that goes far STAYS (after ≠ before), so it's kept.
- * Dropped runs are spanned by gap-fill; since before≈after, the crop holds near the real ball.
- */
-export function filterReturnExcursions(
-  keyframes: CropKeyframe[]
-): CropKeyframe[] {
-  if (keyframes.length < DISTRACTOR_MIN_FRAMES + 2) return keyframes
-  const ax = (k: CropKeyframe) => (typeof k.ballX === 'number' ? k.ballX : k.x)
-  const drop = new Array<boolean>(keyframes.length).fill(false)
-
-  let i = 1
-  while (i < keyframes.length - 1) {
-    const before = keyframes[i - 1]
-    if (Math.abs(ax(keyframes[i]) - ax(before)) < TELEPORT_PX) {
-      i++ // no jump out of the surrounding track at i
-      continue
-    }
-    // Extend the plateau while consecutive points don't themselves jump.
-    let j = i
-    while (
-      j + 1 < keyframes.length &&
-      Math.abs(ax(keyframes[j + 1]) - ax(keyframes[j])) < TELEPORT_PX
-    ) {
-      j++
-    }
-    const after = j + 1 < keyframes.length ? keyframes[j + 1] : null
-    const runLen = j - i + 1
-    if (
-      after &&
-      runLen >= DISTRACTOR_MIN_FRAMES &&
-      runLen <= EXCURSION_MAX_FRAMES &&
-      Math.abs(ax(after) - ax(keyframes[j])) >= TELEPORT_PX && // jumped back
-      Math.abs(ax(after) - ax(before)) < EXCURSION_RETURN_PX // ...to near where it left
-    ) {
-      const baseline = (ax(before) + ax(after)) / 2
-      const devs: number[] = []
-      for (let r = i; r <= j; r++)
-        devs.push(Math.abs(ax(keyframes[r]) - baseline))
-      devs.sort((a, b) => a - b)
-      if (devs[Math.floor(devs.length / 2)] > DISTRACTOR_DISPLACE_PX) {
         for (let r = i; r <= j; r++) drop[r] = true
       }
     }
@@ -971,12 +910,8 @@ export function simplifyCropKeyframes(
   // manufacture a fake cut. The spike rule can't catch this — neighbours agree.
   const deDistracted = filterSustainedDistractor(filtered)
 
-  // Step 1.6: Reject return-excursions (a same-size distractor reached after the real
-  // ball is briefly lost — jumps out, holds, jumps back near where it left).
-  const deExcursed = filterReturnExcursions(deDistracted)
-
   // Step 2: Filter clusters that deviate from surrounding ball detections
-  const clusterFiltered = filterSuspiciousClusters(deExcursed)
+  const clusterFiltered = filterSuspiciousClusters(deDistracted)
 
   // Step 2b: Dead zone — collapse jittery cluster sequences and rapid-fire ball bursts
   const deadZoned = filterDeadZone(clusterFiltered)
