@@ -14,15 +14,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python packages (match modal_app.py deps + boto3 for S3)
+# Install Python packages — MUST match modal_app.py's pinned deps (detect_ball.py
+# imports `supervision`, which was missing here → the image crashed on import).
 RUN pip3 install --no-cache-dir \
-    ultralytics \
-    opencv-python-headless \
-    norfair \
-    numpy \
-    scipy \
-    sahi \
-    boto3
+    "ultralytics" \
+    "opencv-python-headless==4.8.1.78" \
+    "norfair" \
+    "numpy==1.26.2" \
+    "scipy" \
+    "sahi" \
+    "supervision==0.26.1" \
+    "boto3"
 
 WORKDIR /app
 
