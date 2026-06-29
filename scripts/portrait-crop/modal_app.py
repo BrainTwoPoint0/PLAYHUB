@@ -21,7 +21,7 @@ import os
 
 # Bumped on breaking changes to the response schema so routes can correlate
 # a job with the Modal code that produced it.
-MODAL_APP_VERSION = "2026.06.29.2"  # 25fps detection — accuracy (fast-play keyframes)
+MODAL_APP_VERSION = "2026.06.29.3"  # 25fps + DP velocity gate (reject distractor teleports)
 
 app = modal.App("playhub")
 

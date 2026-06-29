@@ -462,6 +462,15 @@ DP_REGION_WEIGHT = 0.0     # soft penalty for candidates far OUTSIDE the play re
 DP_REGION_RADIUS = 700.0   # px — deadband: candidates within this of the player cluster pay nothing
 DP_REGION_SCALE = 500.0    # px — distance beyond the radius at which the penalty = DP_REGION_WEIGHT
 DP_REGION_CAP = 3.0        # max region penalty (a long clearance isn't punished into a miss)
+# Velocity gate: a real ball tops out ~2000 px/s even on a hard near-camera shot (1920px ≈
+# the visible pitch width). A transition implying more is the track teleporting to a
+# DIFFERENT ball (another pitch, same size) — the deviation cost alone is too cheap to stop
+# it once the distractor gives a few confident seconds. Make an impossible-speed transition
+# near-prohibitive so the DP coasts/holds (or keeps the real ball) instead of switching.
+# Penalty is finite + tuned so a brief (~3-5s) distractor never justifies the jump, while a
+# genuine scene cut to the rest of the clip (sustained, many frames) still can.
+DP_MAX_BALL_SPEED = 3000.0   # px/s — 1.5x the real hard-shot max; teleports run 10000+ px/s
+DP_TELEPORT_PENALTY = 1000.0 # additive cost on an impossible-speed transition
 
 
 def select_trajectory(per_frame_data: list) -> list:
@@ -524,6 +533,12 @@ def select_trajectory(per_frame_data: list) -> list:
                     px, py = lrx + vx * elapsed, lry + vy * elapsed
                     sig = DP_SIGMA * (elapsed / base_dt)          # tolerance grows with the gap
                     trans = ((sj["x"] - px) ** 2 + (sj["y"] - py) ** 2) / (2.0 * sig * sig)
+                    # Velocity gate — impossible implied speed = a teleport to a distractor.
+                    # Speed (not raw distance) so a far re-acquisition across a long occlusion
+                    # gap is fine (low speed), but a far candidate one frame later is not.
+                    speed = math.hypot(sj["x"] - lrx, sj["y"] - lry) / elapsed
+                    if speed > DP_MAX_BALL_SPEED:
+                        trans += DP_TELEPORT_PENALTY
                     nvx, nvy = (sj["x"] - lrx) / elapsed, (sj["y"] - lry) / elapsed
                     cand = (pc + trans + ncj, i, nvx, nvy, sj["x"], sj["y"], tj)
                 if cand[0] < best[0]:

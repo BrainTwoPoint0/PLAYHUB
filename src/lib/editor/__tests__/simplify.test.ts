@@ -5,6 +5,7 @@ import {
   detectSceneCuts,
   filterZigzags,
   filterSustainedDistractor,
+  filterReturnExcursions,
 } from '../simplify'
 import type { CropKeyframe } from '../types'
 
@@ -57,6 +58,26 @@ describe('filterSustainedDistractor (smaller ball on another pitch)', () => {
     for (let i = 0; i < 8; i++) kfs.push(kfA(1.8 + i * 0.1, 940 + i * 30, 176))
     const result = filterSustainedDistractor(kfs)
     expect(result.length).toBe(kfs.length) // on-trajectory small ball survives the displacement gate
+  })
+})
+
+describe('filterReturnExcursions (same-size distractor after a brief loss)', () => {
+  it('drops a run that jumps out and returns near where it left', () => {
+    const kfs: CropKeyframe[] = []
+    for (let i = 0; i < 6; i++) kfs.push(kfA(i * 0.1, 820 + i * 2, 176)) // real ball ~820-830
+    for (let i = 0; i < 12; i++) kfs.push(kfA(0.6 + i * 0.1, 1340, 176)) // jump to distractor, hold
+    for (let i = 0; i < 6; i++) kfs.push(kfA(1.8 + i * 0.1, 900 + i * 2, 176)) // jump BACK near start
+    const result = filterReturnExcursions(kfs)
+    expect(result.every((k) => (k.ballX ?? 0) !== 1340)).toBe(true)
+    expect(result.length).toBe(12) // 24 − 12 excursion frames
+  })
+
+  it('keeps a real play that moves far and STAYS (after != before)', () => {
+    const kfs: CropKeyframe[] = []
+    for (let i = 0; i < 6; i++) kfs.push(kfA(i * 0.1, 820, 176)) // ball at left
+    for (let i = 0; i < 18; i++) kfs.push(kfA(0.6 + i * 0.1, 1340, 176)) // moves right and STAYS
+    const result = filterReturnExcursions(kfs)
+    expect(result.length).toBe(kfs.length) // never returns → real play → kept
   })
 })
 
