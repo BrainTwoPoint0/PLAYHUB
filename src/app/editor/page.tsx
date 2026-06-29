@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { motion, AnimatePresence } from 'motion/react'
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import {
   type CropKeyframe,
   detectionsToCropKeyframes,
@@ -71,6 +71,7 @@ export default function EditorPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
   const [posterUrl, setPosterUrl] = useState<string | null>(null)
+  const prefersReducedMotion = useReducedMotion()
   const [trimStart, setTrimStart] = useState(0)
   const [trimEnd, setTrimEnd] = useState(0) // 0 = use full duration
   const [outroFile, setOutroFile] = useState<File | null>(null)
@@ -459,9 +460,9 @@ export default function EditorPage() {
     async (file: File) => {
       setProcessing(true)
       setErrorMessage('')
-      setProcessingStatus('Uploading to GPU...')
+      setProcessingStatus('Preparing footage…')
       try {
-        setProcessingStatus('Detecting ball positions on GPU...')
+        setProcessingStatus('Finding the ball…')
         // Pass highlightId so the route seeds the shared cache on success —
         // the next viewer of this highlight skips the Modal run entirely.
         const hid = searchParams.get('highlightId')
@@ -561,7 +562,7 @@ export default function EditorPage() {
     // branch silently no-op'd because the handler bailed on missing File.
     setProcessing(true)
     setErrorMessage('')
-    setProcessingStatus('Fetching video from source…')
+    setProcessingStatus('Loading footage…')
     try {
       const res = await fetch(videoUrl!)
       if (!res.ok) throw new Error(`Video fetch failed (${res.status})`)
@@ -592,7 +593,7 @@ export default function EditorPage() {
     if (hid) {
       try {
         setProcessing(true)
-        setProcessingStatus('Loading ball track…')
+        setProcessingStatus('Loading saved crop…')
         const res = await fetch(
           `/api/editor/detect-cache?highlightId=${encodeURIComponent(hid)}`,
           { cache: 'no-store' }
@@ -1285,7 +1286,7 @@ export default function EditorPage() {
           <button
             onClick={undo}
             disabled={history.length === 0}
-            className="rounded p-2 min-h-[36px] min-w-[36px] flex items-center justify-center transition-colors hover:bg-white/5 disabled:opacity-20"
+            className="rounded p-2 min-h-[36px] min-w-[36px] flex items-center justify-center transition-colors hover:bg-[var(--timberwolf)]/[0.06] disabled:opacity-20"
             title="Undo (⌘Z)"
           >
             <Undo2 size={14} />
@@ -1293,7 +1294,7 @@ export default function EditorPage() {
           <button
             onClick={redo}
             disabled={future.length === 0}
-            className="rounded p-2 min-h-[36px] min-w-[36px] flex items-center justify-center transition-colors hover:bg-white/5 disabled:opacity-20"
+            className="rounded p-2 min-h-[36px] min-w-[36px] flex items-center justify-center transition-colors hover:bg-[var(--timberwolf)]/[0.06] disabled:opacity-20"
             title="Redo (⌘⇧Z)"
           >
             <Redo2 size={14} />
@@ -1309,14 +1310,14 @@ export default function EditorPage() {
           {/* Import */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="rounded p-2 min-h-[36px] min-w-[36px] flex items-center justify-center transition-colors hover:bg-white/5"
+            className="rounded p-2 min-h-[36px] min-w-[36px] flex items-center justify-center transition-colors hover:bg-[var(--timberwolf)]/[0.06]"
             title="Import video"
           >
             <Upload size={14} />
           </button>
           <button
             onClick={() => jsonInputRef.current?.click()}
-            className="hidden sm:flex rounded p-2 min-h-[36px] min-w-[36px] items-center justify-center transition-colors hover:bg-white/5"
+            className="hidden sm:flex rounded p-2 min-h-[36px] min-w-[36px] items-center justify-center transition-colors hover:bg-[var(--timberwolf)]/[0.06]"
             title="Import keyframes JSON"
           >
             <FileJson size={14} />
@@ -1354,7 +1355,7 @@ export default function EditorPage() {
                     setOutroThumb(null)
                   }
                 }}
-                className="rounded p-0.5 hover:bg-white/10 transition-colors"
+                className="rounded p-0.5 hover:bg-[var(--timberwolf)]/10 transition-colors"
                 title="Remove outro"
               >
                 <X size={10} className="opacity-40" />
@@ -1363,7 +1364,7 @@ export default function EditorPage() {
           ) : (
             <button
               onClick={() => outroInputRef.current?.click()}
-              className="hidden sm:flex items-center gap-1 rounded px-2 py-2 min-h-[36px] text-xs transition-colors hover:bg-white/5 opacity-40 hover:opacity-70"
+              className="hidden sm:flex items-center gap-1 rounded px-2 py-2 min-h-[36px] text-xs transition-colors hover:bg-[var(--timberwolf)]/[0.06] opacity-40 hover:opacity-70"
               title="Add outro video"
             >
               <Plus size={11} />
@@ -1386,7 +1387,7 @@ export default function EditorPage() {
                       ? `Saved ${savedAgo}`
                       : 'Save keyframes'
               }
-              className="flex items-center gap-1.5 rounded px-2 py-2 min-h-[36px] transition-colors hover:bg-white/5 disabled:opacity-30"
+              className="flex items-center gap-1.5 rounded px-2 py-2 min-h-[36px] transition-colors hover:bg-[var(--timberwolf)]/[0.06] disabled:opacity-30"
               title={
                 saveError
                   ? `Save failed: ${saveError}`
@@ -1444,7 +1445,7 @@ export default function EditorPage() {
           {/* Keyboard shortcuts — hidden on mobile */}
           <button
             onClick={() => setShowShortcuts(!showShortcuts)}
-            className="hidden sm:flex rounded p-2 min-h-[36px] min-w-[36px] items-center justify-center transition-colors hover:bg-white/5"
+            className="hidden sm:flex rounded p-2 min-h-[36px] min-w-[36px] items-center justify-center transition-colors hover:bg-[var(--timberwolf)]/[0.06]"
             title="Keyboard shortcuts"
           >
             <Keyboard size={14} />
@@ -1494,7 +1495,7 @@ export default function EditorPage() {
             <span>{errorMessage}</span>
             <button
               onClick={() => setErrorMessage('')}
-              className="p-1 hover:bg-white/5 rounded"
+              className="p-1 hover:bg-[var(--timberwolf)]/[0.06] rounded"
             >
               <X size={12} />
             </button>
@@ -1524,6 +1525,78 @@ export default function EditorPage() {
                 <p className="text-sm opacity-60">
                   Drop video or keyframes JSON
                 </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Detection wait overlay — poster-backed, plain language. The primary
+            reassurance during the ~17s detect (the toolbar spinner is secondary). */}
+        <AnimatePresence>
+          {processing && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-3 z-40 flex flex-col items-center justify-center overflow-hidden rounded-xl"
+              style={{
+                background: 'rgba(10,16,13,0.82)',
+                backdropFilter: 'blur(2px)',
+              }}
+            >
+              {posterUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={posterUrl}
+                  alt=""
+                  aria-hidden
+                  className="absolute inset-0 h-full w-full object-contain opacity-[0.18]"
+                />
+              )}
+              <div
+                className="relative flex flex-col items-center px-6 text-center"
+                role="status"
+                aria-live="polite"
+              >
+                <div className="relative mb-5 h-12 w-12">
+                  <motion.span
+                    className="absolute inset-0 rounded-lg border border-[var(--timberwolf)]/60"
+                    animate={
+                      prefersReducedMotion
+                        ? undefined
+                        : { scale: [1, 0.82, 1], opacity: [0.45, 1, 0.45] }
+                    }
+                    transition={{
+                      duration: 1.6,
+                      repeat: Infinity,
+                      ease: 'easeInOut',
+                    }}
+                  />
+                  <Loader2
+                    size={18}
+                    className="absolute inset-0 m-auto animate-spin text-[var(--timberwolf)]"
+                  />
+                </div>
+                <p className="text-sm font-medium text-[var(--timberwolf)]">
+                  {processingStatus || 'Finding the ball…'}
+                </p>
+                <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-[var(--ash-grey)]">
+                  This usually takes about 15 seconds. You&rsquo;ll be able to
+                  adjust everything after.
+                </p>
+                <div className="mt-4 h-0.5 w-48 overflow-hidden rounded-full bg-[var(--timberwolf)]/10">
+                  <motion.div
+                    className="h-full w-1/3 rounded-full bg-[var(--timberwolf)]"
+                    animate={
+                      prefersReducedMotion ? { x: 0 } : { x: ['-110%', '320%'] }
+                    }
+                    transition={{
+                      duration: 1.4,
+                      repeat: Infinity,
+                      ease: 'easeInOut',
+                    }}
+                  />
+                </div>
               </div>
             </motion.div>
           )}
@@ -1582,7 +1655,7 @@ export default function EditorPage() {
               onClick={() =>
                 setPreviewMode((m) => (m === 'split' ? 'portrait' : 'split'))
               }
-              className="absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-lg px-2.5 py-2 min-h-[36px] text-xs transition-colors hover:bg-white/10"
+              className="absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-lg px-2.5 py-2 min-h-[36px] text-xs transition-colors hover:bg-[var(--timberwolf)]/10"
               style={{
                 background: 'rgba(10,16,13,0.8)',
                 border: '1px solid var(--editor-border, rgba(185,186,163,0.1))',
@@ -1744,10 +1817,7 @@ export default function EditorPage() {
             {/* Left: time display */}
             <div
               className="flex items-center gap-2 tabular-nums"
-              style={{
-                fontFamily: 'var(--font-mono, monospace)',
-                fontSize: '13px',
-              }}
+              style={{ fontSize: '13px' }}
             >
               <span className="text-emerald-400">
                 {formatTime(currentTime)}
@@ -1767,21 +1837,21 @@ export default function EditorPage() {
                   nearestKeyframes.prev && seek(nearestKeyframes.prev.time)
                 }
                 disabled={!nearestKeyframes.prev}
-                className="rounded p-2 min-h-[40px] min-w-[40px] flex items-center justify-center transition-colors hover:bg-white/5 disabled:opacity-20"
+                className="rounded p-2 min-h-[40px] min-w-[40px] flex items-center justify-center transition-colors hover:bg-[var(--timberwolf)]/[0.06] disabled:opacity-20"
                 title="Previous keyframe"
               >
                 <SkipBack size={14} />
               </button>
               <button
                 onClick={stepBackward}
-                className="rounded p-2 min-h-[40px] min-w-[40px] flex items-center justify-center transition-colors hover:bg-white/5"
+                className="rounded p-2 min-h-[40px] min-w-[40px] flex items-center justify-center transition-colors hover:bg-[var(--timberwolf)]/[0.06]"
                 title="Step back (←)"
               >
                 <ChevronLeft size={16} />
               </button>
               <button
                 onClick={togglePlay}
-                className="mx-1 flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-white/10"
+                className="mx-1 flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-[var(--timberwolf)]/10"
                 style={{ background: 'rgba(16,185,129,0.15)' }}
                 title="Play/Pause (Space)"
               >
@@ -1793,7 +1863,7 @@ export default function EditorPage() {
               </button>
               <button
                 onClick={stepForward}
-                className="rounded p-2 min-h-[40px] min-w-[40px] flex items-center justify-center transition-colors hover:bg-white/5"
+                className="rounded p-2 min-h-[40px] min-w-[40px] flex items-center justify-center transition-colors hover:bg-[var(--timberwolf)]/[0.06]"
                 title="Step forward (→)"
               >
                 <ChevronRight size={16} />
@@ -1803,7 +1873,7 @@ export default function EditorPage() {
                   nearestKeyframes.next && seek(nearestKeyframes.next.time)
                 }
                 disabled={!nearestKeyframes.next}
-                className="rounded p-2 min-h-[40px] min-w-[40px] flex items-center justify-center transition-colors hover:bg-white/5 disabled:opacity-20"
+                className="rounded p-2 min-h-[40px] min-w-[40px] flex items-center justify-center transition-colors hover:bg-[var(--timberwolf)]/[0.06] disabled:opacity-20"
                 title="Next keyframe"
               >
                 <SkipForward size={14} />
@@ -1818,7 +1888,7 @@ export default function EditorPage() {
                   <button
                     onClick={trimDeleteLeft}
                     disabled={currentTime <= trimStart}
-                    className="rounded p-2 min-h-[36px] min-w-[36px] flex items-center justify-center text-xs transition-colors hover:bg-white/5 disabled:opacity-20"
+                    className="rounded p-2 min-h-[36px] min-w-[36px] flex items-center justify-center text-xs transition-colors hover:bg-[var(--timberwolf)]/[0.06] disabled:opacity-20"
                     title="Delete left of playhead"
                   >
                     <span className="flex items-center gap-0.5">
@@ -1828,7 +1898,7 @@ export default function EditorPage() {
                   </button>
                   <button
                     onClick={addSplitMarker}
-                    className="rounded p-2 min-h-[36px] min-w-[36px] flex items-center justify-center text-xs transition-colors hover:bg-white/5"
+                    className="rounded p-2 min-h-[36px] min-w-[36px] flex items-center justify-center text-xs transition-colors hover:bg-[var(--timberwolf)]/[0.06]"
                     title="Split at playhead (S)"
                   >
                     <Scissors size={12} />
@@ -1836,7 +1906,7 @@ export default function EditorPage() {
                   <button
                     onClick={trimDeleteRight}
                     disabled={currentTime >= (trimEnd || duration)}
-                    className="rounded p-2 min-h-[36px] min-w-[36px] flex items-center justify-center text-xs transition-colors hover:bg-white/5 disabled:opacity-20"
+                    className="rounded p-2 min-h-[36px] min-w-[36px] flex items-center justify-center text-xs transition-colors hover:bg-[var(--timberwolf)]/[0.06] disabled:opacity-20"
                     title="Delete right of playhead"
                   >
                     <span className="flex items-center gap-0.5">
@@ -1847,18 +1917,18 @@ export default function EditorPage() {
                   {(trimStart > 0 || trimEnd > 0) && (
                     <button
                       onClick={trimReset}
-                      className="rounded p-2 min-h-[36px] text-xs transition-colors hover:bg-white/5 opacity-40 hover:opacity-80"
+                      className="rounded p-2 min-h-[36px] text-xs transition-colors hover:bg-[var(--timberwolf)]/[0.06] opacity-40 hover:opacity-80"
                       title="Reset trim"
                     >
                       <RotateCcw size={10} />
                     </button>
                   )}
-                  <div className="w-px h-4 bg-white/10 mx-0.5" />
+                  <div className="w-px h-4 bg-[var(--timberwolf)]/10 mx-0.5" />
                 </>
               )}
               <button
                 onClick={addKeyframe}
-                className="flex items-center gap-1 rounded px-2 py-2 min-h-[36px] text-xs transition-colors hover:bg-white/5"
+                className="flex items-center gap-1 rounded px-2 py-2 min-h-[36px] text-xs transition-colors hover:bg-[var(--timberwolf)]/[0.06]"
                 title="Add keyframe (K)"
               >
                 <Plus size={12} />
@@ -1867,7 +1937,7 @@ export default function EditorPage() {
               {keyframes.length > 5 && (
                 <button
                   onClick={simplifyKeyframes}
-                  className="hidden sm:flex items-center gap-1 rounded px-2 py-2 min-h-[36px] text-xs transition-colors hover:bg-white/5"
+                  className="hidden sm:flex items-center gap-1 rounded px-2 py-2 min-h-[36px] text-xs transition-colors hover:bg-[var(--timberwolf)]/[0.06]"
                   title="Simplify keyframes"
                 >
                   <Sparkles size={12} />
@@ -1879,7 +1949,7 @@ export default function EditorPage() {
                   {selectedKeyframe?.source === 'user' && (
                     <button
                       onClick={() => resetKeyframe(selectedIndex)}
-                      className="rounded p-2 min-h-[36px] min-w-[36px] flex items-center justify-center text-xs transition-colors hover:bg-white/5"
+                      className="rounded p-2 min-h-[36px] min-w-[36px] flex items-center justify-center text-xs transition-colors hover:bg-[var(--timberwolf)]/[0.06]"
                       title="Reset to AI value"
                     >
                       <RotateCcw size={12} />
@@ -2007,10 +2077,10 @@ export default function EditorPage() {
                 transform: 'translateX(-50%)',
               }}
             >
-              <div className="mx-auto h-full w-px bg-white/80" />
+              <div className="mx-auto h-full w-px bg-[var(--timberwolf)]/80" />
               <div
                 className="absolute -top-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 rounded-sm"
-                style={{ background: 'rgba(255,255,255,0.9)' }}
+                style={{ background: 'rgba(214,213,201,0.9)' }}
               />
             </div>
           </div>
@@ -2107,10 +2177,7 @@ export default function EditorPage() {
             <span className="opacity-60">
               {selectedKeyframe.source.replace('ai_', 'AI ')}
             </span>
-            <span
-              className="tabular-nums"
-              style={{ fontFamily: 'var(--font-mono, monospace)' }}
-            >
+            <span className="tabular-nums">
               {formatTime(selectedKeyframe.time)}
             </span>
             <span className="opacity-40">x: {selectedKeyframe.x}px</span>
