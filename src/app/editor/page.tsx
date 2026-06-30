@@ -14,6 +14,7 @@ import {
   KEYFRAME_COLORS,
 } from '@/lib/editor/types'
 import { simplifyCropKeyframes } from '@/lib/editor/simplify'
+import { removeKeyframeRange } from '@/lib/editor/keyframes'
 import {
   Upload,
   FileJson,
@@ -60,6 +61,8 @@ export default function EditorPage() {
   const [keyframes, setKeyframes] = useState<CropKeyframe[]>([])
   const [sceneChanges, setSceneChanges] = useState<number[]>([])
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+  // The other end of a shift-click range selection (selectedIndex is the anchor).
+  const [rangeAnchor, setRangeAnchor] = useState<number | null>(null)
   const [dragCropX, setDragCropX] = useState<number | null>(null)
   const [history, setHistory] = useState<CropKeyframe[][]>([])
   const [future, setFuture] = useState<CropKeyframe[][]>([])
@@ -1002,13 +1005,37 @@ export default function EditorPage() {
     setSelectedIndex(null)
   }, [updateKeyframes, sceneChanges])
 
-  const deleteKeyframe = useCallback(
-    (index: number) => {
-      updateKeyframes((prev) => prev.filter((_, i) => i !== index))
-      setSelectedIndex(null)
-    },
-    [updateKeyframes]
-  )
+  // Active selection as an inclusive index range ([lo,hi]; single keyframe when no
+  // shift-range). selectionCount drives the "Delete N keyframes" label.
+  const selectionLo =
+    rangeAnchor !== null && selectedIndex !== null
+      ? Math.min(selectedIndex, rangeAnchor)
+      : selectedIndex
+  const selectionHi =
+    rangeAnchor !== null && selectedIndex !== null
+      ? Math.max(selectedIndex, rangeAnchor)
+      : selectedIndex
+  const selectionCount =
+    selectionLo !== null && selectionHi !== null
+      ? selectionHi - selectionLo + 1
+      : 0
+
+  // Delete the whole selection (a single keyframe, or a shift-click range) in one action
+  // — the fast path for clearing a stretch where the AI crop followed a distractor.
+  const deleteSelection = useCallback(() => {
+    if (selectedIndex === null) return
+    const lo =
+      rangeAnchor !== null
+        ? Math.min(selectedIndex, rangeAnchor)
+        : selectedIndex
+    const hi =
+      rangeAnchor !== null
+        ? Math.max(selectedIndex, rangeAnchor)
+        : selectedIndex
+    updateKeyframes((prev) => removeKeyframeRange(prev, lo, hi))
+    setSelectedIndex(null)
+    setRangeAnchor(null)
+  }, [selectedIndex, rangeAnchor, updateKeyframes])
 
   const resetKeyframe = useCallback(
     (index: number) => {
@@ -1095,7 +1122,7 @@ export default function EditorPage() {
         case 'Backspace':
           if (selectedIndex !== null) {
             e.preventDefault()
-            deleteKeyframe(selectedIndex)
+            deleteSelection()
           }
           break
         case 'KeyS':
@@ -1108,6 +1135,7 @@ export default function EditorPage() {
           break
         case 'Escape':
           setSelectedIndex(null)
+          setRangeAnchor(null)
           setShowShortcuts(false)
           break
       }
@@ -1119,7 +1147,7 @@ export default function EditorPage() {
     seek,
     addKeyframe,
     addSplitMarker,
-    deleteKeyframe,
+    deleteSelection,
     undo,
     redo,
     selectedIndex,
@@ -1967,11 +1995,18 @@ export default function EditorPage() {
                     </button>
                   )}
                   <button
-                    onClick={() => deleteKeyframe(selectedIndex)}
-                    className="rounded p-2 min-h-[36px] min-w-[36px] flex items-center justify-center text-xs text-red-400 transition-colors hover:bg-red-400/10"
-                    title="Delete keyframe (⌫)"
+                    onClick={deleteSelection}
+                    className="flex min-h-[36px] items-center justify-center gap-1.5 rounded px-2 text-xs text-red-400 transition-colors hover:bg-red-400/10"
+                    title={
+                      selectionCount > 1
+                        ? `Delete ${selectionCount} keyframes (⌫)`
+                        : 'Delete keyframe (⌫)'
+                    }
                   >
                     <Trash2 size={12} />
+                    {selectionCount > 1 && (
+                      <span className="tabular-nums">{selectionCount}</span>
+                    )}
                   </button>
                 </>
               )}
@@ -2046,6 +2081,12 @@ export default function EditorPage() {
             {keyframes.map((kf, i) => {
               const maxX = SOURCE_WIDTH - CROP_WIDTH
               const yPct = 100 - (kf.x / maxX) * 100
+              const inSelection =
+                selectionLo !== null &&
+                selectionHi !== null &&
+                i >= selectionLo &&
+                i <= selectionHi
+              const uncertain = kf.source !== 'user' && kf.confidence < 0.35
               return (
                 <button
                   key={`kf-${i}`}
@@ -2058,21 +2099,31 @@ export default function EditorPage() {
                   }}
                   onClick={(e) => {
                     e.stopPropagation()
-                    setSelectedIndex(i)
-                    seek(kf.time)
+                    if (e.shiftKey && selectedIndex !== null) {
+                      setRangeAnchor(i) // extend the selection from the anchor to here
+                    } else {
+                      setSelectedIndex(i)
+                      setRangeAnchor(null)
+                      seek(kf.time)
+                    }
                   }}
-                  title={`${kf.source} @ ${formatTime(kf.time)}`}
+                  title={`${kf.source} @ ${formatTime(kf.time)}${uncertain ? ' · low confidence' : ''}`}
                 >
                   <div
                     style={{
-                      width: selectedIndex === i ? '10px' : '6px',
-                      height: selectedIndex === i ? '10px' : '6px',
+                      width: inSelection ? '10px' : '6px',
+                      height: inSelection ? '10px' : '6px',
                       borderRadius: '50%',
                       background: KEYFRAME_COLORS[kf.source],
                       boxShadow:
-                        selectedIndex === i
-                          ? `0 0 8px ${KEYFRAME_COLORS[kf.source]}`
-                          : 'none',
+                        [
+                          inSelection
+                            ? `0 0 8px ${KEYFRAME_COLORS[kf.source]}`
+                            : '',
+                          uncertain ? '0 0 0 2px rgba(244,63,94,0.65)' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(', ') || 'none',
                       transition: 'all 0.15s ease',
                     }}
                   />
@@ -2094,6 +2145,37 @@ export default function EditorPage() {
                 style={{ background: 'rgba(214,213,201,0.9)' }}
               />
             </div>
+          </div>
+
+          {/* Keyframe legend + range-select hint */}
+          <div className="mx-3 mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-[var(--ash-grey)]/70">
+            <span className="flex items-center gap-1.5">
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ background: KEYFRAME_COLORS.ai_ball }}
+              />
+              AI
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ background: KEYFRAME_COLORS.user }}
+              />
+              You
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{
+                  background: KEYFRAME_COLORS.ai_ball,
+                  boxShadow: '0 0 0 1.5px rgba(244,63,94,0.65)',
+                }}
+              />
+              Uncertain
+            </span>
+            <span className="ml-auto hidden sm:inline">
+              ⇧-click a dot to select a range, then ⌫
+            </span>
           </div>
         </div>
       )}
@@ -2138,7 +2220,8 @@ export default function EditorPage() {
                   ['← / →', 'Step 0.2s'],
                   ['⇧← / ⇧→', 'Step 1s'],
                   ['K', 'Add keyframe'],
-                  ['⌫', 'Delete selected keyframe'],
+                  ['⇧-click', 'Select keyframe range'],
+                  ['⌫', 'Delete selection'],
                   ['⌘Z / ⌘⇧Z', 'Undo / Redo'],
                   ['P', 'Toggle preview mode'],
                   ['Esc', 'Deselect'],
