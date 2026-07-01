@@ -31,15 +31,26 @@ export const TIKTOK_SCOPES = [
 
 const BUFFER_MS = 5 * 60 * 1000 // refresh 5 min before expiry
 
+// Until the production app is approved, TikTok requires authorizing against the
+// sandbox, which issues its OWN client key/secret. Sandbox creds take precedence
+// when present; once approved, clear TIKTOK_CLIENT_SANDBOX_* to fall back to the
+// production TIKTOK_CLIENT_KEY/SECRET without a code change.
 function getClientKey(): string {
-  const key = process.env.TIKTOK_CLIENT_KEY
-  if (!key) throw new Error('TIKTOK_CLIENT_KEY is not configured')
+  const key = process.env.TIKTOK_CLIENT_SANDBOX_KEY || process.env.TIKTOK_CLIENT_KEY
+  if (!key) {
+    throw new Error('TIKTOK_CLIENT_KEY (or TIKTOK_CLIENT_SANDBOX_KEY) is not configured')
+  }
   return key
 }
 
 function getClientSecret(): string {
-  const secret = process.env.TIKTOK_CLIENT_SECRET
-  if (!secret) throw new Error('TIKTOK_CLIENT_SECRET is not configured')
+  const secret =
+    process.env.TIKTOK_CLIENT_SANDBOX_SECRET || process.env.TIKTOK_CLIENT_SECRET
+  if (!secret) {
+    throw new Error(
+      'TIKTOK_CLIENT_SECRET (or TIKTOK_CLIENT_SANDBOX_SECRET) is not configured'
+    )
+  }
   return secret
 }
 
