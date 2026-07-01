@@ -41,6 +41,7 @@ import {
   Save,
   Check,
   AlertTriangle,
+  Share2,
 } from 'lucide-react'
 
 /* ───────── constants ───────── */
@@ -109,6 +110,10 @@ export default function EditorPage() {
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [rendering, setRendering] = useState(false)
+  // Storage path of the most recent portrait render — enables "Share to TikTok".
+  const [lastRenderPath, setLastRenderPath] = useState<string | null>(null)
+  const [sharingTikTok, setSharingTikTok] = useState(false)
+  const [tiktokShareMsg, setTiktokShareMsg] = useState<string | null>(null)
   const videoFileRef = useRef<File | null>(null)
   const videoUrlRef = useRef<string | null>(null) // for cleanup on unmount
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -776,7 +781,15 @@ export default function EditorPage() {
         const data = (await res.json().catch(() => ({}))) as { error?: string }
         throw new Error(data.error || `Render failed (${res.status})`)
       }
-      const { signedUrl } = (await res.json()) as { signedUrl: string }
+      const { signedUrl, storagePath } = (await res.json()) as {
+        signedUrl: string
+        storagePath?: string
+      }
+      // Remember the render so it can be shared to TikTok without re-rendering.
+      if (storagePath) {
+        setLastRenderPath(storagePath)
+        setTiktokShareMsg(null)
+      }
       // Force-download the finished clip (the signed URL is Content-Disposition: attachment).
       const a = document.createElement('a')
       a.href = signedUrl
@@ -801,6 +814,37 @@ export default function EditorPage() {
     sceneChanges,
     videoFilename,
   ])
+
+  /* ───────── Share the rendered portrait clip to TikTok ───────── */
+  const handleShareToTikTok = useCallback(async () => {
+    if (sharingTikTok || !lastRenderPath) return
+    setSharingTikTok(true)
+    setTiktokShareMsg(null)
+    try {
+      const res = await fetch('/api/tiktok/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storagePath: lastRenderPath }),
+      })
+      if (res.status === 409) {
+        // Not connected (or connection expired) — send them to connect.
+        window.location.href = '/tiktok'
+        return
+      }
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(data.error || `Share failed (${res.status})`)
+      }
+      // Draft flow: the clip lands in the creator's TikTok inbox to finish posting.
+      setTiktokShareMsg('Sent to your TikTok inbox — open TikTok to post it.')
+    } catch (err) {
+      setTiktokShareMsg(
+        err instanceof Error ? err.message : 'Could not share to TikTok'
+      )
+    } finally {
+      setSharingTikTok(false)
+    }
+  }, [sharingTikTok, lastRenderPath])
 
   /* ───────── Phase 3: save keyframes to Supabase via /api/editor/save ───────── */
   const canPersist = portraitCropEnabled === true && Boolean(recordingId)
@@ -1471,6 +1515,27 @@ export default function EditorPage() {
             </span>
           </button>
 
+          {/* Share to TikTok — appears once a portrait render exists */}
+          {lastRenderPath && (
+            <button
+              onClick={handleShareToTikTok}
+              disabled={sharingTikTok}
+              aria-busy={sharingTikTok}
+              aria-label="Share the rendered clip to TikTok"
+              className="flex items-center gap-1.5 rounded-md px-3 py-2 min-h-[36px] text-sm font-medium text-[var(--timberwolf)] border border-[var(--timberwolf)]/20 transition-colors hover:bg-[var(--timberwolf)]/[0.06] disabled:opacity-40"
+              title="Share to TikTok"
+            >
+              {sharingTikTok ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Share2 size={14} />
+              )}
+              <span className="hidden sm:inline">
+                {sharingTikTok ? 'Sharing…' : 'Share to TikTok'}
+              </span>
+            </button>
+          )}
+
           {/* Export raw keyframe data — advanced/dev affordance */}
           <button
             onClick={handleExport}
@@ -1534,6 +1599,31 @@ export default function EditorPage() {
             <span>{errorMessage}</span>
             <button
               onClick={() => setErrorMessage('')}
+              className="p-1 hover:bg-[var(--timberwolf)]/[0.06] rounded"
+            >
+              <X size={12} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── TIKTOK SHARE STATUS ── */}
+      <AnimatePresence>
+        {tiktokShareMsg && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="flex items-center justify-between px-3 py-2 text-xs text-[var(--timberwolf)] overflow-hidden"
+            style={{
+              background: 'rgba(214,213,201,0.06)',
+              borderBottom:
+                '1px solid var(--editor-border, rgba(185,186,163,0.08))',
+            }}
+          >
+            <span>{tiktokShareMsg}</span>
+            <button
+              onClick={() => setTiktokShareMsg(null)}
               className="p-1 hover:bg-[var(--timberwolf)]/[0.06] rounded"
             >
               <X size={12} />

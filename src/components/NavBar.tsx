@@ -28,6 +28,7 @@ import {
   Building2,
   GraduationCap,
   ShieldCheck,
+  Music2,
 } from 'lucide-react'
 import { cn } from '@braintwopoint0/playback-commons/utils'
 
@@ -88,6 +89,7 @@ export default function NavBar() {
   // Build nav links — static ones always, conditional ones only after all checks complete
   const navLinks = [
     { href: '/recordings', label: 'My Recordings', icon: Film },
+    { href: '/tiktok', label: 'TikTok', icon: Music2 },
     ...(navReady && hasVenues
       ? [{ href: '/venue', label: 'Manage Venue', icon: Building2 }]
       : []),
