@@ -70,3 +70,6 @@ check-*.mjs
 
 # Phase 4 training data — clips + sidecars, multi-GB, never committed
 training-data/
+
+# Dev-server build dir (separate from .next so `next build` cannot clobber a running dev server)
+.next-dev/
