@@ -27,6 +27,10 @@ import {
   ReferenceLine,
 } from 'recharts'
 import { LoadingSpinner } from '@/components/ui/loading'
+import {
+  buildDefaultTitle,
+  buildDefaultDescription,
+} from '@/lib/recordings/defaults'
 import { HlsPlayer } from '@/components/streaming/HlsPlayer'
 import { AuditHistory } from '@/components/venue/AuditHistory'
 import { ClutchVenueStats } from '@/components/venue/ClutchVenueStats'
@@ -400,6 +404,9 @@ export default function VenueManagementPage() {
   const [accessEmails, setAccessEmails] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
+  // Last auto-generated description — lets start-time changes keep the
+  // description in sync without ever overwriting manager-typed text.
+  const lastAutoDescriptionRef = useRef('')
 
   // Access modal state
   const [showAccessModal, setShowAccessModal] = useState(false)
@@ -1470,6 +1477,7 @@ export default function VenueManagementPage() {
         setSuccess('Recording scheduled successfully!')
         setTitle('')
         setDescription('')
+        lastAutoDescriptionRef.current = ''
         setStartTime('')
         setEndTime('')
         setHomeTeam('Home')
@@ -1488,10 +1496,23 @@ export default function VenueManagementPage() {
     }
   }
 
+  function handleStartTimeChange(value: string) {
+    setStartTime(value)
+    if (!venue?.name) return
+    const next = buildDefaultDescription(venue.name, value)
+    if (
+      next &&
+      (description === '' || description === lastAutoDescriptionRef.current)
+    ) {
+      setDescription(next)
+      lastAutoDescriptionRef.current = next
+    }
+  }
+
   function setStartNow() {
     const now = new Date()
     const startDate = new Date(now.getTime() + 1 * 60 * 1000)
-    setStartTime(formatDateTimeLocal(startDate))
+    handleStartTimeChange(formatDateTimeLocal(startDate))
   }
 
   function setDuration(minutes: number) {
@@ -2541,7 +2562,12 @@ export default function VenueManagementPage() {
                         {!showScheduleForm && (
                           <Button
                             className={`w-full md:w-auto ${primaryBtnClass}`}
-                            onClick={() => setShowScheduleForm(true)}
+                            onClick={() => {
+                              if (!title && venue?.name) {
+                                setTitle(buildDefaultTitle(venue.name))
+                              }
+                              setShowScheduleForm(true)
+                            }}
                           >
                             + New Recording
                           </Button>
@@ -2633,7 +2659,7 @@ export default function VenueManagementPage() {
                               </label>
                               <DateTimePicker
                                 value={startTime}
-                                onChange={setStartTime}
+                                onChange={handleStartTimeChange}
                                 required
                                 className={inputClass}
                                 placeholder="Select start time"
