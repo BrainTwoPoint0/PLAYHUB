@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   Bookmark,
   BookmarkCheck,
+  Compass,
   Loader2,
   Plus,
   Lock,
@@ -32,6 +33,8 @@ import {
   type MediaPack,
   type GraphicPackageOverlay,
 } from '@/components/video/VideoPlayer'
+import { FlatZoomPlayer } from '@/components/video/FlatZoomPlayer'
+import { VirtualPanoramaPlayer } from '@/components/video/VirtualPanoramaPlayer'
 import {
   EVENT_TYPE_LABELS,
   EVENT_TYPE_COLORS,
@@ -102,6 +105,9 @@ interface Recording {
   shareToken: string | null
   thumbnailUrl: string | null
   isClutch?: boolean
+  // Panorama recordings render in the pannable/zoomable PanoramaPlayer instead
+  // of the standard VideoPlayer. Set when content_type === 'panorama'.
+  isPanorama?: boolean
 }
 
 interface WatchClientProps {
@@ -119,6 +125,10 @@ interface WatchClientProps {
   isAdmin: boolean
   currentUserId: string | null
   resumeSeconds: number
+  // Public de-warp mesh base URL for panorama recordings (null otherwise). The
+  // "Explore the pitch" flow confirms mesh + raw VP availability before mounting
+  // the pannable VirtualPanoramaPlayer; otherwise the Auto production plays.
+  meshBaseUrl?: string | null
 }
 
 // Map fine-grained event types to coarse rail filters. Lets a coach narrow
@@ -173,8 +183,19 @@ export default function WatchClient({
   isAdmin,
   currentUserId,
   resumeSeconds,
+  meshBaseUrl,
 }: WatchClientProps) {
   const back = backLink(from)
+  // Panorama player: on when the recording is flagged panorama, or when
+  // ?view=panorama is present (a test override for footage not yet flagged).
+  // Read from window (not useSearchParams) to avoid a Suspense boundary.
+  const [forcePanorama, setForcePanorama] = useState(false)
+  useEffect(() => {
+    setForcePanorama(
+      new URLSearchParams(window.location.search).get('view') === 'panorama'
+    )
+  }, [])
+  const showPanorama = Boolean(recording.isPanorama) || forcePanorama
   const [events, setEvents] = useState<RecordingEvent[]>(initialEvents)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -189,6 +210,82 @@ export default function WatchClient({
 
   // Share modal toggle.
   const [shareOpen, setShareOpen] = useState(false)
+
+  // De-warp free-look ("Explore the pitch"): the default surface is the Auto
+  // production (FlatZoomPlayer on videoUrl). Clicking Explore asks the server for
+  // the raw VP (POST /panorama-source — access-gated, may trigger a capture and
+  // return pending); once ready we lazy-mount the pannable VirtualPanoramaPlayer
+  // with the Auto production as its autoSrc. Available only when a mesh exists.
+  const [panoramaMode, setPanoramaMode] = useState(false)
+  const [panoramaSrc, setPanoramaSrc] = useState<string | null>(null)
+  const [exploreState, setExploreState] = useState<
+    'idle' | 'loading' | 'pending' | 'unavailable' | 'timeout' | 'error'
+  >('idle')
+  const explorePollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const exploreDeadlineRef = useRef<number>(0)
+  const explorePollsRef = useRef<number>(0)
+  useEffect(
+    () => () => {
+      if (explorePollRef.current) clearTimeout(explorePollRef.current)
+    },
+    []
+  )
+
+  // Stop polling before the server's 10-min stuck-window would re-trigger a
+  // DUPLICATE multi-GB capture; surface a retryable 'timeout' instead.
+  const scheduleExplorePoll = () => {
+    if (Date.now() > exploreDeadlineRef.current) {
+      setExploreState('timeout')
+      return
+    }
+    explorePollsRef.current += 1
+    const delay = explorePollsRef.current < 10 ? 6000 : 10000 // gentle backoff after ~1 min
+    explorePollRef.current = setTimeout(requestPanorama, delay)
+  }
+
+  const requestPanorama = async (): Promise<void> => {
+    if (Date.now() > exploreDeadlineRef.current) {
+      setExploreState('timeout')
+      return
+    }
+    let data: { status?: string; url?: string } = {}
+    try {
+      const res = await fetch(
+        `/api/recordings/${recording.id}/panorama-source${token ? `?token=${encodeURIComponent(token)}` : ''}`,
+        { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }
+      )
+      // fetch doesn't throw on 4xx/5xx. 5xx is transient → retry; 4xx (403/404) →
+      // not available to this viewer → stop (keeps the Auto production).
+      if (!res.ok) {
+        if (res.status >= 500) return scheduleExplorePoll()
+        setExploreState('unavailable')
+        return
+      }
+      data = await res.json().catch(() => ({}))
+    } catch {
+      // network blip → retry within the deadline
+      return scheduleExplorePoll()
+    }
+    if (data.status === 'ready' && data.url) {
+      setPanoramaSrc(data.url)
+      setPanoramaMode(true)
+      setExploreState('idle')
+    } else if (data.status === 'pending') {
+      setExploreState('pending')
+      scheduleExplorePoll()
+    } else {
+      // 'unavailable' — not a panorama / no game / anonymous-can't-trigger.
+      setExploreState('unavailable')
+    }
+  }
+
+  const onExplore = () => {
+    if (exploreState === 'loading' || exploreState === 'pending') return
+    exploreDeadlineRef.current = Date.now() + 5 * 60_000
+    explorePollsRef.current = 0
+    setExploreState('loading')
+    void requestPanorama()
+  }
 
   // View-progress persistence: skip duplicate writes when the user is
   // paused (player still pings every 5s). Use sendBeacon when the page is
@@ -525,7 +622,62 @@ export default function WatchClient({
             so it stays pinned as the user scrolls match info / description. */}
         <div className="lg:col-span-2 space-y-6">
           <div className="rounded-xl overflow-hidden border border-border bg-muted lg:sticky lg:top-6">
-            {videoUrl ? (
+            {videoUrl && showPanorama ? (
+              panoramaMode && panoramaSrc && meshBaseUrl ? (
+                // De-warp free-look: pannable VirtualPanorama of the raw VP, with
+                // the Auto production as autoSrc (its "Auto" toggle switches back
+                // to the smooth follow; dragging drops into free-look).
+                <VirtualPanoramaPlayer
+                  src={panoramaSrc}
+                  autoSrc={videoUrl}
+                  meshBaseUrl={meshBaseUrl}
+                  posterUrl={recording.thumbnailUrl}
+                  autoplay
+                  className="rounded-xl"
+                />
+              ) : (
+                <div className="relative">
+                  <FlatZoomPlayer
+                    src={videoUrl}
+                    posterUrl={recording.thumbnailUrl}
+                    className="rounded-xl"
+                  />
+                  {/* "Explore the pitch" — only when a de-warp mesh exists. Fetches
+                      the raw VP (may trigger a server-side capture → pending); the
+                      Auto production keeps playing until the de-warp is ready. */}
+                  {meshBaseUrl && exploreState !== 'unavailable' && (
+                    <button
+                      type="button"
+                      onClick={onExplore}
+                      disabled={
+                        exploreState === 'loading' || exploreState === 'pending'
+                      }
+                      title="Pan and zoom freely around the whole pitch"
+                      className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-[var(--timberwolf)] backdrop-blur-sm transition hover:bg-black/75 disabled:cursor-default disabled:opacity-80"
+                    >
+                      {exploreState === 'loading' ||
+                      exploreState === 'pending' ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          {exploreState === 'pending'
+                            ? 'Preparing free-look…'
+                            : 'Loading…'}
+                        </>
+                      ) : exploreState === 'timeout' ||
+                        exploreState === 'error' ? (
+                        <>
+                          <Compass className="h-3.5 w-3.5" /> Retry free-look
+                        </>
+                      ) : (
+                        <>
+                          <Compass className="h-3.5 w-3.5" /> Explore the pitch
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              )
+            ) : videoUrl ? (
               <VideoPlayer
                 src={videoUrl}
                 events={events}
