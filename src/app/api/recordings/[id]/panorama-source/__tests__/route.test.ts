@@ -48,10 +48,16 @@ const rec = (over: Record<string, unknown> = {}) => ({
   ...over,
 })
 
-// Chainable supabase stub: the recording fetch + rollback update resolve via
-// maybeSingle(); the CAS returns `claimed`; awaiting the chain directly (the
-// in-flight COUNT) resolves { count }.
-function stubSupabase({ recording = null as any, claimed = null as any, inflight = 0 } = {}) {
+// Chainable supabase stub: the recording fetch resolves via maybeSingle(); the
+// CAS claim is a count-based UPDATE (no .select()) awaited directly → resolves
+// { count: claimed ? 1 : 0 }; the in-flight COUNT select awaited directly →
+// resolves { count: inflight }. `isUpdate` distinguishes the two awaited chains.
+function stubSupabase({
+  recording = null as any,
+  claimed = null as any,
+  inflight = 0,
+  claimError = null as any,
+} = {}) {
   const from = () => {
     let isUpdate = false
     const chain: any = {
@@ -63,8 +69,13 @@ function stubSupabase({ recording = null as any, claimed = null as any, inflight
       eq: () => chain,
       or: () => chain,
       gt: () => chain,
-      maybeSingle: async () => ({ data: isUpdate ? claimed : recording, error: null }),
-      then: (resolve: (v: unknown) => void) => resolve({ count: inflight, error: null }),
+      maybeSingle: async () => ({ data: recording, error: null }),
+      then: (resolve: (v: unknown) => void) =>
+        resolve(
+          isUpdate
+            ? { count: claimed ? 1 : 0, error: claimError }
+            : { count: inflight, error: null }
+        ),
     }
     return chain
   }
@@ -227,6 +238,20 @@ describe('panorama-source — cost guards', () => {
     mockService.mockReturnValue(stubSupabase({ recording: rec(), inflight: 5 }))
     const res = await POST(postReq(), params)
     expect((await res.json()).status).toBe('pending')
+    expect(mockBatchSend).not.toHaveBeenCalled()
+  })
+  it('surfaces a claim DB error as 500 (never a silent forever-pending)', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'u' } })
+    mockAccess.mockResolvedValue({ hasAccess: true })
+    mockService.mockReturnValue(
+      stubSupabase({
+        recording: rec(),
+        claimError: { code: '42703', message: 'column does not exist' },
+      })
+    )
+    const res = await POST(postReq(), params)
+    expect(res.status).toBe(500)
+    expect((await res.json()).code).toBe('claim_error')
     expect(mockBatchSend).not.toHaveBeenCalled()
   })
   it('rolls the claim back to error when SubmitJob fails', async () => {

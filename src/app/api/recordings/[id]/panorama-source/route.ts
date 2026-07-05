@@ -191,23 +191,39 @@ export async function POST(
   // matches 0 rows (Postgres EvalPlanQual) — exactly one submitter wins.
   const stuckCutoff = new Date(Date.now() - CAPTURE_STUCK_MS).toISOString()
   const errorCutoff = new Date(Date.now() - ERROR_COOLDOWN_MS).toISOString()
-  const { data: claimed } = await supabase
+  // Claim via affected-row COUNT, not return=representation. PostgREST 400s
+  // ("column does not exist") when a mutation combines a top-level or=/and=
+  // logical filter with return=representation — which is exactly what the
+  // supabase-js `.select()`-after-`.update()` path emits. `count: 'exact'`
+  // returns the row count via Content-Range with return=minimal instead, dodging
+  // that bug. It's the SAME single atomic UPDATE, so the compare-and-set
+  // semantics (exactly one concurrent claimer wins, EvalPlanQual) are unchanged.
+  const { count: claimedCount, error: claimErr } = await supabase
     .from('playhub_match_recordings')
-    .update({
-      panorama_capture_status: 'pending',
-      panorama_capture_started_at: new Date().toISOString(),
-      panorama_capture_error: null,
-      panorama_capture_attempts: attempts + 1,
-    })
+    .update(
+      {
+        panorama_capture_status: 'pending',
+        panorama_capture_started_at: new Date().toISOString(),
+        panorama_capture_error: null,
+        panorama_capture_attempts: attempts + 1,
+      },
+      { count: 'exact' }
+    )
     .eq('id', id)
     .or(
       `panorama_capture_status.is.null,` +
         `and(panorama_capture_status.eq.error,panorama_capture_attempts.lt.${MAX_ATTEMPTS},panorama_capture_started_at.lt.${errorCutoff}),` +
         `and(panorama_capture_status.eq.pending,panorama_capture_started_at.lt.${stuckCutoff})`
     )
-    .select('id')
-    .maybeSingle()
-  if (!claimed) {
+  if (claimErr) {
+    // A claim that ERRORS is not a claim that LOST — surfacing it as 500 (which
+    // the client retries, then times out visibly) prevents the exact silent
+    // forever-'pending' failure the PostgREST representation bug caused. Never
+    // masquerade a broken claim as a legitimate lost race.
+    console.error('[panorama-source] claim failed:', claimErr.code, claimErr.message)
+    return noStore({ error: 'claim failed', code: 'claim_error' }, 500)
+  }
+  if (!claimedCount) {
     // Someone else just claimed it (or it's freshly pending) — poll.
     return noStore({ status: 'pending' })
   }
