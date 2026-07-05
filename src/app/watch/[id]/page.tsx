@@ -131,12 +131,15 @@ export default async function WatchPage({
     }
   }
 
-  // Panorama de-warp mesh (public, non-PII geometry). Only offer "Explore the
-  // pitch" when a mesh actually EXISTS for this game — otherwise the de-warp would
-  // mount against 404ing mesh assets. meshExists is a cheap public HEAD; a null
-  // result keeps the watch page on the Auto production.
+  // Panorama de-warp mesh (public, non-PII geometry). Availability keys off the
+  // Spiideo game (+ a published mesh), NOT content_type: a Spiideo recording's
+  // default view is the hosted Play production ('hosted_video'), but it still has
+  // a pannable raw panorama we can de-warp. Only offer "Explore the pitch" when a
+  // mesh actually EXISTS for this game — otherwise the de-warp would mount against
+  // 404ing mesh assets. meshExists is a cheap public HEAD; a null result keeps the
+  // watch page on the standard player.
   let panoramaMeshUrl: string | null = null
-  if (recording.content_type === 'panorama' && recording.spiideo_game_id) {
+  if (recording.spiideo_game_id) {
     const base = meshBaseUrl(recording.spiideo_game_id)
     if (base && (await meshExists(recording.spiideo_game_id))) {
       panoramaMeshUrl = base

@@ -622,11 +622,12 @@ export default function WatchClient({
             so it stays pinned as the user scrolls match info / description. */}
         <div className="lg:col-span-2 space-y-6">
           <div className="rounded-xl overflow-hidden border border-border bg-muted lg:sticky lg:top-6">
-            {videoUrl && showPanorama ? (
+            {videoUrl ? (
               panoramaMode && panoramaSrc && meshBaseUrl ? (
                 // De-warp free-look: pannable VirtualPanorama of the raw VP, with
                 // the Auto production as autoSrc (its "Auto" toggle switches back
-                // to the smooth follow; dragging drops into free-look).
+                // to the smooth follow; dragging drops into free-look). Available
+                // over EITHER default player once a mesh + captured raw VP exist.
                 <VirtualPanoramaPlayer
                   src={panoramaSrc}
                   autoSrc={videoUrl}
@@ -637,14 +638,36 @@ export default function WatchClient({
                 />
               ) : (
                 <div className="relative">
-                  <FlatZoomPlayer
-                    src={videoUrl}
-                    posterUrl={recording.thumbnailUrl}
-                    className="rounded-xl"
-                  />
+                  {/* Default view: FlatZoom for panorama-flagged footage, else the
+                      full tagged VideoPlayer (events, graphics, progress). The
+                      de-warp free-look is an opt-in OVERLAY on top of either. */}
+                  {showPanorama ? (
+                    <FlatZoomPlayer
+                      src={videoUrl}
+                      posterUrl={recording.thumbnailUrl}
+                      className="rounded-xl"
+                    />
+                  ) : (
+                    <VideoPlayer
+                      src={videoUrl}
+                      events={events}
+                      canEdit={canTag}
+                      onAddTag={openTagOverlay}
+                      mediaPack={mediaPack || undefined}
+                      graphicPackage={graphicPackage || undefined}
+                      posterUrl={recording.thumbnailUrl}
+                      highlightedEventId={hoveredTagId}
+                      onMarkerHover={setHoveredTagId}
+                      initialTimeSeconds={resumeSeconds}
+                      onProgressUpdate={
+                        currentUserId ? persistProgress : undefined
+                      }
+                      className="rounded-xl"
+                    />
+                  )}
                   {/* "Explore the pitch" — only when a de-warp mesh exists. Fetches
                       the raw VP (may trigger a server-side capture → pending); the
-                      Auto production keeps playing until the de-warp is ready. */}
+                      default view keeps playing until the de-warp is ready. */}
                   {meshBaseUrl && exploreState !== 'unavailable' && (
                     <button
                       type="button"
@@ -677,21 +700,6 @@ export default function WatchClient({
                   )}
                 </div>
               )
-            ) : videoUrl ? (
-              <VideoPlayer
-                src={videoUrl}
-                events={events}
-                canEdit={canTag}
-                onAddTag={openTagOverlay}
-                mediaPack={mediaPack || undefined}
-                graphicPackage={graphicPackage || undefined}
-                posterUrl={recording.thumbnailUrl}
-                highlightedEventId={hoveredTagId}
-                onMarkerHover={setHoveredTagId}
-                initialTimeSeconds={resumeSeconds}
-                onProgressUpdate={currentUserId ? persistProgress : undefined}
-                className="rounded-xl"
-              />
             ) : (
               <div className="aspect-video flex items-center justify-center text-muted-foreground text-sm">
                 Video unavailable. Try refreshing.

@@ -11,6 +11,7 @@ vi.mock('@/lib/recordings/access-control', () => ({
   checkRecordingAccess: vi.fn(),
 }))
 vi.mock('@/lib/s3/client', () => ({ getPlaybackUrl: vi.fn() }))
+vi.mock('@/lib/panorama/mesh', () => ({ meshExists: vi.fn() }))
 const { mockBatchSend } = vi.hoisted(() => ({ mockBatchSend: vi.fn() }))
 vi.mock('@aws-sdk/client-batch', () => ({
   BatchClient: class {
@@ -25,11 +26,13 @@ import { POST } from '../route'
 import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { checkRecordingAccess } from '@/lib/recordings/access-control'
 import { getPlaybackUrl } from '@/lib/s3/client'
+import { meshExists } from '@/lib/panorama/mesh'
 
 const mockAuth = getAuthUser as unknown as ReturnType<typeof vi.fn>
 const mockAccess = checkRecordingAccess as unknown as ReturnType<typeof vi.fn>
 const mockService = createServiceClient as unknown as ReturnType<typeof vi.fn>
 const mockSign = getPlaybackUrl as unknown as ReturnType<typeof vi.fn>
+const mockMeshExists = meshExists as unknown as ReturnType<typeof vi.fn>
 
 const ID = '11111111-1111-4111-8111-111111111111'
 const rec = (over: Record<string, unknown> = {}) => ({
@@ -81,6 +84,7 @@ beforeEach(() => {
   mockAuth.mockResolvedValue({ user: null })
   mockAccess.mockResolvedValue({ hasAccess: false })
   mockSign.mockResolvedValue('https://signed.example/vp.mp4')
+  mockMeshExists.mockResolvedValue(true) // a published mesh exists by default
   mockBatchSend.mockResolvedValue({ jobId: 'job-1' })
   process.env.VP_MATERIALIZE_JOB_QUEUE = 'q'
   process.env.VP_MATERIALIZE_JOB_DEFINITION = 'jd'
@@ -147,6 +151,45 @@ describe('panorama-source — capability split', () => {
     const res = await POST(postReq(), params)
     expect((await res.json()).status).toBe('pending')
     expect(mockBatchSend).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('panorama-source — availability keys off the Spiideo game, not content_type', () => {
+  it('a hosted_video Spiideo recording (default Play production) can still trigger', async () => {
+    // Real Spiideo recordings sync as 'hosted_video' (the hosted Play production
+    // is the default view); the raw panorama is still de-warpable.
+    mockAuth.mockResolvedValue({ user: { id: 'u' } })
+    mockAccess.mockResolvedValue({ hasAccess: true })
+    mockService.mockReturnValue(
+      stubSupabase({
+        recording: rec({ content_type: 'hosted_video' }),
+        claimed: { id: ID },
+      })
+    )
+    const res = await POST(postReq(), params)
+    expect((await res.json()).status).toBe('pending')
+    expect(mockBatchSend).toHaveBeenCalledTimes(1)
+  })
+  it('a recording with no Spiideo game is unavailable (nothing to materialize)', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'u' } })
+    mockAccess.mockResolvedValue({ hasAccess: true })
+    mockService.mockReturnValue(
+      stubSupabase({ recording: rec({ spiideo_game_id: null }) })
+    )
+    const res = await POST(postReq(), params)
+    expect((await res.json()).status).toBe('unavailable')
+    expect(mockBatchSend).not.toHaveBeenCalled()
+  })
+  it('does NOT trigger a capture when no de-warp mesh is published (un-renderable)', async () => {
+    // Route/page eligibility parity: without a mesh the raw VP can't be de-warped,
+    // so a grant-holder POST must not actuate a multi-GB Batch job.
+    mockAuth.mockResolvedValue({ user: { id: 'u' } })
+    mockAccess.mockResolvedValue({ hasAccess: true })
+    mockMeshExists.mockResolvedValue(false)
+    mockService.mockReturnValue(stubSupabase({ recording: rec(), claimed: { id: ID } }))
+    const res = await POST(postReq(), params)
+    expect((await res.json()).status).toBe('unavailable')
+    expect(mockBatchSend).not.toHaveBeenCalled()
   })
 })
 

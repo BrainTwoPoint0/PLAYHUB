@@ -30,6 +30,7 @@ import { BatchClient, SubmitJobCommand } from '@aws-sdk/client-batch'
 import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { checkRecordingAccess } from '@/lib/recordings/access-control'
 import { getPlaybackUrl } from '@/lib/s3/client'
+import { meshExists } from '@/lib/panorama/mesh'
 
 // Signed URLs (minors' footage) must never be cached across viewers.
 export const dynamic = 'force-dynamic'
@@ -83,7 +84,7 @@ export async function POST(
   const { data: rec } = await supabase
     .from('playhub_match_recordings')
     .select(
-      'id, status, share_token, content_type, spiideo_game_id, panorama_s3_key, panorama_capture_status, panorama_capture_started_at'
+      'id, status, share_token, content_type, spiideo_game_id, panorama_s3_key, panorama_capture_status, panorama_capture_started_at, panorama_capture_attempts'
     )
     .eq('id', id)
     .maybeSingle()
@@ -116,8 +117,12 @@ export async function POST(
     }
   }
 
-  // Non-panorama recording or no Spiideo game → nothing to de-warp.
-  if (rec.content_type !== 'panorama' || !rec.spiideo_game_id) {
+  // De-warp availability keys off the Spiideo game (raw VP is materialized from
+  // it), NOT content_type: the default view of a Spiideo recording is the hosted
+  // Play production ('hosted_video'), yet it still has a pannable raw panorama.
+  // The watch page only shows "Explore" when a mesh exists for this game; here we
+  // independently require just the game id.
+  if (!rec.spiideo_game_id) {
     return noStore({ status: 'unavailable' })
   }
 
@@ -144,6 +149,16 @@ export async function POST(
   // fresh Spiideo capture. Anonymous bearer-token viewers can view a ready
   // panorama (fast path above) but cannot trigger one.
   if (!grant.hasAccess) return noStore({ status: 'unavailable' })
+
+  // Don't actuate an expensive multi-GB capture for a game with no published
+  // de-warp mesh — its raw VP would be un-renderable (the watch page needs the
+  // mesh to de-warp). This mirrors page.tsx's gate so route eligibility == UI
+  // eligibility structurally, not just via the hidden Explore button. Cheap
+  // public HEAD, and only grant-holders on the trigger path reach it (pending
+  // polls returned above).
+  if (!(await meshExists(rec.spiideo_game_id))) {
+    return noStore({ status: 'unavailable' })
+  }
 
   const jobQueue = process.env.VP_MATERIALIZE_JOB_QUEUE
   const jobDefinition = process.env.VP_MATERIALIZE_JOB_DEFINITION
