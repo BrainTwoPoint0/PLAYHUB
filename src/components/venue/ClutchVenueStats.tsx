@@ -56,7 +56,15 @@ export function ClutchVenueStats({ venueId }: { venueId: string }) {
     return () => controller.abort()
   }, [venueId])
 
-  if (!summary || summary.totalRecordings === 0) return null
+  // Guard the shape, not just presence — a 200 with an unexpected body
+  // (e.g. an error payload) must not white-screen the whole venue page.
+  if (
+    !summary ||
+    !Array.isArray(summary.days) ||
+    !Array.isArray(summary.courts) ||
+    summary.totalRecordings === 0
+  )
+    return null
 
   // Chart rows: one series per court
   const chartData = summary.days.map((d) => ({
