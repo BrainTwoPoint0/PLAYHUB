@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
+    "@aws-sdk/client-batch": "^3.1000.0",
     "@aws-sdk/client-lambda": "^3.997.0",
     "@aws-sdk/client-medialive": "^3.958.0",
     "@aws-sdk/client-s3": "^3.948.0",
@@ -57,12 +58,14 @@
     "recharts": "^3.7.0",
     "resend": "^6.6.0",
     "stripe": "^17.5.0",
-    "tailwind-merge": "^2.6.0"
+    "tailwind-merge": "^2.6.0",
+    "three": "^0.180.0"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.180.0",
     "autoprefixer": "^10.4.21",
     "eslint": "^8",
     "eslint-config-next": "^15.5.6",

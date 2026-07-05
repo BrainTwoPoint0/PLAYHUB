@@ -15,6 +15,7 @@ import {
   checkRecordingAccess,
   isVenueAdmin,
 } from '@/lib/recordings/access-control'
+import { meshBaseUrl, meshExists } from '@/lib/panorama/mesh'
 import WatchClient from './WatchClient'
 
 // Legacy /watch/<32-hex-share-token> URLs (still in admin clipboards and the
@@ -127,6 +128,18 @@ export default async function WatchPage({
       videoUrl = await getPlaybackUrl(recording.s3_key, 3600)
     } catch (err) {
       console.error('Failed to generate playback URL:', err)
+    }
+  }
+
+  // Panorama de-warp mesh (public, non-PII geometry). Only offer "Explore the
+  // pitch" when a mesh actually EXISTS for this game — otherwise the de-warp would
+  // mount against 404ing mesh assets. meshExists is a cheap public HEAD; a null
+  // result keeps the watch page on the Auto production.
+  let panoramaMeshUrl: string | null = null
+  if (recording.content_type === 'panorama' && recording.spiideo_game_id) {
+    const base = meshBaseUrl(recording.spiideo_game_id)
+    if (base && (await meshExists(recording.spiideo_game_id))) {
+      panoramaMeshUrl = base
     }
   }
 
@@ -246,6 +259,7 @@ export default async function WatchPage({
         shareToken: recording.share_token,
         thumbnailUrl: recording.thumbnail_url,
         isClutch: !!recording.clutch_video_id,
+        isPanorama: recording.content_type === 'panorama',
       }}
       resumeSeconds={resumeSeconds}
       videoUrl={videoUrl}
@@ -260,6 +274,7 @@ export default async function WatchPage({
       canPublish={canPublish}
       isAdmin={isAdmin}
       currentUserId={user?.id || null}
+      meshBaseUrl={panoramaMeshUrl}
     />
   )
 }
