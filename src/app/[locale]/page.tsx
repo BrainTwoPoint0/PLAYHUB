@@ -114,7 +114,7 @@ export default function HomePage() {
           </FadeIn>
 
           <FadeIn delay={250}>
-            <h1 className="text-[2.75rem] leading-[0.92] md:text-7xl lg:text-[5.5rem] font-extrabold tracking-tight mb-8">
+            <h1 className="text-[2.75rem] leading-[0.92] rtl:leading-[1.25] md:text-7xl lg:text-[5.5rem] font-extrabold tracking-tight rtl:tracking-normal mb-8">
               <span className="text-[var(--timberwolf)] block">
                 {t('heroTitle1')}
               </span>
