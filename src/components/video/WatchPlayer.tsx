@@ -104,7 +104,6 @@ export function WatchPlayer({
   // Intent to switch once the capture is ready (the toggle can be clicked before
   // the raw VP finishes materializing).
   const [wantDewarp, setWantDewarp] = useState(false)
-  const [dewarp, setDewarp] = useState({ autoFollow: false, zoomPct: 100 })
   const dewarpApiRef = useRef<DewarpSurfaceApi | null>(null)
 
   const dewarpReady = Boolean(meshBaseUrl && panoramaSrc)
@@ -230,7 +229,6 @@ export function WatchPlayer({
             masterVideoRef={t.videoRef}
             hideChrome
             apiRef={dewarpApiRef}
-            onStateChange={setDewarp}
             className="h-full w-full"
           />
         </div>
@@ -289,14 +287,7 @@ export function WatchPlayer({
         videoEl={t.videoRef.current}
         capabilities={isDewarp ? DEWARP_CAPS : FLAT_CAPS}
         surfaceToggle={surfaceToggle}
-        extras={
-          isDewarp ? (
-            <DewarpControls
-              apiRef={dewarpApiRef}
-              autoFollow={dewarp.autoFollow}
-            />
-          ) : null
-        }
+        extras={isDewarp ? <DewarpControls apiRef={dewarpApiRef} /> : null}
       />
     </div>
   )
