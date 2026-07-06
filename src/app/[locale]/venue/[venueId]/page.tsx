@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useFormatter, useTranslations } from 'next-intl'
 import { useParams } from 'next/navigation'
 import { useRouter } from '@/i18n/navigation'
 import {
@@ -224,6 +225,8 @@ function MarketplaceRevenue({
   venueId: string
   outlineBtnClass: string
 }) {
+  const t = useTranslations('venue.marketplace')
+  const format = useFormatter()
   const [expanded, setExpanded] = useState(false)
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<{
@@ -262,12 +265,12 @@ function MarketplaceRevenue({
   }
 
   function formatPrice(amount: number, currency: string) {
-    return new Intl.NumberFormat('en-GB', {
+    return format.number(amount, {
       style: 'currency',
       currency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
-    }).format(amount)
+    })
   }
 
   return (
@@ -276,18 +279,16 @@ function MarketplaceRevenue({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-              Marketplace Revenue
+              {t('title')}
             </h2>
-            <p className="text-sm text-muted-foreground">
-              Sales from recordings listed on the marketplace
-            </p>
+            <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
           </div>
           <Button
             variant="outline"
             className={`w-full md:w-auto ${outlineBtnClass}`}
             onClick={handleToggle}
           >
-            {expanded ? 'Hide' : 'View Revenue'}
+            {expanded ? t('hide') : t('viewRevenue')}
           </Button>
         </div>
       </div>
@@ -296,25 +297,23 @@ function MarketplaceRevenue({
           {loading ? (
             <LoadingSpinner size="sm" className="text-muted-foreground" />
           ) : !data || data.totalSales === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No marketplace sales yet.
-            </p>
+            <p className="text-sm text-muted-foreground">{t('noSales')}</p>
           ) : (
             <div className="space-y-4">
               {/* Summary cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-white/[0.06]">
                 {[
-                  { label: 'Total Sales', value: String(data.totalSales) },
+                  { label: t('totalSales'), value: String(data.totalSales) },
                   {
-                    label: 'Total Revenue',
+                    label: t('totalRevenue'),
                     value: formatPrice(data.totalRevenue, data.currency),
                   },
                   {
-                    label: `Your Share (${100 - data.splitPct}%)`,
+                    label: t('yourShare', { pct: 100 - data.splitPct }),
                     value: formatPrice(data.orgShare, data.currency),
                   },
                   {
-                    label: `PLAYHUB (${data.splitPct}%)`,
+                    label: t('playhubShare', { pct: data.splitPct }),
                     value: formatPrice(data.playhubShare, data.currency),
                   },
                 ].map((card) => (
@@ -332,7 +331,7 @@ function MarketplaceRevenue({
               {/* Per-recording breakdown */}
               <div className="space-y-2">
                 <h3 className="text-sm font-semibold text-[var(--timberwolf)]">
-                  Per Recording
+                  {t('perRecording')}
                 </h3>
                 {data.perRecording.map((rec) => (
                   <div
@@ -344,15 +343,17 @@ function MarketplaceRevenue({
                         {rec.title}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {rec.sales} sale{rec.sales !== 1 ? 's' : ''}
+                        {t('salesCount', { count: rec.sales })}
                       </p>
                     </div>
-                    <div className="text-right flex-shrink-0 ml-4">
+                    <div className="text-end flex-shrink-0 ms-4">
                       <p className="text-sm font-semibold text-[var(--timberwolf)]">
                         {formatPrice(rec.orgShare, data.currency)}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        of {formatPrice(rec.revenue, data.currency)}
+                        {t('ofTotal', {
+                          amount: formatPrice(rec.revenue, data.currency),
+                        })}
                       </p>
                     </div>
                   </div>
@@ -376,6 +377,9 @@ export default function VenueManagementPage() {
   const params = useParams()
   const venueId = params.venueId as string
   const router = useRouter()
+  const t = useTranslations('venue')
+  const tc = useTranslations('common')
+  const format = useFormatter()
 
   const [venue, setVenue] = useState<Venue | null>(null)
   const [venueCount, setVenueCount] = useState(0)
@@ -602,7 +606,7 @@ export default function VenueManagementPage() {
       setVenueCount(data.venueCount ?? 1)
       setVenue(data.venue)
     } catch (err) {
-      setError('Failed to load venue data')
+      setError(t('feedback.loadVenueFailed'))
     } finally {
       setLoading(false)
     }
@@ -861,7 +865,7 @@ export default function VenueManagementPage() {
         fetchRecordings()
       }
     } catch (err) {
-      setError('Failed to grant access')
+      setError(t('feedback.grantAccessFailed'))
     } finally {
       setGrantingAccess(false)
     }
@@ -870,7 +874,7 @@ export default function VenueManagementPage() {
   async function handleRevokeAccess(accessId: string) {
     if (!selectedRecording) return
 
-    if (!confirm('Are you sure you want to revoke this access?')) return
+    if (!confirm(t('access.revokeConfirm'))) return
 
     try {
       await fetch(
@@ -905,7 +909,7 @@ export default function VenueManagementPage() {
   async function submitListing(recording: Recording) {
     const price = Number(listingPrice)
     if (!Number.isFinite(price) || price <= 0) {
-      setError('Enter a valid price')
+      setError(t('feedback.invalidPrice'))
       return
     }
     setListingSubmitting(recording.id)
@@ -921,26 +925,27 @@ export default function VenueManagementPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || 'Failed to list recording')
+        setError(data.error || t('feedback.listFailed'))
         return
       }
       setSuccess(
         recording.marketplace_product
-          ? 'Listing updated'
-          : 'Recording listed for sale'
+          ? t('feedback.listingUpdated')
+          : t('feedback.recordingListed')
       )
       cancelListingEditor()
       fetchRecordings()
     } catch (err) {
       console.error('Failed to submit listing:', err)
-      setError('Failed to list recording')
+      setError(t('feedback.listFailed'))
     } finally {
       setListingSubmitting(null)
     }
   }
 
   async function unlistRecording(recording: Recording) {
-    if (!confirm(`Unlist "${recording.title}" from the marketplace?`)) return
+    if (!confirm(t('marketplace.unlistConfirm', { title: recording.title })))
+      return
     setListingSubmitting(recording.id)
     try {
       const res = await fetch(`/api/recordings/${recording.id}/marketplace`, {
@@ -948,15 +953,15 @@ export default function VenueManagementPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || 'Failed to unlist recording')
+        setError(data.error || t('feedback.unlistFailed'))
         return
       }
-      setSuccess('Recording unlisted from marketplace')
+      setSuccess(t('feedback.recordingUnlisted'))
       cancelListingEditor()
       fetchRecordings()
     } catch (err) {
       console.error('Failed to unlist:', err)
-      setError('Failed to unlist recording')
+      setError(t('feedback.unlistFailed'))
     } finally {
       setListingSubmitting(null)
     }
@@ -979,17 +984,17 @@ export default function VenueManagementPage() {
         // Try to copy to clipboard, with fallback for Safari/strict browsers
         try {
           await navigator.clipboard.writeText(fullUrl)
-          setSuccess('Public link copied to clipboard!')
+          setSuccess(t('feedback.publicLinkCopied'))
           setTimeout(() => setSuccess(null), 3000)
         } catch (clipboardErr) {
           // Clipboard failed (Safari permissions) - show prompt for manual copy
-          window.prompt('Copy this link:', fullUrl)
+          window.prompt(t('feedback.copyLinkPrompt'), fullUrl)
         }
       } else {
-        setError('Failed to generate public link')
+        setError(t('feedback.publicLinkFailed'))
       }
     } catch (err) {
-      setError('Failed to generate public link')
+      setError(t('feedback.publicLinkFailed'))
     } finally {
       setGeneratingLink(null)
     }
@@ -1013,10 +1018,10 @@ export default function VenueManagementPage() {
         )
       } else {
         const data = await res.json()
-        setError(data.error || 'Failed to update')
+        setError(data.error || t('feedback.updateFailed'))
       }
     } catch {
-      setError('Failed to update billable status')
+      setError(t('feedback.updateBillableFailed'))
     } finally {
       setTogglingBillable(null)
     }
@@ -1042,10 +1047,10 @@ export default function VenueManagementPage() {
         )
       } else {
         const data = await res.json()
-        setError(data.error || 'Failed to update amount')
+        setError(data.error || t('feedback.updateAmountFailed'))
       }
     } catch {
-      setError('Failed to update amount')
+      setError(t('feedback.updateAmountFailed'))
     } finally {
       setEditingAmountId(null)
     }
@@ -1087,10 +1092,10 @@ export default function VenueManagementPage() {
         setEditingRecording(null)
       } else {
         const data = await res.json()
-        setError(data.error || 'Failed to save')
+        setError(data.error || t('feedback.saveFailed'))
       }
     } catch {
-      setError('Failed to save changes')
+      setError(t('feedback.saveChangesFailed'))
     } finally {
       setSavingEdit(false)
     }
@@ -1113,10 +1118,10 @@ export default function VenueManagementPage() {
         fetchRecordings()
       } else {
         const data = await res.json()
-        setError(data.error || 'Failed to delete')
+        setError(data.error || t('feedback.deleteFailed'))
       }
     } catch {
-      setError('Failed to delete recording')
+      setError(t('feedback.deleteRecordingFailed'))
     } finally {
       setDeletingRecording(null)
     }
@@ -1153,22 +1158,20 @@ export default function VenueManagementPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'Failed to add admin')
+        setError(data.error || t('feedback.addAdminFailed'))
         return
       }
 
       if (data.invited) {
-        setSuccess(
-          'Invitation email sent! They will be added as admin after creating an account.'
-        )
+        setSuccess(t('feedback.adminInvited'))
       } else {
-        setSuccess('Admin added successfully!')
+        setSuccess(t('feedback.adminAdded'))
       }
       fetchAdmins()
       setNewAdminEmail('')
       setTimeout(() => setSuccess(null), 5000)
     } catch (err) {
-      setError('Failed to add admin')
+      setError(t('feedback.addAdminFailed'))
     } finally {
       setAddingAdmin(false)
     }
@@ -1183,15 +1186,15 @@ export default function VenueManagementPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'Failed to remove admin')
+        setError(data.error || t('feedback.removeAdminFailed'))
         return
       }
 
-      setSuccess('Admin removed successfully!')
+      setSuccess(t('feedback.adminRemoved'))
       fetchAdmins()
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
-      setError('Failed to remove admin')
+      setError(t('feedback.removeAdminFailed'))
     } finally {
       setRemovingAdminId(null)
     }
@@ -1243,27 +1246,23 @@ export default function VenueManagementPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'Failed to create channel')
+        setError(data.error || t('feedback.createChannelFailed'))
         return
       }
 
       setNewChannelName('')
-      setSuccess('Channel created! It may take a minute to become ready.')
+      setSuccess(t('feedback.channelCreated'))
       setTimeout(() => setSuccess(null), 5000)
       fetchChannels()
     } catch (err) {
-      setError('Failed to create channel')
+      setError(t('feedback.createChannelFailed'))
     } finally {
       setCreatingChannel(false)
     }
   }
 
   async function handleStartChannel(channelId: string) {
-    if (
-      !confirm(
-        'Starting the stream will begin AWS billing (~$0.35/hour). Continue?'
-      )
-    ) {
+    if (!confirm(t('streams.startConfirm'))) {
       return
     }
 
@@ -1275,15 +1274,15 @@ export default function VenueManagementPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'Failed to start channel')
+        setError(data.error || t('feedback.startChannelFailed'))
         return
       }
 
-      setSuccess('Channel starting... It may take 1-2 minutes.')
+      setSuccess(t('feedback.channelStarting'))
       setTimeout(() => setSuccess(null), 5000)
       fetchChannels()
     } catch (err) {
-      setError('Failed to start channel')
+      setError(t('feedback.startChannelFailed'))
     } finally {
       setStartingChannelId(null)
     }
@@ -1298,26 +1297,22 @@ export default function VenueManagementPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'Failed to stop channel')
+        setError(data.error || t('feedback.stopChannelFailed'))
         return
       }
 
-      setSuccess('Channel stopping... Billing will stop when it reaches IDLE.')
+      setSuccess(t('feedback.channelStopping'))
       setTimeout(() => setSuccess(null), 5000)
       fetchChannels()
     } catch (err) {
-      setError('Failed to stop channel')
+      setError(t('feedback.stopChannelFailed'))
     } finally {
       setStoppingChannelId(null)
     }
   }
 
   async function handleDeleteChannel(channelId: string) {
-    if (
-      !confirm(
-        'Are you sure you want to delete this channel? This cannot be undone.'
-      )
-    ) {
+    if (!confirm(t('streams.deleteConfirm'))) {
       return
     }
 
@@ -1329,15 +1324,15 @@ export default function VenueManagementPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'Failed to delete channel')
+        setError(data.error || t('feedback.deleteChannelFailed'))
         return
       }
 
-      setSuccess('Channel deleted successfully!')
+      setSuccess(t('feedback.channelDeleted'))
       setTimeout(() => setSuccess(null), 3000)
       fetchChannels()
     } catch (err) {
-      setError('Failed to delete channel')
+      setError(t('feedback.deleteChannelFailed'))
     } finally {
       setDeletingChannelId(null)
     }
@@ -1350,7 +1345,7 @@ export default function VenueManagementPage() {
       setTimeout(() => setCopiedField(null), 2000)
     } catch {
       // Clipboard failed (Safari permissions) - show prompt for manual copy
-      window.prompt('Copy this value:', text)
+      window.prompt(t('feedback.copyValuePrompt'), text)
     }
   }
 
@@ -1376,7 +1371,7 @@ export default function VenueManagementPage() {
     e.preventDefault()
 
     if (!streamTitle || !streamSceneId || !streamStartTime || !streamEndTime) {
-      setError('Please fill in all required fields')
+      setError(t('feedback.fillRequired'))
       return
     }
 
@@ -1400,11 +1395,11 @@ export default function VenueManagementPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to schedule live stream')
+        throw new Error(data.error || t('feedback.scheduleStreamFailed'))
       }
 
       setSuccess(
-        `Live stream scheduled! Playback URL: ${data.channel.playbackUrl}`
+        t('feedback.streamScheduled', { url: data.channel.playbackUrl })
       )
       setTimeout(() => setSuccess(null), 15000)
 
@@ -1416,7 +1411,7 @@ export default function VenueManagementPage() {
       fetchChannels()
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Failed to schedule live stream'
+        err instanceof Error ? err.message : t('feedback.scheduleStreamFailed')
       )
     } finally {
       setSchedulingStream(false)
@@ -1424,7 +1419,7 @@ export default function VenueManagementPage() {
   }
 
   function formatTime(isoString: string): string {
-    return new Date(isoString).toLocaleString()
+    return format.dateTime(new Date(isoString), 'full')
   }
 
   async function handleSchedule(e: React.FormEvent) {
@@ -1475,7 +1470,7 @@ export default function VenueManagementPage() {
       if (data.error) {
         setError(data.error)
       } else {
-        setSuccess('Recording scheduled successfully!')
+        setSuccess(t('feedback.recordingScheduled'))
         setTitle('')
         setDescription('')
         lastAutoDescriptionRef.current = ''
@@ -1491,7 +1486,7 @@ export default function VenueManagementPage() {
         fetchRecordings()
       }
     } catch (err) {
-      setError('Failed to schedule recording')
+      setError(t('feedback.scheduleRecordingFailed'))
     } finally {
       setSubmitting(false)
     }
@@ -1660,7 +1655,7 @@ export default function VenueManagementPage() {
               variant="outline"
               onClick={() => router.push('/venue')}
             >
-              Back to Venues
+              {t('header.backToVenues')}
             </Button>
           </div>
         </div>
@@ -1674,7 +1669,9 @@ export default function VenueManagementPage() {
         <div className="flex flex-row items-end sm:items-center justify-between gap-3 mb-8">
           <div className="min-w-0">
             <p className="text-muted-foreground text-xs font-semibold tracking-[0.25em] uppercase mb-2">
-              {venue?.type === 'group' ? 'Group Overview' : 'Venue Management'}
+              {venue?.type === 'group'
+                ? t('header.groupOverview')
+                : t('header.venueManagement')}
             </p>
             <h1 className="text-2xl md:text-3xl font-bold text-[var(--timberwolf)] truncate">
               {venue?.name}
@@ -1687,7 +1684,7 @@ export default function VenueManagementPage() {
               className={`flex-shrink-0 sm:size-default ${outlineBtnClass}`}
               onClick={() => router.push('/venue')}
             >
-              Switch Venue
+              {t('header.switchVenue')}
             </Button>
           )}
         </div>
@@ -1719,39 +1716,41 @@ export default function VenueManagementPage() {
                   <div className="rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
                     <div className="p-5">
                       <h2 className="text-base font-semibold text-[var(--timberwolf)] mb-4">
-                        Portfolio Overview
+                        {t('group.portfolioOverview')}
                       </h2>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-white/[0.06]">
                         {[
                           {
-                            label: 'Total Recordings',
+                            label: t('group.totalRecordings'),
                             value: String(groupData.totals.totalRecordings),
-                            sub: `${groupData.totals.publishedRecordings} published`,
+                            sub: t('group.publishedCount', {
+                              count: groupData.totals.publishedRecordings,
+                            }),
                           },
                           {
-                            label: 'This Month',
+                            label: t('group.thisMonth'),
                             value: String(groupData.totals.monthRecordings),
-                            sub: 'recordings',
+                            sub: t('group.recordings'),
                           },
                           {
-                            label: 'Monthly Revenue',
+                            label: t('group.monthlyRevenue'),
                             value:
                               groupData.childVenues.length > 0
-                                ? new Intl.NumberFormat('en-GB', {
+                                ? format.number(groupData.totals.monthRevenue, {
                                     style: 'currency',
                                     currency:
                                       groupData.childVenues[0]?.currency ||
                                       'KWD',
                                     minimumFractionDigits: 0,
                                     maximumFractionDigits: 3,
-                                  }).format(groupData.totals.monthRevenue)
+                                  })
                                 : '0',
-                            sub: 'billable',
+                            sub: t('group.billable'),
                           },
                           {
-                            label: 'Today',
+                            label: t('group.today'),
                             value: String(groupData.totals.todayCount),
-                            sub: 'recordings',
+                            sub: t('group.recordings'),
                           },
                         ].map((card) => (
                           <div
@@ -1780,107 +1779,113 @@ export default function VenueManagementPage() {
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                           <div>
                             <h2 className="text-base font-semibold text-[var(--timberwolf)]">
-                              Daily Performance
+                              {t('group.dailyPerformance')}
                             </h2>
                             <p className="text-xs text-muted-foreground">
-                              Avg {groupData.averagePerDay}/day
+                              {t('group.avgPerDay', {
+                                avg: groupData.averagePerDay,
+                              })}
                               {groupData.totalDailyTarget > 0 &&
-                                ` · Target: ${groupData.totalDailyTarget}/day`}
+                                ` · ${t('group.targetPerDay', {
+                                  target: groupData.totalDailyTarget,
+                                })}`}
                             </p>
                           </div>
                         </div>
-                        <ChartContainer
-                          config={
-                            Object.fromEntries(
-                              groupData.venueNames.map((name, i) => [
-                                name,
-                                {
-                                  label: name,
-                                  color: [
-                                    'hsl(142, 71%, 45%)',
-                                    'hsl(217, 91%, 60%)',
-                                    'hsl(47, 96%, 53%)',
-                                    'hsl(280, 65%, 60%)',
-                                    'hsl(15, 90%, 55%)',
-                                  ][i % 5],
-                                },
-                              ])
-                            ) as ChartConfig
-                          }
-                          className="h-[220px] w-full"
-                        >
-                          <AreaChart data={groupData.dailyChart}>
-                            <CartesianGrid
-                              strokeDasharray="3 3"
-                              stroke="hsl(var(--border))"
-                            />
-                            <XAxis
-                              dataKey="date"
-                              tickFormatter={(d: string) => {
-                                const day = parseInt(d.split('-')[2], 10)
-                                return day % 5 === 1 || day === 1
-                                  ? String(day)
-                                  : ''
-                              }}
-                              stroke="hsl(var(--muted-foreground))"
-                              fontSize={11}
-                            />
-                            <YAxis
-                              stroke="hsl(var(--muted-foreground))"
-                              fontSize={11}
-                              allowDecimals={false}
-                            />
-                            <ChartTooltip
-                              content={
-                                <ChartTooltipContent
-                                  labelFormatter={(label: string) => {
-                                    const d = new Date(label + 'T00:00:00')
-                                    return d.toLocaleDateString('en-GB', {
-                                      day: 'numeric',
-                                      month: 'short',
-                                    })
-                                  }}
-                                />
-                              }
-                            />
-                            {groupData.totalDailyTarget > 0 && (
-                              <ReferenceLine
-                                y={groupData.totalDailyTarget}
+                        <div dir="ltr">
+                          <ChartContainer
+                            config={
+                              Object.fromEntries(
+                                groupData.venueNames.map((name, i) => [
+                                  name,
+                                  {
+                                    label: name,
+                                    color: [
+                                      'hsl(142, 71%, 45%)',
+                                      'hsl(217, 91%, 60%)',
+                                      'hsl(47, 96%, 53%)',
+                                      'hsl(280, 65%, 60%)',
+                                      'hsl(15, 90%, 55%)',
+                                    ][i % 5],
+                                  },
+                                ])
+                              ) as ChartConfig
+                            }
+                            className="h-[220px] w-full"
+                          >
+                            <AreaChart data={groupData.dailyChart}>
+                              <CartesianGrid
+                                strokeDasharray="3 3"
+                                stroke="hsl(var(--border))"
+                              />
+                              <XAxis
+                                dataKey="date"
+                                tickFormatter={(d: string) => {
+                                  const day = parseInt(d.split('-')[2], 10)
+                                  return day % 5 === 1 || day === 1
+                                    ? String(day)
+                                    : ''
+                                }}
                                 stroke="hsl(var(--muted-foreground))"
-                                strokeDasharray="6 4"
-                                strokeOpacity={0.5}
+                                fontSize={11}
                               />
-                            )}
-                            {groupData.venueNames.map((name, i) => (
-                              <Area
-                                key={name}
-                                type="monotone"
-                                dataKey={name}
-                                stackId="1"
-                                fill={
-                                  [
-                                    'hsl(142, 71%, 45%)',
-                                    'hsl(217, 91%, 60%)',
-                                    'hsl(47, 96%, 53%)',
-                                    'hsl(280, 65%, 60%)',
-                                    'hsl(15, 90%, 55%)',
-                                  ][i % 5]
-                                }
-                                fillOpacity={0.4}
-                                stroke={
-                                  [
-                                    'hsl(142, 71%, 45%)',
-                                    'hsl(217, 91%, 60%)',
-                                    'hsl(47, 96%, 53%)',
-                                    'hsl(280, 65%, 60%)',
-                                    'hsl(15, 90%, 55%)',
-                                  ][i % 5]
-                                }
-                                strokeWidth={1.5}
+                              <YAxis
+                                stroke="hsl(var(--muted-foreground))"
+                                fontSize={11}
+                                allowDecimals={false}
                               />
-                            ))}
-                          </AreaChart>
-                        </ChartContainer>
+                              <ChartTooltip
+                                content={
+                                  <ChartTooltipContent
+                                    labelFormatter={(label: string) => {
+                                      const d = new Date(label + 'T00:00:00')
+                                      return format.dateTime(d, {
+                                        day: 'numeric',
+                                        month: 'short',
+                                      })
+                                    }}
+                                  />
+                                }
+                              />
+                              {groupData.totalDailyTarget > 0 && (
+                                <ReferenceLine
+                                  y={groupData.totalDailyTarget}
+                                  stroke="hsl(var(--muted-foreground))"
+                                  strokeDasharray="6 4"
+                                  strokeOpacity={0.5}
+                                />
+                              )}
+                              {groupData.venueNames.map((name, i) => (
+                                <Area
+                                  key={name}
+                                  type="monotone"
+                                  dataKey={name}
+                                  stackId="1"
+                                  fill={
+                                    [
+                                      'hsl(142, 71%, 45%)',
+                                      'hsl(217, 91%, 60%)',
+                                      'hsl(47, 96%, 53%)',
+                                      'hsl(280, 65%, 60%)',
+                                      'hsl(15, 90%, 55%)',
+                                    ][i % 5]
+                                  }
+                                  fillOpacity={0.4}
+                                  stroke={
+                                    [
+                                      'hsl(142, 71%, 45%)',
+                                      'hsl(217, 91%, 60%)',
+                                      'hsl(47, 96%, 53%)',
+                                      'hsl(280, 65%, 60%)',
+                                      'hsl(15, 90%, 55%)',
+                                    ][i % 5]
+                                  }
+                                  strokeWidth={1.5}
+                                />
+                              ))}
+                            </AreaChart>
+                          </ChartContainer>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1889,7 +1894,9 @@ export default function VenueManagementPage() {
                   <div className="rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
                     <div className="p-5">
                       <h2 className="text-base font-semibold text-[var(--timberwolf)] mb-4">
-                        Venues ({groupData.childVenues.length})
+                        {t('group.venuesCount', {
+                          count: groupData.childVenues.length,
+                        })}
                       </h2>
                       <div className="space-y-3">
                         {groupData.childVenues.map((child) => (
@@ -1907,12 +1914,22 @@ export default function VenueManagementPage() {
                                 </span>
                               </div>
                               <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                                <span>{child.totalRecordings} recordings</span>
-                                <span>{child.monthRecordings} this month</span>
+                                <span>
+                                  {t('group.recordingsCount', {
+                                    count: child.totalRecordings,
+                                  })}
+                                </span>
+                                <span>
+                                  {t('group.thisMonthCount', {
+                                    count: child.monthRecordings,
+                                  })}
+                                </span>
                                 {child.dailyTarget > 0 && (
                                   <span>
-                                    Today: {child.todayCount}/
-                                    {child.dailyTarget}
+                                    {t('group.todayProgress', {
+                                      today: child.todayCount,
+                                      target: child.dailyTarget,
+                                    })}
                                   </span>
                                 )}
                               </div>
@@ -1920,12 +1937,12 @@ export default function VenueManagementPage() {
                             <div className="flex items-center gap-3 flex-shrink-0">
                               {child.monthRevenue > 0 && (
                                 <span className="text-sm font-semibold text-[var(--timberwolf)]">
-                                  {new Intl.NumberFormat('en-GB', {
+                                  {format.number(child.monthRevenue, {
                                     style: 'currency',
                                     currency: child.currency,
                                     minimumFractionDigits: 0,
                                     maximumFractionDigits: 3,
-                                  }).format(child.monthRevenue)}
+                                  })}
                                 </span>
                               )}
                               <Button
@@ -1936,15 +1953,14 @@ export default function VenueManagementPage() {
                                   router.push(`/venue/${child.id}`)
                                 }
                               >
-                                Manage
+                                {t('group.manage')}
                               </Button>
                             </div>
                           </div>
                         ))}
                         {groupData.childVenues.length === 0 && (
                           <p className="text-muted-foreground text-center py-4">
-                            No child venues yet. Add venues from the admin
-                            dashboard.
+                            {t('group.noChildVenues')}
                           </p>
                         )}
                       </div>
@@ -1999,7 +2015,7 @@ export default function VenueManagementPage() {
                         rearrange the three slots responsively. */}
                     <div className="flex flex-wrap items-center gap-3 mb-4">
                       <h2 className="text-base font-semibold text-[var(--timberwolf)]">
-                        Billing
+                        {t('billing.title')}
                       </h2>
 
                       {/* Summary stats — centred between title and nav on
@@ -2015,19 +2031,19 @@ export default function VenueManagementPage() {
                             >
                               {billingSummary.totalRevenue.toFixed(3)}
                             </span>
-                            <span className="text-muted-foreground/60 ml-1 text-xs">
+                            <span className="text-muted-foreground/60 ms-1 text-xs">
                               {billingSummary.currency}
                             </span>
                           </div>
-                          <div className="border-l border-border pl-3 sm:pl-4">
+                          <div className="border-s border-border ps-3 sm:ps-4">
                             <span
                               className="text-[var(--timberwolf)] font-medium"
                               style={{ fontVariantNumeric: 'tabular-nums' }}
                             >
                               {billingSummary.count}
                             </span>
-                            <span className="text-muted-foreground/60 ml-1 text-xs">
-                              recordings
+                            <span className="text-muted-foreground/60 ms-1 text-xs">
+                              {t('billing.recordingsSuffix')}
                             </span>
                           </div>
                           {/* Daily average: meaningful for every month —
@@ -2046,15 +2062,15 @@ export default function VenueManagementPage() {
                             const avg =
                               billingSummary.count / Math.max(1, daysElapsed)
                             return (
-                              <div className="border-l border-border pl-3 sm:pl-4">
+                              <div className="border-s border-border ps-3 sm:ps-4">
                                 <span
                                   className="text-[var(--timberwolf)] font-medium"
                                   style={{ fontVariantNumeric: 'tabular-nums' }}
                                 >
                                   {avg.toFixed(1)}
                                 </span>
-                                <span className="text-muted-foreground/60 text-xs ml-1">
-                                  /day avg
+                                <span className="text-muted-foreground/60 text-xs ms-1">
+                                  {t('billing.perDayAvg')}
                                 </span>
                               </div>
                             )
@@ -2063,9 +2079,9 @@ export default function VenueManagementPage() {
                       )}
 
                       {/* Month nav — appears between title and summary on
-                          mobile (right-aligned via ml-auto) and at the far
+                          mobile (right-aligned via ms-auto) and at the far
                           right on desktop (order-3). */}
-                      <div className="order-2 ml-auto sm:order-3 sm:ml-0 flex items-center gap-2 sm:gap-3">
+                      <div className="order-2 ms-auto sm:order-3 sm:ms-0 flex items-center gap-2 sm:gap-3">
                         <button
                           onClick={() => {
                             const prev =
@@ -2081,13 +2097,10 @@ export default function VenueManagementPage() {
                           ‹
                         </button>
                         <p className="text-sm text-muted-foreground font-medium min-w-[110px] text-center">
-                          {new Date(
-                            billingYear,
-                            billingMonth - 1
-                          ).toLocaleDateString('en-GB', {
-                            month: 'long',
-                            year: 'numeric',
-                          })}
+                          {format.dateTime(
+                            new Date(billingYear, billingMonth - 1),
+                            { month: 'long', year: 'numeric' }
+                          )}
                         </p>
                         <button
                           onClick={() => {
@@ -2126,7 +2139,7 @@ export default function VenueManagementPage() {
                               <div className="flex items-center gap-1.5 mb-1.5">
                                 <div className="h-1.5 w-1.5 rounded-full bg-amber-400/60" />
                                 <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
-                                  At venue
+                                  {t('billing.atVenue')}
                                 </p>
                               </div>
                               <p
@@ -2136,15 +2149,14 @@ export default function VenueManagementPage() {
                                 {billingSummary.venueCollectedRevenue.toFixed(
                                   3
                                 )}
-                                <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
+                                <span className="text-[10px] font-normal text-muted-foreground/50 ms-1">
                                   {billingSummary.currency}
                                 </span>
                               </p>
                               <p className="text-[10px] text-muted-foreground/40 mt-1">
-                                {billingSummary.venueCollectedCount} recording
-                                {billingSummary.venueCollectedCount === 1
-                                  ? ''
-                                  : 's'}
+                                {t('billing.recordingsCount', {
+                                  count: billingSummary.venueCollectedCount,
+                                })}
                               </p>
                             </div>
                             {/* QR Code-collected revenue */}
@@ -2152,7 +2164,7 @@ export default function VenueManagementPage() {
                               <div className="flex items-center gap-1.5 mb-1.5">
                                 <div className="h-1.5 w-1.5 rounded-full bg-indigo-400/60" />
                                 <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
-                                  QR Code
+                                  {t('billing.qrCode')}
                                 </p>
                               </div>
                               <p
@@ -2162,15 +2174,14 @@ export default function VenueManagementPage() {
                                 {billingSummary.playhubCollectedRevenue.toFixed(
                                   3
                                 )}
-                                <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
+                                <span className="text-[10px] font-normal text-muted-foreground/50 ms-1">
                                   {billingSummary.currency}
                                 </span>
                               </p>
                               <p className="text-[10px] text-muted-foreground/40 mt-1">
-                                {billingSummary.playhubCollectedCount} recording
-                                {billingSummary.playhubCollectedCount === 1
-                                  ? ''
-                                  : 's'}
+                                {t('billing.recordingsCount', {
+                                  count: billingSummary.playhubCollectedCount,
+                                })}
                               </p>
                             </div>
                             {hasProfitShare && (
@@ -2180,7 +2191,7 @@ export default function VenueManagementPage() {
                                   <div className="flex items-center gap-1.5 mb-1.5">
                                     <div className="h-1.5 w-1.5 rounded-full bg-emerald-400/60" />
                                     <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
-                                      Your profit
+                                      {t('billing.yourProfit')}
                                     </p>
                                   </div>
                                   <p
@@ -2190,20 +2201,17 @@ export default function VenueManagementPage() {
                                     }}
                                   >
                                     {billingSummary.venueTotalProfit.toFixed(3)}
-                                    <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
+                                    <span className="text-[10px] font-normal text-muted-foreground/50 ms-1">
                                       {billingSummary.currency}
                                     </span>
                                   </p>
                                   <p className="text-[10px] text-muted-foreground/40 mt-1">
-                                    {billingSummary.count} recording
-                                    {billingSummary.count === 1
-                                      ? ''
-                                      : 's'} in{' '}
-                                    {new Date(
-                                      billingYear,
-                                      billingMonth - 1
-                                    ).toLocaleDateString('en-GB', {
-                                      month: 'long',
+                                    {t('billing.recordingsInMonth', {
+                                      count: billingSummary.count,
+                                      month: format.dateTime(
+                                        new Date(billingYear, billingMonth - 1),
+                                        { month: 'long' }
+                                      ),
                                     })}
                                   </p>
                                 </div>
@@ -2214,7 +2222,7 @@ export default function VenueManagementPage() {
                                       className={`h-1.5 w-1.5 rounded-full ${billingSummary.netBalance > 0 ? 'bg-amber-400/60' : billingSummary.netBalance < 0 ? 'bg-emerald-400/60' : 'bg-[var(--ash-grey)]/40'}`}
                                     />
                                     <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
-                                      Net settlement
+                                      {t('billing.netSettlement')}
                                     </p>
                                   </div>
                                   <p
@@ -2226,16 +2234,16 @@ export default function VenueManagementPage() {
                                     {Math.abs(
                                       billingSummary.netBalance
                                     ).toFixed(3)}
-                                    <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">
+                                    <span className="text-[10px] font-normal text-muted-foreground/50 ms-1">
                                       {billingSummary.currency}
                                     </span>
                                   </p>
                                   <p className="text-[10px] text-muted-foreground/40 mt-1">
                                     {billingSummary.netBalance > 0
-                                      ? 'venue owes PLAYBACK'
+                                      ? t('billing.venueOwesPlayback')
                                       : billingSummary.netBalance < 0
-                                        ? 'PLAYBACK owes venue'
-                                        : 'settled'}
+                                        ? t('billing.playbackOwesVenue')
+                                        : t('billing.settled')}
                                   </p>
                                 </div>
                               </>
@@ -2256,7 +2264,7 @@ export default function VenueManagementPage() {
                       >
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest flex items-center gap-2">
-                            Daily activity
+                            {t('billing.dailyActivity')}
                             {chartLoading && (
                               <span className="inline-flex h-1 w-1 animate-pulse rounded-full bg-emerald-400/70" />
                             )}
@@ -2289,14 +2297,47 @@ export default function VenueManagementPage() {
                             </div>
                           )}
                         </div>
-                        <ChartContainer
-                          config={
-                            Object.fromEntries(
-                              dailyStats.scenes.map((scene, i) => [
-                                scene,
-                                {
-                                  label: scene,
-                                  color: [
+                        <div dir="ltr">
+                          <ChartContainer
+                            config={
+                              Object.fromEntries(
+                                dailyStats.scenes.map((scene, i) => [
+                                  scene,
+                                  {
+                                    label: scene,
+                                    color: [
+                                      '#6366f1',
+                                      '#22c55e',
+                                      '#f59e0b',
+                                      '#ef4444',
+                                      '#06b6d4',
+                                      '#ec4899',
+                                      '#8b5cf6',
+                                      '#14b8a6',
+                                    ][i % 8],
+                                  },
+                                ])
+                              ) as ChartConfig
+                            }
+                            className="aspect-[2/1] sm:aspect-[3/1] md:aspect-[4/1] w-full"
+                          >
+                            <AreaChart
+                              data={dailyStats.days
+                                .filter(
+                                  (d) =>
+                                    d.date <=
+                                    new Date().toISOString().slice(0, 10)
+                                )
+                                .map((d) => ({
+                                  date: d.date.slice(8),
+                                  ...d.byScene,
+                                  total: d.total,
+                                }))}
+                              margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
+                            >
+                              <defs>
+                                {dailyStats.scenes.map((scene, i) => {
+                                  const color = [
                                     '#6366f1',
                                     '#22c55e',
                                     '#f59e0b',
@@ -2305,28 +2346,70 @@ export default function VenueManagementPage() {
                                     '#ec4899',
                                     '#8b5cf6',
                                     '#14b8a6',
-                                  ][i % 8],
-                                },
-                              ])
-                            ) as ChartConfig
-                          }
-                          className="aspect-[2/1] sm:aspect-[3/1] md:aspect-[4/1] w-full"
-                        >
-                          <AreaChart
-                            data={dailyStats.days
-                              .filter(
-                                (d) =>
-                                  d.date <=
-                                  new Date().toISOString().slice(0, 10)
-                              )
-                              .map((d) => ({
-                                date: d.date.slice(8),
-                                ...d.byScene,
-                                total: d.total,
-                              }))}
-                            margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
-                          >
-                            <defs>
+                                  ][i % 8]
+                                  return (
+                                    <linearGradient
+                                      key={scene}
+                                      id={`fill-${i}`}
+                                      x1="0"
+                                      y1="0"
+                                      x2="0"
+                                      y2="1"
+                                    >
+                                      <stop
+                                        offset="5%"
+                                        stopColor={color}
+                                        stopOpacity={0.25}
+                                      />
+                                      <stop
+                                        offset="95%"
+                                        stopColor={color}
+                                        stopOpacity={0}
+                                      />
+                                    </linearGradient>
+                                  )
+                                })}
+                              </defs>
+                              <CartesianGrid
+                                strokeDasharray="3 3"
+                                stroke="rgba(185,186,163,0.05)"
+                                vertical={false}
+                              />
+                              <XAxis
+                                dataKey="date"
+                                tick={{
+                                  fill: 'rgba(185,186,163,0.4)',
+                                  fontSize: 9,
+                                }}
+                                axisLine={false}
+                                tickLine={false}
+                                interval="preserveStartEnd"
+                              />
+                              <YAxis
+                                allowDecimals={false}
+                                tick={{
+                                  fill: 'rgba(185,186,163,0.4)',
+                                  fontSize: 9,
+                                }}
+                                axisLine={false}
+                                tickLine={false}
+                                width={20}
+                              />
+                              <ChartTooltip
+                                content={
+                                  <ChartTooltipContent
+                                    indicator="dot"
+                                    labelFormatter={(value) => {
+                                      const dayNum =
+                                        typeof value === 'string'
+                                          ? value
+                                          : String(value)
+                                      const now = new Date()
+                                      return `${dayNum} ${format.dateTime(now, 'monthShort')}`
+                                    }}
+                                  />
+                                }
+                              />
                               {dailyStats.scenes.map((scene, i) => {
                                 const color = [
                                   '#6366f1',
@@ -2339,121 +2422,52 @@ export default function VenueManagementPage() {
                                   '#14b8a6',
                                 ][i % 8]
                                 return (
-                                  <linearGradient
+                                  <Area
                                     key={scene}
-                                    id={`fill-${i}`}
-                                    x1="0"
-                                    y1="0"
-                                    x2="0"
-                                    y2="1"
-                                  >
-                                    <stop
-                                      offset="5%"
-                                      stopColor={color}
-                                      stopOpacity={0.25}
-                                    />
-                                    <stop
-                                      offset="95%"
-                                      stopColor={color}
-                                      stopOpacity={0}
-                                    />
-                                  </linearGradient>
+                                    dataKey={scene}
+                                    type="monotone"
+                                    stackId="a"
+                                    stroke={color}
+                                    fill={`url(#fill-${i})`}
+                                    strokeWidth={1.5}
+                                  />
                                 )
                               })}
-                            </defs>
-                            <CartesianGrid
-                              strokeDasharray="3 3"
-                              stroke="rgba(185,186,163,0.05)"
-                              vertical={false}
-                            />
-                            <XAxis
-                              dataKey="date"
-                              tick={{
-                                fill: 'rgba(185,186,163,0.4)',
-                                fontSize: 9,
-                              }}
-                              axisLine={false}
-                              tickLine={false}
-                              interval="preserveStartEnd"
-                            />
-                            <YAxis
-                              allowDecimals={false}
-                              tick={{
-                                fill: 'rgba(185,186,163,0.4)',
-                                fontSize: 9,
-                              }}
-                              axisLine={false}
-                              tickLine={false}
-                              width={20}
-                            />
-                            <ChartTooltip
-                              content={
-                                <ChartTooltipContent
-                                  indicator="dot"
-                                  labelFormatter={(value) => {
-                                    const dayNum =
-                                      typeof value === 'string'
-                                        ? value
-                                        : String(value)
-                                    const now = new Date()
-                                    return `${dayNum} ${now.toLocaleDateString('en-GB', { month: 'short' })}`
+                              {/* Target line */}
+                              {dailyStats.dailyTarget > 0 && (
+                                <ReferenceLine
+                                  y={dailyStats.dailyTarget}
+                                  stroke="rgba(245,158,11,0.35)"
+                                  strokeDasharray="6 3"
+                                  label={{
+                                    value: t('billing.targetPerDay', {
+                                      target: dailyStats.dailyTarget,
+                                    }),
+                                    position: 'insideTopRight',
+                                    fill: 'rgba(245,158,11,0.5)',
+                                    fontSize: 9,
                                   }}
                                 />
-                              }
-                            />
-                            {dailyStats.scenes.map((scene, i) => {
-                              const color = [
-                                '#6366f1',
-                                '#22c55e',
-                                '#f59e0b',
-                                '#ef4444',
-                                '#06b6d4',
-                                '#ec4899',
-                                '#8b5cf6',
-                                '#14b8a6',
-                              ][i % 8]
-                              return (
-                                <Area
-                                  key={scene}
-                                  dataKey={scene}
-                                  type="monotone"
-                                  stackId="a"
-                                  stroke={color}
-                                  fill={`url(#fill-${i})`}
-                                  strokeWidth={1.5}
+                              )}
+                              {/* Average line */}
+                              {dailyStats.averagePerDay > 0 && (
+                                <ReferenceLine
+                                  y={dailyStats.averagePerDay}
+                                  stroke="rgba(99,102,241,0.4)"
+                                  strokeDasharray="3 3"
+                                  label={{
+                                    value: t('billing.avgPerDay', {
+                                      avg: dailyStats.averagePerDay,
+                                    }),
+                                    position: 'insideBottomRight',
+                                    fill: 'rgba(99,102,241,0.6)',
+                                    fontSize: 9,
+                                  }}
                                 />
-                              )
-                            })}
-                            {/* Target line */}
-                            {dailyStats.dailyTarget > 0 && (
-                              <ReferenceLine
-                                y={dailyStats.dailyTarget}
-                                stroke="rgba(245,158,11,0.35)"
-                                strokeDasharray="6 3"
-                                label={{
-                                  value: `Target: ${dailyStats.dailyTarget}/day`,
-                                  position: 'insideTopRight',
-                                  fill: 'rgba(245,158,11,0.5)',
-                                  fontSize: 9,
-                                }}
-                              />
-                            )}
-                            {/* Average line */}
-                            {dailyStats.averagePerDay > 0 && (
-                              <ReferenceLine
-                                y={dailyStats.averagePerDay}
-                                stroke="rgba(99,102,241,0.4)"
-                                strokeDasharray="3 3"
-                                label={{
-                                  value: `Avg: ${dailyStats.averagePerDay}/day`,
-                                  position: 'insideBottomRight',
-                                  fill: 'rgba(99,102,241,0.6)',
-                                  fontSize: 9,
-                                }}
-                              />
-                            )}
-                          </AreaChart>
-                        </ChartContainer>
+                              )}
+                            </AreaChart>
+                          </ChartContainer>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2468,8 +2482,8 @@ export default function VenueManagementPage() {
                       }}
                     >
                       {showBillingSection
-                        ? 'Hide invoices'
-                        : 'View invoices \u2192'}
+                        ? t('billing.hideInvoices')
+                        : t('billing.viewInvoices')}
                     </button>
                   </div>
 
@@ -2478,7 +2492,7 @@ export default function VenueManagementPage() {
                     <div className="px-5 pb-5 border-t border-[var(--ash-grey)]/[0.06] pt-4 space-y-2">
                       {invoices.length === 0 ? (
                         <p className="text-xs text-muted-foreground/50">
-                          No invoices yet
+                          {t('billing.noInvoices')}
                         </p>
                       ) : (
                         invoices.map((inv) => {
@@ -2493,19 +2507,21 @@ export default function VenueManagementPage() {
                             >
                               <div className="min-w-0">
                                 <p className="text-sm font-medium text-[var(--timberwolf)]">
-                                  {new Date(
-                                    inv.period_start
-                                  ).toLocaleDateString('en-GB', {
+                                  {format.dateTime(new Date(inv.period_start), {
                                     month: 'long',
                                     year: 'numeric',
                                   })}
                                 </p>
                                 <p className="text-[11px] text-muted-foreground/50">
-                                  {totalRecordings} recording
-                                  {totalRecordings === 1 ? '' : 's'}
+                                  {t('billing.recordingsCount', {
+                                    count: totalRecordings,
+                                  })}
                                   {inv.venue_collected_count > 0 &&
                                     inv.playhub_collected_count > 0 &&
-                                    ` (${inv.venue_collected_count} venue, ${inv.playhub_collected_count} QR code)`}
+                                    ` ${t('billing.collectionBreakdown', {
+                                      venue: inv.venue_collected_count,
+                                      qr: inv.playhub_collected_count,
+                                    })}`}
                                 </p>
                               </div>
                               <div className="flex items-center gap-2 flex-shrink-0">
@@ -2517,7 +2533,9 @@ export default function VenueManagementPage() {
                                   {Math.abs(net).toFixed(3)} {inv.currency}
                                 </span>
                                 <span className="text-[10px] text-muted-foreground/40">
-                                  {net >= 0 ? 'owed' : 'due to venue'}
+                                  {net >= 0
+                                    ? t('billing.owed')
+                                    : t('billing.dueToVenue')}
                                 </span>
                                 <span
                                   className={`text-[10px] px-1.5 py-0.5 rounded ${
@@ -2558,7 +2576,7 @@ export default function VenueManagementPage() {
                     <div className="p-6">
                       <div className="flex flex-col md:flex-row items-center justify-between gap-2">
                         <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-                          Schedule Recording
+                          {t('schedule.title')}
                         </h2>
                         {!showScheduleForm && (
                           <Button
@@ -2570,7 +2588,7 @@ export default function VenueManagementPage() {
                               setShowScheduleForm(true)
                             }}
                           >
-                            + New Recording
+                            {t('schedule.newRecording')}
                           </Button>
                         )}
                       </div>
@@ -2581,19 +2599,19 @@ export default function VenueManagementPage() {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <label className="text-sm font-medium text-[var(--timberwolf)]">
-                                Title *
+                                {t('schedule.titleLabel')}
                               </label>
                               <Input
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
-                                placeholder="Match title"
+                                placeholder={t('schedule.titlePlaceholder')}
                                 required
                                 className={inputClass}
                               />
                             </div>
                             <div className="space-y-2">
                               <label className="text-sm font-medium text-[var(--timberwolf)]">
-                                Pitch/Camera *
+                                {t('schedule.pitchCameraLabel')}
                               </label>
                               <Select
                                 value={sceneId}
@@ -2601,13 +2619,17 @@ export default function VenueManagementPage() {
                                 disabled={scenes.length <= 1}
                               >
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select pitch..." />
+                                  <SelectValue
+                                    placeholder={t('schedule.selectPitch')}
+                                  />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {scenes.map((scene) => (
                                     <SelectItem key={scene.id} value={scene.id}>
                                       {scene.provider === 'clutch'
-                                        ? `${scene.name} (padel)`
+                                        ? t('schedule.scenePadel', {
+                                            name: scene.name,
+                                          })
                                         : scene.name}
                                     </SelectItem>
                                   ))}
@@ -2618,12 +2640,12 @@ export default function VenueManagementPage() {
 
                           <div className="space-y-2">
                             <label className="text-sm font-medium text-[var(--timberwolf)]">
-                              Description
+                              {t('schedule.description')}
                             </label>
                             <Input
                               value={description}
                               onChange={(e) => setDescription(e.target.value)}
-                              placeholder="Optional description"
+                              placeholder={t('schedule.descriptionPlaceholder')}
                               className={inputClass}
                             />
                           </div>
@@ -2631,23 +2653,23 @@ export default function VenueManagementPage() {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <label className="text-sm font-medium text-[var(--timberwolf)]">
-                                Home Team
+                                {t('schedule.homeTeam')}
                               </label>
                               <Input
                                 value={homeTeam}
                                 onChange={(e) => setHomeTeam(e.target.value)}
-                                placeholder="Home team name"
+                                placeholder={t('schedule.homeTeamPlaceholder')}
                                 className={inputClass}
                               />
                             </div>
                             <div className="space-y-2">
                               <label className="text-sm font-medium text-[var(--timberwolf)]">
-                                Away Team
+                                {t('schedule.awayTeam')}
                               </label>
                               <Input
                                 value={awayTeam}
                                 onChange={(e) => setAwayTeam(e.target.value)}
-                                placeholder="Away team name"
+                                placeholder={t('schedule.awayTeamPlaceholder')}
                                 className={inputClass}
                               />
                             </div>
@@ -2656,14 +2678,14 @@ export default function VenueManagementPage() {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <label className="text-sm font-medium text-[var(--timberwolf)]">
-                                Start Time *
+                                {t('schedule.startTime')}
                               </label>
                               <DateTimePicker
                                 value={startTime}
                                 onChange={handleStartTimeChange}
                                 required
                                 className={inputClass}
-                                placeholder="Select start time"
+                                placeholder={t('schedule.selectStartTime')}
                               />
                               <Button
                                 type="button"
@@ -2672,19 +2694,19 @@ export default function VenueManagementPage() {
                                 onClick={setStartNow}
                                 className={`w-full ${outlineBtnClass}`}
                               >
-                                Start Now (+1 min)
+                                {t('schedule.startNow')}
                               </Button>
                             </div>
                             <div className="space-y-2">
                               <label className="text-sm font-medium text-[var(--timberwolf)]">
-                                End Time *
+                                {t('schedule.endTime')}
                               </label>
                               <DateTimePicker
                                 value={endTime}
                                 onChange={setEndTime}
                                 required
                                 className={inputClass}
-                                placeholder="Select end time"
+                                placeholder={t('schedule.selectEndTime')}
                               />
                               {startTime && (
                                 <div className="flex gap-2">
@@ -2695,7 +2717,7 @@ export default function VenueManagementPage() {
                                     onClick={() => setDuration(60)}
                                     className={outlineBtnClass}
                                   >
-                                    +1h
+                                    {t('schedule.plus1h')}
                                   </Button>
                                   <Button
                                     type="button"
@@ -2704,7 +2726,7 @@ export default function VenueManagementPage() {
                                     onClick={() => setDuration(90)}
                                     className={outlineBtnClass}
                                   >
-                                    +1.5h
+                                    {t('schedule.plus90m')}
                                   </Button>
                                   <Button
                                     type="button"
@@ -2713,7 +2735,7 @@ export default function VenueManagementPage() {
                                     onClick={() => setDuration(120)}
                                     className={outlineBtnClass}
                                   >
-                                    +2h
+                                    {t('schedule.plus2h')}
                                   </Button>
                                 </div>
                               )}
@@ -2722,17 +2744,18 @@ export default function VenueManagementPage() {
 
                           <div className="space-y-2">
                             <label className="text-sm font-medium text-[var(--timberwolf)]">
-                              Grant Access (emails, comma-separated)
+                              {t('schedule.grantAccessLabel')}
                             </label>
                             <Input
                               value={accessEmails}
                               onChange={(e) => setAccessEmails(e.target.value)}
-                              placeholder="user1@example.com, user2@example.com"
+                              placeholder={t(
+                                'schedule.accessEmailsPlaceholder'
+                              )}
                               className={inputClass}
                             />
                             <p className="text-xs text-muted-foreground">
-                              These users will have access immediately (even
-                              before recording is ready)
+                              {t('schedule.accessHint')}
                             </p>
                           </div>
 
@@ -2749,7 +2772,7 @@ export default function VenueManagementPage() {
                                   className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
                                 />
                                 <span className="text-sm font-medium text-[var(--timberwolf)]">
-                                  Paid recording
+                                  {t('schedule.paidRecording')}
                                 </span>
                               </label>
                               {isBillable && (
@@ -2789,7 +2812,7 @@ export default function VenueManagementPage() {
                                   className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
                                 />
                                 <span className="text-sm font-medium text-[var(--timberwolf)]">
-                                  List on marketplace
+                                  {t('schedule.listOnMarketplace')}
                                 </span>
                               </label>
                               {marketplaceEnabled && (
@@ -2821,7 +2844,7 @@ export default function VenueManagementPage() {
                           {scheduleGraphicPackages.length > 0 && (
                             <div className="space-y-2">
                               <label className="text-sm font-medium text-[var(--timberwolf)]">
-                                Graphic Package
+                                {t('schedule.graphicPackage')}
                               </label>
                               <Select
                                 value={selectedGraphicPackageId}
@@ -2832,19 +2855,24 @@ export default function VenueManagementPage() {
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="default">
-                                    Use Default
+                                    {t('schedule.useDefault')}
                                   </SelectItem>
-                                  <SelectItem value="none">None</SelectItem>
+                                  <SelectItem value="none">
+                                    {t('schedule.none')}
+                                  </SelectItem>
                                   {scheduleGraphicPackages.map((pkg) => (
                                     <SelectItem key={pkg.id} value={pkg.id}>
-                                      {pkg.name}
-                                      {pkg.is_default ? ' (default)' : ''}
+                                      {pkg.is_default
+                                        ? t('schedule.packageDefault', {
+                                            name: pkg.name,
+                                          })
+                                        : pkg.name}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
                               <p className="text-xs text-muted-foreground">
-                                Logo overlays applied to this recording
+                                {t('schedule.graphicPackageHint')}
                               </p>
                             </div>
                           )}
@@ -2868,8 +2896,8 @@ export default function VenueManagementPage() {
                               className={`flex-1 ${primaryBtnClass}`}
                             >
                               {submitting
-                                ? 'Scheduling...'
-                                : 'Schedule Recording'}
+                                ? t('schedule.scheduling')
+                                : t('schedule.title')}
                             </Button>
                             <Button
                               type="button"
@@ -2877,7 +2905,7 @@ export default function VenueManagementPage() {
                               onClick={() => setShowScheduleForm(false)}
                               className={outlineBtnClass}
                             >
-                              Cancel
+                              {tc('cancel')}
                             </Button>
                           </div>
                         </form>
@@ -2894,10 +2922,10 @@ export default function VenueManagementPage() {
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                     <div>
                       <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-                        Live Streaming
+                        {t('streams.title')}
                       </h2>
                       <p className="text-sm text-muted-foreground">
-                        Manage live stream channels for this venue
+                        {t('streams.subtitle')}
                       </p>
                     </div>
                     <Button
@@ -2910,7 +2938,9 @@ export default function VenueManagementPage() {
                         }
                       }}
                     >
-                      {showStreamingSection ? 'Hide' : 'Manage Streams'}
+                      {showStreamingSection
+                        ? t('streams.hide')
+                        : t('streams.manageStreams')}
                     </Button>
                   </div>
                 </div>
@@ -2924,7 +2954,7 @@ export default function VenueManagementPage() {
                       <Input
                         value={newChannelName}
                         onChange={(e) => setNewChannelName(e.target.value)}
-                        placeholder="Channel name (e.g., Pitch 1 Live)"
+                        placeholder={t('streams.channelNamePlaceholder')}
                         className={`flex-1 ${inputClass}`}
                       />
                       <Button
@@ -2932,7 +2962,9 @@ export default function VenueManagementPage() {
                         className={`w-full sm:w-auto ${primaryBtnClass}`}
                         disabled={creatingChannel || !newChannelName.trim()}
                       >
-                        {creatingChannel ? 'Creating...' : '+ Create Channel'}
+                        {creatingChannel
+                          ? t('streams.creating')
+                          : t('streams.createChannel')}
                       </Button>
                     </form>
 
@@ -2941,11 +2973,10 @@ export default function VenueManagementPage() {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                         <div>
                           <h4 className="font-medium text-[var(--timberwolf)]">
-                            Schedule Live Stream
+                            {t('streams.scheduleTitle')}
                           </h4>
                           <p className="text-sm text-muted-foreground">
-                            Create a Spiideo recording + MediaLive stream in one
-                            step
+                            {t('streams.scheduleSubtitle')}
                           </p>
                         </div>
                         {!showStreamScheduleForm && (
@@ -2964,7 +2995,7 @@ export default function VenueManagementPage() {
                               }
                             }}
                           >
-                            + Schedule Stream
+                            {t('streams.scheduleStream')}
                           </Button>
                         )}
                       </div>
@@ -2977,26 +3008,28 @@ export default function VenueManagementPage() {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
                               <label className="text-sm text-muted-foreground">
-                                Title *
+                                {t('schedule.titleLabel')}
                               </label>
                               <Input
                                 value={streamTitle}
                                 onChange={(e) => setStreamTitle(e.target.value)}
-                                placeholder="Match title"
+                                placeholder={t('schedule.titlePlaceholder')}
                                 required
                                 className={inputClass}
                               />
                             </div>
                             <div>
                               <label className="text-sm text-muted-foreground">
-                                Camera/Pitch *
+                                {t('streams.cameraPitchLabel')}
                               </label>
                               <Select
                                 value={streamSceneId}
                                 onValueChange={setStreamSceneId}
                               >
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select pitch..." />
+                                  <SelectValue
+                                    placeholder={t('schedule.selectPitch')}
+                                  />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {/* Live streaming is Spiideo-only */}
@@ -3015,26 +3048,26 @@ export default function VenueManagementPage() {
                             </div>
                             <div>
                               <label className="text-sm text-muted-foreground">
-                                Start Time *
+                                {t('schedule.startTime')}
                               </label>
                               <DateTimePicker
                                 value={streamStartTime}
                                 onChange={setStreamStartTime}
                                 required
                                 className={inputClass}
-                                placeholder="Select start time"
+                                placeholder={t('schedule.selectStartTime')}
                               />
                             </div>
                             <div>
                               <label className="text-sm text-muted-foreground">
-                                End Time *
+                                {t('schedule.endTime')}
                               </label>
                               <DateTimePicker
                                 value={streamEndTime}
                                 onChange={setStreamEndTime}
                                 required
                                 className={inputClass}
-                                placeholder="Select end time"
+                                placeholder={t('schedule.selectEndTime')}
                               />
                             </div>
                           </div>
@@ -3045,7 +3078,7 @@ export default function VenueManagementPage() {
                               onClick={() => setShowStreamScheduleForm(false)}
                               className="text-[var(--timberwolf)] hover:bg-muted"
                             >
-                              Cancel
+                              {tc('cancel')}
                             </Button>
                             <Button
                               type="submit"
@@ -3053,8 +3086,8 @@ export default function VenueManagementPage() {
                               className={primaryBtnClass}
                             >
                               {schedulingStream
-                                ? 'Setting up...'
-                                : 'Create & Start Stream'}
+                                ? t('streams.settingUp')
+                                : t('streams.createAndStart')}
                             </Button>
                           </div>
                         </form>
@@ -3064,11 +3097,11 @@ export default function VenueManagementPage() {
                     {/* Channels list */}
                     {loadingChannels ? (
                       <p className="text-sm text-muted-foreground">
-                        Loading channels...
+                        {t('streams.loadingChannels')}
                       </p>
                     ) : channels.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">
-                        No streaming channels yet. Create one to get started.
+                        {t('streams.noChannels')}
                       </p>
                     ) : (
                       <div className="space-y-4">
@@ -3100,8 +3133,8 @@ export default function VenueManagementPage() {
                                     disabled={startingChannelId === channel.id}
                                   >
                                     {startingChannelId === channel.id
-                                      ? 'Starting...'
-                                      : 'Start'}
+                                      ? t('streams.starting')
+                                      : t('streams.start')}
                                   </Button>
                                 )}
                                 {channel.state === 'RUNNING' && (
@@ -3115,8 +3148,8 @@ export default function VenueManagementPage() {
                                     disabled={stoppingChannelId === channel.id}
                                   >
                                     {stoppingChannelId === channel.id
-                                      ? 'Stopping...'
-                                      : 'Stop'}
+                                      ? t('streams.stopping')
+                                      : t('streams.stop')}
                                   </Button>
                                 )}
                                 {(channel.state === 'IDLE' ||
@@ -3131,8 +3164,8 @@ export default function VenueManagementPage() {
                                     disabled={deletingChannelId === channel.id}
                                   >
                                     {deletingChannelId === channel.id
-                                      ? 'Deleting...'
-                                      : 'Delete'}
+                                      ? t('streams.deleting')
+                                      : tc('delete')}
                                   </Button>
                                 )}
                               </div>
@@ -3143,7 +3176,7 @@ export default function VenueManagementPage() {
                               <div className="space-y-2 text-sm">
                                 <div>
                                   <span className="text-muted-foreground text-xs block mb-1">
-                                    RTMP URL
+                                    {t('streams.rtmpUrl')}
                                   </span>
                                   <div className="flex items-center gap-2">
                                     <code className="flex-1 min-w-0 bg-black/30 px-2 py-1 rounded text-xs truncate text-[var(--timberwolf)]">
@@ -3161,14 +3194,14 @@ export default function VenueManagementPage() {
                                       }
                                     >
                                       {copiedField === `rtmp-${channel.id}`
-                                        ? 'Copied!'
-                                        : 'Copy'}
+                                        ? t('streams.copied')
+                                        : t('streams.copy')}
                                     </Button>
                                   </div>
                                 </div>
                                 <div>
                                   <span className="text-muted-foreground text-xs block mb-1">
-                                    Stream Key
+                                    {t('streams.streamKey')}
                                   </span>
                                   <div className="flex items-center gap-2">
                                     <code className="flex-1 min-w-0 bg-black/30 px-2 py-1 rounded text-xs truncate text-[var(--timberwolf)]">
@@ -3186,15 +3219,15 @@ export default function VenueManagementPage() {
                                       }
                                     >
                                       {copiedField === `key-${channel.id}`
-                                        ? 'Copied!'
-                                        : 'Copy'}
+                                        ? t('streams.copied')
+                                        : t('streams.copy')}
                                     </Button>
                                   </div>
                                 </div>
                                 {channel.playbackUrl && (
                                   <div>
                                     <span className="text-muted-foreground text-xs block mb-1">
-                                      Playback
+                                      {t('streams.playback')}
                                     </span>
                                     <div className="flex items-center gap-2">
                                       <code className="flex-1 min-w-0 bg-black/30 px-2 py-1 rounded text-xs truncate text-[var(--timberwolf)]">
@@ -3212,8 +3245,8 @@ export default function VenueManagementPage() {
                                         }
                                       >
                                         {copiedField === `hls-${channel.id}`
-                                          ? 'Copied!'
-                                          : 'Copy'}
+                                          ? t('streams.copied')
+                                          : t('streams.copy')}
                                       </Button>
                                     </div>
                                   </div>
@@ -3226,7 +3259,7 @@ export default function VenueManagementPage() {
                               channel.playbackUrl && (
                                 <div className="mt-3">
                                   <p className="text-xs text-muted-foreground mb-2">
-                                    Live Preview:
+                                    {t('streams.livePreview')}
                                   </p>
                                   <div className="aspect-video bg-black rounded-lg overflow-hidden">
                                     <HlsPlayer
@@ -3242,20 +3275,17 @@ export default function VenueManagementPage() {
                             {/* State-specific messages */}
                             {channel.state === 'CREATING' && (
                               <p className="text-xs text-yellow-500">
-                                Channel is being created. This may take a
-                                minute...
+                                {t('streams.stateCreating')}
                               </p>
                             )}
                             {channel.state === 'STARTING' && (
                               <p className="text-xs text-yellow-500">
-                                Channel is starting. This may take 1-2 minutes.
-                                Billing has started.
+                                {t('streams.stateStarting')}
                               </p>
                             )}
                             {channel.state === 'STOPPING' && (
                               <p className="text-xs text-yellow-500">
-                                Channel is stopping. Billing will stop when it
-                                reaches IDLE.
+                                {t('streams.stateStopping')}
                               </p>
                             )}
                           </div>
@@ -3296,17 +3326,16 @@ export default function VenueManagementPage() {
         <div className="rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
           <div className="p-6">
             <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-              Recordings
+              {t('recordings.title')}
             </h2>
             <p className="text-sm text-muted-foreground">
-              {totalRecordings} recording
-              {totalRecordings === 1 ? '' : 's'}
+              {t('recordings.count', { count: totalRecordings })}
             </p>
 
             {/* Search + Filters */}
             <div className="mt-4 flex flex-col sm:flex-row gap-3">
               <Input
-                placeholder="Search title or team..."
+                placeholder={t('recordings.searchPlaceholder')}
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 className={`sm:max-w-xs ${inputClass}`}
@@ -3322,10 +3351,16 @@ export default function VenueManagementPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="published">Published</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="scheduled">Scheduled</SelectItem>
+                  <SelectItem value="all">
+                    {t('recordings.allStatuses')}
+                  </SelectItem>
+                  <SelectItem value="published">
+                    {t('recordings.published')}
+                  </SelectItem>
+                  <SelectItem value="draft">{t('recordings.draft')}</SelectItem>
+                  <SelectItem value="scheduled">
+                    {t('recordings.scheduled')}
+                  </SelectItem>
                 </SelectContent>
               </Select>
               <Select
@@ -3339,9 +3374,13 @@ export default function VenueManagementPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="true">Billable</SelectItem>
-                  <SelectItem value="false">Not Billable</SelectItem>
+                  <SelectItem value="all">{t('recordings.all')}</SelectItem>
+                  <SelectItem value="true">
+                    {t('recordings.billable')}
+                  </SelectItem>
+                  <SelectItem value="false">
+                    {t('recordings.notBillable')}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -3350,8 +3389,8 @@ export default function VenueManagementPage() {
             {recordings.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">
                 {debouncedSearch || statusFilter || billableFilter
-                  ? 'No recordings match your filters.'
-                  : 'No recordings yet. Schedule a recording to get started.'}
+                  ? t('recordings.noMatch')
+                  : t('recordings.empty')}
               </p>
             ) : (
               <div className="space-y-3">
@@ -3378,7 +3417,7 @@ export default function VenueManagementPage() {
                           className={`flex-shrink-0 ${outlineBtnClass}`}
                         >
                           <svg
-                            className="w-4 h-4 ml-0.5"
+                            className="w-4 h-4 ms-0.5"
                             fill="currentColor"
                             viewBox="0 0 24 24"
                           >
@@ -3411,7 +3450,7 @@ export default function VenueManagementPage() {
                           )}
                           {recording.clutch_video_id && (
                             <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 flex-shrink-0">
-                              Padel
+                              {t('recordings.padel')}
                             </span>
                           )}
                         </div>
@@ -3426,8 +3465,9 @@ export default function VenueManagementPage() {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-3 pt-3 border-t border-border gap-2">
                       <div className="flex items-center gap-3">
                         <span className="text-sm text-muted-foreground">
-                          {recording.accessCount || 0} user
-                          {(recording.accessCount || 0) === 1 ? '' : 's'}
+                          {t('recordings.userCount', {
+                            count: recording.accessCount || 0,
+                          })}
                         </span>
                         <button
                           onClick={() => toggleBillable(recording)}
@@ -3441,8 +3481,8 @@ export default function VenueManagementPage() {
                           {togglingBillable === recording.id
                             ? '...'
                             : recording.is_billable !== false
-                              ? 'Billable'
-                              : 'Not Billable'}
+                              ? t('recordings.billable')
+                              : t('recordings.notBillable')}
                         </button>
                         {recording.is_billable !== false &&
                           (editingAmountId === recording.id ? (
@@ -3472,8 +3512,8 @@ export default function VenueManagementPage() {
                               } text-muted-foreground`}
                               title={
                                 recording.collected_by === 'playhub'
-                                  ? 'Amount locked (verified transaction)'
-                                  : 'Click to edit amount'
+                                  ? t('recordings.amountLocked')
+                                  : t('recordings.clickToEdit')
                               }
                               onClick={() => {
                                 if (recording.collected_by !== 'playhub') {
@@ -3499,7 +3539,7 @@ export default function VenueManagementPage() {
                         {recording.graphicPackageName && (
                           <span
                             className="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-400"
-                            title="Graphic Package"
+                            title={t('schedule.graphicPackage')}
                           >
                             {recording.graphicPackageName}
                           </span>
@@ -3524,7 +3564,7 @@ export default function VenueManagementPage() {
                               )
                             }
                           >
-                            Stats{' '}
+                            {t('recordings.stats')}{' '}
                             <span aria-hidden="true">
                               {expandedClutchId === recording.id ? '▴' : '▾'}
                             </span>
@@ -3541,8 +3581,8 @@ export default function VenueManagementPage() {
                           }
                         >
                           {generatingLink === recording.id
-                            ? 'Copying...'
-                            : 'Public Link'}
+                            ? t('recordings.copying')
+                            : t('recordings.publicLink')}
                         </Button>
                         <Button
                           variant="outline"
@@ -3550,7 +3590,7 @@ export default function VenueManagementPage() {
                           className={outlineBtnClass}
                           onClick={() => openAccessModal(recording)}
                         >
-                          Manage Access
+                          {t('access.title')}
                         </Button>
                         {orgMarketplace?.marketplace_enabled &&
                           recording.status === 'published' && (
@@ -3562,8 +3602,8 @@ export default function VenueManagementPage() {
                               disabled={listingSubmitting === recording.id}
                             >
                               {recording.marketplace_product?.is_available
-                                ? 'Manage Listing'
-                                : 'List for Sale'}
+                                ? t('recordings.manageListing')
+                                : t('recordings.listForSale')}
                             </Button>
                           )}
                         <Button
@@ -3572,7 +3612,7 @@ export default function VenueManagementPage() {
                           className={outlineBtnClass}
                           onClick={() => openEditModal(recording)}
                         >
-                          Edit
+                          {t('recordings.edit')}
                         </Button>
                         <Button
                           variant="outline"
@@ -3583,7 +3623,7 @@ export default function VenueManagementPage() {
                         >
                           {deletingRecording === recording.id
                             ? '...'
-                            : 'Delete'}
+                            : tc('delete')}
                         </Button>
                       </div>
                     </div>
@@ -3594,68 +3634,88 @@ export default function VenueManagementPage() {
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                             <div className="p-3 bg-muted rounded-lg">
                               <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
-                                Match time
+                                {t('recordings.matchTime')}
                               </p>
                               <p className="text-[var(--timberwolf)] font-medium">
                                 {recording.clutch_match_stats
                                   .match_time_minutes != null
-                                  ? `${Math.round(recording.clutch_match_stats.match_time_minutes)} min`
+                                  ? t('recordings.minutes', {
+                                      minutes: Math.round(
+                                        recording.clutch_match_stats
+                                          .match_time_minutes
+                                      ),
+                                    })
                                   : '—'}
                               </p>
                             </div>
                             <div className="p-3 bg-muted rounded-lg">
                               <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
-                                In play
+                                {t('recordings.inPlay')}
                               </p>
                               <p className="text-[var(--timberwolf)] font-medium">
                                 {recording.clutch_match_stats
                                   .match_time_in_play_minutes != null
-                                  ? `${Math.round(recording.clutch_match_stats.match_time_in_play_minutes)} min`
+                                  ? t('recordings.minutes', {
+                                      minutes: Math.round(
+                                        recording.clutch_match_stats
+                                          .match_time_in_play_minutes
+                                      ),
+                                    })
                                   : '—'}
                               </p>
                             </div>
                             <div className="p-3 bg-muted rounded-lg">
                               <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
-                                Avg rally
+                                {t('recordings.avgRally')}
                               </p>
                               <p className="text-[var(--timberwolf)] font-medium">
                                 {recording.clutch_match_stats.avg_rally_shots !=
                                 null
-                                  ? `${recording.clutch_match_stats.avg_rally_shots} shots`
+                                  ? t('recordings.shots', {
+                                      count:
+                                        recording.clutch_match_stats
+                                          .avg_rally_shots,
+                                    })
                                   : '—'}
                                 {recording.clutch_match_stats
                                   .avg_rally_seconds != null && (
                                   <span className="text-muted-foreground">
                                     {' '}
                                     ·{' '}
-                                    {Math.round(
-                                      recording.clutch_match_stats
-                                        .avg_rally_seconds
-                                    )}
-                                    s
+                                    {t('recordings.seconds', {
+                                      seconds: Math.round(
+                                        recording.clutch_match_stats
+                                          .avg_rally_seconds
+                                      ),
+                                    })}
                                   </span>
                                 )}
                               </p>
                             </div>
                             <div className="p-3 bg-muted rounded-lg">
                               <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
-                                Longest rally
+                                {t('recordings.longestRally')}
                               </p>
                               <p className="text-[var(--timberwolf)] font-medium">
                                 {recording.clutch_match_stats
                                   .longest_rally_shots != null
-                                  ? `${recording.clutch_match_stats.longest_rally_shots} shots`
+                                  ? t('recordings.shots', {
+                                      count:
+                                        recording.clutch_match_stats
+                                          .longest_rally_shots,
+                                    })
                                   : '—'}
                                 {recording.clutch_match_stats
                                   .longest_rally_seconds != null && (
                                   <span className="text-muted-foreground">
                                     {' '}
                                     ·{' '}
-                                    {Math.round(
-                                      recording.clutch_match_stats
-                                        .longest_rally_seconds
-                                    )}
-                                    s
+                                    {t('recordings.seconds', {
+                                      seconds: Math.round(
+                                        recording.clutch_match_stats
+                                          .longest_rally_seconds
+                                      ),
+                                    })}
                                   </span>
                                 )}
                               </p>
@@ -3671,7 +3731,7 @@ export default function VenueManagementPage() {
                               )
                             }
                           >
-                            Watch &amp; full stats →
+                            {t('recordings.watchFullStats')}
                           </Button>
                         </div>
                       )}
@@ -3690,21 +3750,21 @@ export default function VenueManagementPage() {
                             className={`w-32 ${inputClass}`}
                           />
                           <span className="text-sm text-muted-foreground">
-                            {orgMarketplace?.default_price_currency || 'AED'} ·
-                            listed publicly on /matches
+                            {orgMarketplace?.default_price_currency || 'AED'} ·{' '}
+                            {t('recordings.listedPublicly')}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
+                        <div className="flex items-center gap-2 sm:ms-auto flex-wrap">
                           <Button
                             size="sm"
                             onClick={() => submitListing(recording)}
                             disabled={listingSubmitting === recording.id}
                           >
                             {listingSubmitting === recording.id
-                              ? 'Saving...'
+                              ? t('recordings.saving')
                               : recording.marketplace_product
-                                ? 'Update'
-                                : 'List'}
+                                ? t('recordings.update')
+                                : t('recordings.list')}
                           </Button>
                           {recording.marketplace_product?.is_available && (
                             <Button
@@ -3714,7 +3774,7 @@ export default function VenueManagementPage() {
                               onClick={() => unlistRecording(recording)}
                               disabled={listingSubmitting === recording.id}
                             >
-                              Unlist
+                              {t('recordings.unlist')}
                             </Button>
                           )}
                           <Button
@@ -3724,7 +3784,7 @@ export default function VenueManagementPage() {
                             onClick={cancelListingEditor}
                             disabled={listingSubmitting === recording.id}
                           >
-                            Cancel
+                            {tc('cancel')}
                           </Button>
                         </div>
                       </div>
@@ -3735,10 +3795,12 @@ export default function VenueManagementPage() {
                 {/* Pagination controls */}
                 {totalRecordings > pageSize && (
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4 pt-4 border-t border-border">
-                    <p className="text-sm text-muted-foreground text-center sm:text-left">
-                      {(currentPage - 1) * pageSize + 1}–
-                      {Math.min(currentPage * pageSize, totalRecordings)} of{' '}
-                      {totalRecordings}
+                    <p className="text-sm text-muted-foreground text-center sm:text-start">
+                      {t('recordings.pageRange', {
+                        from: (currentPage - 1) * pageSize + 1,
+                        to: Math.min(currentPage * pageSize, totalRecordings),
+                        total: totalRecordings,
+                      })}
                     </p>
                     <div className="flex items-center justify-center sm:justify-start gap-2">
                       <Button
@@ -3752,11 +3814,13 @@ export default function VenueManagementPage() {
                         disabled={currentPage <= 1 || loadingRecordings}
                         onClick={() => setCurrentPage((p) => p - 1)}
                       >
-                        Previous
+                        {t('recordings.previous')}
                       </Button>
                       <span className="text-sm text-muted-foreground px-2 whitespace-nowrap">
-                        Page {currentPage} of{' '}
-                        {Math.ceil(totalRecordings / pageSize)}
+                        {t('recordings.pageOf', {
+                          page: currentPage,
+                          total: Math.ceil(totalRecordings / pageSize),
+                        })}
                       </span>
                       <Button
                         variant="outline"
@@ -3769,7 +3833,7 @@ export default function VenueManagementPage() {
                         }
                         onClick={() => setCurrentPage((p) => p + 1)}
                       >
-                        Next
+                        {t('recordings.next')}
                       </Button>
                     </div>
                   </div>
@@ -3787,7 +3851,7 @@ export default function VenueManagementPage() {
               <div className="p-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                   <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-                    Venue Admins
+                    {t('access.venueAdmins')}
                   </h2>
                   <Button
                     variant="outline"
@@ -3799,11 +3863,13 @@ export default function VenueManagementPage() {
                       }
                     }}
                   >
-                    {showAdminSection ? 'Hide' : 'Manage Admins'}
+                    {showAdminSection
+                      ? t('access.hide')
+                      : t('access.manageAdmins')}
                   </Button>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Users who can manage this venue and its recordings
+                  {t('access.adminsSubtitle')}
                 </p>
               </div>
               {showAdminSection && (
@@ -3829,7 +3895,7 @@ export default function VenueManagementPage() {
                       type="email"
                       value={newAdminEmail}
                       onChange={(e) => setNewAdminEmail(e.target.value)}
-                      placeholder="admin@example.com"
+                      placeholder={t('access.adminEmailPlaceholder')}
                       className={`flex-1 ${inputClass}`}
                     />
                     <Button
@@ -3837,7 +3903,7 @@ export default function VenueManagementPage() {
                       className={`w-full sm:w-auto ${primaryBtnClass}`}
                       disabled={addingAdmin || !newAdminEmail}
                     >
-                      {addingAdmin ? 'Adding...' : 'Add Admin'}
+                      {addingAdmin ? t('access.adding') : t('access.addAdmin')}
                     </Button>
                   </form>
 
@@ -3845,11 +3911,11 @@ export default function VenueManagementPage() {
                   <div className="space-y-2">
                     {adminsLoading && !adminsLoaded ? (
                       <p className="text-sm text-muted-foreground">
-                        Loading admins...
+                        {t('access.loadingAdmins')}
                       </p>
                     ) : admins.length === 0 && pendingInvites.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
-                        No admins yet. Add one above to get started.
+                        {t('access.noAdmins')}
                       </p>
                     ) : (
                       <>
@@ -3860,10 +3926,12 @@ export default function VenueManagementPage() {
                           >
                             <div className="min-w-0">
                               <p className="font-medium truncate text-[var(--timberwolf)]">
-                                {admin.fullName || admin.email || 'Unknown'}
+                                {admin.fullName ||
+                                  admin.email ||
+                                  t('access.unknown')}
                                 {admin.isCurrentUser && (
-                                  <span className="ml-2 text-xs text-muted-foreground">
-                                    (you)
+                                  <span className="ms-2 text-xs text-muted-foreground">
+                                    {t('access.you')}
                                   </span>
                                 )}
                               </p>
@@ -3884,8 +3952,8 @@ export default function VenueManagementPage() {
                                   className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
                                 >
                                   {removingAdminId === admin.id
-                                    ? 'Removing...'
-                                    : 'Remove'}
+                                    ? t('access.removing')
+                                    : t('access.remove')}
                                 </Button>
                               )}
                             </div>
@@ -3895,7 +3963,7 @@ export default function VenueManagementPage() {
                         {pendingInvites.length > 0 && (
                           <div className="pt-2">
                             <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase mb-2">
-                              Pending invites
+                              {t('access.pendingInvites')}
                             </p>
                             <div className="space-y-2">
                               {pendingInvites.map((invite) => (
@@ -3908,11 +3976,12 @@ export default function VenueManagementPage() {
                                       {invite.email}
                                     </p>
                                     <p className="text-sm text-muted-foreground">
-                                      Invited{' '}
-                                      {new Date(
-                                        invite.invitedAt
-                                      ).toLocaleDateString()}{' '}
-                                      — waiting for account creation
+                                      {t('access.invitedWaiting', {
+                                        date: format.dateTime(
+                                          new Date(invite.invitedAt),
+                                          'short'
+                                        ),
+                                      })}
                                     </p>
                                   </div>
                                   <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 flex-shrink-0 w-fit">
@@ -3946,7 +4015,7 @@ export default function VenueManagementPage() {
             <div className="w-full max-w-lg m-4 rounded-xl border border-border bg-[var(--night)]">
               <div className="p-6">
                 <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-                  Manage Access
+                  {t('access.title')}
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   {selectedRecording.title}
@@ -3956,13 +4025,13 @@ export default function VenueManagementPage() {
                 {/* Add new access */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-[var(--timberwolf)]">
-                    Grant access (emails, comma-separated)
+                    {t('access.grantLabel')}
                   </label>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <Input
                       value={newEmails}
                       onChange={(e) => setNewEmails(e.target.value)}
-                      placeholder="user@example.com"
+                      placeholder={t('access.emailPlaceholder')}
                       className={`flex-1 ${inputClass}`}
                     />
                     <Button
@@ -3970,7 +4039,7 @@ export default function VenueManagementPage() {
                       onClick={handleGrantAccess}
                       disabled={grantingAccess || !newEmails}
                     >
-                      {grantingAccess ? 'Adding...' : 'Add'}
+                      {grantingAccess ? t('access.adding') : t('access.add')}
                     </Button>
                   </div>
                 </div>
@@ -3978,11 +4047,11 @@ export default function VenueManagementPage() {
                 {/* Access list */}
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-[var(--timberwolf)]">
-                    Current Access
+                    {t('access.currentAccess')}
                   </p>
                   {accessList.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      No one has access yet
+                      {t('access.noAccess')}
                     </p>
                   ) : (
                     <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -3999,7 +4068,9 @@ export default function VenueManagementPage() {
                             </p>
                             {access.expiresAt && (
                               <p className="text-xs text-muted-foreground">
-                                Expires: {formatTime(access.expiresAt)}
+                                {t('access.expires', {
+                                  date: formatTime(access.expiresAt),
+                                })}
                               </p>
                             )}
                           </div>
@@ -4010,12 +4081,12 @@ export default function VenueManagementPage() {
                               className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
                               onClick={() => handleRevokeAccess(access.id)}
                             >
-                              Revoke
+                              {t('access.revoke')}
                             </Button>
                           )}
                           {!access.isActive && (
                             <span className="text-xs text-muted-foreground">
-                              Revoked
+                              {t('access.revoked')}
                             </span>
                           )}
                         </div>
@@ -4033,7 +4104,7 @@ export default function VenueManagementPage() {
                     setAccessList([])
                   }}
                 >
-                  Close
+                  {tc('close')}
                 </Button>
               </div>
             </div>
@@ -4046,13 +4117,13 @@ export default function VenueManagementPage() {
             <div className="w-full max-w-lg m-4 rounded-xl border border-border bg-[var(--night)]">
               <div className="p-6">
                 <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-                  Edit Recording
+                  {t('recordings.editRecording')}
                 </h2>
               </div>
               <div className="px-6 pb-6 space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-[var(--timberwolf)]">
-                    Title
+                    {t('recordings.titleLabel')}
                   </label>
                   <Input
                     value={editTitle}
@@ -4062,7 +4133,7 @@ export default function VenueManagementPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-[var(--timberwolf)]">
-                    Home Team
+                    {t('schedule.homeTeam')}
                   </label>
                   <Input
                     value={editHomeTeam}
@@ -4072,7 +4143,7 @@ export default function VenueManagementPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-[var(--timberwolf)]">
-                    Away Team
+                    {t('schedule.awayTeam')}
                   </label>
                   <Input
                     value={editAwayTeam}
@@ -4086,14 +4157,14 @@ export default function VenueManagementPage() {
                     onClick={handleSaveEdit}
                     disabled={savingEdit}
                   >
-                    {savingEdit ? 'Saving...' : 'Save'}
+                    {savingEdit ? t('recordings.saving') : tc('save')}
                   </Button>
                   <Button
                     variant="outline"
                     className={`flex-1 ${outlineBtnClass}`}
                     onClick={() => setEditingRecording(null)}
                   >
-                    Cancel
+                    {tc('cancel')}
                   </Button>
                 </div>
               </div>
@@ -4107,20 +4178,23 @@ export default function VenueManagementPage() {
             <div className="w-full max-w-md m-4 rounded-xl border border-red-500/30 bg-[var(--night)]">
               <div className="p-6">
                 <h2 className="text-lg font-semibold text-red-400">
-                  Delete Recording
+                  {t('recordings.deleteRecording')}
                 </h2>
                 <p className="text-sm text-muted-foreground mt-2">
-                  This will permanently delete{' '}
-                  <span className="text-[var(--timberwolf)] font-medium">
-                    {deleteConfirmRecording.title}
-                  </span>{' '}
-                  including the video file from storage. This cannot be undone.
+                  {t.rich('recordings.deleteWarning', {
+                    title: deleteConfirmRecording.title,
+                    name: (chunks) => (
+                      <span className="text-[var(--timberwolf)] font-medium">
+                        {chunks}
+                      </span>
+                    ),
+                  })}
                 </p>
               </div>
               <div className="px-6 pb-6 space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-[var(--timberwolf)]">
-                    Type DELETE to confirm
+                    {t('recordings.typeDeleteToConfirm')}
                   </label>
                   <Input
                     value={deleteConfirmText}
@@ -4139,15 +4213,15 @@ export default function VenueManagementPage() {
                     }
                   >
                     {deletingRecording === deleteConfirmRecording.id
-                      ? 'Deleting...'
-                      : 'Delete Forever'}
+                      ? t('recordings.deleting')
+                      : t('recordings.deleteForever')}
                   </Button>
                   <Button
                     variant="outline"
                     className={`flex-1 ${outlineBtnClass}`}
                     onClick={() => setDeleteConfirmRecording(null)}
                   >
-                    Cancel
+                    {tc('cancel')}
                   </Button>
                 </div>
               </div>

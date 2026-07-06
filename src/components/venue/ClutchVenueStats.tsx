@@ -5,6 +5,7 @@
 // zero Clutch recordings — Spiideo-only venues never see it.
 
 import { useEffect, useState } from 'react'
+import { useFormatter, useTranslations } from 'next-intl'
 import { Link } from '@/i18n/navigation'
 import {
   ChartContainer,
@@ -43,6 +44,8 @@ const COURT_COLORS = [
 ]
 
 export function ClutchVenueStats({ venueId }: { venueId: string }) {
+  const t = useTranslations('venueStats')
+  const format = useFormatter()
   const [summary, setSummary] = useState<ClutchSummary | null>(null)
 
   useEffect(() => {
@@ -86,44 +89,46 @@ export function ClutchVenueStats({ venueId }: { venueId: string }) {
     <div className="rounded-2xl border border-white/[0.06] bg-[rgba(15,21,18,0.4)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)] p-6 mb-6">
       <div className="flex items-center gap-2 flex-wrap">
         <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-          Padel analytics
+          {t('title')}
         </h2>
         <span className="inline-flex items-center rounded-full bg-emerald-400/10 px-2.5 py-0.5 text-[11px] font-medium text-emerald-300 ring-1 ring-emerald-400/20">
-          {summary.totalRecordings} recording
-          {summary.totalRecordings === 1 ? '' : 's'}
+          {t('recordingsBadge', { count: summary.totalRecordings })}
         </span>
       </div>
 
       <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
         <div className="p-3 bg-muted rounded-lg">
           <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
-            Time in play
+            {t('timeInPlay')}
           </p>
           <p className="text-[var(--timberwolf)] font-medium">
             {inPlayHours >= 1
-              ? `${inPlayHours.toFixed(1)} hrs`
-              : `${Math.round(summary.totalInPlayMinutes)} min`}
+              ? t('hours', { hours: inPlayHours.toFixed(1) })
+              : t('minutes', {
+                  minutes: Math.round(summary.totalInPlayMinutes),
+                })}
           </p>
         </div>
         <div className="p-3 bg-muted rounded-lg">
           <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
-            Avg rally
+            {t('avgRally')}
           </p>
           <p className="text-[var(--timberwolf)] font-medium">
             {summary.avgRallyShots != null
-              ? `${summary.avgRallyShots} shots`
+              ? t('shots', { count: summary.avgRallyShots })
               : '—'}
             {summary.avgRallySeconds != null && (
               <span className="text-muted-foreground">
                 {' '}
-                · {Math.round(summary.avgRallySeconds)}s
+                ·{' '}
+                {t('seconds', { seconds: Math.round(summary.avgRallySeconds) })}
               </span>
             )}
           </p>
         </div>
         <div className="p-3 bg-muted rounded-lg">
           <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
-            Longest rally
+            {t('longestRally')}
           </p>
           {summary.longestRally ? (
             <Link
@@ -131,11 +136,14 @@ export function ClutchVenueStats({ venueId }: { venueId: string }) {
               className="text-emerald-300 font-medium underline decoration-emerald-400/30 underline-offset-2 hover:decoration-emerald-300 transition-colors"
               title={summary.longestRally.title}
             >
-              {summary.longestRally.shots} shots
+              {t('shots', { count: summary.longestRally.shots })}
               {summary.longestRally.seconds != null && (
                 <span className="text-muted-foreground">
                   {' '}
-                  · {Math.round(summary.longestRally.seconds)}s
+                  ·{' '}
+                  {t('seconds', {
+                    seconds: Math.round(summary.longestRally.seconds),
+                  })}
                 </span>
               )}{' '}
               →
@@ -146,10 +154,10 @@ export function ClutchVenueStats({ venueId }: { venueId: string }) {
         </div>
         <div
           className="p-3 bg-muted rounded-lg"
-          title="Players who have been identified by name in recordings at this venue"
+          title={t('playersIdentifiedTitle')}
         >
           <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
-            Players identified
+            {t('playersIdentified')}
           </p>
           <p className="text-[var(--timberwolf)] font-medium">
             {summary.namedPlayers}
@@ -160,70 +168,77 @@ export function ClutchVenueStats({ venueId }: { venueId: string }) {
       {summary.courts.length > 0 && (
         <div className="mt-5">
           <p className="text-sm text-muted-foreground mb-2">
-            Recordings per court — last 30 days
+            {t('perCourtLast30')}
           </p>
           <p className="sr-only">
             {summary.courts
-              .map(
-                (court) =>
-                  `${court}: ${summary.days.reduce((n, d) => n + (d.byCourt[court] || 0), 0)} recordings in the last 30 days`
+              .map((court) =>
+                t('courtSummary', {
+                  court,
+                  count: summary.days.reduce(
+                    (n, d) => n + (d.byCourt[court] || 0),
+                    0
+                  ),
+                })
               )
               .join('; ')}
           </p>
-          <ChartContainer config={chartConfig} className="h-[200px] w-full">
-            <AreaChart data={chartData}>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="hsl(var(--border))"
-              />
-              <XAxis
-                dataKey="date"
-                tickFormatter={(d: string) => {
-                  const day = parseInt(d.split('-')[2], 10)
-                  if (day === 1) {
-                    return new Date(d + 'T00:00:00').toLocaleDateString(
-                      'en-GB',
-                      { day: 'numeric', month: 'short' }
-                    )
-                  }
-                  return day % 5 === 1 ? String(day) : ''
-                }}
-                stroke="hsl(var(--muted-foreground))"
-                fontSize={11}
-              />
-              <YAxis
-                stroke="hsl(var(--muted-foreground))"
-                fontSize={11}
-                allowDecimals={false}
-              />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    labelFormatter={(label: string) => {
-                      const d = new Date(label + 'T00:00:00')
-                      return d.toLocaleDateString('en-GB', {
+          <div dir="ltr">
+            <ChartContainer config={chartConfig} className="h-[200px] w-full">
+              <AreaChart data={chartData}>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="hsl(var(--border))"
+                />
+                <XAxis
+                  dataKey="date"
+                  tickFormatter={(d: string) => {
+                    const day = parseInt(d.split('-')[2], 10)
+                    if (day === 1) {
+                      return format.dateTime(new Date(d + 'T00:00:00'), {
                         day: 'numeric',
                         month: 'short',
                       })
-                    }}
-                  />
-                }
-              />
-              <ChartLegend content={<ChartLegendContent />} />
-              {summary.courts.map((court, i) => (
-                <Area
-                  key={court}
-                  type="monotone"
-                  dataKey={court}
-                  stackId="1"
-                  fill={COURT_COLORS[i % COURT_COLORS.length]}
-                  fillOpacity={0.4}
-                  stroke={COURT_COLORS[i % COURT_COLORS.length]}
-                  strokeWidth={1.5}
+                    }
+                    return day % 5 === 1 ? String(day) : ''
+                  }}
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={11}
                 />
-              ))}
-            </AreaChart>
-          </ChartContainer>
+                <YAxis
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={11}
+                  allowDecimals={false}
+                />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      labelFormatter={(label: string) => {
+                        const d = new Date(label + 'T00:00:00')
+                        return format.dateTime(d, {
+                          day: 'numeric',
+                          month: 'short',
+                        })
+                      }}
+                    />
+                  }
+                />
+                <ChartLegend content={<ChartLegendContent />} />
+                {summary.courts.map((court, i) => (
+                  <Area
+                    key={court}
+                    type="monotone"
+                    dataKey={court}
+                    stackId="1"
+                    fill={COURT_COLORS[i % COURT_COLORS.length]}
+                    fillOpacity={0.4}
+                    stroke={COURT_COLORS[i % COURT_COLORS.length]}
+                    strokeWidth={1.5}
+                  />
+                ))}
+              </AreaChart>
+            </ChartContainer>
+          </div>
         </div>
       )}
     </div>

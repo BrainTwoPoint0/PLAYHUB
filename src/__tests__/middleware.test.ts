@@ -97,6 +97,17 @@ describe('middleware composition (Supabase + next-intl)', () => {
     expect(res.cookies.get('sb-test-auth-token-code-verifier')).toBeUndefined()
   })
 
+  it('clears stale cookies on a locale-normalization 307', async () => {
+    // /en/venue 307s to /venue under localePrefix 'as-needed' — the
+    // maxAge:0 deletions must ride the redirect response.
+    mockSupabase({ error: { status: 400 } })
+    const res = await middleware(
+      makeRequest('/en/venue', { 'sb-test-auth-token': 'stale' })
+    )
+    expect(res.status).toBe(307)
+    expect(res.cookies.get('sb-test-auth-token')?.maxAge).toBe(0)
+  })
+
   it('does not clear cookies on rate limit (429)', async () => {
     mockSupabase({ error: { status: 429 } })
     const res = await middleware(

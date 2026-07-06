@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from '@/i18n/navigation'
 import {
   Button,
@@ -18,6 +19,7 @@ interface Venue {
 }
 
 export default function VenueSelectorPage() {
+  const t = useTranslations('venueSelector')
   const router = useRouter()
   const [venues, setVenues] = useState<Venue[]>([])
   const [loading, setLoading] = useState(true)
@@ -46,7 +48,7 @@ export default function VenueSelectorPage() {
         router.replace(`/venue/${venueList[0].id}`)
       }
     } catch (err) {
-      setError('Failed to load venues')
+      setError(t('loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -91,7 +93,7 @@ export default function VenueSelectorPage() {
             variant="outline"
             onClick={() => router.push('/')}
           >
-            Back to Home
+            {t('backToHome')}
           </Button>
         </div>
       </div>
@@ -103,11 +105,11 @@ export default function VenueSelectorPage() {
       <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
         <EmptyState
           icon={<Building2 className="h-10 w-10" />}
-          title="No Venues"
-          description="You do not have access to manage any venues. To manage a venue, you need to be an admin of an organization with Spiideo integration."
+          title={t('noVenuesTitle')}
+          description={t('noVenuesDescription')}
           action={
             <Button variant="outline" onClick={() => router.push('/')}>
-              Back to Home
+              {t('backToHome')}
             </Button>
           }
         />
@@ -119,14 +121,12 @@ export default function VenueSelectorPage() {
     <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
       <FadeIn>
         <p className="text-muted-foreground text-xs font-semibold tracking-[0.25em] uppercase mb-3">
-          Venue Management
+          {t('eyebrow')}
         </p>
         <h1 className="text-3xl md:text-4xl font-bold text-[var(--timberwolf)] mb-2">
-          Your Venues
+          {t('title')}
         </h1>
-        <p className="text-muted-foreground mb-10">
-          Select a venue to manage recordings and access
-        </p>
+        <p className="text-muted-foreground mb-10">{t('subtitle')}</p>
       </FadeIn>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -163,7 +163,7 @@ export default function VenueSelectorPage() {
                   </div>
                 </div>
                 <Button variant="outline" className="w-full">
-                  Manage Venue
+                  {t('manageVenue')}
                 </Button>
               </div>
             </div>
