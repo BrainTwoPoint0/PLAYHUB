@@ -159,9 +159,11 @@ export default function NavBar() {
 
           {/* Right side */}
           <div className="ms-auto flex items-center gap-2">
+            {/* Language switcher — visible on all sizes (Gulf bilingual-web
+                convention: header toggle, not buried in the menu) */}
+            <LanguageSwitcher className="h-9 px-2 sm:px-3 font-medium" />
             {/* Desktop auth controls */}
             <div className="hidden md:flex items-center gap-4">
-              <LanguageSwitcher className="h-9 px-3 font-medium" />
               {loading ? (
                 <div className="h-8 w-8 animate-pulse rounded-full bg-muted" />
               ) : user ? (
@@ -290,16 +292,6 @@ export default function NavBar() {
                     </Link>
                   ))}
                 </nav>
-
-                <Separator className="bg-border" />
-
-                {/* Language */}
-                <div className="px-2 py-2">
-                  <LanguageSwitcher
-                    className="w-full justify-start gap-3 px-3 py-2.5"
-                    onSwitched={() => setMobileOpen(false)}
-                  />
-                </div>
 
                 <Separator className="bg-border" />
 
