@@ -43,7 +43,16 @@
     "cookies": "Cookies",
     "newsletterLabel": "Newsletter",
     "newsletterTitle": "Updates from the Network.",
-    "newsletterSubtitle": "Only when relevant. No spam."
+    "newsletterSubtitle": "Only when relevant. No spam.",
+    "newsletterPlaceholder": "you@club.com",
+    "newsletterEmailLabel": "Email address",
+    "newsletterAriaLabel": "Subscribe to updates",
+    "newsletterSubmit": "Subscribe",
+    "newsletterSending": "Subscribing…",
+    "newsletterSuccess": "Thanks — we’ll be in touch.",
+    "newsletterInvalidEmail": "Please enter a valid email address.",
+    "newsletterServerError": "Could not subscribe right now. Please try again in a moment.",
+    "newsletterRateLimited": "Too many attempts. Try again in a minute."
   },
   "notFound": {
     "metaTitle": "Page not found",
@@ -647,5 +656,151 @@
     "foul": "Foul",
     "substitution": "Substitution",
     "other": "Other"
+  },
+  "auth": {
+    "common": {
+      "emailPlaceholder": "you@example.com"
+    },
+    "login": {
+      "title": "Welcome back",
+      "subtitle": "Sign in to access your purchases",
+      "form": {
+        "emailLabel": "Email",
+        "passwordLabel": "Password",
+        "passwordPlaceholder": "Enter your password",
+        "submit": "Sign in",
+        "submitting": "Signing in...",
+        "forgotPassword": "Forgot your password?",
+        "noAccount": "Don't have an account?",
+        "signUp": "Sign up",
+        "showPassword": "Show password",
+        "hidePassword": "Hide password",
+        "errors": {
+          "fillAllFields": "Please fill in all fields",
+          "invalidEmail": "Please enter a valid email address",
+          "tooManyAttempts": "Too many attempts. Please wait {seconds} seconds.",
+          "unexpected": "An unexpected error occurred. Please try again."
+        }
+      }
+    },
+    "forgotPassword": {
+      "title": "Forgot password?",
+      "subtitle": "Enter your email and we'll send you a reset link.",
+      "form": {
+        "emailLabel": "Email",
+        "emailPlaceholder": "you@example.com",
+        "submit": "Send reset link",
+        "submitting": "Sending email...",
+        "cooldownSubmit": "Try again in {seconds}s",
+        "successTitle": "Check your email",
+        "successMessage": "We sent a reset link to {email}. If it's not in your inbox, check spam.",
+        "resend": "Send another email",
+        "resendCooldown": "Send another email in {seconds}s",
+        "backToSignIn": "Back to sign in",
+        "errors": {
+          "emailRequired": "Please enter your email address",
+          "invalidEmail": "Please enter a valid email address",
+          "cooldown": "Please wait {seconds} seconds before resending.",
+          "unexpected": "An unexpected error occurred. Please try again."
+        }
+      }
+    },
+    "resetPassword": {
+      "title": "Reset password",
+      "subtitle": "Enter a new password for your account.",
+      "form": {
+        "passwordLabel": "New password",
+        "passwordPlaceholder": "Enter a new password",
+        "confirmPasswordLabel": "Confirm new password",
+        "confirmPasswordPlaceholder": "Re-enter your new password",
+        "passwordHint": "At least 8 characters with an uppercase letter, a lowercase letter, and a number.",
+        "submit": "Update password",
+        "submitting": "Updating password...",
+        "successTitle": "Password updated",
+        "successMessage": "Redirecting you to sign in…",
+        "continue": "Continue to sign in",
+        "backToSignIn": "Back to sign in",
+        "showPassword": "Show password",
+        "hidePassword": "Hide password",
+        "errors": {
+          "fillBothFields": "Please fill in both fields",
+          "passwordsMismatch": "Passwords do not match",
+          "unexpected": "An unexpected error occurred. Please try again."
+        }
+      }
+    },
+    "register": {
+      "title": "Create account",
+      "subtitle": "Sign up to purchase match recordings",
+      "fullNameLabel": "Full name",
+      "fullNamePlaceholder": "Your name",
+      "usernameLabel": "Username",
+      "usernamePlaceholder": "Choose a username",
+      "usernameTaken": "Username is taken",
+      "usernameInvalid": "3-30 characters, letters, numbers, underscore, hyphen only",
+      "usernameAvailable": "Username is available",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "Create a password",
+      "passwordHint": "Min 8 characters with uppercase, lowercase, and number",
+      "confirmPasswordLabel": "Confirm password",
+      "confirmPasswordPlaceholder": "Re-enter password",
+      "signUp": "Sign up",
+      "creatingAccount": "Creating account...",
+      "haveAccount": "Already have an account?",
+      "signIn": "Sign in",
+      "errors": {
+        "fillAllFields": "Please fill in all fields",
+        "invalidEmail": "Please enter a valid email address",
+        "usernameUnavailable": "Please choose an available username",
+        "fullNameTooShort": "Full name must be at least 2 characters",
+        "passwordsMismatch": "Passwords do not match",
+        "emailExists": "An account with this email already exists. Please sign in instead.",
+        "createFailed": "Failed to create account. Please try again.",
+        "unexpected": "An unexpected error occurred. Please try again."
+      }
+    },
+    "verifyEmail": {
+      "title": "Check your email",
+      "description": "We've sent you a confirmation link. Click the link in your email to verify your account.",
+      "spamHint": "Didn't receive the email? Check your spam folder.",
+      "backToSignIn": "Back to sign in"
+    }
+  },
+  "matches": {
+    "title": "Match Marketplace",
+    "subtitle": "Browse professional match recordings",
+    "matchesWord": "{count, plural, one {match} other {matches}}",
+    "emptyTitle": "No matches yet",
+    "emptyDescription": "Check back soon for new recordings",
+    "vs": "vs",
+    "card": {
+      "bought": "Bought",
+      "noPrice": "N/A"
+    },
+    "detail": {
+      "backToMatches": "Back to Matches",
+      "watchAriaLabel": "Watch this match",
+      "date": "Date",
+      "venue": "Venue",
+      "organization": "Organization",
+      "duration": "Duration",
+      "durationMinutes": "{count, plural, one {# minute} other {# minutes}}",
+      "aboutTitle": "About This Match",
+      "ownTitle": "You own this match",
+      "purchaseTitle": "Purchase Access",
+      "purchased": "Purchased",
+      "lifetimeAccess": "Lifetime access",
+      "daysAccess": "{count, plural, one {# day access} other {# days access}}",
+      "watchNow": "Watch now",
+      "processing": "Processing...",
+      "purchaseNow": "Purchase Now",
+      "features": {
+        "instantAccess": "Instant access after purchase",
+        "streamHd": "Stream in HD quality",
+        "watchUnlimited": "Watch unlimited times",
+        "securePayment": "Secure payment with Stripe"
+      }
+    }
   }
 }

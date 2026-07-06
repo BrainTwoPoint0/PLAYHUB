@@ -1,4 +1,4 @@
-import { setRequestLocale } from 'next-intl/server'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
 import { Mail } from 'lucide-react'
 import { Button } from '@braintwopoint0/playback-commons/ui'
@@ -10,7 +10,9 @@ export default async function VerifyEmailPage({
 }: {
   params: Promise<{ locale: string }>
 }) {
-  setRequestLocale((await params).locale)
+  const { locale } = await params
+  setRequestLocale(locale)
+  const t = await getTranslations('auth.verifyEmail')
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -21,24 +23,21 @@ export default async function VerifyEmailPage({
 
           <div>
             <h1 className="text-2xl font-bold text-[var(--timberwolf)] mb-2">
-              Check your email
+              {t('title')}
             </h1>
             <p className="text-sm text-[var(--ash-grey)]">
-              We&apos;ve sent you a confirmation link. Click the link in your
-              email to verify your account.
+              {t('description')}
             </p>
           </div>
 
           <div className="pt-4 space-y-3">
-            <p className="text-xs text-[var(--ash-grey)]">
-              Didn&apos;t receive the email? Check your spam folder.
-            </p>
+            <p className="text-xs text-[var(--ash-grey)]">{t('spamHint')}</p>
             <Link href="/auth/login">
               <Button
                 variant="outline"
                 className="w-full border-[var(--ash-grey)]/30 text-[var(--timberwolf)] hover:bg-zinc-800"
               >
-                Back to sign in
+                {t('backToSignIn')}
               </Button>
             </Link>
           </div>

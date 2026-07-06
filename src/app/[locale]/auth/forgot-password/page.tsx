@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { ForgotPasswordForm } from '@braintwopoint0/playback-commons/ui'
 
 export default function ForgotPasswordPage() {
+  const t = useTranslations('auth.forgotPassword')
   // window.location.origin must be read on the client; pre-compute once mounted.
   const [redirectTo, setRedirectTo] = useState('')
 
@@ -24,7 +26,27 @@ export default function ForgotPasswordPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <ForgotPasswordForm redirectTo={redirectTo} />
+        <ForgotPasswordForm
+          redirectTo={redirectTo}
+          title={t('title')}
+          subtitle={t('subtitle')}
+          emailLabel={t('form.emailLabel')}
+          emailPlaceholder={t('form.emailPlaceholder')}
+          submitLabel={t('form.submit')}
+          submittingLabel={t('form.submitting')}
+          // t.raw: the commons form substitutes {seconds}/{email} itself, so
+          // the raw ICU templates must pass through unformatted.
+          cooldownSubmitLabel={t.raw('form.cooldownSubmit')}
+          successTitle={t('form.successTitle')}
+          successMessage={t.raw('form.successMessage')}
+          resendLabel={t('form.resend')}
+          resendCooldownLabel={t.raw('form.resendCooldown')}
+          backToSignInLabel={t('form.backToSignIn')}
+          errorEmailRequired={t('form.errors.emailRequired')}
+          errorInvalidEmail={t('form.errors.invalidEmail')}
+          errorCooldown={t.raw('form.errors.cooldown')}
+          errorUnexpected={t('form.errors.unexpected')}
+        />
       </div>
     </div>
   )

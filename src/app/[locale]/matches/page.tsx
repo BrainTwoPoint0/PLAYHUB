@@ -5,9 +5,11 @@ import { Skeleton, EmptyState } from '@braintwopoint0/playback-commons/ui'
 import MatchCard from '@/components/MatchCard'
 import { FadeIn } from '@/components/FadeIn'
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Film } from 'lucide-react'
 
 export default function MatchesPage() {
+  const t = useTranslations('matches')
   const [matches, setMatches] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -74,18 +76,16 @@ export default function MatchesPage() {
     <div className="mx-auto max-w-screen-xl px-4 py-12 sm:px-6 lg:px-8">
       <FadeIn className="mb-10">
         <h1 className="text-3xl md:text-4xl font-bold text-[var(--timberwolf)] mb-2">
-          Match Marketplace
+          {t('title')}
         </h1>
         <div className="flex items-center justify-between flex-wrap gap-4">
-          <p className="text-muted-foreground">
-            Browse professional match recordings
-          </p>
+          <p className="text-muted-foreground">{t('subtitle')}</p>
           <div className="px-3 py-1.5 rounded-lg border border-border bg-card">
             <span className="text-lg font-bold text-[var(--timberwolf)]">
               {loading ? '...' : matches.length}
             </span>
-            <span className="text-muted-foreground ml-2 text-sm">
-              {matches.length === 1 ? 'match' : 'matches'}
+            <span className="text-muted-foreground ms-2 text-sm">
+              {t('matchesWord', { count: matches.length })}
             </span>
           </div>
         </div>
@@ -118,8 +118,8 @@ export default function MatchesPage() {
       ) : (
         <EmptyState
           icon={<Film className="h-10 w-10" />}
-          title="No matches yet"
-          description="Check back soon for new recordings"
+          title={t('emptyTitle')}
+          description={t('emptyDescription')}
         />
       )}
     </div>

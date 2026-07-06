@@ -11,7 +11,7 @@ import {
   Badge,
   Button,
 } from '@braintwopoint0/playback-commons/ui'
-import { formatPrice, formatDate } from '@braintwopoint0/playback-commons/utils'
+import { useFormatter, useTranslations } from 'next-intl'
 import { useState } from 'react'
 import {
   ArrowLeft,
@@ -34,7 +34,16 @@ export default function MatchDetailClient({
   product,
   hasAccess,
 }: MatchDetailClientProps) {
+  const t = useTranslations('matches')
+  const format = useFormatter()
   const [isLoading, setIsLoading] = useState(false)
+
+  const formatPrice = (amount: number, currency: string) =>
+    format.number(amount, {
+      numberingSystem: 'latn',
+      style: 'currency',
+      currency,
+    })
 
   const handlePurchase = async () => {
     setIsLoading(true)
@@ -57,8 +66,8 @@ export default function MatchDetailClient({
           href="/matches"
           className="text-muted-foreground hover:text-[var(--timberwolf)] mb-8 inline-flex items-center text-sm transition-colors duration-300 gap-2"
         >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Matches
+          <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
+          {t('detail.backToMatches')}
         </Link>
       </motion.div>
 
@@ -94,7 +103,7 @@ export default function MatchDetailClient({
 
             {/* Sport Badge */}
             {match.sport && (
-              <Badge className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm text-[var(--timberwolf)] border-border z-20 px-3 py-1.5">
+              <Badge className="absolute top-4 start-4 bg-black/60 backdrop-blur-sm text-[var(--timberwolf)] border-border z-20 px-3 py-1.5">
                 {match.sport.name}
               </Badge>
             )}
@@ -104,7 +113,7 @@ export default function MatchDetailClient({
               <Link
                 href={`/watch/${match.id}?from=matches`}
                 className="absolute inset-0 flex items-center justify-center z-20 group-hover:bg-black/20 transition-colors duration-300"
-                aria-label="Watch this match"
+                aria-label={t('detail.watchAriaLabel')}
               >
                 <div className="w-20 h-20 rounded-full bg-[var(--timberwolf)]/90 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                   <Play className="h-9 w-9 text-[var(--night)] ml-1" />
@@ -123,7 +132,7 @@ export default function MatchDetailClient({
               <CardHeader className="pb-4">
                 <CardTitle className="text-2xl md:text-3xl text-[var(--timberwolf)]">
                   {match.home_team}{' '}
-                  <span className="text-muted-foreground">vs</span>{' '}
+                  <span className="text-muted-foreground">{t('vs')}</span>{' '}
                   {match.away_team}
                 </CardTitle>
                 {match.competition && (
@@ -136,16 +145,16 @@ export default function MatchDetailClient({
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-muted-foreground mb-1 text-xs uppercase tracking-wide">
-                      Date
+                      {t('detail.date')}
                     </p>
                     <p className="text-[var(--timberwolf)] font-medium text-sm">
-                      {formatDate(match.match_date)}
+                      {format.dateTime(new Date(match.match_date), 'short')}
                     </p>
                   </div>
                   {match.venue && (
                     <div className="p-3 bg-muted rounded-lg">
                       <p className="text-muted-foreground mb-1 text-xs uppercase tracking-wide">
-                        Venue
+                        {t('detail.venue')}
                       </p>
                       <p className="text-[var(--timberwolf)] font-medium text-sm">
                         {match.venue}
@@ -155,7 +164,7 @@ export default function MatchDetailClient({
                   {match.organization && (
                     <div className="p-3 bg-muted rounded-lg">
                       <p className="text-muted-foreground mb-1 text-xs uppercase tracking-wide">
-                        Organization
+                        {t('detail.organization')}
                       </p>
                       <p className="text-[var(--timberwolf)] font-medium text-sm">
                         {match.organization.name}
@@ -165,10 +174,12 @@ export default function MatchDetailClient({
                   {match.duration_seconds && (
                     <div className="p-3 bg-muted rounded-lg">
                       <p className="text-muted-foreground mb-1 text-xs uppercase tracking-wide">
-                        Duration
+                        {t('detail.duration')}
                       </p>
                       <p className="text-[var(--timberwolf)] font-medium text-sm">
-                        {Math.floor(match.duration_seconds / 60)} minutes
+                        {t('detail.durationMinutes', {
+                          count: Math.floor(match.duration_seconds / 60),
+                        })}
                       </p>
                     </div>
                   )}
@@ -177,7 +188,7 @@ export default function MatchDetailClient({
                 {match.description && (
                   <div className="pt-4 border-t border-border">
                     <h3 className="text-sm font-semibold text-[var(--timberwolf)] mb-2">
-                      About This Match
+                      {t('detail.aboutTitle')}
                     </h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
                       {match.description}
@@ -203,7 +214,7 @@ export default function MatchDetailClient({
                   {hasAccess && (
                     <CheckCircle className="h-5 w-5 text-emerald-400" />
                   )}
-                  {hasAccess ? 'You own this match' : 'Purchase Access'}
+                  {hasAccess ? t('detail.ownTitle') : t('detail.purchaseTitle')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-5">
@@ -212,13 +223,16 @@ export default function MatchDetailClient({
                     {/* Owned state — confirm the purchase + Watch CTA. */}
                     <div className="text-center py-5 bg-emerald-400/[0.06] border border-emerald-400/20 rounded-lg">
                       <p className="text-sm text-muted-foreground mb-1">
-                        Purchased
+                        {t('detail.purchased')}
                       </p>
-                      <p className="text-2xl font-bold text-[var(--timberwolf)]">
+                      <p
+                        dir="ltr"
+                        className="text-2xl font-bold text-[var(--timberwolf)]"
+                      >
                         {formatPrice(product.price_amount, product.currency)}
                       </p>
                       <p className="text-xs text-muted-foreground mt-2">
-                        Lifetime access
+                        {t('detail.lifetimeAccess')}
                       </p>
                     </div>
 
@@ -227,15 +241,18 @@ export default function MatchDetailClient({
                       className="w-full bg-[var(--timberwolf)] text-[var(--night)] hover:bg-[var(--ash-grey)]"
                     >
                       <Link href={`/watch/${match.id}?from=matches`}>
-                        <Play className="h-4 w-4 mr-2" />
-                        Watch now
+                        <Play className="h-4 w-4 me-2" />
+                        {t('detail.watchNow')}
                       </Link>
                     </Button>
 
                     <div className="pt-4 border-t border-border space-y-3">
                       {[
-                        { icon: Film, text: 'Stream in HD quality' },
-                        { icon: Repeat, text: 'Watch unlimited times' },
+                        { icon: Film, text: t('detail.features.streamHd') },
+                        {
+                          icon: Repeat,
+                          text: t('detail.features.watchUnlimited'),
+                        },
                       ].map((feature, idx) => (
                         <div
                           key={idx}
@@ -251,13 +268,18 @@ export default function MatchDetailClient({
                   <>
                     {/* Pre-purchase state — price + CTA. */}
                     <div className="text-center py-5 bg-muted rounded-lg">
-                      <p className="text-4xl font-bold text-[var(--timberwolf)] mb-1">
+                      <p
+                        dir="ltr"
+                        className="text-4xl font-bold text-[var(--timberwolf)] mb-1"
+                      >
                         {formatPrice(product.price_amount, product.currency)}
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {product.access_duration_days
-                          ? `${product.access_duration_days} days access`
-                          : 'Lifetime access'}
+                          ? t('detail.daysAccess', {
+                              count: product.access_duration_days,
+                            })
+                          : t('detail.lifetimeAccess')}
                       </p>
                     </div>
 
@@ -266,17 +288,22 @@ export default function MatchDetailClient({
                       disabled={isLoading}
                       className="w-full bg-[var(--timberwolf)] text-[var(--night)] hover:bg-[var(--ash-grey)]"
                     >
-                      {isLoading ? 'Processing...' : 'Purchase Now'}
+                      {isLoading
+                        ? t('detail.processing')
+                        : t('detail.purchaseNow')}
                     </Button>
 
                     <div className="pt-4 border-t border-border space-y-3">
                       {[
-                        { icon: Zap, text: 'Instant access after purchase' },
-                        { icon: Film, text: 'Stream in HD quality' },
-                        { icon: Repeat, text: 'Watch unlimited times' },
+                        { icon: Zap, text: t('detail.features.instantAccess') },
+                        { icon: Film, text: t('detail.features.streamHd') },
+                        {
+                          icon: Repeat,
+                          text: t('detail.features.watchUnlimited'),
+                        },
                         {
                           icon: ShieldCheck,
-                          text: 'Secure payment with Stripe',
+                          text: t('detail.features.securePayment'),
                         },
                       ].map((feature, idx) => (
                         <div

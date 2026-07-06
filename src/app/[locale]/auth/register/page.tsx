@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useRouter } from '@/i18n/navigation'
 import { Link } from '@/i18n/navigation'
 import {
@@ -32,6 +33,8 @@ import {
 } from 'lucide-react'
 
 function RegisterForm() {
+  const t = useTranslations('auth.register')
+  const tAuth = useTranslations('auth')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -104,12 +107,12 @@ function RegisterForm() {
     setError('')
 
     if (!email || !password || !confirmPassword || !username || !fullName) {
-      setError('Please fill in all fields')
+      setError(t('errors.fillAllFields'))
       return
     }
 
     if (!validateEmail(email)) {
-      setError('Please enter a valid email address')
+      setError(t('errors.invalidEmail'))
       return
     }
 
@@ -120,12 +123,12 @@ function RegisterForm() {
     }
 
     if (usernameStatus !== 'available') {
-      setError('Please choose an available username')
+      setError(t('errors.usernameUnavailable'))
       return
     }
 
     if (fullName.trim().length < 2) {
-      setError('Full name must be at least 2 characters')
+      setError(t('errors.fullNameTooShort'))
       return
     }
 
@@ -136,7 +139,7 @@ function RegisterForm() {
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match')
+      setError(t('errors.passwordsMismatch'))
       return
     }
 
@@ -154,9 +157,7 @@ function RegisterForm() {
         setError(getAuthErrorMessage(error))
       } else if (data?.user) {
         if (data.user.identities && data.user.identities.length === 0) {
-          setError(
-            'An account with this email already exists. Please sign in instead.'
-          )
+          setError(t('errors.emailExists'))
         } else {
           const raw = searchParams.get('redirect') || '/'
           const safe =
@@ -169,10 +170,10 @@ function RegisterForm() {
           router.push(safe)
         }
       } else {
-        setError('Failed to create account. Please try again.')
+        setError(t('errors.createFailed'))
       }
     } catch {
-      setError('An unexpected error occurred. Please try again.')
+      setError(t('errors.unexpected'))
     } finally {
       setLoading(false)
     }
@@ -194,11 +195,9 @@ function RegisterForm() {
           {/* Header */}
           <div className="text-center">
             <h1 className="text-2xl font-bold text-[var(--timberwolf)] mb-2">
-              Create account
+              {t('title')}
             </h1>
-            <p className="text-sm text-muted-foreground">
-              Sign up to purchase match recordings
-            </p>
+            <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
           </div>
 
           {/* Form */}
@@ -207,42 +206,44 @@ function RegisterForm() {
               <div className="bg-red-900/20 border border-red-700/30 rounded-lg p-3">
                 <div className="flex items-center gap-2 text-red-400 text-sm">
                   <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                  <span>{error}</span>
+                  <span dir="auto">{error}</span>
                 </div>
               </div>
             )}
 
             <div className="space-y-2">
               <Label htmlFor="fullName" className="text-[var(--timberwolf)]">
-                Full name
+                {t('fullNameLabel')}
               </Label>
               <div className="relative">
                 <Input
                   id="fullName"
                   type="text"
-                  placeholder="Your name"
+                  placeholder={t('fullNamePlaceholder')}
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="h-11 pl-10"
+                  className="h-11 ps-10"
                   disabled={loading}
                   autoComplete="name"
                 />
-                <User className="h-4 w-4 absolute left-3 top-3.5 text-muted-foreground" />
+                <User className="h-4 w-4 absolute start-3 top-3.5 text-muted-foreground" />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="username" className="text-[var(--timberwolf)]">
-                Username
+                {t('usernameLabel')}
               </Label>
               <div className="relative">
                 <Input
                   id="username"
                   type="text"
-                  placeholder="Choose a username"
+                  dir="ltr"
+                  autoCapitalize="none"
+                  placeholder={t('usernamePlaceholder')}
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className={`h-11 pl-10 pr-10 ${
+                  className={`h-11 ps-10 pe-10 ${
                     usernameStatus === 'taken' || usernameStatus === 'invalid'
                       ? 'ring-2 ring-red-500'
                       : usernameStatus === 'available'
@@ -252,8 +253,8 @@ function RegisterForm() {
                   disabled={loading}
                   autoComplete="username"
                 />
-                <AtSign className="h-4 w-4 absolute left-3 top-3.5 text-muted-foreground" />
-                <div className="absolute right-3 top-3.5">
+                <AtSign className="h-4 w-4 absolute start-3 top-3.5 text-muted-foreground" />
+                <div className="absolute end-3 top-3.5">
                   {usernameStatus === 'checking' && (
                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                   )}
@@ -267,56 +268,58 @@ function RegisterForm() {
                 </div>
               </div>
               {usernameStatus === 'taken' && (
-                <p className="text-xs text-red-400">Username is taken</p>
+                <p className="text-xs text-red-400">{t('usernameTaken')}</p>
               )}
               {usernameStatus === 'invalid' && (
-                <p className="text-xs text-red-400">
-                  3-30 characters, letters, numbers, underscore, hyphen only
-                </p>
+                <p className="text-xs text-red-400">{t('usernameInvalid')}</p>
               )}
               {usernameStatus === 'available' && (
-                <p className="text-xs text-green-400">Username is available</p>
+                <p className="text-xs text-green-400">
+                  {t('usernameAvailable')}
+                </p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="email" className="text-[var(--timberwolf)]">
-                Email
+                {t('emailLabel')}
               </Label>
               <div className="relative">
                 <Input
                   id="email"
                   type="email"
-                  placeholder="you@example.com"
+                  dir="ltr"
+                  autoCapitalize="none"
+                  placeholder={tAuth('common.emailPlaceholder')}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="h-11 pl-10"
+                  className="h-11 ps-10"
                   disabled={loading}
                   autoComplete="email"
                 />
-                <Mail className="h-4 w-4 absolute left-3 top-3.5 text-muted-foreground" />
+                <Mail className="h-4 w-4 absolute start-3 top-3.5 text-muted-foreground" />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="password" className="text-[var(--timberwolf)]">
-                Password
+                {t('passwordLabel')}
               </Label>
               <div className="relative">
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Create a password"
+                  placeholder={t('passwordPlaceholder')}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-11 pl-10"
+                  className="h-11 ps-10"
                   disabled={loading}
                   autoComplete="new-password"
                 />
-                <Lock className="h-4 w-4 absolute left-3 top-3.5 text-muted-foreground" />
+                <Lock className="h-4 w-4 absolute start-3 top-3.5 text-muted-foreground" />
               </div>
               <p className="text-xs text-muted-foreground">
-                Min 8 characters with uppercase, lowercase, and number
+                {t('passwordHint')}
               </p>
             </div>
 
@@ -325,20 +328,20 @@ function RegisterForm() {
                 htmlFor="confirmPassword"
                 className="text-[var(--timberwolf)]"
               >
-                Confirm password
+                {t('confirmPasswordLabel')}
               </Label>
               <div className="relative">
                 <Input
                   id="confirmPassword"
                   type="password"
-                  placeholder="Re-enter password"
+                  placeholder={t('confirmPasswordPlaceholder')}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="h-11 pl-10"
+                  className="h-11 ps-10"
                   disabled={loading}
                   autoComplete="new-password"
                 />
-                <Lock className="h-4 w-4 absolute left-3 top-3.5 text-muted-foreground" />
+                <Lock className="h-4 w-4 absolute start-3 top-3.5 text-muted-foreground" />
               </div>
             </div>
 
@@ -349,18 +352,18 @@ function RegisterForm() {
             >
               {loading ? (
                 <>
-                  <LoadingSpinner size="sm" className="mr-2" />
-                  Creating account...
+                  <LoadingSpinner size="sm" className="me-2" />
+                  {t('creatingAccount')}
                 </>
               ) : (
-                'Sign up'
+                t('signUp')
               )}
             </Button>
           </form>
 
           <div className="text-center text-sm">
             <p className="text-muted-foreground">
-              Already have an account?{' '}
+              {t('haveAccount')}{' '}
               <Link
                 href={
                   searchParams.get('redirect')
@@ -369,7 +372,7 @@ function RegisterForm() {
                 }
                 className="text-[var(--timberwolf)] hover:underline"
               >
-                Sign in
+                {t('signIn')}
               </Link>
             </p>
           </div>

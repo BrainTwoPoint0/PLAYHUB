@@ -3,7 +3,7 @@
 import { Link } from '@/i18n/navigation'
 import Image from 'next/image'
 import { motion } from 'motion/react'
-import { formatPrice, formatDate } from '@braintwopoint0/playback-commons/utils'
+import { useFormatter, useTranslations } from 'next-intl'
 import { MapPin, Calendar, Check } from 'lucide-react'
 
 interface MatchCardProps {
@@ -33,10 +33,16 @@ interface MatchCardProps {
 }
 
 export default function MatchCard({ match }: MatchCardProps) {
+  const t = useTranslations('matches')
+  const format = useFormatter()
   const product = match.products?.[0]
   const price = product
-    ? formatPrice(product.price_amount, product.currency)
-    : 'N/A'
+    ? format.number(product.price_amount, {
+        numberingSystem: 'latn',
+        style: 'currency',
+        currency: product.currency,
+      })
+    : t('card.noPrice')
 
   return (
     <Link href={`/matches/${match.id}`}>
@@ -68,19 +74,22 @@ export default function MatchCard({ match }: MatchCardProps) {
 
             {/* Sport Tag */}
             {match.sport && (
-              <div className="absolute top-3 left-3 px-2.5 py-1 bg-black/60 backdrop-blur-sm border border-border rounded-md text-xs font-medium text-[var(--timberwolf)]">
+              <div className="absolute top-3 start-3 px-2.5 py-1 bg-black/60 backdrop-blur-sm border border-border rounded-md text-xs font-medium text-[var(--timberwolf)]">
                 {match.sport.name}
               </div>
             )}
 
             {/* Price / Owned Badge */}
             {match.owned ? (
-              <div className="absolute top-3 right-3 px-3 py-1.5 bg-emerald-400/90 text-[var(--night)] rounded-md font-bold text-sm flex items-center gap-1.5">
+              <div className="absolute top-3 end-3 px-3 py-1.5 bg-emerald-400/90 text-[var(--night)] rounded-md font-bold text-sm flex items-center gap-1.5">
                 <Check className="h-3.5 w-3.5" />
-                Bought
+                {t('card.bought')}
               </div>
             ) : (
-              <div className="absolute top-3 right-3 px-3 py-1.5 bg-[var(--timberwolf)] text-[var(--night)] rounded-md font-bold text-sm">
+              <div
+                dir="ltr"
+                className="absolute top-3 end-3 px-3 py-1.5 bg-[var(--timberwolf)] text-[var(--night)] rounded-md font-bold text-sm"
+              >
                 {price}
               </div>
             )}
@@ -91,7 +100,7 @@ export default function MatchCard({ match }: MatchCardProps) {
             {/* Teams */}
             <h3 className="text-lg font-semibold text-[var(--timberwolf)] mb-1 line-clamp-1">
               {match.home_team}{' '}
-              <span className="text-muted-foreground">vs</span>{' '}
+              <span className="text-muted-foreground">{t('vs')}</span>{' '}
               {match.away_team}
             </h3>
 
@@ -112,7 +121,9 @@ export default function MatchCard({ match }: MatchCardProps) {
               )}
               <div className="flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5" />
-                <span>{formatDate(match.match_date)}</span>
+                <span>
+                  {format.dateTime(new Date(match.match_date), 'short')}
+                </span>
               </div>
             </div>
 

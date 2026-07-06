@@ -43,7 +43,16 @@
     "cookies": "ملفات تعريف الارتباط",
     "newsletterLabel": "النشرة البريدية",
     "newsletterTitle": "آخر أخبار الشبكة.",
-    "newsletterSubtitle": "عند الحاجة فقط. بدون رسائل مزعجة."
+    "newsletterSubtitle": "عند الحاجة فقط. بدون رسائل مزعجة.",
+    "newsletterPlaceholder": "you@club.com",
+    "newsletterEmailLabel": "البريد الإلكتروني",
+    "newsletterAriaLabel": "الاشتراك في التحديثات",
+    "newsletterSubmit": "اشترك",
+    "newsletterSending": "جارٍ الاشتراك…",
+    "newsletterSuccess": "شكراً — سنتواصل معك.",
+    "newsletterInvalidEmail": "يرجى إدخال بريد إلكتروني صحيح.",
+    "newsletterServerError": "تعذّر الاشتراك حالياً. يرجى المحاولة بعد قليل.",
+    "newsletterRateLimited": "محاولات كثيرة. حاول مرة أخرى بعد دقيقة."
   },
   "notFound": {
     "metaTitle": "الصفحة غير موجودة",
@@ -647,5 +656,151 @@
     "autoFollowToggle": "تبديل التتبع التلقائي",
     "autoFollowOnTitle": "التتبع التلقائي مفعّل — اسحب للتحكم",
     "autoFollowOffTitle": "تتبع تلقائي للّعب"
+  },
+  "auth": {
+    "common": {
+      "emailPlaceholder": "you@example.com"
+    },
+    "login": {
+      "title": "أهلاً بعودتك",
+      "subtitle": "سجّل الدخول للوصول إلى مشترياتك",
+      "form": {
+        "emailLabel": "البريد الإلكتروني",
+        "passwordLabel": "كلمة المرور",
+        "passwordPlaceholder": "أدخل كلمة المرور",
+        "submit": "تسجيل الدخول",
+        "submitting": "جارٍ تسجيل الدخول...",
+        "forgotPassword": "نسيت كلمة المرور؟",
+        "noAccount": "ليس لديك حساب؟",
+        "signUp": "إنشاء حساب",
+        "showPassword": "إظهار كلمة المرور",
+        "hidePassword": "إخفاء كلمة المرور",
+        "errors": {
+          "fillAllFields": "يرجى تعبئة جميع الحقول",
+          "invalidEmail": "يرجى إدخال بريد إلكتروني صحيح",
+          "tooManyAttempts": "محاولات كثيرة. يرجى الانتظار {seconds} ثانية.",
+          "unexpected": "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى."
+        }
+      }
+    },
+    "forgotPassword": {
+      "title": "نسيت كلمة المرور؟",
+      "subtitle": "أدخل بريدك الإلكتروني وسنرسل لك رابط إعادة التعيين.",
+      "form": {
+        "emailLabel": "البريد الإلكتروني",
+        "emailPlaceholder": "you@example.com",
+        "submit": "إرسال رابط إعادة التعيين",
+        "submitting": "جارٍ الإرسال...",
+        "cooldownSubmit": "حاول مرة أخرى بعد {seconds}ث",
+        "successTitle": "تحقق من بريدك الإلكتروني",
+        "successMessage": "أرسلنا رابط إعادة التعيين إلى {email}. إن لم تجده في بريدك الوارد، تحقق من مجلد الرسائل غير المرغوب فيها.",
+        "resend": "إرسال رسالة أخرى",
+        "resendCooldown": "إرسال رسالة أخرى بعد {seconds}ث",
+        "backToSignIn": "العودة إلى تسجيل الدخول",
+        "errors": {
+          "emailRequired": "يرجى إدخال بريدك الإلكتروني",
+          "invalidEmail": "يرجى إدخال بريد إلكتروني صحيح",
+          "cooldown": "يرجى الانتظار {seconds} ثانية قبل إعادة الإرسال.",
+          "unexpected": "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى."
+        }
+      }
+    },
+    "resetPassword": {
+      "title": "إعادة تعيين كلمة المرور",
+      "subtitle": "أدخل كلمة مرور جديدة لحسابك.",
+      "form": {
+        "passwordLabel": "كلمة المرور الجديدة",
+        "passwordPlaceholder": "أدخل كلمة مرور جديدة",
+        "confirmPasswordLabel": "تأكيد كلمة المرور الجديدة",
+        "confirmPasswordPlaceholder": "أعد إدخال كلمة المرور الجديدة",
+        "passwordHint": "8 أحرف على الأقل مع حرف كبير وحرف صغير ورقم.",
+        "submit": "تحديث كلمة المرور",
+        "submitting": "جارٍ التحديث...",
+        "successTitle": "تم تحديث كلمة المرور",
+        "successMessage": "جارٍ تحويلك إلى تسجيل الدخول…",
+        "continue": "المتابعة إلى تسجيل الدخول",
+        "backToSignIn": "العودة إلى تسجيل الدخول",
+        "showPassword": "إظهار كلمة المرور",
+        "hidePassword": "إخفاء كلمة المرور",
+        "errors": {
+          "fillBothFields": "يرجى تعبئة كلا الحقلين",
+          "passwordsMismatch": "كلمتا المرور غير متطابقتين",
+          "unexpected": "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى."
+        }
+      }
+    },
+    "verifyEmail": {
+      "title": "تحقق من بريدك الإلكتروني",
+      "description": "أرسلنا لك رابط تأكيد. انقر على الرابط في بريدك الإلكتروني لتفعيل حسابك.",
+      "spamHint": "لم تستلم الرسالة؟ تحقق من مجلد الرسائل غير المرغوب فيها.",
+      "backToSignIn": "العودة إلى تسجيل الدخول"
+    },
+    "register": {
+      "title": "إنشاء حساب",
+      "subtitle": "سجّل لشراء تسجيلات المباريات",
+      "fullNameLabel": "الاسم الكامل",
+      "fullNamePlaceholder": "اسمك",
+      "usernameLabel": "اسم المستخدم",
+      "usernamePlaceholder": "اختر اسم مستخدم",
+      "usernameTaken": "اسم المستخدم محجوز",
+      "usernameInvalid": "من 3 إلى 30 حرفاً: أحرف لاتينية وأرقام وشرطة سفلية وشرطة فقط",
+      "usernameAvailable": "اسم المستخدم متاح",
+      "emailLabel": "البريد الإلكتروني",
+      "passwordLabel": "كلمة المرور",
+      "passwordPlaceholder": "أنشئ كلمة مرور",
+      "passwordHint": "8 أحرف على الأقل مع حرف كبير وحرف صغير ورقم",
+      "confirmPasswordLabel": "تأكيد كلمة المرور",
+      "confirmPasswordPlaceholder": "أعد إدخال كلمة المرور",
+      "signUp": "إنشاء حساب",
+      "creatingAccount": "جارٍ إنشاء الحساب...",
+      "haveAccount": "لديك حساب بالفعل؟",
+      "signIn": "تسجيل الدخول",
+      "errors": {
+        "fillAllFields": "يرجى تعبئة جميع الحقول",
+        "invalidEmail": "يرجى إدخال بريد إلكتروني صحيح",
+        "usernameUnavailable": "اسم المستخدم غير متاح",
+        "fullNameTooShort": "الاسم الكامل قصير جداً",
+        "passwordsMismatch": "كلمتا المرور غير متطابقتين",
+        "emailExists": "هذا البريد الإلكتروني مسجّل بالفعل",
+        "createFailed": "تعذّر إنشاء الحساب",
+        "unexpected": "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى."
+      }
+    }
+  },
+  "matches": {
+    "title": "متجر المباريات",
+    "subtitle": "تصفح تسجيلات مباريات احترافية",
+    "matchesWord": "{count, plural, zero {مباريات} one {مباراة} two {مباراتان} few {مباريات} many {مباراة} other {مباراة}}",
+    "emptyTitle": "لا توجد مباريات بعد",
+    "emptyDescription": "عُد قريباً لتسجيلات جديدة",
+    "vs": "ضد",
+    "card": {
+      "bought": "تم الشراء",
+      "noPrice": "غير متاح"
+    },
+    "detail": {
+      "backToMatches": "العودة إلى المباريات",
+      "watchAriaLabel": "شاهد هذه المباراة",
+      "date": "التاريخ",
+      "venue": "النادي",
+      "organization": "المؤسسة",
+      "duration": "المدة",
+      "durationMinutes": "{count, plural, one {دقيقة واحدة} two {دقيقتان} few {{count, number, latn} دقائق} many {{count, number, latn} دقيقة} other {{count, number, latn} دقيقة}}",
+      "aboutTitle": "عن هذه المباراة",
+      "ownTitle": "أنت تملك هذه المباراة",
+      "purchaseTitle": "شراء الوصول",
+      "purchased": "تم الشراء",
+      "lifetimeAccess": "وصول دائم",
+      "daysAccess": "{count, plural, one {وصول ليوم واحد} two {وصول ليومين} few {وصول لمدة {count, number, latn} أيام} many {وصول لمدة {count, number, latn} يوماً} other {وصول لمدة {count, number, latn} يوم}}",
+      "watchNow": "شاهد الآن",
+      "processing": "جارٍ المعالجة...",
+      "purchaseNow": "اشترِ الآن",
+      "features": {
+        "instantAccess": "وصول فوري بعد الشراء",
+        "streamHd": "بث بجودة عالية",
+        "watchUnlimited": "مشاهدات غير محدودة",
+        "securePayment": "دفع آمن عبر Stripe"
+      }
+    }
   }
 }

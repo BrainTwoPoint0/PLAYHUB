@@ -75,6 +75,17 @@ export default function Footer() {
       newsletterLabel={t('newsletterLabel')}
       newsletterTitle={t('newsletterTitle')}
       newsletterSubtitle={t('newsletterSubtitle')}
+      newsletterStrings={{
+        placeholder: t('newsletterPlaceholder'),
+        emailLabel: t('newsletterEmailLabel'),
+        ariaLabel: t('newsletterAriaLabel'),
+        submitLabel: t('newsletterSubmit'),
+        sendingLabel: t('newsletterSending'),
+        successMessage: t('newsletterSuccess'),
+        invalidEmailMessage: t('newsletterInvalidEmail'),
+        serverErrorMessage: t('newsletterServerError'),
+        rateLimitedMessage: t('newsletterRateLimited'),
+      }}
     />
   )
 }
