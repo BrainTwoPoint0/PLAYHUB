@@ -22,10 +22,22 @@ export default getRequestConfig(async ({ requestLocale }) => {
     locale,
     messages,
     formats: {
+      // numberingSystem 'latn' pins Western digits for Arabic — engines
+      // disagree on the default for plain 'ar' (Chrome renders ٠١٢).
+      // Flip to 'arab' here if Eastern Arabic numerals are preferred.
       dateTime: {
-        short: { day: 'numeric', month: 'short', year: 'numeric' },
-        monthShort: { month: 'short' },
-        full: { dateStyle: 'medium', timeStyle: 'short' },
+        short: {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          numberingSystem: 'latn',
+        },
+        monthShort: { month: 'short', numberingSystem: 'latn' },
+        full: {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+          numberingSystem: 'latn',
+        },
       },
     },
   }

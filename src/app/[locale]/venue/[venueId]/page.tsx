@@ -266,6 +266,7 @@ function MarketplaceRevenue({
 
   function formatPrice(amount: number, currency: string) {
     return format.number(amount, {
+      numberingSystem: 'latn',
       style: 'currency',
       currency,
       minimumFractionDigits: 0,
@@ -1737,6 +1738,7 @@ export default function VenueManagementPage() {
                             value:
                               groupData.childVenues.length > 0
                                 ? format.number(groupData.totals.monthRevenue, {
+                                    numberingSystem: 'latn',
                                     style: 'currency',
                                     currency:
                                       groupData.childVenues[0]?.currency ||
@@ -1840,6 +1842,7 @@ export default function VenueManagementPage() {
                                     labelFormatter={(label: string) => {
                                       const d = new Date(label + 'T00:00:00')
                                       return format.dateTime(d, {
+                                        numberingSystem: 'latn',
                                         day: 'numeric',
                                         month: 'short',
                                       })
@@ -1938,6 +1941,7 @@ export default function VenueManagementPage() {
                               {child.monthRevenue > 0 && (
                                 <span className="text-sm font-semibold text-[var(--timberwolf)]">
                                   {format.number(child.monthRevenue, {
+                                    numberingSystem: 'latn',
                                     style: 'currency',
                                     currency: child.currency,
                                     minimumFractionDigits: 0,
@@ -2099,7 +2103,7 @@ export default function VenueManagementPage() {
                         <p className="text-sm text-muted-foreground font-medium min-w-[110px] text-center">
                           {format.dateTime(
                             new Date(billingYear, billingMonth - 1),
-                            { month: 'long', year: 'numeric' }
+                            { numberingSystem: 'latn', month: 'long', year: 'numeric' }
                           )}
                         </p>
                         <button
@@ -2210,7 +2214,7 @@ export default function VenueManagementPage() {
                                       count: billingSummary.count,
                                       month: format.dateTime(
                                         new Date(billingYear, billingMonth - 1),
-                                        { month: 'long' }
+                                        { numberingSystem: 'latn', month: 'long' }
                                       ),
                                     })}
                                   </p>
@@ -2508,6 +2512,7 @@ export default function VenueManagementPage() {
                               <div className="min-w-0">
                                 <p className="text-sm font-medium text-[var(--timberwolf)]">
                                   {format.dateTime(new Date(inv.period_start), {
+                                    numberingSystem: 'latn',
                                     month: 'long',
                                     year: 'numeric',
                                   })}

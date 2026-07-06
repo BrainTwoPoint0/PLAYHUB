@@ -196,6 +196,7 @@ export function ClutchVenueStats({ venueId }: { venueId: string }) {
                     const day = parseInt(d.split('-')[2], 10)
                     if (day === 1) {
                       return format.dateTime(new Date(d + 'T00:00:00'), {
+                        numberingSystem: 'latn',
                         day: 'numeric',
                         month: 'short',
                       })
@@ -216,6 +217,7 @@ export function ClutchVenueStats({ venueId }: { venueId: string }) {
                       labelFormatter={(label: string) => {
                         const d = new Date(label + 'T00:00:00')
                         return format.dateTime(d, {
+                          numberingSystem: 'latn',
                           day: 'numeric',
                           month: 'short',
                         })
