@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   Bookmark,
   BookmarkCheck,
-  Compass,
   Loader2,
   Plus,
   Lock,
@@ -29,12 +28,11 @@ import {
 } from '@braintwopoint0/playback-commons/ui'
 import { formatDate } from '@braintwopoint0/playback-commons/utils'
 import {
-  VideoPlayer,
   type MediaPack,
   type GraphicPackageOverlay,
 } from '@/components/video/VideoPlayer'
 import { FlatZoomPlayer } from '@/components/video/FlatZoomPlayer'
-import { VirtualPanoramaPlayer } from '@/components/video/VirtualPanoramaPlayer'
+import { WatchPlayer } from '@/components/video/WatchPlayer'
 import {
   EVENT_TYPE_LABELS,
   EVENT_TYPE_COLORS,
@@ -216,7 +214,6 @@ export default function WatchClient({
   // the raw VP (POST /panorama-source — access-gated, may trigger a capture and
   // return pending); once ready we lazy-mount the pannable VirtualPanoramaPlayer
   // with the Auto production as its autoSrc. Available only when a mesh exists.
-  const [panoramaMode, setPanoramaMode] = useState(false)
   const [panoramaSrc, setPanoramaSrc] = useState<string | null>(null)
   const [exploreState, setExploreState] = useState<
     'idle' | 'loading' | 'pending' | 'unavailable' | 'timeout' | 'error'
@@ -267,8 +264,9 @@ export default function WatchClient({
       return scheduleExplorePoll()
     }
     if (data.status === 'ready' && data.url) {
+      // WatchPlayer flips to the de-warp surface once panoramaSrc is set (if the
+      // user asked for it). We just publish the ready URL + clear the poll state.
       setPanoramaSrc(data.url)
-      setPanoramaMode(true)
       setExploreState('idle')
     } else if (data.status === 'pending') {
       setExploreState('pending')
@@ -623,82 +621,36 @@ export default function WatchClient({
         <div className="lg:col-span-2 space-y-6">
           <div className="rounded-xl overflow-hidden border border-border bg-muted lg:sticky lg:top-6">
             {videoUrl ? (
-              panoramaMode && panoramaSrc && meshBaseUrl ? (
-                // De-warp free-look: pannable VirtualPanorama of the raw VP, with
-                // the Auto production as autoSrc (its "Auto" toggle switches back
-                // to the smooth follow; dragging drops into free-look). Available
-                // over EITHER default player once a mesh + captured raw VP exist.
-                <VirtualPanoramaPlayer
-                  src={panoramaSrc}
-                  autoSrc={videoUrl}
-                  meshBaseUrl={meshBaseUrl}
+              showPanorama ? (
+                // Panorama-flagged footage: the raw panorama IS the default view
+                // (no separate flat production), so keep the FlatZoom path.
+                <FlatZoomPlayer
+                  src={videoUrl}
                   posterUrl={recording.thumbnailUrl}
-                  autoplay
                   className="rounded-xl"
                 />
               ) : (
-                <div className="relative">
-                  {/* Default view: FlatZoom for panorama-flagged footage, else the
-                      full tagged VideoPlayer (events, graphics, progress). The
-                      de-warp free-look is an opt-in OVERLAY on top of either. */}
-                  {showPanorama ? (
-                    <FlatZoomPlayer
-                      src={videoUrl}
-                      posterUrl={recording.thumbnailUrl}
-                      className="rounded-xl"
-                    />
-                  ) : (
-                    <VideoPlayer
-                      src={videoUrl}
-                      events={events}
-                      canEdit={canTag}
-                      onAddTag={openTagOverlay}
-                      mediaPack={mediaPack || undefined}
-                      graphicPackage={graphicPackage || undefined}
-                      posterUrl={recording.thumbnailUrl}
-                      highlightedEventId={hoveredTagId}
-                      onMarkerHover={setHoveredTagId}
-                      initialTimeSeconds={resumeSeconds}
-                      onProgressUpdate={
-                        currentUserId ? persistProgress : undefined
-                      }
-                      className="rounded-xl"
-                    />
-                  )}
-                  {/* "Explore the pitch" — only when a de-warp mesh exists. Fetches
-                      the raw VP (may trigger a server-side capture → pending); the
-                      default view keeps playing until the de-warp is ready. */}
-                  {meshBaseUrl && exploreState !== 'unavailable' && (
-                    <button
-                      type="button"
-                      onClick={onExplore}
-                      disabled={
-                        exploreState === 'loading' || exploreState === 'pending'
-                      }
-                      title="Pan and zoom freely around the whole pitch"
-                      className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-[var(--timberwolf)] backdrop-blur-sm transition hover:bg-black/75 disabled:cursor-default disabled:opacity-80"
-                    >
-                      {exploreState === 'loading' ||
-                      exploreState === 'pending' ? (
-                        <>
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          {exploreState === 'pending'
-                            ? 'Preparing free-look…'
-                            : 'Loading…'}
-                        </>
-                      ) : exploreState === 'timeout' ||
-                        exploreState === 'error' ? (
-                        <>
-                          <Compass className="h-3.5 w-3.5" /> Retry free-look
-                        </>
-                      ) : (
-                        <>
-                          <Compass className="h-3.5 w-3.5" /> Explore the pitch
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
+                // Unified player: the flat production is the master clock + chrome;
+                // the in-bar "Explore" toggle swaps to the WebGL de-warp SURFACE
+                // without ever hiding the transport controls (never locked out).
+                <WatchPlayer
+                  src={videoUrl}
+                  events={events}
+                  canEdit={canTag}
+                  onAddTag={openTagOverlay}
+                  mediaPack={mediaPack || undefined}
+                  graphicPackage={graphicPackage || undefined}
+                  posterUrl={recording.thumbnailUrl}
+                  highlightedEventId={hoveredTagId}
+                  onMarkerHover={setHoveredTagId}
+                  initialTimeSeconds={resumeSeconds}
+                  onProgressUpdate={currentUserId ? persistProgress : undefined}
+                  className="rounded-xl"
+                  meshBaseUrl={meshBaseUrl}
+                  panoramaSrc={panoramaSrc}
+                  exploreState={exploreState}
+                  onExplore={onExplore}
+                />
               )
             ) : (
               <div className="aspect-video flex items-center justify-center text-muted-foreground text-sm">

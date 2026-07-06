@@ -94,6 +94,28 @@ interface VirtualPanoramaPlayerProps {
   /** Roll/perspective residual: blend-strip x-shift = a + b·y at the seam edge (world units). */
   seamWarpA?: number
   seamWarpB?: number
+  /**
+   * SLAVE MODE (WatchPlayer): when set, this de-warp surface stops owning
+   * transport and slaves its raw-VP <video> clock to the given MASTER video
+   * (the flat production). Play/pause/seek/rate mirror the master; a drift guard
+   * keeps them aligned. Pair with `hideChrome` so the shared PlayerControlBar
+   * (bound to the master) is the only transport UI — the user is never locked out.
+   */
+  masterVideoRef?: React.RefObject<HTMLVideoElement | null>
+  /** Hide this component's own transport chrome (scrubber/play/time/fullscreen + center play). Canvas, zoom%, hint, loading/error stay. */
+  hideChrome?: boolean
+  /** Imperative control handle for the pan/zoom/auto extras, so they can live in the shared control bar. Populated on mount. */
+  apiRef?: React.MutableRefObject<DewarpSurfaceApi | null>
+  /** Reports pan-state changes (auto-follow toggled by button OR by a drag; zoom %) up to the shared bar's extras. */
+  onStateChange?: (s: { autoFollow: boolean; zoomPct: number }) => void
+}
+
+/** Imperative surface controls, surfaced so DewarpControls can drive them from the shared bar. */
+export interface DewarpSurfaceApi {
+  zoomIn: () => void
+  zoomOut: () => void
+  reset: () => void
+  toggleAuto: () => void
 }
 
 const FOV_MIN = 12
@@ -450,33 +472,31 @@ function buildExactPanorama(
       rgba[k * 4 + 2] = 1
       rgba[k * 4 + 3] = a
     }
-    // The mesh is a regular raster grid in (f2,f3): f2 sweeps 0→1 along each row
-    // then wraps. Detect rows by that wrap and triangulate adjacent rows by
-    // column (the file's own indices are a triangle strip we don't rely on).
-    const rows: { start: number; len: number }[] = []
-    let rowStart = 0
-    let prevF2 = F[P.vStart * 5 + 2]
-    for (let k = 1; k < P.count; k++) {
-      const f2 = F[(P.vStart + k) * 5 + 2]
-      if (f2 < prevF2 - 0.3) {
-        rows.push({ start: rowStart, len: k - rowStart })
-        rowStart = k
-      }
-      prevF2 = f2
-    }
-    rows.push({ start: rowStart, len: P.count - rowStart })
+    // Use the mesh's OWN complete per-projection indices (a full regular-grid
+    // triangle LIST — 97446 = 2·149·109·3 for the 150×110 grid). The previous code
+    // re-triangulated by detecting rows via an f2-wrap heuristic and paired rows
+    // with m = min(len_a, len_b), which truncated the highest-index (right-most)
+    // columns whenever a row split was missed — leaving a right-side black wedge.
+    // File indices reference the GLOBAL vertex array and are stored sequentially
+    // per projection, so slice this projection's block (cumulative n_indices
+    // offset) and rebase to local (−vStart); drop any stray out-of-range triangle.
+    let idxOff = 0
+    for (let q = 0; q < P.pi; q++) idxOff += sceneProjs[q].n_indices
+    const nIdx = sceneProjs[P.pi].n_indices
     const tris: number[] = []
-    for (let r = 0; r < rows.length - 1; r++) {
-      const a = rows[r],
-        b = rows[r + 1]
-      const m = Math.min(a.len, b.len)
-      for (let c = 0; c < m - 1; c++) {
-        const a0 = a.start + c,
-          a1 = a.start + c + 1
-        const b0 = b.start + c,
-          b1 = b.start + c + 1
-        tris.push(a0, b0, a1, a1, b0, b1)
-      }
+    for (let t = 0; t + 2 < nIdx; t += 3) {
+      const a0 = I[idxOff + t] - P.vStart
+      const a1 = I[idxOff + t + 1] - P.vStart
+      const a2 = I[idxOff + t + 2] - P.vStart
+      if (
+        a0 >= 0 &&
+        a0 < P.count &&
+        a1 >= 0 &&
+        a1 < P.count &&
+        a2 >= 0 &&
+        a2 < P.count
+      )
+        tris.push(a0, a1, a2)
     }
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
@@ -588,6 +608,10 @@ export function VirtualPanoramaPlayer({
   seamShiftY = SEAM_SHIFT_Y_DEFAULT,
   seamWarpA = SEAM_WARP_A_DEFAULT,
   seamWarpB = SEAM_WARP_B_DEFAULT,
+  masterVideoRef,
+  hideChrome = false,
+  apiRef,
+  onStateChange,
 }: VirtualPanoramaPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasHostRef = useRef<HTMLDivElement>(null)
@@ -677,7 +701,10 @@ export function VirtualPanoramaPlayer({
     video.crossOrigin = 'anonymous'
     video.playsInline = true
     video.preload = 'auto'
-    if (autoplay) video.muted = true // muted autoplay is permitted → live VideoTexture frames
+    // Mute for autoplay (permitted → live VideoTexture frames) AND in slave mode:
+    // the master carries the audio, and an unmuted programmatic play() on the
+    // slave gets blocked by autoplay policy → frozen texture + double audio.
+    if (autoplay || masterVideoRef) video.muted = true
     videoRef.current = video
 
     const isHls = src.includes('.m3u8')
@@ -1288,6 +1315,73 @@ export function VirtualPanoramaPlayer({
     return () => document.removeEventListener('fullscreenchange', onFs)
   }, [])
 
+  // SLAVE MODE — follow the master clock (the flat production video). The raw-VP
+  // <video> that feeds the WebGL texture mirrors the master's play/pause/seek/rate;
+  // a rAF drift guard keeps them within ~0.15s so toggling the surface is seamless
+  // (no restart / jump). Re-binds when the raw-VP element is recreated (`retry`).
+  useEffect(() => {
+    const master = masterVideoRef?.current
+    if (!master) return
+    let raf = 0
+    const onPlay = () => {
+      const v = videoRef.current
+      if (!v) return
+      v.currentTime = master.currentTime
+      void v.play().catch(() => {})
+    }
+    const onPause = () => videoRef.current?.pause()
+    const onSeeked = () => {
+      const v = videoRef.current
+      if (v) v.currentTime = master.currentTime
+    }
+    const onRate = () => {
+      const v = videoRef.current
+      if (v) v.playbackRate = master.playbackRate
+    }
+    master.addEventListener('play', onPlay)
+    master.addEventListener('pause', onPause)
+    master.addEventListener('seeked', onSeeked)
+    master.addEventListener('ratechange', onRate)
+    onSeeked()
+    onRate()
+    if (!master.paused) onPlay()
+    const tick = () => {
+      const v = videoRef.current
+      if (v && v.readyState >= 1) {
+        if (Math.abs(v.currentTime - master.currentTime) > 0.15)
+          v.currentTime = master.currentTime
+        if (!master.paused && v.paused) void v.play().catch(() => {})
+        if (master.paused && !v.paused) v.pause()
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => {
+      cancelAnimationFrame(raf)
+      master.removeEventListener('play', onPlay)
+      master.removeEventListener('pause', onPause)
+      master.removeEventListener('seeked', onSeeked)
+      master.removeEventListener('ratechange', onRate)
+    }
+  }, [masterVideoRef, retry])
+
+  // Report pan-state up so DewarpControls (rendered in the shared bar's extras)
+  // reflect Auto-pressed + zoom%. Fires when Auto flips via button OR a drag.
+  useEffect(() => {
+    onStateChange?.({ autoFollow, zoomPct })
+  }, [autoFollow, zoomPct, onStateChange])
+
+  // Publish the imperative control handle for the extras (ref-as-latest-callback,
+  // same pattern as toggleFullscreenRef — the closures below are already defined).
+  if (apiRef) {
+    apiRef.current = {
+      zoomIn: () => zoomBy(1.25),
+      zoomOut: () => zoomBy(1 / 1.25),
+      reset: resetView,
+      toggleAuto: toggleAutoFollow,
+    }
+  }
+
   const seekPct =
     duration > 0 ? (Math.min(currentTime, duration) / duration) * 100 : 0
   const canInteract = !isLoading && !error
@@ -1355,7 +1449,7 @@ export function VirtualPanoramaPlayer({
           </div>
         )}
 
-        {canInteract && !isPlaying && (
+        {!hideChrome && canInteract && !isPlaying && (
           <button
             type="button"
             onClick={togglePlay}
@@ -1383,7 +1477,7 @@ export function VirtualPanoramaPlayer({
           {zoomPct}%
         </div>
 
-        {canInteract && (
+        {!hideChrome && canInteract && (
           <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3 pb-2 pt-6">
             <input
               type="range"
