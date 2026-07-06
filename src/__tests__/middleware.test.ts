@@ -25,7 +25,11 @@ function mockSupabase({
   error = null as { status?: number } | null,
 } = {}) {
   mocks.createServerClient.mockImplementation(
-    (_url: string, _key: string, config: { cookies: { setAll: (c: CookieToSet[]) => void } }) => ({
+    (
+      _url: string,
+      _key: string,
+      config: { cookies: { setAll: (c: CookieToSet[]) => void } }
+    ) => ({
       auth: {
         getSession: vi.fn(async () => {
           if (refreshedCookies.length > 0) {

@@ -2103,7 +2103,11 @@ export default function VenueManagementPage() {
                         <p className="text-sm text-muted-foreground font-medium min-w-[110px] text-center">
                           {format.dateTime(
                             new Date(billingYear, billingMonth - 1),
-                            { numberingSystem: 'latn', month: 'long', year: 'numeric' }
+                            {
+                              numberingSystem: 'latn',
+                              month: 'long',
+                              year: 'numeric',
+                            }
                           )}
                         </p>
                         <button
@@ -2214,7 +2218,10 @@ export default function VenueManagementPage() {
                                       count: billingSummary.count,
                                       month: format.dateTime(
                                         new Date(billingYear, billingMonth - 1),
-                                        { numberingSystem: 'latn', month: 'long' }
+                                        {
+                                          numberingSystem: 'latn',
+                                          month: 'long',
+                                        }
                                       ),
                                     })}
                                   </p>

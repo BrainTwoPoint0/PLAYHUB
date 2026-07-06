@@ -10,10 +10,7 @@ export default defineConfig({
       ),
       // next-intl's ESM build imports the extensionless 'next/server',
       // which Node's ESM resolver rejects outside the Next runtime.
-      'next/server': path.resolve(
-        __dirname,
-        './node_modules/next/server.js'
-      ),
+      'next/server': path.resolve(__dirname, './node_modules/next/server.js'),
       '@braintwopoint0/playback-commons/playerdata': path.resolve(
         __dirname,
         '../packages/commons/src/playerdata/index.ts'
