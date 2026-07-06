@@ -5,6 +5,10 @@ import { routing } from './routing'
 
 export default getRequestConfig(async ({ requestLocale }) => {
   const requested = await requestLocale
+  // NOTE: do not return a locale with Unicode extensions (e.g.
+  // 'ar-u-nu-latn') — next-intl's Link uses this value for URL prefixing
+  // and would emit /ar-u-nu-latn/... hrefs. Digit pinning happens via the
+  // named 'latn' number format below plus per-call formatter options.
   const locale = hasLocale(routing.locales, requested)
     ? requested
     : routing.defaultLocale
@@ -24,7 +28,13 @@ export default getRequestConfig(async ({ requestLocale }) => {
     formats: {
       // numberingSystem 'latn' pins Western digits for Arabic — engines
       // disagree on the default for plain 'ar' (Chrome renders ٠١٢).
-      // Flip to 'arab' here if Eastern Arabic numerals are preferred.
+      // ar.json references the 'latn' number format for interpolated
+      // numbers ({count, number, latn}) since ICU interpolation ignores
+      // per-call formatter options. Flip to 'arab' everywhere here if
+      // Eastern Arabic numerals are preferred.
+      number: {
+        latn: { numberingSystem: 'latn' },
+      },
       dateTime: {
         short: {
           day: 'numeric',

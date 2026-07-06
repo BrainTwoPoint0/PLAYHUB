@@ -239,6 +239,7 @@
       "deleteRecording": "Delete Recording",
       "deleteWarning": "This will permanently delete <name>{title}</name> including the video file from storage. This cannot be undone.",
       "typeDeleteToConfirm": "Type DELETE to confirm",
+      "deletePlaceholder": "DELETE",
       "deleteForever": "Delete Forever"
     },
     "access": {
@@ -320,6 +321,7 @@
     "longestRally": "Longest rally",
     "playersIdentified": "Players identified",
     "playersIdentifiedTitle": "Players who have been identified by name in recordings at this venue",
+    "openArrow": "→",
     "perCourtLast30": "Recordings per court — last 30 days",
     "courtSummary": "{court}: {count, plural, one {# recording} other {# recordings}} in the last 30 days"
   },

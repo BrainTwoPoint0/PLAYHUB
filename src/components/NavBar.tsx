@@ -161,7 +161,7 @@ export default function NavBar() {
           <div className="ms-auto flex items-center gap-2">
             {/* Desktop auth controls */}
             <div className="hidden md:flex items-center gap-4">
-              <LanguageSwitcher className="px-2 py-1.5" />
+              <LanguageSwitcher className="h-9 px-3 font-medium" />
               {loading ? (
                 <div className="h-8 w-8 animate-pulse rounded-full bg-muted" />
               ) : user ? (
@@ -244,7 +244,7 @@ export default function NavBar() {
                 </button>
               </SheetTrigger>
               <SheetContent
-                side={locale === 'ar' ? 'left' : 'right'}
+                side={locale.startsWith('ar') ? 'left' : 'right'}
                 className="w-72 bg-card border-border p-0"
               >
                 <SheetTitle className="sr-only">{t('navigation')}</SheetTitle>

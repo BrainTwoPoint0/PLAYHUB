@@ -146,7 +146,7 @@ export function ClutchVenueStats({ venueId }: { venueId: string }) {
                   })}
                 </span>
               )}{' '}
-              →
+              {t('openArrow')}
             </Link>
           ) : (
             <p className="text-[var(--timberwolf)] font-medium">—</p>

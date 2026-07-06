@@ -2029,14 +2029,16 @@ export default function VenueManagementPage() {
                       {billingSummary && (
                         <div className="order-3 w-full sm:order-2 sm:w-auto sm:flex-1 flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-sm">
                           <div>
-                            <span
-                              className="text-[var(--timberwolf)] font-semibold text-base sm:text-lg"
-                              style={{ fontVariantNumeric: 'tabular-nums' }}
-                            >
-                              {billingSummary.totalRevenue.toFixed(3)}
-                            </span>
-                            <span className="text-muted-foreground/60 ms-1 text-xs">
-                              {billingSummary.currency}
+                            <span dir="ltr" className="inline-block">
+                              <span
+                                className="text-[var(--timberwolf)] font-semibold text-base sm:text-lg"
+                                style={{ fontVariantNumeric: 'tabular-nums' }}
+                              >
+                                {billingSummary.totalRevenue.toFixed(3)}
+                              </span>
+                              <span className="text-muted-foreground/60 ms-1 text-xs">
+                                {billingSummary.currency}
+                              </span>
                             </span>
                           </div>
                           <div className="border-s border-border ps-3 sm:ps-4">
@@ -2154,11 +2156,13 @@ export default function VenueManagementPage() {
                                 className="text-lg font-semibold text-[var(--timberwolf)]"
                                 style={{ fontVariantNumeric: 'tabular-nums' }}
                               >
-                                {billingSummary.venueCollectedRevenue.toFixed(
-                                  3
-                                )}
-                                <span className="text-[10px] font-normal text-muted-foreground/50 ms-1">
-                                  {billingSummary.currency}
+                                <span dir="ltr" className="inline-block">
+                                  {billingSummary.venueCollectedRevenue.toFixed(
+                                    3
+                                  )}
+                                  <span className="text-[10px] font-normal text-muted-foreground/50 ms-1">
+                                    {billingSummary.currency}
+                                  </span>
                                 </span>
                               </p>
                               <p className="text-[10px] text-muted-foreground/40 mt-1">
@@ -2179,11 +2183,13 @@ export default function VenueManagementPage() {
                                 className="text-lg font-semibold text-[var(--timberwolf)]"
                                 style={{ fontVariantNumeric: 'tabular-nums' }}
                               >
-                                {billingSummary.playhubCollectedRevenue.toFixed(
-                                  3
-                                )}
-                                <span className="text-[10px] font-normal text-muted-foreground/50 ms-1">
-                                  {billingSummary.currency}
+                                <span dir="ltr" className="inline-block">
+                                  {billingSummary.playhubCollectedRevenue.toFixed(
+                                    3
+                                  )}
+                                  <span className="text-[10px] font-normal text-muted-foreground/50 ms-1">
+                                    {billingSummary.currency}
+                                  </span>
                                 </span>
                               </p>
                               <p className="text-[10px] text-muted-foreground/40 mt-1">
@@ -2208,9 +2214,13 @@ export default function VenueManagementPage() {
                                       fontVariantNumeric: 'tabular-nums',
                                     }}
                                   >
-                                    {billingSummary.venueTotalProfit.toFixed(3)}
-                                    <span className="text-[10px] font-normal text-muted-foreground/50 ms-1">
-                                      {billingSummary.currency}
+                                    <span dir="ltr" className="inline-block">
+                                      {billingSummary.venueTotalProfit.toFixed(
+                                        3
+                                      )}
+                                      <span className="text-[10px] font-normal text-muted-foreground/50 ms-1">
+                                        {billingSummary.currency}
+                                      </span>
                                     </span>
                                   </p>
                                   <p className="text-[10px] text-muted-foreground/40 mt-1">
@@ -2242,11 +2252,13 @@ export default function VenueManagementPage() {
                                       fontVariantNumeric: 'tabular-nums',
                                     }}
                                   >
-                                    {Math.abs(
-                                      billingSummary.netBalance
-                                    ).toFixed(3)}
-                                    <span className="text-[10px] font-normal text-muted-foreground/50 ms-1">
-                                      {billingSummary.currency}
+                                    <span dir="ltr" className="inline-block">
+                                      {Math.abs(
+                                        billingSummary.netBalance
+                                      ).toFixed(3)}
+                                      <span className="text-[10px] font-normal text-muted-foreground/50 ms-1">
+                                        {billingSummary.currency}
+                                      </span>
                                     </span>
                                   </p>
                                   <p className="text-[10px] text-muted-foreground/40 mt-1">
@@ -2538,11 +2550,17 @@ export default function VenueManagementPage() {
                               </div>
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 <span
+                                  dir="ltr"
                                   className={`text-sm font-medium ${net >= 0 ? 'text-[var(--timberwolf)]' : 'text-emerald-400'}`}
                                   style={{ fontVariantNumeric: 'tabular-nums' }}
                                 >
-                                  {net >= 0 ? '' : '-'}
-                                  {Math.abs(net).toFixed(3)} {inv.currency}
+                                  {format.number(net, {
+                                    numberingSystem: 'latn',
+                                    style: 'currency',
+                                    currency: inv.currency,
+                                    minimumFractionDigits: 3,
+                                    maximumFractionDigits: 3,
+                                  })}
                                 </span>
                                 <span className="text-[10px] text-muted-foreground/40">
                                   {net >= 0
@@ -2759,6 +2777,9 @@ export default function VenueManagementPage() {
                               {t('schedule.grantAccessLabel')}
                             </label>
                             <Input
+                              dir="ltr"
+                              inputMode="email"
+                              autoCapitalize="none"
                               value={accessEmails}
                               onChange={(e) => setAccessEmails(e.target.value)}
                               placeholder={t(
@@ -2890,14 +2911,14 @@ export default function VenueManagementPage() {
                           )}
 
                           {error && (
-                            <div className="bg-red-500/10 text-red-400 p-3 rounded-lg">
-                              {error}
+                            <div dir="auto" className="bg-red-500/10 text-red-400 p-3 rounded-lg">
+
                             </div>
                           )}
 
                           {success && (
-                            <div className="bg-green-500/10 text-green-400 p-3 rounded-lg">
-                              {success}
+                            <div dir="auto" className="bg-green-500/10 text-green-400 p-3 rounded-lg">
+
                             </div>
                           )}
 
@@ -3191,7 +3212,10 @@ export default function VenueManagementPage() {
                                     {t('streams.rtmpUrl')}
                                   </span>
                                   <div className="flex items-center gap-2">
-                                    <code className="flex-1 min-w-0 bg-black/30 px-2 py-1 rounded text-xs truncate text-[var(--timberwolf)]">
+                                    <code
+                                      dir="ltr"
+                                      className="flex-1 min-w-0 bg-black/30 px-2 py-1 rounded text-xs truncate text-[var(--timberwolf)]"
+                                    >
                                       {channel.rtmp.url}
                                     </code>
                                     <Button
@@ -3216,7 +3240,10 @@ export default function VenueManagementPage() {
                                     {t('streams.streamKey')}
                                   </span>
                                   <div className="flex items-center gap-2">
-                                    <code className="flex-1 min-w-0 bg-black/30 px-2 py-1 rounded text-xs truncate text-[var(--timberwolf)]">
+                                    <code
+                                      dir="ltr"
+                                      className="flex-1 min-w-0 bg-black/30 px-2 py-1 rounded text-xs truncate text-[var(--timberwolf)]"
+                                    >
                                       {channel.rtmp.streamKey}
                                     </code>
                                     <Button
@@ -3242,7 +3269,10 @@ export default function VenueManagementPage() {
                                       {t('streams.playback')}
                                     </span>
                                     <div className="flex items-center gap-2">
-                                      <code className="flex-1 min-w-0 bg-black/30 px-2 py-1 rounded text-xs truncate text-[var(--timberwolf)]">
+                                      <code
+                                      dir="ltr"
+                                      className="flex-1 min-w-0 bg-black/30 px-2 py-1 rounded text-xs truncate text-[var(--timberwolf)]"
+                                    >
                                         {channel.playbackUrl}
                                       </code>
                                       <Button
@@ -3888,13 +3918,13 @@ export default function VenueManagementPage() {
                 <div className="px-6 pb-6 space-y-4">
                   {/* Success/Error messages */}
                   {success && (
-                    <div className="bg-green-500/10 text-green-400 p-3 rounded-lg text-sm">
-                      {success}
+                    <div dir="auto" className="bg-green-500/10 text-green-400 p-3 rounded-lg text-sm">
+
                     </div>
                   )}
                   {error && (
-                    <div className="bg-red-500/10 text-red-400 p-3 rounded-lg text-sm">
-                      {error}
+                    <div dir="auto" className="bg-red-500/10 text-red-400 p-3 rounded-lg text-sm">
+
                     </div>
                   )}
 
@@ -3905,6 +3935,7 @@ export default function VenueManagementPage() {
                   >
                     <Input
                       type="email"
+                      dir="ltr"
                       value={newAdminEmail}
                       onChange={(e) => setNewAdminEmail(e.target.value)}
                       placeholder={t('access.adminEmailPlaceholder')}
@@ -4211,7 +4242,7 @@ export default function VenueManagementPage() {
                   <Input
                     value={deleteConfirmText}
                     onChange={(e) => setDeleteConfirmText(e.target.value)}
-                    placeholder="DELETE"
+                    placeholder={t('recordings.deletePlaceholder')}
                     className={inputClass}
                   />
                 </div>
@@ -4220,7 +4251,10 @@ export default function VenueManagementPage() {
                     className="flex-1 bg-red-600 hover:bg-red-700 text-white border-0"
                     onClick={confirmDeleteRecording}
                     disabled={
-                      deleteConfirmText !== 'DELETE' ||
+                      // Arabic keyboards make the Latin token disproportionate
+                      // friction — the localized equivalent also passes.
+                      (deleteConfirmText !== 'DELETE' &&
+                        deleteConfirmText !== 'حذف') ||
                       deletingRecording === deleteConfirmRecording.id
                     }
                   >

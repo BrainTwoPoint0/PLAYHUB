@@ -18,8 +18,10 @@ export function LanguageSwitcher({
   const router = useRouter()
   const pathname = usePathname()
 
-  const target = locale === 'ar' ? 'en' : 'ar'
-  const label = locale === 'ar' ? 'English' : 'العربية'
+  // startsWith survives region/extension variants (ar-KW etc.)
+  const isArabic = locale.startsWith('ar')
+  const target = isArabic ? 'en' : 'ar'
+  const label = isArabic ? 'English' : 'العربية'
 
   function handleSwitch() {
     // window.location.search instead of useSearchParams(): NavBar renders in
@@ -32,6 +34,7 @@ export function LanguageSwitcher({
 
   return (
     <button
+      type="button"
       onClick={handleSwitch}
       lang={target}
       className={cn(

@@ -199,7 +199,8 @@ export function AuditHistory({ venueId }: AuditHistoryProps) {
         ) : error ? (
           <div className="flex items-center gap-2 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2 text-xs text-red-300">
             <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
-            {error}
+            {/* dir=auto: server errors arrive in English and must not render right-aligned in RTL */}
+            <span dir="auto">{error}</span>
           </div>
         ) : rows.length === 0 ? (
           <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-white/[0.06] bg-white/[0.01] py-8 text-center">
@@ -333,7 +334,10 @@ export function AuditHistory({ venueId }: AuditHistoryProps) {
                           <summary className="cursor-pointer text-[10px] uppercase tracking-[0.14em] text-muted-foreground/70 hover:text-muted-foreground">
                             {t('rawMetadata')}
                           </summary>
-                          <pre className="mt-1.5 max-h-48 overflow-auto rounded bg-black/30 p-2 text-[10px] font-mono text-muted-foreground/80">
+                          <pre
+                            dir="ltr"
+                            className="mt-1.5 max-h-48 overflow-auto rounded bg-black/30 p-2 text-[10px] font-mono text-muted-foreground/80"
+                          >
                             {JSON.stringify(row.metadata, null, 2)}
                           </pre>
                         </details>

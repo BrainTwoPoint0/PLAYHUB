@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { createTranslator } from 'next-intl'
 import en from '../../../messages/en.json'
 import ar from '../../../messages/ar.json'
 import es from '../../../messages/es.json'
@@ -67,5 +68,27 @@ describe('en.json', () => {
       .filter(([, v]) => v.trim() === '')
       .map(([k]) => k)
     expect(empty).toEqual([])
+  })
+})
+
+describe('Arabic digit pinning', () => {
+  // Chrome renders Eastern Arabic digits (٠١٢) for plain 'ar'; Node renders
+  // Latin. ar-u-nu-arab forces the Chrome behavior so this test is
+  // deterministic across engines. Interpolated numbers must come out Latin
+  // via the named 'latn' number format (i18n/request.ts).
+  const t = createTranslator({
+    locale: 'ar-u-nu-arab',
+    messages: ar as Parameters<typeof createTranslator>[0]['messages'],
+    formats: { number: { latn: { numberingSystem: 'latn' } } },
+  })
+
+  it('renders Latin digits in plural counts', () => {
+    expect(t('venue.recordings.count', { count: 15 })).toMatch(/15/)
+  })
+
+  it('renders Latin digits in numeric interpolations', () => {
+    expect(t('venue.recordings.pageRange', { from: 1, to: 20, total: 143 }))
+      .toMatch(/1.*20.*143/)
+    expect(t('auditHistory.daysAgo', { count: 5 })).toMatch(/5/)
   })
 })

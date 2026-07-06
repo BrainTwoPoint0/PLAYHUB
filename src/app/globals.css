@@ -105,3 +105,12 @@ input[type='number'] {
 .no-visible-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Arabic is a connected script — letter-spacing breaks glyph joining.
+   (tracking-tight is deliberately excluded: only used on the Latin logo.) */
+[dir='rtl'] .tracking-wide,
+[dir='rtl'] .tracking-wider,
+[dir='rtl'] .tracking-widest,
+[dir='rtl'] [class*='tracking-['] {
+  letter-spacing: 0;
+}

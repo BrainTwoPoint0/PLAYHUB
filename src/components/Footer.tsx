@@ -1,25 +1,32 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
+import { getPathname } from '@/i18n/navigation'
 import { SiteFooter } from '@braintwopoint0/playback-commons/ui'
 import type { FooterColumnDef } from '@braintwopoint0/playback-commons/ui'
 
 export default function Footer() {
   const t = useTranslations('footer')
+  const locale = useLocale()
+
+  // The commons SiteFooter renders plain next/link, which doesn't know about
+  // the locale prefix — internal hrefs must be prefixed here or /ar users
+  // silently drop back to English on footer navigation.
+  const localized = (href: string) => getPathname({ href, locale })
 
   const columns: FooterColumnDef[] = [
     {
       title: t('browse'),
       links: [
-        { label: t('matches'), href: '/matches' },
-        { label: t('academy'), href: '/academy' },
+        { label: t('matches'), href: localized('/matches') },
+        { label: t('academy'), href: localized('/academy') },
       ],
     },
     {
       title: t('account'),
       links: [
-        { label: t('recordings'), href: '/recordings' },
-        { label: t('signIn'), href: '/auth/login' },
+        { label: t('recordings'), href: localized('/recordings') },
+        { label: t('signIn'), href: localized('/auth/login') },
       ],
     },
     {
@@ -45,7 +52,7 @@ export default function Footer() {
     {
       title: t('legal'),
       links: [
-        { label: t('terms'), href: '/legal/terms' },
+        { label: t('terms'), href: localized('/legal/terms') },
         {
           label: t('privacy'),
           href: 'https://playbacksports.ai/legal/privacy',
