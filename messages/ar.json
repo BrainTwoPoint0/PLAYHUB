@@ -12,9 +12,9 @@
   },
   "nav": {
     "myRecordings": "تسجيلاتي",
-    "manageVenue": "إدارة المنشأة",
+    "manageVenue": "إدارة النادي",
     "academy": "الأكاديمية",
-    "manageOrg": "إدارة النادي",
+    "manageOrg": "إدارة المؤسسة",
     "admin": "الإدارة",
     "signIn": "تسجيل الدخول",
     "signUp": "إنشاء حساب",
@@ -53,21 +53,21 @@
     "myRecordings": "تسجيلاتي"
   },
   "venueSelector": {
-    "eyebrow": "إدارة المنشآت",
-    "title": "منشآتك",
-    "subtitle": "اختر منشأة لإدارة التسجيلات والصلاحيات",
-    "manageVenue": "إدارة المنشأة",
+    "eyebrow": "إدارة الأندية",
+    "title": "أنديتك",
+    "subtitle": "اختر نادياً لإدارة التسجيلات والصلاحيات",
+    "manageVenue": "إدارة النادي",
     "backToHome": "العودة إلى الرئيسية",
-    "loadFailed": "تعذّر تحميل المنشآت",
-    "noVenuesTitle": "لا توجد منشآت",
-    "noVenuesDescription": "لا تملك صلاحية إدارة أي منشأة. لإدارة منشأة، يجب أن تكون مشرفاً في نادٍ مرتبط بنظام Spiideo."
+    "loadFailed": "تعذّر تحميل الأندية",
+    "noVenuesTitle": "لا توجد أندية",
+    "noVenuesDescription": "لا تملك صلاحية إدارة أي نادٍ. لإدارة نادٍ، يجب أن يكون حسابك مشرفاً ضمن مؤسسة مرتبطة بنظام Spiideo."
   },
   "venue": {
     "header": {
       "groupOverview": "نظرة عامة على المجموعة",
-      "venueManagement": "إدارة المنشأة",
-      "switchVenue": "تبديل المنشأة",
-      "backToVenues": "العودة إلى المنشآت"
+      "venueManagement": "إدارة النادي",
+      "switchVenue": "تبديل النادي",
+      "backToVenues": "العودة إلى الأندية"
     },
     "group": {
       "portfolioOverview": "نظرة عامة على المحفظة",
@@ -81,25 +81,25 @@
       "dailyPerformance": "الأداء اليومي",
       "avgPerDay": "المعدل {avg, number, latn}/يوم",
       "targetPerDay": "الهدف: {target, number, latn}/يوم",
-      "venuesCount": "المنشآت ({count, number, latn})",
+      "venuesCount": "الأندية ({count, number, latn})",
       "recordingsCount": "{count, plural, zero {لا تسجيلات} one {تسجيل واحد} two {تسجيلان} few {{count, number, latn} تسجيلات} many {{count, number, latn} تسجيلاً} other {{count, number, latn} تسجيل}}",
       "thisMonthCount": "{count, number, latn} هذا الشهر",
       "todayProgress": "اليوم: {today, number, latn}/{target, number, latn}",
       "manage": "إدارة",
-      "noChildVenues": "لا توجد منشآت فرعية بعد. أضِف منشآت من لوحة الإدارة."
+      "noChildVenues": "لا توجد أندية فرعية بعد. أضِف أندية من لوحة الإدارة."
     },
     "billing": {
       "title": "الفوترة",
       "recordingsSuffix": "تسجيلات",
       "perDayAvg": "/يوم كمعدل",
-      "atVenue": "في المنشأة",
+      "atVenue": "في النادي",
       "qrCode": "رمز QR",
       "yourProfit": "أرباحك",
       "netSettlement": "صافي التسوية",
       "recordingsCount": "{count, plural, zero {لا تسجيلات} one {تسجيل واحد} two {تسجيلان} few {{count, number, latn} تسجيلات} many {{count, number, latn} تسجيلاً} other {{count, number, latn} تسجيل}}",
       "recordingsInMonth": "{count, plural, zero {لا تسجيلات} one {تسجيل واحد} two {تسجيلان} few {{count, number, latn} تسجيلات} many {{count, number, latn} تسجيلاً} other {{count, number, latn} تسجيل}} في {month}",
       "venueOwesPlayback": "مستحق للمنصة PLAYBACK",
-      "playbackOwesVenue": "مستحق للمنشأة من PLAYBACK",
+      "playbackOwesVenue": "مستحق للنادي من PLAYBACK",
       "settled": "تمت التسوية",
       "dailyActivity": "النشاط اليومي",
       "targetPerDay": "الهدف: {target, number, latn}/يوم",
@@ -107,9 +107,9 @@
       "hideInvoices": "إخفاء الفواتير",
       "viewInvoices": "عرض الفواتير ←",
       "noInvoices": "لا توجد فواتير بعد",
-      "collectionBreakdown": "({venue, number, latn} في المنشأة، {qr, number, latn} رمز QR)",
+      "collectionBreakdown": "({venue, number, latn} في النادي، {qr, number, latn} رمز QR)",
       "owed": "مستحق",
-      "dueToVenue": "مستحق للمنشأة"
+      "dueToVenue": "مستحق للنادي"
     },
     "schedule": {
       "title": "جدولة تسجيل",
@@ -147,7 +147,7 @@
     },
     "streams": {
       "title": "البث المباشر",
-      "subtitle": "إدارة قنوات البث المباشر لهذه المنشأة",
+      "subtitle": "إدارة قنوات البث المباشر لهذا النادي",
       "hide": "إخفاء",
       "manageStreams": "إدارة البث",
       "channelNamePlaceholder": "اسم القناة (مثال: ملعب 1 مباشر)",
@@ -254,10 +254,10 @@
       "revoke": "سحب",
       "revoked": "تم السحب",
       "revokeConfirm": "هل أنت متأكد من سحب هذه الصلاحية؟",
-      "venueAdmins": "مشرفو المنشأة",
+      "venueAdmins": "مشرفو النادي",
       "hide": "إخفاء",
       "manageAdmins": "إدارة المشرفين",
-      "adminsSubtitle": "المستخدمون الذين يمكنهم إدارة هذه المنشأة وتسجيلاتها",
+      "adminsSubtitle": "المستخدمون الذين يمكنهم إدارة هذا النادي وتسجيلاته",
       "adminEmailPlaceholder": "admin@example.com",
       "addAdmin": "إضافة مشرف",
       "loadingAdmins": "جارٍ تحميل المشرفين...",
@@ -270,7 +270,7 @@
       "invitedWaiting": "دُعي في {date} — بانتظار إنشاء الحساب"
     },
     "feedback": {
-      "loadVenueFailed": "تعذّر تحميل بيانات المنشأة",
+      "loadVenueFailed": "تعذّر تحميل بيانات النادي",
       "grantAccessFailed": "تعذّر منح الصلاحية",
       "invalidPrice": "أدخل سعراً صحيحاً",
       "listFailed": "تعذّر عرض التسجيل",
@@ -321,7 +321,7 @@
     "longestRally": "أطول تبادل",
     "openArrow": "←",
     "playersIdentified": "اللاعبون المحددون",
-    "playersIdentifiedTitle": "اللاعبون الذين تم التعرف عليهم بالاسم في تسجيلات هذه المنشأة",
+    "playersIdentifiedTitle": "اللاعبون الذين تم التعرف عليهم بالاسم في تسجيلات هذا النادي",
     "perCourtLast30": "التسجيلات لكل ملعب — آخر 30 يوماً",
     "courtSummary": "{court}: {count, plural, zero {لا تسجيلات} one {تسجيل واحد} two {تسجيلان} few {{count, number, latn} تسجيلات} many {{count, number, latn} تسجيلاً} other {{count, number, latn} تسجيل}} في آخر 30 يوماً"
   },
