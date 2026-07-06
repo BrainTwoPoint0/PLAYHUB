@@ -21,6 +21,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { useTranslations } from 'next-intl'
 import Hls from 'hls.js'
 import { Button } from '@braintwopoint0/playback-commons/ui'
 import {
@@ -589,6 +590,7 @@ export function VirtualPanoramaPlayer({
   seamWarpA = SEAM_WARP_A_DEFAULT,
   seamWarpB = SEAM_WARP_B_DEFAULT,
 }: VirtualPanoramaPlayerProps) {
+  const t = useTranslations('player')
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasHostRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -693,7 +695,7 @@ export function VirtualPanoramaPlayer({
         else {
           hls.destroy()
           setIsLoading(false)
-          setError('This recording could not be loaded.')
+          setError(t('loadFailed'))
         }
       })
       hlsRef.current = hls
@@ -707,7 +709,7 @@ export function VirtualPanoramaPlayer({
     const onPause = () => setIsPlaying(false)
     const onError = () => {
       setIsLoading(false)
-      setError('This recording could not be loaded.')
+      setError(t('loadFailed'))
     }
     const onCanPlay = () => {
       if (autoplay) void video.play().catch(() => {})
@@ -1123,7 +1125,7 @@ export function VirtualPanoramaPlayer({
       } catch {
         if (!disposed) {
           setIsLoading(false)
-          setError('Could not load the panorama calibration.')
+          setError(t('calibrationFailed'))
         }
       }
     })()
@@ -1295,6 +1297,8 @@ export function VirtualPanoramaPlayer({
   return (
     <div
       ref={containerRef}
+      // Media-player chrome stays LTR by convention (seek bar, time readout).
+      dir="ltr"
       className={cn(
         'relative w-full overflow-hidden rounded-lg bg-[#050907] select-none',
         className
@@ -1304,7 +1308,7 @@ export function VirtualPanoramaPlayer({
         <div
           ref={canvasHostRef}
           role="application"
-          aria-label="Panoramic recording. Drag or arrow keys to look around; scroll or +/- to zoom."
+          aria-label={t('panoramaAria')}
           tabIndex={canInteract ? 0 : -1}
           className="absolute inset-0 cursor-grab outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--timberwolf)]"
           onPointerDown={onPointerDown}
@@ -1350,7 +1354,7 @@ export function VirtualPanoramaPlayer({
             <AlertTriangle className="h-6 w-6 text-[var(--ash-grey)]" />
             <p className="text-sm text-[var(--timberwolf)]">{error}</p>
             <Button variant="outline" size="sm" onClick={reload}>
-              Try again
+              {t('tryAgain')}
             </Button>
           </div>
         )}
@@ -1359,7 +1363,7 @@ export function VirtualPanoramaPlayer({
           <button
             type="button"
             onClick={togglePlay}
-            aria-label="Play"
+            aria-label={t('play')}
             className="absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm transition hover:bg-white/30"
           >
             <Play className="h-7 w-7 translate-x-0.5" />
@@ -1369,7 +1373,7 @@ export function VirtualPanoramaPlayer({
         {showHint && canInteract && (
           <div className="pointer-events-none absolute inset-x-0 top-4 flex justify-center">
             <div className="flex items-center gap-2 rounded-full bg-black/60 px-4 py-2 text-sm text-[var(--timberwolf)] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2">
-              <Move className="h-4 w-4" /> Drag to look around · scroll to zoom
+              <Move className="h-4 w-4" /> {t('panoramaHint')}
             </div>
           </div>
         )}
@@ -1392,8 +1396,11 @@ export function VirtualPanoramaPlayer({
               step={0.1}
               value={Math.min(currentTime, duration || 0)}
               onChange={onSeek}
-              aria-label="Seek"
-              aria-valuetext={`${fmtTime(currentTime)} of ${fmtTime(duration)}`}
+              aria-label={t('seek')}
+              aria-valuetext={t('seekValue', {
+                current: fmtTime(currentTime),
+                duration: fmtTime(duration),
+              })}
               style={{
                 background: `linear-gradient(to right, #10b981 ${seekPct}%, rgba(255,255,255,0.25) ${seekPct}%)`,
               }}
@@ -1404,7 +1411,7 @@ export function VirtualPanoramaPlayer({
                 variant="ghost"
                 size="icon"
                 onClick={togglePlay}
-                aria-label={isPlaying ? 'Pause' : 'Play'}
+                aria-label={isPlaying ? t('pause') : t('play')}
                 className="h-9 w-9 text-white hover:bg-white/20 md:h-8 md:w-8"
               >
                 {isPlaying ? (
@@ -1422,12 +1429,12 @@ export function VirtualPanoramaPlayer({
                     variant="ghost"
                     size="sm"
                     onClick={toggleAutoFollow}
-                    aria-label="Toggle auto-follow"
+                    aria-label={t('autoFollowToggle')}
                     aria-pressed={autoFollow}
                     title={
                       autoFollow
-                        ? 'Auto-follow on — drag to take control'
-                        : 'Auto-follow the action'
+                        ? t('autoFollowOnTitle')
+                        : t('autoFollowOffTitle')
                     }
                     className={cn(
                       'h-9 gap-1.5 px-2 text-white hover:bg-white/20 md:h-8',
@@ -1436,14 +1443,14 @@ export function VirtualPanoramaPlayer({
                     )}
                   >
                     <Crosshair className="h-4 w-4" />
-                    <span className="text-xs font-medium">Auto</span>
+                    <span className="text-xs font-medium">{t('auto')}</span>
                   </Button>
                 )}
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => zoomBy(1 / 1.25)}
-                  aria-label="Zoom out"
+                  aria-label={t('zoomOut')}
                   className="h-9 w-9 text-white hover:bg-white/20 md:h-8 md:w-8"
                 >
                   <Minus className="h-4 w-4" />
@@ -1452,7 +1459,7 @@ export function VirtualPanoramaPlayer({
                   variant="ghost"
                   size="icon"
                   onClick={() => zoomBy(1.25)}
-                  aria-label="Zoom in"
+                  aria-label={t('zoomIn')}
                   className="h-9 w-9 text-white hover:bg-white/20 md:h-8 md:w-8"
                 >
                   <Plus className="h-4 w-4" />
@@ -1461,7 +1468,7 @@ export function VirtualPanoramaPlayer({
                   variant="ghost"
                   size="icon"
                   onClick={resetView}
-                  aria-label="Reset view"
+                  aria-label={t('resetView')}
                   className="h-9 w-9 text-white hover:bg-white/20 md:h-8 md:w-8"
                 >
                   <Frame className="h-4 w-4" />
@@ -1470,7 +1477,9 @@ export function VirtualPanoramaPlayer({
                   variant="ghost"
                   size="icon"
                   onClick={toggleFullscreen}
-                  aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+                  aria-label={
+                    isFullscreen ? t('exitFullscreen') : t('fullscreen')
+                  }
                   className="h-9 w-9 text-white hover:bg-white/20 md:h-8 md:w-8"
                 >
                   <Maximize className="h-4 w-4" />

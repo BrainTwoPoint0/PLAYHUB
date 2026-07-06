@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@braintwopoint0/playback-commons/ui'
 import {
   Play,
@@ -21,9 +22,9 @@ import Hls from 'hls.js'
 import type { RecordingEvent } from '@/lib/recordings/event-types'
 import {
   EVENT_TYPE_COLORS,
-  EVENT_TYPE_LABELS,
   formatTimestamp,
 } from '@/lib/recordings/event-types'
+import { useEventTypeLabels } from '@/lib/recordings/use-event-labels'
 
 export interface MediaPack {
   logo_url?: string
@@ -99,6 +100,8 @@ export function VideoPlayer({
   initialTimeSeconds,
   onProgressUpdate,
 }: VideoPlayerProps) {
+  const t = useTranslations('player')
+  const eventLabels = useEventTypeLabels()
   const videoRef = useRef<HTMLVideoElement>(null)
   const hlsRef = useRef<Hls | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -568,6 +571,9 @@ export function VideoPlayer({
   return (
     <div
       ref={containerRef}
+      // Media-player chrome stays LTR by convention — progress bar fills
+      // left→right and the time readout must not mirror in RTL locales.
+      dir="ltr"
       className={`relative bg-black rounded-lg overflow-hidden group aspect-video ${className}`}
       onMouseMove={handleMouseMove}
       onTouchStart={handleMouseMove}
@@ -697,11 +703,14 @@ export function VideoPlayer({
           className="mb-2 md:mb-3 relative py-2 -my-2 cursor-pointer"
           onClick={handleProgressClick}
           role="slider"
-          aria-label="Seek"
+          aria-label={t('seek')}
           aria-valuemin={0}
           aria-valuemax={Math.floor(duration)}
           aria-valuenow={Math.floor(currentTime)}
-          aria-valuetext={`${formatTimestamp(currentTime)} of ${formatTimestamp(duration)}`}
+          aria-valuetext={t('seekValue', {
+            current: formatTimestamp(currentTime),
+            duration: formatTimestamp(duration),
+          })}
         >
           <div className="relative w-full h-1.5 md:h-2 bg-white/20 rounded-full pointer-events-none">
             {/* Buffered range — lighter than the played portion, sits behind it. */}
@@ -773,7 +782,7 @@ export function VideoPlayer({
                   backgroundColor: EVENT_TYPE_COLORS[hoveredEvent.event_type],
                 }}
               />
-              {EVENT_TYPE_LABELS[hoveredEvent.event_type]}
+              {eventLabels[hoveredEvent.event_type]}
               {hoveredEvent.label && ` — ${hoveredEvent.label}`}
               <span className="ml-1 text-white/60">
                 {formatTimestamp(hoveredEvent.timestamp_seconds)}
@@ -789,8 +798,8 @@ export function VideoPlayer({
               onClick={togglePlayPause}
               size="sm"
               variant="ghost"
-              aria-label={isPlaying ? 'Pause' : 'Play'}
-              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+              aria-label={isPlaying ? t('pause') : t('play')}
+              title={isPlaying ? t('pauseTitle') : t('playTitle')}
               className="text-white hover:bg-white/20 h-9 w-9 md:h-8 md:w-8 p-0"
             >
               {isPlaying ? (
@@ -804,8 +813,8 @@ export function VideoPlayer({
               onClick={() => skip(-5)}
               size="sm"
               variant="ghost"
-              aria-label="Rewind 5 seconds"
-              title="Rewind 5s (←)"
+              aria-label={t('rewind5')}
+              title={t('rewind5Title')}
               className="text-white hover:bg-white/20 h-9 w-9 md:h-8 md:w-8 p-0"
             >
               <RotateCcw className="h-4 w-4" />
@@ -815,8 +824,8 @@ export function VideoPlayer({
               onClick={() => skip(5)}
               size="sm"
               variant="ghost"
-              aria-label="Forward 5 seconds"
-              title="Forward 5s (→)"
+              aria-label={t('forward5')}
+              title={t('forward5Title')}
               className="text-white hover:bg-white/20 h-9 w-9 md:h-8 md:w-8 p-0"
             >
               <RotateCw className="h-4 w-4" />
@@ -830,8 +839,8 @@ export function VideoPlayer({
                 onClick={toggleMute}
                 size="sm"
                 variant="ghost"
-                aria-label={isMuted ? 'Unmute' : 'Mute'}
-                title={isMuted ? 'Unmute (M)' : 'Mute (M)'}
+                aria-label={isMuted ? t('unmute') : t('mute')}
+                title={isMuted ? t('unmuteTitle') : t('muteTitle')}
                 className="text-white hover:bg-white/20 h-8 w-8 p-0"
               >
                 {isMuted || volume === 0 ? (
@@ -846,7 +855,7 @@ export function VideoPlayer({
                 max="100"
                 value={isMuted ? 0 : volume * 100}
                 onChange={handleVolumeChange}
-                aria-label="Volume"
+                aria-label={t('volume')}
                 style={{
                   background: `linear-gradient(to right, var(--timberwolf) 0%, var(--timberwolf) ${
                     isMuted ? 0 : volume * 100
@@ -870,8 +879,8 @@ export function VideoPlayer({
               onClick={() => stepFrame(-1)}
               size="sm"
               variant="ghost"
-              aria-label="Previous frame"
-              title="Previous frame (,)"
+              aria-label={t('prevFrame')}
+              title={t('prevFrameTitle')}
               className="hidden md:flex text-white hover:bg-white/20 h-8 w-8 p-0"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -880,8 +889,8 @@ export function VideoPlayer({
               onClick={() => stepFrame(1)}
               size="sm"
               variant="ghost"
-              aria-label="Next frame"
-              title="Next frame (.)"
+              aria-label={t('nextFrame')}
+              title={t('nextFrameTitle')}
               className="hidden md:flex text-white hover:bg-white/20 h-8 w-8 p-0"
             >
               <ChevronRight className="h-4 w-4" />
@@ -895,10 +904,10 @@ export function VideoPlayer({
                 }
                 size="sm"
                 variant="ghost"
-                aria-label="Playback speed"
+                aria-label={t('playbackSpeed')}
                 aria-haspopup="menu"
                 aria-expanded={openMenu === 'speed'}
-                title="Playback speed"
+                title={t('playbackSpeed')}
                 className={`text-white hover:bg-white/20 h-9 md:h-8 p-0 font-mono tabular-nums text-[10px] md:text-xs ${
                   playbackRate === 1 ? 'w-9 md:w-8' : 'px-2 gap-1'
                 }`}
@@ -926,7 +935,7 @@ export function VideoPlayer({
                       <span>{rate}×</span>
                       {rate === 1 && (
                         <span className="hidden md:inline text-[9px] text-muted-foreground/60 font-sans">
-                          Normal
+                          {t('normal')}
                         </span>
                       )}
                     </button>
@@ -944,10 +953,10 @@ export function VideoPlayer({
                   }
                   size="sm"
                   variant="ghost"
-                  aria-label="Quality"
+                  aria-label={t('quality')}
                   aria-haspopup="menu"
                   aria-expanded={openMenu === 'quality'}
-                  title="Quality"
+                  title={t('quality')}
                   className="text-white hover:bg-white/20 h-8 w-8 p-0"
                 >
                   <Settings2 className="h-4 w-4" />
@@ -967,7 +976,7 @@ export function VideoPlayer({
                           : 'text-muted-foreground hover:bg-white/[0.04] hover:text-[var(--timberwolf)]'
                       }`}
                     >
-                      <span>Auto</span>
+                      <span>{t('auto')}</span>
                     </button>
                     {qualityLevels.map((lvl) => (
                       <button
@@ -982,7 +991,9 @@ export function VideoPlayer({
                         }`}
                       >
                         <span>
-                          {lvl.height ? `${lvl.height}p` : `Level ${lvl.index}`}
+                          {lvl.height
+                            ? t('heightP', { height: lvl.height })
+                            : t('level', { index: lvl.index })}
                         </span>
                       </button>
                     ))}
@@ -999,10 +1010,8 @@ export function VideoPlayer({
                 onClick={togglePiP}
                 size="sm"
                 variant="ghost"
-                aria-label={
-                  isPiP ? 'Exit picture-in-picture' : 'Picture-in-picture'
-                }
-                title="Picture-in-picture"
+                aria-label={isPiP ? t('exitPip') : t('pip')}
+                title={t('pip')}
                 className={`hidden md:flex text-white hover:bg-white/20 h-8 w-8 p-0 ${
                   isPiP ? 'bg-white/15' : ''
                 }`}
@@ -1018,12 +1027,12 @@ export function VideoPlayer({
                   onClick={() => onAddTag(currentTime, videoRef.current)}
                   size="sm"
                   variant="ghost"
-                  aria-label="Tag this moment"
-                  title="Tag this moment (T)"
+                  aria-label={t('tagMoment')}
+                  title={t('tagMomentTitle')}
                   className="text-white hover:bg-white/20 h-9 w-9 md:h-8 md:w-auto md:px-2 p-0 text-xs gap-1"
                 >
                   <Tag className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline">Tag</span>
+                  <span className="hidden md:inline">{t('tag')}</span>
                 </Button>
                 {/* Keyboard shortcut hint, hidden on mobile (no kbd) */}
                 <span
@@ -1041,8 +1050,8 @@ export function VideoPlayer({
               onClick={toggleFullscreen}
               size="sm"
               variant="ghost"
-              aria-label="Fullscreen"
-              title="Fullscreen (F)"
+              aria-label={t('fullscreen')}
+              title={t('fullscreenTitle')}
               className="text-white hover:bg-white/20 h-9 w-9 md:h-8 md:w-8 p-0"
             >
               <Maximize className="h-4 w-4" />

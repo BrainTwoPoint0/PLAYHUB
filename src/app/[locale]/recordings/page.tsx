@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useFormatter, useTranslations } from 'next-intl'
 import { Link, useRouter } from '@/i18n/navigation'
-import { formatDateTime } from '@braintwopoint0/playback-commons/utils'
 import {
   Select,
   SelectTrigger,
@@ -34,6 +34,9 @@ interface Recording {
 }
 
 export default function RecordingsPage() {
+  const t = useTranslations('library')
+  const tc = useTranslations('common')
+  const format = useFormatter()
   const router = useRouter()
   const [recordings, setRecordings] = useState<Recording[]>([])
   const [loading, setLoading] = useState(true)
@@ -137,14 +140,12 @@ export default function RecordingsPage() {
       {/* Header */}
       <FadeIn className="mb-10">
         <p className="text-muted-foreground text-xs font-semibold tracking-[0.25em] uppercase mb-3">
-          Your Library
+          {t('eyebrow')}
         </p>
         <h1 className="text-3xl md:text-4xl font-bold text-[var(--timberwolf)] mb-2">
-          My Recordings
+          {t('title')}
         </h1>
-        <p className="text-muted-foreground mb-6">
-          Match recordings you have access to
-        </p>
+        <p className="text-muted-foreground mb-6">{t('subtitle')}</p>
 
         {/* Filters row */}
         <div className="flex flex-wrap items-center justify-center md:justify-between gap-3">
@@ -158,7 +159,7 @@ export default function RecordingsPage() {
                   setShowAll(false)
                 }}
                 max={dateTo || undefined}
-                placeholder="From date"
+                placeholder={t('fromDate')}
                 className="h-10 min-w-[130px]"
               />
               <DatePicker
@@ -168,7 +169,7 @@ export default function RecordingsPage() {
                   setShowAll(false)
                 }}
                 min={dateFrom || undefined}
-                placeholder="To date"
+                placeholder={t('toDate')}
                 className="h-10 min-w-[130px]"
               />
               {hasActiveFilters && (
@@ -176,7 +177,7 @@ export default function RecordingsPage() {
                   onClick={clearFilters}
                   className="h-9 px-3 text-sm text-muted-foreground hover:text-[var(--timberwolf)] transition-colors"
                 >
-                  Clear
+                  {t('clear')}
                 </button>
               )}
             </div>
@@ -191,11 +192,14 @@ export default function RecordingsPage() {
                 {loading
                   ? '...'
                   : hasActiveFilters
-                    ? `${filteredRecordings.length} of ${recordings.length}`
+                    ? t('countFiltered', {
+                        filtered: filteredRecordings.length,
+                        total: recordings.length,
+                      })
                     : recordings.length}
               </span>
-              <span className="text-muted-foreground ml-1.5 text-sm">
-                {recordings.length === 1 ? 'recording' : 'recordings'}
+              <span className="text-muted-foreground ms-1.5 text-sm">
+                {t('recordingsWord', { count: recordings.length })}
               </span>
             </div>
 
@@ -205,10 +209,10 @@ export default function RecordingsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="date_desc">Newest first</SelectItem>
-                  <SelectItem value="date_asc">Oldest first</SelectItem>
-                  <SelectItem value="title_asc">Title A-Z</SelectItem>
-                  <SelectItem value="title_desc">Title Z-A</SelectItem>
+                  <SelectItem value="date_desc">{t('sortNewest')}</SelectItem>
+                  <SelectItem value="date_asc">{t('sortOldest')}</SelectItem>
+                  <SelectItem value="title_asc">{t('sortTitleAZ')}</SelectItem>
+                  <SelectItem value="title_desc">{t('sortTitleZA')}</SelectItem>
                 </SelectContent>
               </Select>
             )}
@@ -237,11 +241,11 @@ export default function RecordingsPage() {
       ) : loginRequired ? (
         <EmptyState
           icon={<Lock className="h-10 w-10" />}
-          title="Login Required"
-          description="Please log in to view your recordings"
+          title={t('loginRequiredTitle')}
+          description={t('loginRequiredDescription')}
           action={
             <Button asChild variant="outline">
-              <Link href="/auth/login">Log In</Link>
+              <Link href="/auth/login">{t('logIn')}</Link>
             </Button>
           }
         />
@@ -270,7 +274,7 @@ export default function RecordingsPage() {
                       {recording.title}
                     </h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {formatDateTime(recording.match_date)}
+                      {format.dateTime(new Date(recording.match_date), 'full')}
                     </p>
                   </div>
                 </div>
@@ -286,8 +290,8 @@ export default function RecordingsPage() {
                     onClick={() => setShareRecording(recording)}
                     className="flex-1 md:flex-none"
                   >
-                    <Share2 className="h-4 w-4 mr-1.5" />
-                    Share
+                    <Share2 className="h-4 w-4 me-1.5" />
+                    {tc('share')}
                   </Button>
                   <Button
                     variant="outline"
@@ -295,8 +299,8 @@ export default function RecordingsPage() {
                     onClick={() => handleDownload(recording)}
                     className="flex-1 md:flex-none"
                   >
-                    <Download className="h-4 w-4 mr-1.5" />
-                    Download
+                    <Download className="h-4 w-4 me-1.5" />
+                    {t('download')}
                   </Button>
                 </div>
               </div>
@@ -308,16 +312,16 @@ export default function RecordingsPage() {
               className="w-full py-3 text-sm text-[var(--timberwolf)] hover:bg-muted/50 border border-border rounded-xl transition-colors"
             >
               {showAll
-                ? 'Show less'
-                : `Show all ${filteredRecordings.length} recordings`}
+                ? t('showLess')
+                : t('showAll', { count: filteredRecordings.length })}
             </button>
           )}
         </div>
       ) : (
         <EmptyState
           icon={<Film className="h-10 w-10" />}
-          title="No recordings yet"
-          description="Recordings will appear here once transferred from Spiideo"
+          title={t('emptyTitle')}
+          description={t('emptyDescription')}
         />
       )}
       {shareRecording && (

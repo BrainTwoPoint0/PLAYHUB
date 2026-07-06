@@ -7,6 +7,7 @@
 // into who invited them and a one-click decline.
 
 import { useEffect, useState } from 'react'
+import { useFormatter, useTranslations } from 'next-intl'
 import { Link } from '@/i18n/navigation'
 import {
   Card,
@@ -16,7 +17,6 @@ import {
   Button,
 } from '@braintwopoint0/playback-commons/ui'
 import { Loader2, MailOpen, Play, X as XIcon } from 'lucide-react'
-import { formatDate } from '@braintwopoint0/playback-commons/utils'
 
 interface PendingGrantRecording {
   id: string
@@ -37,6 +37,8 @@ interface PendingGrant {
 }
 
 export function PendingInvitations() {
+  const t = useTranslations('library.invitations')
+  const format = useFormatter()
   const [grants, setGrants] = useState<PendingGrant[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -55,7 +57,7 @@ export function PendingInvitations() {
         setGrants(data.grants || [])
       })
       .catch(() => {
-        if (mounted) setError('Failed to load invitations')
+        if (mounted) setError(t('loadFailed'))
       })
       .finally(() => {
         if (mounted) setLoading(false)
@@ -74,13 +76,13 @@ export function PendingInvitations() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setError(data.error || 'Failed to decline')
+        setError(data.error || t('declineFailed'))
         return
       }
       // Optimistic remove from the list — the server has already revoked.
       setGrants((prev) => prev.filter((g) => g.id !== grantId))
     } catch {
-      setError('Failed to decline')
+      setError(t('declineFailed'))
     } finally {
       setDecliningId(null)
     }
@@ -98,7 +100,7 @@ export function PendingInvitations() {
         <div className="flex items-center gap-2.5">
           <MailOpen className="h-4 w-4 text-emerald-300" />
           <CardTitle className="text-base text-[var(--timberwolf)]">
-            Pending invitations
+            {t('title')}
           </CardTitle>
           {grants.length > 0 && (
             <span className="grid h-5 min-w-[20px] place-items-center rounded-full bg-emerald-400/10 px-1.5 text-[10px] font-medium tabular-nums text-emerald-300">
@@ -109,7 +111,10 @@ export function PendingInvitations() {
       </CardHeader>
       <CardContent className="pt-0">
         {error && (
-          <div className="mb-3 flex items-center gap-2 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2 text-xs text-red-300">
+          <div
+            dir="auto"
+            className="mb-3 flex items-center gap-2 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2 text-xs text-red-300"
+          >
             <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
             {error}
           </div>
@@ -118,7 +123,7 @@ export function PendingInvitations() {
         {grants.length > 0 && (
           <ul className="space-y-2">
             {grants.map((g) => {
-              const inviter = g.granted_by?.display || 'Someone'
+              const inviter = g.granted_by?.display || t('someone')
               const recording = g.recording
               return (
                 <li
@@ -127,24 +132,31 @@ export function PendingInvitations() {
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-[var(--timberwolf)]">
-                      {recording?.title || 'Recording'}
+                      {recording?.title || t('recordingFallback')}
                     </p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      <span className="font-medium text-[var(--timberwolf)]/80">
-                        {inviter}
-                      </span>{' '}
-                      shared with you
+                      {t.rich('sharedBy', {
+                        name: inviter,
+                        inviter: (chunks) => (
+                          <span className="font-medium text-[var(--timberwolf)]/80">
+                            {chunks}
+                          </span>
+                        ),
+                      })}
                       {recording?.match_date && (
                         <>
                           {' · '}
-                          {formatDate(recording.match_date)}
+                          {format.dateTime(
+                            new Date(recording.match_date),
+                            'short'
+                          )}
                         </>
                       )}
                       {!g.claimed && (
                         <>
                           {' · '}
                           <span className="text-emerald-300/80">
-                            sign-in claimed it for you
+                            {t('claimedOnSignIn')}
                           </span>
                         </>
                       )}
@@ -159,8 +171,8 @@ export function PendingInvitations() {
                         className="h-8 px-3 text-xs bg-[var(--timberwolf)] text-[var(--night)] hover:bg-[var(--ash-grey)]"
                       >
                         <Link href={`/watch/${recording.id}`}>
-                          <Play className="h-3 w-3 mr-1.5" />
-                          Watch
+                          <Play className="h-3 w-3 me-1.5" />
+                          {t('watch')}
                         </Link>
                       </Button>
                     )}
@@ -175,8 +187,8 @@ export function PendingInvitations() {
                         <Loader2 className="h-3 w-3 animate-spin" />
                       ) : (
                         <>
-                          <XIcon className="h-3 w-3 mr-1.5" />
-                          Decline
+                          <XIcon className="h-3 w-3 me-1.5" />
+                          {t('decline')}
                         </>
                       )}
                     </Button>

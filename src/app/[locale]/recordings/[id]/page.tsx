@@ -41,10 +41,10 @@ import type {
 } from '@/lib/recordings/event-types'
 import {
   EVENT_TYPES,
-  EVENT_TYPE_LABELS,
   EVENT_TYPE_COLORS,
   formatTimestamp,
 } from '@/lib/recordings/event-types'
+import { useEventTypeLabels } from '@/lib/recordings/use-event-labels'
 
 interface Recording {
   id: string
@@ -84,6 +84,7 @@ function TagForm({
   onCancel: () => void
   submitLabel: string
 }) {
+  const eventLabels = useEventTypeLabels()
   const [form, setForm] = useState<TagFormData>(initial)
 
   return (
@@ -105,7 +106,7 @@ function TagForm({
           <SelectContent>
             {EVENT_TYPES.map((type) => (
               <SelectItem key={type} value={type}>
-                {EVENT_TYPE_LABELS[type]}
+                {eventLabels[type]}
               </SelectItem>
             ))}
           </SelectContent>
@@ -233,6 +234,7 @@ function TagForm({
 // ─── Main Page ───────────────────────────────────────────────────
 
 export default function RecordingPage() {
+  const eventLabels = useEventTypeLabels()
   const params = useParams()
   const router = useRouter()
   const recordingId = params.id as string
@@ -687,7 +689,7 @@ export default function RecordingPage() {
                               EVENT_TYPE_COLORS[event.event_type] + '40',
                           }}
                         >
-                          {EVENT_TYPE_LABELS[event.event_type]}
+                          {eventLabels[event.event_type]}
                         </Badge>
 
                         {/* Team */}

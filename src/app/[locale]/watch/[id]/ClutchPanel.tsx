@@ -8,6 +8,7 @@
 // a silent blank.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import {
   Button,
   Card,
@@ -66,21 +67,18 @@ interface ClutchPanelProps {
   canLabel: boolean
 }
 
-const SELECTOR_LABELS: Record<string, string> = {
-  longest_rally: 'Longest rallies',
-  rating_based: 'Top pace',
-  pose_based: 'Player picks',
+// Translation keys under `watch.clutch.*` for the rally-selector pills and
+// full-length clip buttons. Unknown API keys fall back to the raw key.
+const SELECTOR_LABEL_KEYS: Record<string, string> = {
+  longest_rally: 'longestRallies',
+  rating_based: 'topPace',
+  pose_based: 'playerPicks',
 }
 
-const FULL_LABELS: Record<string, string> = {
-  clutchLandscape: 'Highlight reel',
-  clutchAutopan: 'Highlight reel (vertical)',
-  matchWoBreaks: 'Match without breaks',
-}
-
-function formatMinutes(min: number | null): string {
-  if (min == null) return '—'
-  return `${Math.round(min)} min`
+const FULL_LABEL_KEYS: Record<string, string> = {
+  clutchLandscape: 'highlightReel',
+  clutchAutopan: 'highlightReelVertical',
+  matchWoBreaks: 'matchWithoutBreaks',
 }
 
 // Pause every other <video> on the page when a clip starts — prevents the
@@ -95,6 +93,10 @@ export default function ClutchPanel({
   recordingId,
   canLabel,
 }: ClutchPanelProps) {
+  const t = useTranslations('watch.clutch')
+  const tc = useTranslations('common')
+  const formatMinutes = (min: number | null): string =>
+    min == null ? '—' : t('minutes', { minutes: Math.round(min) })
   const [data, setData] = useState<ClutchData | null>(null)
   const [loadState, setLoadState] = useState<
     'loading' | 'ready' | 'hidden' | 'error'
@@ -149,12 +151,10 @@ export default function ClutchPanel({
     return (
       <Card className="bg-card border-border">
         <CardContent className="p-6 flex items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">
-            Couldn&apos;t load match stats and highlights.
-          </p>
+          <p className="text-sm text-muted-foreground">{t('loadFailed')}</p>
           <Button variant="outline" size="sm" onClick={load}>
-            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-            Retry
+            <RefreshCw className="h-3.5 w-3.5 me-1.5" />
+            {tc('retry')}
           </Button>
         </CardContent>
       </Card>
@@ -169,7 +169,7 @@ export default function ClutchPanel({
   const ordinals = new Map<string, string>(
     [...players]
       .sort((a, b) => a.playerId.localeCompare(b.playerId))
-      .map((p, i) => [p.playerId, `Player ${i + 1}`])
+      .map((p, i) => [p.playerId, t('playerOrdinal', { num: i + 1 })])
   )
   const nameFor = (p: ClutchPlayer) =>
     p.displayName ?? ordinals.get(p.playerId) ?? p.playerId
@@ -239,7 +239,7 @@ export default function ClutchPanel({
       // Reopen the editor with the attempted value so the work isn't lost.
       setEditingId(playerId)
       setEditValue(displayName ?? '')
-      setSaveError("Couldn't save — check your connection and try again.")
+      setSaveError(t('saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -252,14 +252,14 @@ export default function ClutchPanel({
         <Card className="bg-card border-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-base text-[var(--timberwolf)]">
-              Match stats
+              {t('matchStats')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
-                  Match time
+                  {t('matchTime')}
                 </p>
                 <p className="text-[var(--timberwolf)] font-medium">
                   {formatMinutes(stats.matchTimeMinutes)}
@@ -267,7 +267,7 @@ export default function ClutchPanel({
               </div>
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
-                  In play
+                  {t('inPlay')}
                 </p>
                 <p className="text-[var(--timberwolf)] font-medium">
                   {formatMinutes(stats.matchTimeInPlayMinutes)}
@@ -275,28 +275,34 @@ export default function ClutchPanel({
               </div>
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
-                  Avg rally
+                  {t('avgRally')}
                 </p>
                 <p className="text-[var(--timberwolf)] font-medium">
-                  {stats.avgRallyShots ?? '—'} shots
+                  {t('shotsValue', { value: stats.avgRallyShots ?? '—' })}
                   {stats.avgRallySeconds != null && (
                     <span className="text-muted-foreground">
                       {' '}
-                      · {Math.round(stats.avgRallySeconds)}s
+                      ·{' '}
+                      {t('secondsShort', {
+                        seconds: Math.round(stats.avgRallySeconds),
+                      })}
                     </span>
                   )}
                 </p>
               </div>
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
-                  Longest rally
+                  {t('longestRally')}
                 </p>
                 <p className="text-[var(--timberwolf)] font-medium">
-                  {stats.longestRallyShots ?? '—'} shots
+                  {t('shotsValue', { value: stats.longestRallyShots ?? '—' })}
                   {stats.longestRallySeconds != null && (
                     <span className="text-muted-foreground">
                       {' '}
-                      · {Math.round(stats.longestRallySeconds)}s
+                      ·{' '}
+                      {t('secondsShort', {
+                        seconds: Math.round(stats.longestRallySeconds),
+                      })}
                     </span>
                   )}
                 </p>
@@ -310,36 +316,36 @@ export default function ClutchPanel({
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left text-muted-foreground text-[10px] uppercase tracking-[0.14em]">
-                      <th scope="col" className="pb-2 pr-3 font-medium">
-                        Player
+                    <tr className="text-start text-muted-foreground text-[10px] uppercase tracking-[0.14em]">
+                      <th scope="col" className="pb-2 pe-3 font-medium">
+                        {t('player')}
                       </th>
                       <th
                         scope="col"
-                        className="pb-2 pr-3 font-medium text-right"
+                        className="pb-2 pe-3 font-medium text-end"
                       >
-                        Shots
+                        {t('shots')}
                       </th>
                       <th
                         scope="col"
-                        className="pb-2 pr-3 font-medium text-right"
+                        className="pb-2 pe-3 font-medium text-end"
                       >
-                        Winners
+                        {t('winners')}
                       </th>
                       <th
                         scope="col"
-                        className="pb-2 pr-3 font-medium text-right"
+                        className="pb-2 pe-3 font-medium text-end"
                       >
-                        Errors
+                        {t('errors')}
                       </th>
                       <th
                         scope="col"
-                        className="pb-2 pr-3 font-medium text-right hidden sm:table-cell"
+                        className="pb-2 pe-3 font-medium text-end hidden sm:table-cell"
                       >
-                        Distance
+                        {t('distance')}
                       </th>
-                      <th scope="col" className="pb-2 font-medium text-right">
-                        Rating
+                      <th scope="col" className="pb-2 font-medium text-end">
+                        {t('rating')}
                       </th>
                     </tr>
                   </thead>
@@ -353,25 +359,29 @@ export default function ClutchPanel({
                         >
                           <th
                             scope="row"
-                            className="py-2 pr-3 text-left text-[var(--timberwolf)] font-medium"
+                            className="py-2 pe-3 text-start text-[var(--timberwolf)] font-medium"
                           >
                             {nameFor(p)}
                           </th>
-                          <td className="py-2 pr-3 text-right text-[var(--timberwolf)]">
+                          <td className="py-2 pe-3 text-end text-[var(--timberwolf)]">
                             {p.stats!.nShots ?? '—'}
                           </td>
-                          <td className="py-2 pr-3 text-right text-emerald-300">
+                          <td className="py-2 pe-3 text-end text-emerald-300">
                             {p.stats!.winnerShots ?? '—'}
                           </td>
-                          <td className="py-2 pr-3 text-right text-red-300/80">
+                          <td className="py-2 pe-3 text-end text-red-300/80">
                             {p.stats!.errorShots ?? '—'}
                           </td>
-                          <td className="py-2 pr-3 text-right text-[var(--timberwolf)] hidden sm:table-cell">
+                          <td className="py-2 pe-3 text-end text-[var(--timberwolf)] hidden sm:table-cell">
                             {p.stats!.distanceRunMeters != null
-                              ? `${(p.stats!.distanceRunMeters / 1000).toFixed(1)} km`
+                              ? t('km', {
+                                  km: (
+                                    p.stats!.distanceRunMeters / 1000
+                                  ).toFixed(1),
+                                })
                               : '—'}
                           </td>
-                          <td className="py-2 text-right">
+                          <td className="py-2 text-end">
                             {p.stats!.rating != null ? (
                               <span className="inline-flex items-center rounded-full bg-emerald-400/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300 ring-1 ring-emerald-400/20">
                                 {p.stats!.rating.toFixed(1)}
@@ -385,12 +395,9 @@ export default function ClutchPanel({
                   </tbody>
                 </table>
                 <p className="mt-2 text-[10px] text-muted-foreground">
-                  Match rating (0–22)
+                  {t('ratingScale')}
                   {canLabel && unlabeledCount > 0 && (
-                    <span>
-                      {' '}
-                      · Don&apos;t recognize the names? Identify players below.
-                    </span>
+                    <span> · {t('identifyPrompt')}</span>
                   )}
                 </p>
               </div>
@@ -404,12 +411,10 @@ export default function ClutchPanel({
         <Card className="bg-card border-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-base text-[var(--timberwolf)]">
-              Players
+              {t('playersTitle')}
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              {canLabel
-                ? "Tap a player's name to say who's who — stats follow the names."
-                : 'Names are set by the match owner.'}
+              {canLabel ? t('labelHint') : t('labelHintReadOnly')}
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -434,7 +439,7 @@ export default function ClutchPanel({
                       />
                     ) : (
                       <span className="text-[10px] text-muted-foreground px-2 text-center">
-                        No photo
+                        {t('noPhoto')}
                       </span>
                     )}
                   </div>
@@ -446,8 +451,8 @@ export default function ClutchPanel({
                         onChange={(e) => setEditValue(e.target.value)}
                         maxLength={60}
                         autoFocus
-                        placeholder="Name"
-                        aria-label={`Name for ${nameFor(player)}`}
+                        placeholder={t('namePlaceholder')}
+                        aria-label={t('nameFor', { name: nameFor(player) })}
                         className="h-8 text-xs bg-zinc-800 text-white"
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && editValue.trim() && !saving)
@@ -461,13 +466,13 @@ export default function ClutchPanel({
                           size="sm"
                           className="h-8 flex-1 text-xs"
                           disabled={!editValue.trim() || saving}
-                          aria-label="Save name"
+                          aria-label={t('saveName')}
                           onClick={() =>
                             saveLabel(player.playerId, editValue.trim())
                           }
                         >
-                          <Check className="h-3.5 w-3.5 mr-1" />
-                          Save
+                          <Check className="h-3.5 w-3.5 me-1" />
+                          {tc('save')}
                         </Button>
                         {player.displayName && (
                           <Button
@@ -475,17 +480,17 @@ export default function ClutchPanel({
                             size="sm"
                             className="h-8 text-xs text-muted-foreground"
                             disabled={saving}
-                            aria-label="Remove name"
+                            aria-label={t('removeName')}
                             onClick={() => saveLabel(player.playerId, null)}
                           >
-                            Clear
+                            {t('clearName')}
                           </Button>
                         )}
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 shrink-0"
-                          aria-label="Cancel"
+                          aria-label={tc('cancel')}
                           onClick={() => setEditingId(null)}
                         >
                           <X className="h-3.5 w-3.5" />
@@ -498,7 +503,7 @@ export default function ClutchPanel({
                     <button
                       type="button"
                       onClick={() => startEdit(player)}
-                      aria-label={`Edit name for ${nameFor(player)}`}
+                      aria-label={t('editNameFor', { name: nameFor(player) })}
                       className="flex w-full items-center justify-between gap-1 min-h-9 rounded px-1 -mx-1 hover:bg-white/5 transition-colors"
                     >
                       <span
@@ -537,7 +542,7 @@ export default function ClutchPanel({
         <Card className="bg-card border-border">
           <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2 space-y-0">
             <CardTitle className="text-base text-[var(--timberwolf)]">
-              Highlights
+              {t('highlights')}
             </CardTitle>
             {clipError && (
               <Button
@@ -546,8 +551,8 @@ export default function ClutchPanel({
                 className="h-7 text-xs"
                 onClick={load}
               >
-                <RefreshCw className="h-3 w-3 mr-1.5" />
-                Refresh clips
+                <RefreshCw className="h-3 w-3 me-1.5" />
+                {t('refreshClips')}
               </Button>
             )}
           </CardHeader>
@@ -584,8 +589,8 @@ export default function ClutchPanel({
                     )}
                     onClick={() => setActiveClip(entry)}
                   >
-                    <Play className="h-3 w-3 mr-1.5" />
-                    {FULL_LABELS[key] ?? key}
+                    <Play className="h-3 w-3 me-1.5" />
+                    {FULL_LABEL_KEYS[key] ? t(FULL_LABEL_KEYS[key]) : key}
                   </Button>
                 ) : null
               )}
@@ -597,7 +602,7 @@ export default function ClutchPanel({
                 <div
                   className="flex flex-wrap gap-1.5"
                   role="group"
-                  aria-label="Highlight categories"
+                  aria-label={t('highlightCategories')}
                 >
                   {availableSelectors.map((selector) => (
                     <button
@@ -612,9 +617,11 @@ export default function ClutchPanel({
                       )}
                     >
                       {selector === currentSelector && (
-                        <Check className="inline h-3 w-3 mr-1 -mt-px" />
+                        <Check className="inline h-3 w-3 me-1 -mt-px" />
                       )}
-                      {SELECTOR_LABELS[selector] ?? selector}
+                      {SELECTOR_LABEL_KEYS[selector]
+                        ? t(SELECTOR_LABEL_KEYS[selector])
+                        : selector}
                     </button>
                   ))}
                 </div>
@@ -624,7 +631,7 @@ export default function ClutchPanel({
                     <button
                       key={entry.url}
                       onClick={() => setActiveClip(entry)}
-                      aria-label={`Play rally ${i + 1}`}
+                      aria-label={t('playRally', { num: i + 1 })}
                       className={cn(
                         'group relative aspect-video rounded-lg overflow-hidden bg-muted text-left',
                         activeClip?.url === entry.url &&
@@ -647,8 +654,8 @@ export default function ClutchPanel({
                       <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/30 transition-colors">
                         <Play className="h-6 w-6 text-white/80 group-hover:text-white transition-colors drop-shadow" />
                       </div>
-                      <span className="absolute bottom-1.5 left-2 text-[10px] font-medium text-white drop-shadow">
-                        Rally {i + 1}
+                      <span className="absolute bottom-1.5 start-2 text-[10px] font-medium text-white drop-shadow">
+                        {t('rally', { num: i + 1 })}
                       </span>
                     </button>
                   ))}

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { createTranslator } from 'next-intl'
+import {
+  parse,
+  TYPE,
+  type MessageFormatElement,
+} from '@formatjs/icu-messageformat-parser'
 import en from '../../../messages/en.json'
 import ar from '../../../messages/ar.json'
 import es from '../../../messages/es.json'
@@ -21,12 +26,28 @@ function flatten(obj: Messages, prefix = ''): Map<string, string> {
   return out
 }
 
-// ICU arguments like {url}, {count, plural, ...} — capture the argument name.
+// ICU arguments like {url}, {count, plural, ...} — extracted with the real
+// ICU parser: a regex misreads Latin plural-branch literals such as
+// "one {recording}" as arguments.
+function collectArgs(elements: MessageFormatElement[], args: Set<string>) {
+  for (const el of elements) {
+    if (el.type !== TYPE.literal && el.type !== TYPE.pound && 'value' in el) {
+      args.add(String(el.value))
+    }
+    if (el.type === TYPE.plural || el.type === TYPE.select) {
+      for (const option of Object.values(el.options)) {
+        collectArgs(option.value, args)
+      }
+    }
+    if (el.type === TYPE.tag) {
+      collectArgs(el.children, args)
+    }
+  }
+}
+
 function icuArgs(message: string): string[] {
   const args = new Set<string>()
-  for (const match of message.matchAll(/\{\s*([a-zA-Z0-9_]+)/g)) {
-    args.add(match[1])
-  }
+  collectArgs(parse(message, { ignoreTag: false }), args)
   return [...args].sort()
 }
 
@@ -87,8 +108,9 @@ describe('Arabic digit pinning', () => {
   })
 
   it('renders Latin digits in numeric interpolations', () => {
-    expect(t('venue.recordings.pageRange', { from: 1, to: 20, total: 143 }))
-      .toMatch(/1.*20.*143/)
+    expect(
+      t('venue.recordings.pageRange', { from: 1, to: 20, total: 143 })
+    ).toMatch(/1.*20.*143/)
     expect(t('auditHistory.daysAgo', { count: 5 })).toMatch(/5/)
   })
 })

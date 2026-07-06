@@ -114,3 +114,10 @@ input[type='number'] {
 [dir='rtl'] [class*='tracking-['] {
   letter-spacing: 0;
 }
+
+/* Any element that overflows inline-start (left in RTL) widens the document
+   and lets mobile pinch-zoom out past the layout. Clip the document edge —
+   individual scroll areas keep their own overflow behavior. */
+html {
+  overflow-x: clip;
+}
