@@ -52,6 +52,70 @@
     "home": "Home",
     "myRecordings": "My recordings"
   },
+  "landing": {
+    "eyebrow": "Match Recording Marketplace",
+    "heroTitle1": "YOUR GAME.",
+    "heroTitle2": "ON DEMAND.",
+    "heroDescription": "Full match recordings from clubs and academies. Instant access, any device. From individual matches to full academy subscriptions.",
+    "browseRecordings": "Browse Recordings",
+    "stats": {
+      "recordings": "Recordings",
+      "venues": "Venues",
+      "resolution": "Resolution",
+      "access": "Access"
+    },
+    "whyEyebrow": "Why PLAYHUB",
+    "whyTitle1": "Everything you need to",
+    "whyTitle2": "watch the beautiful game.",
+    "features": {
+      "streaming": {
+        "title": "4K Streaming",
+        "desc": "Crystal clear 4K playback. Watch every detail of the game."
+      },
+      "instant": {
+        "title": "Instant Access",
+        "desc": "Start watching immediately after purchase. No waiting around."
+      },
+      "device": {
+        "title": "Any Device",
+        "desc": "Watch on phone, tablet, or desktop. Your match travels with you."
+      },
+      "academy": {
+        "title": "Academy Subscriptions",
+        "desc": "Subscribe to your academy for instant access to every match recording, all season long."
+      },
+      "payments": {
+        "title": "Secure Payments",
+        "desc": "Powered by Stripe. Your payment details are always protected."
+      },
+      "library": {
+        "title": "Your Library",
+        "desc": "All purchases saved to your library. Rewatch anytime you want."
+      }
+    },
+    "processEyebrow": "Simple process",
+    "processTitle": "Three steps to kickoff.",
+    "stepLabel": "STEP {num}",
+    "steps": {
+      "find": {
+        "title": "Find your match",
+        "desc": "Browse recordings by date, team, or competition. Filter to find exactly what you need."
+      },
+      "access": {
+        "title": "Get access",
+        "desc": "One-time purchase, academy subscription, or shared link. Multiple ways to watch."
+      },
+      "watch": {
+        "title": "Watch instantly",
+        "desc": "Stream in HD from any device. Your purchase is saved forever."
+      }
+    },
+    "clubsEyebrow": "For clubs & academies",
+    "clubsTitle1": "Your recordings,",
+    "clubsTitle2": "your platform.",
+    "clubsDescription": "Connect your Veo or Spiideo recordings, manage academy subscriptions, and give your players instant access to their match footage.",
+    "getInTouch": "Get in touch"
+  },
   "venueSelector": {
     "eyebrow": "Venue Management",
     "title": "Your Venues",

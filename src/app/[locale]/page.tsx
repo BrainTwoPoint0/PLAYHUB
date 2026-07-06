@@ -1,6 +1,7 @@
 'use client'
 
 import { Link } from '@/i18n/navigation'
+import { useTranslations } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@braintwopoint0/playback-commons/ui'
 import {
@@ -61,67 +62,32 @@ function CountUp({ target, suffix = '' }: { target: number; suffix?: string }) {
   )
 }
 
-/* ── Data ── */
-const stats = [
-  { value: 1000, suffix: '+', label: 'Recordings' },
-  { value: 50, suffix: '+', label: 'Venues' },
-  { value: 4, suffix: 'K', label: 'Resolution' },
-  { value: 24, suffix: '/7', label: 'Access' },
-]
+/* ── Static data (labels resolved inside the component via t()) ── */
+const STAT_DEFS = [
+  { key: 'recordings', value: 1000, suffix: '+' },
+  { key: 'venues', value: 50, suffix: '+' },
+  { key: 'resolution', value: 4, suffix: 'K' },
+  { key: 'access', value: 24, suffix: '/7' },
+] as const
 
-const features = [
-  {
-    icon: MonitorPlay,
-    title: '4K Streaming',
-    desc: 'Crystal clear 4K playback. Watch every detail of the game.',
-  },
-  {
-    icon: Zap,
-    title: 'Instant Access',
-    desc: 'Start watching immediately after purchase. No waiting around.',
-  },
-  {
-    icon: Smartphone,
-    title: 'Any Device',
-    desc: 'Watch on phone, tablet, or desktop. Your match travels with you.',
-  },
-  {
-    icon: CalendarCheck,
-    title: 'Academy Subscriptions',
-    desc: 'Subscribe to your academy for instant access to every match recording, all season long.',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Secure Payments',
-    desc: 'Powered by Stripe. Your payment details are always protected.',
-  },
-  {
-    icon: Play,
-    title: 'Your Library',
-    desc: 'All purchases saved to your library. Rewatch anytime you want.',
-  },
-]
+const FEATURE_DEFS = [
+  { key: 'streaming', icon: MonitorPlay },
+  { key: 'instant', icon: Zap },
+  { key: 'device', icon: Smartphone },
+  { key: 'academy', icon: CalendarCheck },
+  { key: 'payments', icon: ShieldCheck },
+  { key: 'library', icon: Play },
+] as const
 
-const steps = [
-  {
-    num: '01',
-    title: 'Find your match',
-    desc: 'Browse recordings by date, team, or competition. Filter to find exactly what you need.',
-  },
-  {
-    num: '02',
-    title: 'Get access',
-    desc: 'One-time purchase, academy subscription, or shared link. Multiple ways to watch.',
-  },
-  {
-    num: '03',
-    title: 'Watch instantly',
-    desc: 'Stream in HD from any device. Your purchase is saved forever.',
-  },
-]
+const STEP_DEFS = [
+  { key: 'find', num: '01' },
+  { key: 'access', num: '02' },
+  { key: 'watch', num: '03' },
+] as const
 
 /* ── Page ── */
 export default function HomePage() {
+  const t = useTranslations('landing')
   return (
     <div className="bg-[var(--night)] overflow-hidden">
       {/* ═══ HERO ═══ */}
@@ -143,24 +109,24 @@ export default function HomePage() {
         <div className="container mx-auto px-5 relative z-10 py-20">
           <FadeIn delay={150}>
             <p className="text-[var(--ash-grey)] text-xs md:text-sm font-semibold tracking-[0.25em] uppercase mb-6">
-              Match Recording Marketplace
+              {t('eyebrow')}
             </p>
           </FadeIn>
 
           <FadeIn delay={250}>
             <h1 className="text-[2.75rem] leading-[0.92] md:text-7xl lg:text-[5.5rem] font-extrabold tracking-tight mb-8">
-              <span className="text-[var(--timberwolf)] block">YOUR GAME.</span>
-              <span className="block bg-gradient-to-r from-[var(--timberwolf)] to-[var(--ash-grey)] bg-clip-text text-transparent">
-                ON DEMAND.
+              <span className="text-[var(--timberwolf)] block">
+                {t('heroTitle1')}
+              </span>
+              <span className="block bg-gradient-to-r rtl:bg-gradient-to-l from-[var(--timberwolf)] to-[var(--ash-grey)] bg-clip-text text-transparent">
+                {t('heroTitle2')}
               </span>
             </h1>
           </FadeIn>
 
           <FadeIn delay={450}>
             <p className="text-base md:text-lg text-[var(--ash-grey)] max-w-md mb-10 leading-relaxed">
-              Full match recordings from clubs and academies.
-              <br className="hidden sm:block" /> Instant access, any device.
-              From individual matches to full academy subscriptions.
+              {t('heroDescription')}
             </p>
           </FadeIn>
 
@@ -170,8 +136,8 @@ export default function HomePage() {
                 size="lg"
                 className="w-full sm:w-auto bg-[var(--timberwolf)] text-[var(--night)] hover:bg-[var(--ash-grey)] font-bold px-8 text-base"
               >
-                Browse Recordings
-                <ArrowRight className="ml-2 h-4 w-4" />
+                {t('browseRecordings')}
+                <ArrowRight className="ms-2 h-4 w-4 rtl:rotate-180" />
               </Button>
             </Link>
           </FadeIn>
@@ -182,21 +148,24 @@ export default function HomePage() {
       <section className="bg-white/[0.03]">
         <div className="container mx-auto px-5 py-14 md:py-20">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-0">
-            {stats.map((stat, i) => (
+            {STAT_DEFS.map((stat, i) => (
               <FadeIn
-                key={stat.label}
+                key={stat.key}
                 delay={i * 100}
                 className={`text-center ${
-                  i < stats.length - 1
-                    ? 'md:border-r md:border-[var(--ash-grey)]/10'
+                  i < STAT_DEFS.length - 1
+                    ? 'md:border-e md:border-[var(--ash-grey)]/10'
                     : ''
                 }`}
               >
-                <p className="text-3xl md:text-5xl font-extrabold text-[var(--timberwolf)] mb-1">
+                <p
+                  dir="ltr"
+                  className="text-3xl md:text-5xl font-extrabold text-[var(--timberwolf)] mb-1"
+                >
                   <CountUp target={stat.value} suffix={stat.suffix} />
                 </p>
                 <p className="text-xs md:text-sm text-[var(--ash-grey)]">
-                  {stat.label}
+                  {t(`stats.${stat.key}`)}
                 </p>
               </FadeIn>
             ))}
@@ -209,27 +178,27 @@ export default function HomePage() {
         <div className="container mx-auto px-5 py-20 md:py-28">
           <FadeIn className="mb-12 md:mb-16">
             <p className="text-[var(--ash-grey)] text-xs font-semibold tracking-[0.25em] uppercase mb-3">
-              Why PLAYHUB
+              {t('whyEyebrow')}
             </p>
             <h2 className="text-2xl md:text-4xl font-bold text-[var(--timberwolf)]">
-              Everything you need to
-              <br className="hidden md:block" /> watch the beautiful game.
+              {t('whyTitle1')}
+              <br className="hidden md:block" /> {t('whyTitle2')}
             </h2>
           </FadeIn>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-            {features.map((f, i) => (
+            {FEATURE_DEFS.map((f, i) => (
               <FadeIn
-                key={f.title}
+                key={f.key}
                 delay={i * 70}
                 className="group p-6 rounded-xl border border-[var(--ash-grey)]/10 hover:border-[var(--timberwolf)]/25 bg-white/[0.015] hover:bg-white/[0.035] transition-colors duration-300"
               >
                 <f.icon className="w-5 h-5 text-[var(--timberwolf)] mb-4 transition-transform duration-300 group-hover:scale-110" />
                 <h3 className="text-[var(--timberwolf)] font-semibold mb-2">
-                  {f.title}
+                  {t(`features.${f.key}.title`)}
                 </h3>
                 <p className="text-sm text-[var(--ash-grey)] leading-relaxed">
-                  {f.desc}
+                  {t(`features.${f.key}.desc`)}
                 </p>
               </FadeIn>
             ))}
@@ -242,28 +211,28 @@ export default function HomePage() {
         <div className="container mx-auto px-5 py-20 md:py-28">
           <FadeIn className="mb-12 md:mb-16">
             <p className="text-[var(--ash-grey)] text-xs font-semibold tracking-[0.25em] uppercase mb-3">
-              Simple process
+              {t('processEyebrow')}
             </p>
             <h2 className="text-2xl md:text-4xl font-bold text-[var(--timberwolf)]">
-              Three steps to kickoff.
+              {t('processTitle')}
             </h2>
           </FadeIn>
 
           <div className="grid md:grid-cols-3 gap-10 md:gap-12">
-            {steps.map((step, i) => (
+            {STEP_DEFS.map((step, i) => (
               <FadeIn
                 key={step.num}
                 delay={i * 150}
-                className="relative pl-5 border-l-2 border-[var(--timberwolf)]/20"
+                className="relative ps-5 border-s-2 border-[var(--timberwolf)]/20"
               >
                 <span className="text-[var(--ash-grey)] text-xs font-bold tracking-widest mb-3 block">
-                  STEP {step.num}
+                  {t('stepLabel', { num: step.num })}
                 </span>
                 <h3 className="text-lg font-semibold text-[var(--timberwolf)] mb-2">
-                  {step.title}
+                  {t(`steps.${step.key}.title`)}
                 </h3>
                 <p className="text-sm text-[var(--ash-grey)] leading-relaxed">
-                  {step.desc}
+                  {t(`steps.${step.key}.desc`)}
                 </p>
               </FadeIn>
             ))}
@@ -276,17 +245,15 @@ export default function HomePage() {
         <div className="container mx-auto px-5 py-20 md:py-28">
           <FadeIn direction="left" className="max-w-2xl">
             <p className="text-[var(--ash-grey)] text-xs font-semibold tracking-[0.25em] uppercase mb-4">
-              For clubs & academies
+              {t('clubsEyebrow')}
             </p>
             <h2 className="text-2xl md:text-4xl font-bold text-[var(--timberwolf)] mb-4 leading-tight">
-              Your recordings,
+              {t('clubsTitle1')}
               <br />
-              your platform.
+              {t('clubsTitle2')}
             </h2>
             <p className="text-[var(--ash-grey)] leading-relaxed mb-8 max-w-lg">
-              Connect your Veo or Spiideo recordings, manage academy
-              subscriptions, and give your players instant access to their match
-              footage.
+              {t('clubsDescription')}
             </p>
             <a href="https://playbacksports.ai">
               <Button
@@ -294,8 +261,8 @@ export default function HomePage() {
                 size="lg"
                 className="border-[var(--timberwolf)]/30 text-[var(--timberwolf)] hover:bg-[var(--timberwolf)]/10"
               >
-                Get in touch
-                <ArrowRight className="ml-2 h-4 w-4" />
+                {t('getInTouch')}
+                <ArrowRight className="ms-2 h-4 w-4 rtl:rotate-180" />
               </Button>
             </a>
           </FadeIn>
