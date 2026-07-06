@@ -1318,17 +1318,23 @@ export function VirtualPanoramaPlayer({
   }, [])
 
   // SLAVE MODE — follow the master clock (the flat production video). The raw-VP
-  // <video> that feeds the WebGL texture mirrors the master's play/pause/seek/rate;
-  // a rAF drift guard keeps them within ~0.15s so toggling the surface is seamless
-  // (no restart / jump). Re-binds when the raw-VP element is recreated (`retry`).
+  // <video> that feeds the WebGL texture must PLAY FREELY for smooth video; we
+  // only mirror discrete master events (play/pause/seek/rate) and correct drift
+  // LOOSELY (>1.5s, checked every 2s). An earlier per-frame drift-seek re-seeked
+  // the 4K feed whenever it fell >0.15s behind, which a heavy decode can't avoid
+  // → it played frame-by-frame instead of smoothly. Re-binds on `retry`.
   useEffect(() => {
     const master = masterVideoRef?.current
     if (!master) return
-    let raf = 0
+    const align = () => {
+      const v = videoRef.current
+      if (v && Math.abs(v.currentTime - master.currentTime) > 0.5)
+        v.currentTime = master.currentTime
+    }
     const onPlay = () => {
       const v = videoRef.current
       if (!v) return
-      v.currentTime = master.currentTime
+      align()
       void v.play().catch(() => {})
     }
     const onPause = () => videoRef.current?.pause()
@@ -1347,19 +1353,18 @@ export function VirtualPanoramaPlayer({
     onSeeked()
     onRate()
     if (!master.paused) onPlay()
-    const tick = () => {
+    // Loose keep-alive: re-assert play/pause state + correct only BAD drift
+    // (>1.5s) on a slow cadence, so normal playback is never interrupted.
+    const drift = setInterval(() => {
       const v = videoRef.current
-      if (v && v.readyState >= 1) {
-        if (Math.abs(v.currentTime - master.currentTime) > 0.15)
-          v.currentTime = master.currentTime
-        if (!master.paused && v.paused) void v.play().catch(() => {})
-        if (master.paused && !v.paused) v.pause()
-      }
-      raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
+      if (!v) return
+      if (!master.paused && v.paused) void v.play().catch(() => {})
+      else if (master.paused && !v.paused) v.pause()
+      if (Math.abs(v.currentTime - master.currentTime) > 1.5)
+        v.currentTime = master.currentTime
+    }, 2000)
     return () => {
-      cancelAnimationFrame(raf)
+      clearInterval(drift)
       master.removeEventListener('play', onPlay)
       master.removeEventListener('pause', onPause)
       master.removeEventListener('seeked', onSeeked)
