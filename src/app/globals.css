@@ -121,3 +121,22 @@ input[type='number'] {
 html {
   overflow-x: clip;
 }
+/* overflow: clip is dropped (not fallback-ed) below Safari 16 / Chrome 90 —
+   real pitch-side phones. hidden makes html a scroll container, acceptable
+   as the degraded mode; it also covers gotcha-feedback's inline left:-9999
+   live region, which no class override can reach. */
+@supports not (overflow: clip) {
+  html {
+    overflow-x: hidden;
+  }
+}
+
+/* The commons newsletter honeypot hides itself at left:-10000px. In RTL the
+   left side is the scrollable direction, so it stretched every Arabic page
+   to ~10,000px wide (mobile could zoom out into empty canvas). Re-hide it
+   with the clip technique, which has no directional footprint. Remove once
+   commons ships an sr-only-style honeypot. */
+[dir='rtl'] .left-\[-10000px\] {
+  left: 0;
+  clip-path: inset(50%);
+}
