@@ -448,7 +448,13 @@
       "preparing": "Preparing free-look…",
       "loading": "Loading…",
       "retry": "Retry free-look",
-      "cta": "Explore the pitch"
+      "cta": "Explore the pitch",
+      "exploreLabel": "Explore",
+      "videoLabel": "Video",
+      "retryLabel": "Retry",
+      "preparingLabel": "Preparing…",
+      "backLabel": "Back to video",
+      "backTitle": "Back to the broadcast view"
     },
     "videoUnavailable": "Video unavailable. Try refreshing.",
     "vs": "vs",
