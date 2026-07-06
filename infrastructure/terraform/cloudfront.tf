@@ -135,7 +135,15 @@ resource "aws_s3_bucket_policy" "recordings_cloudfront" {
         Effect    = "Allow"
         Principal = { Service = "cloudfront.amazonaws.com" }
         Action    = "s3:GetObject"
-        Resource  = "${aws_s3_bucket.recordings.arn}/recordings/*"
+        # Prefix-scoped on PURPOSE — must NOT be "/*", which would expose
+        # keys/cloudfront-private-key.pem (the URL-signing key) via CloudFront.
+        # panoramas/* is the de-warp VirtualPanorama capture prefix (VP_S3_PREFIX);
+        # signed playback of those objects 403s without this (they're served the
+        # same getPlaybackUrl → CloudFront path as recordings/).
+        Resource = [
+          "${aws_s3_bucket.recordings.arn}/recordings/*",
+          "${aws_s3_bucket.recordings.arn}/panoramas/*",
+        ]
         Condition = {
           StringEquals = {
             "AWS:SourceArn" = aws_cloudfront_distribution.recordings.arn
