@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useFormatter, useTranslations } from 'next-intl'
 import { useParams } from 'next/navigation'
 import { useRouter } from '@/i18n/navigation'
 import {
@@ -108,26 +109,24 @@ const primaryBtnClass =
 
 // ── Nav tabs ──────────────────────────────────────────────────────────
 
+// Tab labels resolve at render time via t(`tabs.${id}`).
 const allTabs = [
   {
     id: 'graphics' as const,
-    label: 'Graphic Packages',
     icon: Layers,
     featureKey: 'featureGraphicPackages' as const,
   },
   {
     id: 'marketplace' as const,
-    label: 'Marketplace',
     icon: ShoppingBag,
     featureKey: 'marketplaceEnabled' as const,
   },
   {
     id: 'recordings' as const,
-    label: 'Recordings',
     icon: Film,
     featureKey: 'featureRecordings' as const,
   },
-  { id: 'team' as const, label: 'Team', icon: Users, featureKey: null },
+  { id: 'team' as const, icon: Users, featureKey: null },
 ]
 
 type TabId = 'graphics' | 'marketplace' | 'recordings' | 'team'
@@ -140,6 +139,8 @@ function getVisibleTabs(org: OrgInfo | null) {
 // ── Graphic Packages Tab ──────────────────────────────────────────────
 
 function GraphicPackagesTab({ slug }: { slug: string }) {
+  const t = useTranslations('org.manage.graphics')
+  const tc = useTranslations('common')
   const [packages, setPackages] = useState<GraphicPackage[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -185,7 +186,7 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
       const data = await res.json()
       setPackages(data.packages || [])
     } catch {
-      setError('Failed to load graphic packages')
+      setError(t('loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -204,7 +205,7 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
     })
     if (!res.ok) {
       const data = await res.json()
-      setError(data.error || 'Upload failed')
+      setError(data.error || t('uploadFailed'))
       return null
     }
     const data = await res.json()
@@ -305,22 +306,22 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
 
       if (res.ok) {
         setShowForm(false)
-        setSuccessMsg(editingPkg ? 'Package updated' : 'Package created')
+        setSuccessMsg(editingPkg ? t('packageUpdated') : t('packageCreated'))
         setTimeout(() => setSuccessMsg(null), 3000)
         fetchPackages()
       } else {
         const data = await res.json()
-        setError(data.error || 'Failed to save')
+        setError(data.error || t('saveFailed'))
       }
     } catch {
-      setError('Failed to save package')
+      setError(t('savePackageFailed'))
     } finally {
       setSaving(false)
     }
   }
 
   async function handleDelete(pkg: GraphicPackage) {
-    if (!confirm(`Delete "${pkg.name}"?`)) return
+    if (!confirm(t('deleteConfirm', { name: pkg.name }))) return
     try {
       const res = await fetch(
         `/api/org/${slug}/graphic-packages?id=${pkg.id}`,
@@ -328,11 +329,11 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
       )
       if (res.ok) {
         setPackages((prev) => prev.filter((p) => p.id !== pkg.id))
-        setSuccessMsg('Package deleted')
+        setSuccessMsg(t('packageDeleted'))
         setTimeout(() => setSuccessMsg(null), 3000)
       }
     } catch {
-      setError('Failed to delete')
+      setError(t('deleteFailed'))
     }
   }
 
@@ -345,7 +346,7 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
       })
       if (res.ok) fetchPackages()
     } catch {
-      setError('Failed to set default')
+      setError(t('setDefaultFailed'))
     }
   }
 
@@ -356,13 +357,13 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
       const res = await fetch(`/api/org/${slug}/graphic-packages/import`)
       if (!res.ok) {
         const data = await res.json()
-        setError(data.error || 'Failed to fetch Spiideo packages')
+        setError(data.error || t('fetchSpiideoFailed'))
         return
       }
       const data = await res.json()
       setSpiideoPackages(data.packages || [])
     } catch {
-      setError('Failed to fetch Spiideo packages')
+      setError(t('fetchSpiideoFailed'))
     } finally {
       setLoadingImport(false)
     }
@@ -378,7 +379,7 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
         body: JSON.stringify({ spiideoId: pkg.id, name: pkg.name }),
       })
       if (res.ok) {
-        setSuccessMsg(`Imported "${pkg.name}"`)
+        setSuccessMsg(t('imported', { name: pkg.name }))
         setTimeout(() => setSuccessMsg(null), 3000)
         setSpiideoPackages((prev) =>
           prev.map((p) =>
@@ -388,23 +389,23 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
         fetchPackages()
       } else {
         const data = await res.json()
-        setError(data.error || 'Import failed')
+        setError(data.error || t('importFailed'))
       }
     } catch {
-      setError('Failed to import package')
+      setError(t('importPackageFailed'))
     } finally {
       setImportingId(null)
     }
   }
 
   const positionLabel = (pos: string) => {
-    const labels: Record<string, string> = {
-      'top-left': 'Top Left',
-      'top-right': 'Top Right',
-      'bottom-left': 'Bottom Left',
-      'bottom-right': 'Bottom Right',
+    const keys: Record<string, string> = {
+      'top-left': 'topLeft',
+      'top-right': 'topRight',
+      'bottom-left': 'bottomLeft',
+      'bottom-right': 'bottomRight',
     }
-    return labels[pos] || pos
+    return keys[pos] ? t(`positions.${keys[pos]}`) : pos
   }
 
   if (loading) {
@@ -417,22 +418,24 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-4">
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && (
+        <p dir="auto" className="text-sm text-red-400">
+          {error}
+        </p>
+      )}
       {successMsg && <p className="text-sm text-emerald-400">{successMsg}</p>}
 
       {/* Package list */}
       {packages.length === 0 && !showForm ? (
         <div className="rounded-lg border border-dashed border-border py-12 text-center">
           <Layers className="mx-auto h-8 w-8 text-muted-foreground/50 mb-3" />
-          <p className="text-sm text-muted-foreground">
-            No graphic packages yet
-          </p>
+          <p className="text-sm text-muted-foreground">{t('emptyTitle')}</p>
           <p className="text-xs text-muted-foreground/60 mt-1 mb-4">
-            Create one to add logo overlays to your recordings
+            {t('emptyDescription')}
           </p>
           <div className="flex items-center justify-center gap-2">
             <Button onClick={openCreateForm} className={primaryBtnClass}>
-              + New Package
+              {t('newPackage')}
             </Button>
             <Button
               variant="outline"
@@ -442,7 +445,7 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
                 fetchSpiideoPackages()
               }}
             >
-              Import from Spiideo
+              {t('importFromSpiideo')}
             </Button>
           </div>
         </div>
@@ -464,7 +467,7 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
                   ) : (
                     <div className="w-10 h-10 rounded bg-white/5 flex items-center justify-center flex-shrink-0">
                       <span className="text-[10px] text-muted-foreground">
-                        No logo
+                        {t('noLogo')}
                       </span>
                     </div>
                   )}
@@ -475,7 +478,7 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
                       </span>
                       {pkg.is_default && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-medium flex-shrink-0">
-                          Default
+                          {t('defaultBadge')}
                         </span>
                       )}
                       {pkg.spiideo_graphic_package_id && (
@@ -485,10 +488,16 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
                       )}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                      <span>Logo: {positionLabel(pkg.logo_position)}</span>
+                      <span>
+                        {t('logoPosition', {
+                          position: positionLabel(pkg.logo_position),
+                        })}
+                      </span>
                       {pkg.sponsor_logo_url && (
                         <span>
-                          Sponsor: {positionLabel(pkg.sponsor_position)}
+                          {t('sponsorPosition', {
+                            position: positionLabel(pkg.sponsor_position),
+                          })}
                         </span>
                       )}
                     </div>
@@ -500,20 +509,20 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
                       onClick={() => setDefault(pkg)}
                       className="text-xs px-2.5 py-1.5 rounded-md text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted transition-colors"
                     >
-                      Set Default
+                      {t('setDefault')}
                     </button>
                   )}
                   <button
                     onClick={() => openEditForm(pkg)}
                     className="text-xs px-2.5 py-1.5 rounded-md text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted transition-colors"
                   >
-                    Edit
+                    {t('edit')}
                   </button>
                   <button
                     onClick={() => handleDelete(pkg)}
                     className="text-xs px-2.5 py-1.5 rounded-md text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                   >
-                    Delete
+                    {tc('delete')}
                   </button>
                 </div>
               </div>
@@ -527,7 +536,7 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
                 onClick={openCreateForm}
                 className={`flex-1 ${outlineBtnClass}`}
               >
-                + New Package
+                {t('newPackage')}
               </Button>
               <Button
                 variant="outline"
@@ -537,7 +546,7 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
                 }}
                 className={outlineBtnClass}
               >
-                {showImport ? 'Hide Spiideo' : 'Import from Spiideo'}
+                {showImport ? t('hideSpiideo') : t('importFromSpiideo')}
               </Button>
             </div>
           )}
@@ -548,16 +557,16 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
       {showForm && (
         <div className="space-y-4 p-4 rounded-lg border border-border bg-[var(--night)]">
           <h3 className="text-sm font-semibold text-[var(--timberwolf)]">
-            {editingPkg ? 'Edit Package' : 'New Package'}
+            {editingPkg ? t('editPackage') : t('newPackageTitle')}
           </h3>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">
-              Package Name
+              {t('packageName')}
             </label>
             <Input
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
-              placeholder="e.g. DAFL Season 2025-26"
+              placeholder={t('packageNamePlaceholder')}
               className={inputClass}
             />
           </div>
@@ -565,18 +574,21 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
           {/* Upload row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Logo</label>
+              <label className="text-xs text-muted-foreground">
+                {t('logo')}
+              </label>
               <div className="flex gap-2">
                 <Input
+                  dir="ltr"
                   value={formLogoUrl}
                   onChange={(e) => setFormLogoUrl(e.target.value)}
-                  placeholder="https://... or upload"
+                  placeholder={t('urlPlaceholder')}
                   className={`flex-1 ${inputClass}`}
                 />
                 <label
                   className={`inline-flex items-center px-3 text-xs rounded cursor-pointer whitespace-nowrap ${outlineBtnClass} border`}
                 >
-                  {uploadingLogo ? '...' : 'Upload'}
+                  {uploadingLogo ? '...' : t('upload')}
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp,image/svg+xml"
@@ -589,19 +601,20 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">
-                Sponsor Logo
+                {t('sponsorLogo')}
               </label>
               <div className="flex gap-2">
                 <Input
+                  dir="ltr"
                   value={formSponsorUrl}
                   onChange={(e) => setFormSponsorUrl(e.target.value)}
-                  placeholder="https://... or upload"
+                  placeholder={t('urlPlaceholder')}
                   className={`flex-1 ${inputClass}`}
                 />
                 <label
                   className={`inline-flex items-center px-3 text-xs rounded cursor-pointer whitespace-nowrap ${outlineBtnClass} border`}
                 >
-                  {uploadingSponsor ? '...' : 'Upload'}
+                  {uploadingSponsor ? '...' : t('upload')}
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp,image/svg+xml"
@@ -620,7 +633,7 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
               {formLogoUrl && (
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">
-                    Logo Size — {formLogoScale}%
+                    {t('logoSize', { percent: formLogoScale })}
                   </label>
                   <input
                     type="range"
@@ -638,7 +651,7 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
               {formSponsorUrl && (
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">
-                    Sponsor Size — {formSponsorScale}%
+                    {t('sponsorSize', { percent: formSponsorScale })}
                   </label>
                   <input
                     type="range"
@@ -660,7 +673,7 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
           {(formLogoUrl || formSponsorUrl) && (
             <div className="space-y-1.5">
               <label className="text-xs text-muted-foreground">
-                Drag to position overlays
+                {t('dragToPosition')}
               </label>
               <div
                 ref={previewRef}
@@ -723,12 +736,12 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
                   <div className="absolute top-2/3 left-0 right-0 h-px bg-white/5" />
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/30 pointer-events-none">
-                  16:9 Preview
+                  {t('previewLabel')}
                 </div>
                 {formLogoUrl && (
                   <img
                     src={formLogoUrl}
-                    alt="Logo"
+                    alt={t('logo')}
                     draggable={false}
                     className={`absolute object-contain opacity-80 cursor-grab ${dragging === 'logo' ? 'cursor-grabbing ring-2 ring-emerald-500/50' : 'hover:ring-2 hover:ring-white/30'} rounded transition-shadow`}
                     style={{
@@ -747,7 +760,7 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
                 {formSponsorUrl && (
                   <img
                     src={formSponsorUrl}
-                    alt="Sponsor"
+                    alt={t('sponsorLogo')}
                     draggable={false}
                     className={`absolute object-contain opacity-80 cursor-grab ${dragging === 'sponsor' ? 'cursor-grabbing ring-2 ring-blue-500/50' : 'hover:ring-2 hover:ring-white/30'} rounded transition-shadow`}
                     style={{
@@ -775,7 +788,7 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
               className="w-4 h-4 rounded border-border bg-white/5 accent-[var(--timberwolf)]"
             />
             <span className="text-sm text-[var(--timberwolf)]">
-              Set as default package
+              {t('setAsDefault')}
             </span>
           </label>
 
@@ -785,14 +798,14 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
               disabled={saving || !formName.trim()}
               className={primaryBtnClass}
             >
-              {saving ? 'Saving...' : editingPkg ? 'Update' : 'Create'}
+              {saving ? t('saving') : editingPkg ? t('update') : t('create')}
             </Button>
             <Button
               variant="outline"
               onClick={() => setShowForm(false)}
               className={outlineBtnClass}
             >
-              Cancel
+              {tc('cancel')}
             </Button>
           </div>
         </div>
@@ -802,13 +815,13 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
       {showImport && !showForm && (
         <div className="space-y-2 p-4 rounded-lg border border-border bg-[var(--night)]">
           <h3 className="text-sm font-semibold text-[var(--timberwolf)]">
-            Import from Spiideo
+            {t('importFromSpiideo')}
           </h3>
           {loadingImport ? (
             <LoadingSpinner size="sm" className="text-muted-foreground" />
           ) : spiideoPackages.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              No Spiideo packages found
+              {t('noSpiideoPackages')}
             </p>
           ) : (
             <div className="space-y-1">
@@ -821,13 +834,13 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
                     <span className="text-sm text-[var(--timberwolf)]">
                       {pkg.name}
                     </span>
-                    <span className="text-xs text-muted-foreground ml-2">
+                    <span className="text-xs text-muted-foreground ms-2">
                       ({pkg.type})
                     </span>
                   </div>
                   {pkg.alreadyImported ? (
                     <span className="text-xs text-muted-foreground">
-                      Imported
+                      {t('importedBadge')}
                     </span>
                   ) : (
                     <Button
@@ -837,7 +850,7 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
                       disabled={importingId === pkg.id}
                       onClick={() => importSpiideoPackage(pkg)}
                     >
-                      {importingId === pkg.id ? '...' : 'Import'}
+                      {importingId === pkg.id ? '...' : t('import')}
                     </Button>
                   )}
                 </div>
@@ -853,6 +866,7 @@ function GraphicPackagesTab({ slug }: { slug: string }) {
 // ── Marketplace Tab ───────────────────────────────────────────────────
 
 function MarketplaceTab({ slug }: { slug: string }) {
+  const t = useTranslations('org.manage.marketplace')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState<string | null>(null)
@@ -897,11 +911,11 @@ function MarketplaceTab({ slug }: { slug: string }) {
         }),
       })
       if (res.ok) {
-        setSavedMsg('Saved')
+        setSavedMsg(t('saved'))
         setTimeout(() => setSavedMsg(null), 3000)
       }
     } catch {
-      setSavedMsg('Failed to save')
+      setSavedMsg(t('saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -926,10 +940,10 @@ function MarketplaceTab({ slug }: { slug: string }) {
         />
         <div>
           <span className="text-sm text-[var(--timberwolf)]">
-            Enable marketplace
+            {t('enable')}
           </span>
           <p className="text-xs text-muted-foreground">
-            Allow recordings to be sold through the PLAYHUB marketplace
+            {t('enableDescription')}
           </p>
         </div>
       </label>
@@ -938,7 +952,7 @@ function MarketplaceTab({ slug }: { slug: string }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-lg border border-border bg-[var(--night)]">
           <div className="space-y-1.5">
             <label className="text-xs text-muted-foreground font-medium">
-              Default Price
+              {t('defaultPrice')}
             </label>
             <Input
               type="number"
@@ -946,13 +960,13 @@ function MarketplaceTab({ slug }: { slug: string }) {
               min="0"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
-              placeholder="25.00"
+              placeholder={t('pricePlaceholder')}
               className={inputClass}
             />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs text-muted-foreground font-medium">
-              Currency
+              {t('currency')}
             </label>
             <Select value={currency} onValueChange={setCurrency}>
               <SelectTrigger>
@@ -976,7 +990,7 @@ function MarketplaceTab({ slug }: { slug: string }) {
           disabled={saving}
           className={primaryBtnClass}
         >
-          {saving ? 'Saving...' : 'Save Settings'}
+          {saving ? t('saving') : t('saveSettings')}
         </Button>
         {savedMsg && (
           <span className="text-sm text-emerald-400">{savedMsg}</span>
@@ -1003,6 +1017,8 @@ interface OrgRecording {
 }
 
 function RecordingsTab({ slug }: { slug: string }) {
+  const t = useTranslations('org.manage.recordings')
+  const format = useFormatter()
   const [recordings, setRecordings] = useState<OrgRecording[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
@@ -1032,12 +1048,10 @@ function RecordingsTab({ slug }: { slug: string }) {
   }
 
   function formatDate(d: string) {
-    return new Date(d).toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    })
+    return format.dateTime(new Date(d), 'short')
   }
+
+  const knownStatuses = ['published', 'processing', 'draft', 'archived']
 
   const statusColor: Record<string, string> = {
     published: 'bg-emerald-500/15 text-emerald-400',
@@ -1058,7 +1072,9 @@ function RecordingsTab({ slug }: { slug: string }) {
     <div className="space-y-4">
       {/* Filter + count */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">{total} recordings</p>
+        <p className="text-sm text-muted-foreground">
+          {t('count', { count: total })}
+        </p>
         <Select
           value={statusFilter}
           onValueChange={(v) => {
@@ -1067,14 +1083,16 @@ function RecordingsTab({ slug }: { slug: string }) {
           }}
         >
           <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="All statuses" />
+            <SelectValue placeholder={t('allStatuses')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="published">Published</SelectItem>
-            <SelectItem value="processing">Processing</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="archived">Archived</SelectItem>
+            <SelectItem value="all">{t('allStatuses')}</SelectItem>
+            <SelectItem value="published">{t('statuses.published')}</SelectItem>
+            <SelectItem value="processing">
+              {t('statuses.processing')}
+            </SelectItem>
+            <SelectItem value="draft">{t('statuses.draft')}</SelectItem>
+            <SelectItem value="archived">{t('statuses.archived')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -1082,7 +1100,7 @@ function RecordingsTab({ slug }: { slug: string }) {
       {recordings.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border py-16 text-center">
           <Film className="mx-auto h-8 w-8 text-muted-foreground/50 mb-3" />
-          <p className="text-sm text-muted-foreground">No recordings found</p>
+          <p className="text-sm text-muted-foreground">{t('empty')}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -1104,11 +1122,13 @@ function RecordingsTab({ slug }: { slug: string }) {
                 <span
                   className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${statusColor[rec.status] || 'bg-zinc-500/15 text-zinc-400'}`}
                 >
-                  {rec.status}
+                  {knownStatuses.includes(rec.status)
+                    ? t(`statuses.${rec.status}`)
+                    : rec.status}
                 </span>
                 {rec.marketplace_enabled && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-medium">
-                    Marketplace
+                    {t('marketplaceBadge')}
                   </span>
                 )}
               </div>
@@ -1125,17 +1145,17 @@ function RecordingsTab({ slug }: { slug: string }) {
             disabled={page === 1}
             className="text-xs px-3 py-1.5 rounded-md text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted disabled:opacity-30 transition-colors"
           >
-            Previous
+            {t('previous')}
           </button>
           <span className="text-xs text-muted-foreground">
-            {page} / {totalPages}
+            {t('pageOf', { page, total: totalPages })}
           </span>
           <button
             onClick={() => setPage(Math.min(totalPages, page + 1))}
             disabled={page === totalPages}
             className="text-xs px-3 py-1.5 rounded-md text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted disabled:opacity-30 transition-colors"
           >
-            Next
+            {t('next')}
           </button>
         </div>
       )}
@@ -1162,6 +1182,7 @@ interface PendingInvite {
 }
 
 function TeamTab({ slug }: { slug: string }) {
+  const t = useTranslations('org.manage.team')
   const [admins, setAdmins] = useState<TeamMember[]>([])
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([])
   const [loading, setLoading] = useState(true)
@@ -1204,16 +1225,16 @@ function TeamTab({ slug }: { slug: string }) {
       const data = await res.json()
       if (res.ok) {
         setMessage({
-          text: data.message || 'Added successfully',
+          text: data.message || t('addedSuccess'),
           type: 'success',
         })
         setInviteEmail('')
         fetchTeam()
       } else {
-        setMessage({ text: data.error || 'Failed', type: 'error' })
+        setMessage({ text: data.error || t('failed'), type: 'error' })
       }
     } catch {
-      setMessage({ text: 'Failed to send invite', type: 'error' })
+      setMessage({ text: t('inviteFailed'), type: 'error' })
     } finally {
       setSaving(false)
       setTimeout(() => setMessage(null), 4000)
@@ -1221,7 +1242,7 @@ function TeamTab({ slug }: { slug: string }) {
   }
 
   async function handleRemove(membershipId: string) {
-    if (!confirm('Remove this team member?')) return
+    if (!confirm(t('removeConfirm'))) return
     try {
       const res = await fetch(
         `/api/org/${slug}/manage/team?id=${membershipId}`,
@@ -1231,11 +1252,11 @@ function TeamTab({ slug }: { slug: string }) {
       )
       if (res.ok) {
         setAdmins((prev) => prev.filter((a) => a.id !== membershipId))
-        setMessage({ text: 'Removed', type: 'success' })
+        setMessage({ text: t('removed'), type: 'success' })
         setTimeout(() => setMessage(null), 3000)
       }
     } catch {
-      setMessage({ text: 'Failed to remove', type: 'error' })
+      setMessage({ text: t('removeFailed'), type: 'error' })
     }
   }
 
@@ -1251,6 +1272,7 @@ function TeamTab({ slug }: { slug: string }) {
     <div className="space-y-5">
       {message && (
         <p
+          dir="auto"
           className={`text-sm ${message.type === 'success' ? 'text-emerald-400' : 'text-red-400'}`}
         >
           {message.text}
@@ -1260,9 +1282,10 @@ function TeamTab({ slug }: { slug: string }) {
       {/* Invite form */}
       <div className="flex flex-col sm:flex-row gap-2">
         <Input
+          dir="ltr"
           value={inviteEmail}
           onChange={(e) => setInviteEmail(e.target.value)}
-          placeholder="Email address"
+          placeholder={t('emailPlaceholder')}
           type="email"
           className={`flex-1 ${inputClass}`}
           onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
@@ -1272,8 +1295,8 @@ function TeamTab({ slug }: { slug: string }) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="manager">Manager</SelectItem>
+            <SelectItem value="admin">{t('roles.admin')}</SelectItem>
+            <SelectItem value="manager">{t('roles.manager')}</SelectItem>
           </SelectContent>
         </Select>
         <Button
@@ -1281,7 +1304,7 @@ function TeamTab({ slug }: { slug: string }) {
           disabled={saving || !inviteEmail.trim()}
           className={primaryBtnClass}
         >
-          {saving ? '...' : 'Invite'}
+          {saving ? '...' : t('invite')}
         </Button>
       </div>
 
@@ -1298,11 +1321,13 @@ function TeamTab({ slug }: { slug: string }) {
                   {admin.fullName || admin.email}
                 </p>
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-700 text-muted-foreground font-medium">
-                  {admin.role}
+                  {admin.role === 'admin' || admin.role === 'manager'
+                    ? t(`roles.${admin.role}`)
+                    : admin.role}
                 </span>
                 {admin.isCurrentUser && (
                   <span className="text-[10px] text-muted-foreground">
-                    (you)
+                    {t('you')}
                   </span>
                 )}
               </div>
@@ -1317,7 +1342,7 @@ function TeamTab({ slug }: { slug: string }) {
                 onClick={() => handleRemove(admin.id)}
                 className="text-xs px-2.5 py-1.5 rounded-md text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
               >
-                Remove
+                {t('remove')}
               </button>
             )}
           </div>
@@ -1327,7 +1352,9 @@ function TeamTab({ slug }: { slug: string }) {
       {/* Pending invites */}
       {pendingInvites.length > 0 && (
         <div>
-          <p className="text-xs text-muted-foreground mb-2">Pending invites</p>
+          <p className="text-xs text-muted-foreground mb-2">
+            {t('pendingInvites')}
+          </p>
           <div className="space-y-1">
             {pendingInvites.map((inv) => (
               <div
@@ -1339,7 +1366,7 @@ function TeamTab({ slug }: { slug: string }) {
                     {inv.invited_email}
                   </p>
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-medium">
-                    Pending
+                    {t('pendingBadge')}
                   </span>
                 </div>
               </div>
@@ -1370,6 +1397,9 @@ function GroupDashboardView({
   slug: string
   hasGraphicPackages: boolean
 }) {
+  const t = useTranslations('org.manage')
+  const tg = useTranslations('org.manage.group')
+  const format = useFormatter()
   const router = useRouter()
   const [data, setData] = useState<GroupDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -1420,37 +1450,37 @@ function GroupDashboardView({
     }
   }
 
-  const monthLabel = new Date(year, month - 1).toLocaleDateString('en-GB', {
+  const monthLabel = format.dateTime(new Date(year, month - 1), {
     month: 'long',
     year: 'numeric',
+    numberingSystem: 'latn',
   })
 
   function formatCurrency(amount: number, currency: string) {
-    return new Intl.NumberFormat('en-GB', {
+    return format.number(amount, {
+      numberingSystem: 'latn',
       style: 'currency',
       currency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 3,
-    }).format(amount)
+    })
   }
 
   if (!data && !loading && activeTab === 'overview') return null
 
   const currency = data?.currency || 'KWD'
 
-  const groupTabs: Array<{ id: GroupTab; label: string }> = [
-    { id: 'overview', label: 'Overview' },
-    ...(hasGraphicPackages
-      ? [{ id: 'graphics' as GroupTab, label: 'Graphic Packages' }]
-      : []),
-    { id: 'team', label: 'Team' },
+  const groupTabs: GroupTab[] = [
+    'overview',
+    ...(hasGraphicPackages ? (['graphics'] as GroupTab[]) : []),
+    'team',
   ]
 
   return (
     <div className="space-y-6">
       {/* Tab navigation */}
       <div className="flex gap-1 border-b border-border pb-px overflow-x-auto">
-        {groupTabs.map(({ id, label }) => (
+        {groupTabs.map((id) => (
           <button
             key={id}
             onClick={() => setActiveTab(id)}
@@ -1460,7 +1490,7 @@ function GroupDashboardView({
                 : 'text-muted-foreground border-transparent hover:text-[var(--timberwolf)] hover:bg-muted/20'
             }`}
           >
-            {label}
+            {t(`tabs.${id}`)}
           </button>
         ))}
       </div>
@@ -1492,7 +1522,7 @@ function GroupDashboardView({
               onClick={prevMonth}
               className="p-1.5 rounded-md text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted transition-colors"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
             </button>
             <span className="text-sm font-medium text-[var(--timberwolf)] min-w-[140px] text-center">
               {monthLabel}
@@ -1502,7 +1532,7 @@ function GroupDashboardView({
               disabled={isCurrentMonth}
               className="p-1.5 rounded-md text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-4 w-4 rtl:rotate-180" />
             </button>
           </div>
 
@@ -1510,32 +1540,34 @@ function GroupDashboardView({
           <div className="rounded-xl border border-border bg-card">
             <div className="p-5">
               <h2 className="text-base font-semibold text-[var(--timberwolf)] mb-4">
-                Portfolio Overview
+                {tg('portfolioOverview')}
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-lg overflow-hidden bg-muted">
                 {[
                   {
-                    label: 'Total Recordings',
+                    label: tg('totalRecordings'),
                     value: String(data.totals.totalRecordings),
-                    sub: `${data.totals.publishedRecordings} published`,
+                    sub: tg('publishedCount', {
+                      count: data.totals.publishedRecordings,
+                    }),
                   },
                   {
-                    label: 'This Month',
+                    label: tg('thisMonth'),
                     value: String(data.totals.monthRecordings),
-                    sub: 'recordings',
+                    sub: tg('recordingsSub'),
                   },
                   {
-                    label: 'Monthly Revenue',
+                    label: tg('monthlyRevenue'),
                     value:
                       data.totals.monthRevenue > 0
                         ? formatCurrency(data.totals.monthRevenue, currency)
                         : '0',
-                    sub: 'billable',
+                    sub: tg('billable'),
                   },
                   {
-                    label: 'Today',
+                    label: tg('today'),
                     value: String(data.totals.todayCount),
-                    sub: 'recordings',
+                    sub: tg('recordingsSub'),
                   },
                 ].map((card) => (
                   <div key={card.label} className="bg-[var(--night)] p-3.5">
@@ -1559,80 +1591,84 @@ function GroupDashboardView({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                   <div>
                     <h2 className="text-base font-semibold text-[var(--timberwolf)]">
-                      Daily Performance
+                      {tg('dailyPerformance')}
                     </h2>
                     <p className="text-xs text-muted-foreground">
-                      Avg {data.averagePerDay}/day
+                      {tg('avgPerDay', { avg: data.averagePerDay })}
                       {data.totalDailyTarget > 0 &&
-                        ` · Target: ${data.totalDailyTarget}/day`}
+                        ` · ${tg('targetPerDay', { target: data.totalDailyTarget })}`}
                     </p>
                   </div>
                 </div>
-                <ChartContainer
-                  config={
-                    Object.fromEntries(
-                      data.venueNames.map((name, i) => [
-                        name,
-                        { label: name, color: CHART_COLORS[i % 5] },
-                      ])
-                    ) as ChartConfig
-                  }
-                  className="h-[220px] w-full"
-                >
-                  <AreaChart data={data.dailyChart}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="hsl(var(--border))"
-                    />
-                    <XAxis
-                      dataKey="date"
-                      tickFormatter={(d: string) => {
-                        const day = parseInt(d.split('-')[2], 10)
-                        return day % 5 === 1 || day === 1 ? String(day) : ''
-                      }}
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={11}
-                    />
-                    <YAxis
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={11}
-                      allowDecimals={false}
-                    />
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent
-                          labelFormatter={(label: string) => {
-                            const d = new Date(label + 'T00:00:00')
-                            return d.toLocaleDateString('en-GB', {
-                              day: 'numeric',
-                              month: 'short',
-                            })
-                          }}
-                        />
-                      }
-                    />
-                    {data.totalDailyTarget > 0 && (
-                      <ReferenceLine
-                        y={data.totalDailyTarget}
+                {/* Recharts renders physical coordinates — keep LTR in RTL locales */}
+                <div dir="ltr">
+                  <ChartContainer
+                    config={
+                      Object.fromEntries(
+                        data.venueNames.map((name, i) => [
+                          name,
+                          { label: name, color: CHART_COLORS[i % 5] },
+                        ])
+                      ) as ChartConfig
+                    }
+                    className="h-[220px] w-full"
+                  >
+                    <AreaChart data={data.dailyChart}>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="hsl(var(--border))"
+                      />
+                      <XAxis
+                        dataKey="date"
+                        tickFormatter={(d: string) => {
+                          const day = parseInt(d.split('-')[2], 10)
+                          return day % 5 === 1 || day === 1 ? String(day) : ''
+                        }}
                         stroke="hsl(var(--muted-foreground))"
-                        strokeDasharray="6 4"
-                        strokeOpacity={0.5}
+                        fontSize={11}
                       />
-                    )}
-                    {data.venueNames.map((name, i) => (
-                      <Area
-                        key={name}
-                        type="monotone"
-                        dataKey={name}
-                        stackId="1"
-                        fill={CHART_COLORS[i % 5]}
-                        fillOpacity={0.4}
-                        stroke={CHART_COLORS[i % 5]}
-                        strokeWidth={1.5}
+                      <YAxis
+                        stroke="hsl(var(--muted-foreground))"
+                        fontSize={11}
+                        allowDecimals={false}
                       />
-                    ))}
-                  </AreaChart>
-                </ChartContainer>
+                      <ChartTooltip
+                        content={
+                          <ChartTooltipContent
+                            labelFormatter={(label: string) => {
+                              const d = new Date(label + 'T00:00:00')
+                              return format.dateTime(d, {
+                                day: 'numeric',
+                                month: 'short',
+                                numberingSystem: 'latn',
+                              })
+                            }}
+                          />
+                        }
+                      />
+                      {data.totalDailyTarget > 0 && (
+                        <ReferenceLine
+                          y={data.totalDailyTarget}
+                          stroke="hsl(var(--muted-foreground))"
+                          strokeDasharray="6 4"
+                          strokeOpacity={0.5}
+                        />
+                      )}
+                      {data.venueNames.map((name, i) => (
+                        <Area
+                          key={name}
+                          type="monotone"
+                          dataKey={name}
+                          stackId="1"
+                          fill={CHART_COLORS[i % 5]}
+                          fillOpacity={0.4}
+                          stroke={CHART_COLORS[i % 5]}
+                          strokeWidth={1.5}
+                        />
+                      ))}
+                    </AreaChart>
+                  </ChartContainer>
+                </div>
               </div>
             </div>
           )}
@@ -1641,7 +1677,7 @@ function GroupDashboardView({
           <div className="rounded-xl border border-border bg-card">
             <div className="p-5">
               <h2 className="text-base font-semibold text-[var(--timberwolf)] mb-4">
-                Venues ({data.childVenues.length})
+                {tg('venuesCount', { count: data.childVenues.length })}
               </h2>
               <div className="space-y-3">
                 {data.childVenues.map((child) => (
@@ -1659,11 +1695,22 @@ function GroupDashboardView({
                         </span>
                       </div>
                       <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                        <span>{child.totalRecordings} recordings</span>
-                        <span>{child.monthRecordings} this month</span>
+                        <span>
+                          {tg('recordingsCount', {
+                            count: child.totalRecordings,
+                          })}
+                        </span>
+                        <span>
+                          {tg('thisMonthCount', {
+                            count: child.monthRecordings,
+                          })}
+                        </span>
                         {child.dailyTarget > 0 && (
                           <span>
-                            Today: {child.todayCount}/{child.dailyTarget}
+                            {tg('todayProgress', {
+                              today: child.todayCount,
+                              target: child.dailyTarget,
+                            })}
                           </span>
                         )}
                       </div>
@@ -1680,14 +1727,14 @@ function GroupDashboardView({
                         className={outlineBtnClass}
                         onClick={() => router.push(`/venue/${child.id}`)}
                       >
-                        Manage
+                        {tg('manage')}
                       </Button>
                     </div>
                   </div>
                 ))}
                 {data.childVenues.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-8">
-                    No child venues found
+                    {tg('noChildVenues')}
                   </p>
                 )}
               </div>
@@ -1702,6 +1749,8 @@ function GroupDashboardView({
 // ── Main Page ─────────────────────────────────────────────────────────
 
 export default function OrgManagePage() {
+  const t = useTranslations('org.manage')
+  const tc = useTranslations('common')
   const params = useParams()
   const router = useRouter()
   const slug = params.slug as string
@@ -1722,7 +1771,7 @@ export default function OrgManagePage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'Not found')
+        setError(data.error || t('notFound'))
         return
       }
 
@@ -1730,7 +1779,7 @@ export default function OrgManagePage() {
       const visible = getVisibleTabs(data)
       if (visible.length > 0) setActiveTab(visible[0].id)
     } catch {
-      setError('Failed to load organization')
+      setError(t('loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -1761,13 +1810,15 @@ export default function OrgManagePage() {
   if (error || !org) {
     return (
       <div className="min-h-[50vh] flex flex-col items-center justify-center gap-4">
-        <p className="text-muted-foreground">{error || 'Not found'}</p>
+        <p dir="auto" className="text-muted-foreground">
+          {error || t('notFound')}
+        </p>
         <Button
           variant="outline"
           className={outlineBtnClass}
           onClick={() => router.push('/venue')}
         >
-          Back
+          {tc('back')}
         </Button>
       </div>
     )
@@ -1781,7 +1832,7 @@ export default function OrgManagePage() {
           onClick={() => router.back()}
           className="text-muted-foreground hover:text-[var(--timberwolf)] transition-colors"
         >
-          <ChevronLeft className="h-5 w-5" />
+          <ChevronLeft className="h-5 w-5 rtl:rotate-180" />
         </button>
         {org.logoUrl ? (
           <img
@@ -1799,7 +1850,7 @@ export default function OrgManagePage() {
             {org.name}
           </h1>
           <p className="text-xs text-muted-foreground">
-            {org.type === 'group' ? 'Group Dashboard' : 'Organization Settings'}
+            {org.type === 'group' ? t('groupDashboard') : t('orgSettings')}
           </p>
         </div>
       </div>
@@ -1813,7 +1864,7 @@ export default function OrgManagePage() {
         <>
           {/* Tab navigation */}
           <div className="flex gap-1 mb-6 border-b border-border pb-px overflow-x-auto">
-            {getVisibleTabs(org).map(({ id, label, icon: Icon }) => (
+            {getVisibleTabs(org).map(({ id, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
@@ -1824,7 +1875,7 @@ export default function OrgManagePage() {
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />
-                {label}
+                {t(`tabs.${id}`)}
               </button>
             ))}
           </div>

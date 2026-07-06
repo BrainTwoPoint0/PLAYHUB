@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useFormatter, useTranslations } from 'next-intl'
 import { VideoPlayer } from '@/components/video/VideoPlayer'
 import type { RecordingEvent } from '@/lib/recordings/event-types'
 import { useParams } from 'next/navigation'
@@ -83,6 +84,8 @@ interface MatchContent {
   events?: VeoEventsByType
 }
 
+type Translator = ReturnType<typeof useTranslations>
+
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -91,18 +94,6 @@ function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = Math.floor(seconds % 60)
   return `${m}:${s.toString().padStart(2, '0')}`
-}
-
-function formatDate(dateStr: string): string {
-  try {
-    return new Date(dateStr).toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    })
-  } catch {
-    return dateStr
-  }
 }
 
 function teamName(team: unknown): string {
@@ -134,6 +125,20 @@ function privacyColor(privacy: string): string {
       return 'bg-red-500/10 text-red-400/80'
     default:
       return 'bg-yellow-500/10 text-yellow-400/80'
+  }
+}
+
+/** Translated label for Veo's privacy enum; unknown values render raw. */
+function privacyLabel(t: Translator, privacy: string): string {
+  switch (privacy) {
+    case 'public':
+      return t('privacy.public')
+    case 'private':
+      return t('privacy.private')
+    case 'unlisted':
+      return t('privacy.unlisted')
+    default:
+      return String(privacy || '')
   }
 }
 
@@ -175,14 +180,15 @@ function highlightTagColor(tag: string): string {
 // Components
 // ============================================================================
 
-function videoLabel(video: VeoVideo): string {
+function videoLabel(t: Translator, video: VeoVideo): string {
   const render = String((video as any).render_type || '')
   const w = video.width
   const h = video.height
-  if (render === 'panorama' && w && h) return `Panorama (${w}x${h})`
-  if (render === 'panorama') return 'Panorama'
-  if (w && h) return `Standard (${w}x${h})`
-  return 'Video'
+  if (render === 'panorama' && w && h)
+    return t('video.panoramaWithSize', { width: w, height: h })
+  if (render === 'panorama') return t('video.panorama')
+  if (w && h) return t('video.standardWithSize', { width: w, height: h })
+  return t('video.video')
 }
 
 /**
@@ -267,10 +273,10 @@ function teamAssocValue(assoc: unknown): 'own' | 'opponent' | null {
 }
 
 /** Display label for a team_association. Veo's vocabulary, not home/away. */
-function teamAssocLabel(assoc: unknown): string | null {
+function teamAssocLabel(t: Translator, assoc: unknown): string | null {
   const v = teamAssocValue(assoc)
-  if (v === 'own') return 'Ours'
-  if (v === 'opponent') return 'Opponent'
+  if (v === 'own') return t('match.ours')
+  if (v === 'opponent') return t('match.opponent')
   return null
 }
 
@@ -285,10 +291,11 @@ function HighlightCard({
   onOpen: () => void
   isPlaying: boolean
 }) {
+  const t = useTranslations('academy.content')
   const router = useRouter()
   const videoUrl = highlight.videos?.[0]?.url
   const tag = tagToString(highlight.tags?.[0])
-  const team = teamAssocLabel(highlight.team_association)
+  const team = teamAssocLabel(t, highlight.team_association)
 
   function openInEditor(e: React.MouseEvent) {
     // Don't bubble to the card-level click that opens the player.
@@ -344,18 +351,18 @@ function HighlightCard({
           </div>
         )}
         {/* Duration overlay */}
-        <span className="absolute bottom-1.5 right-1.5 text-[10px] tabular-nums px-1.5 py-0.5 rounded bg-black/70 text-white/80 pointer-events-none">
+        <span className="absolute bottom-1.5 end-1.5 text-[10px] tabular-nums px-1.5 py-0.5 rounded bg-black/70 text-white/80 pointer-events-none">
           {formatDuration(highlight.duration)}
         </span>
         {/* AI badge */}
         {highlight.is_ai_generated && (
-          <span className="absolute top-1.5 left-1.5 text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 backdrop-blur-sm pointer-events-none">
-            AI
+          <span className="absolute top-1.5 start-1.5 text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 backdrop-blur-sm pointer-events-none">
+            {t('highlight.ai')}
           </span>
         )}
         {/* Team badge */}
         {team && (
-          <span className="absolute top-1.5 right-1.5 text-[9px] px-1.5 py-0.5 rounded bg-black/60 text-white/70 backdrop-blur-sm max-w-[50%] truncate pointer-events-none">
+          <span className="absolute top-1.5 end-1.5 text-[9px] px-1.5 py-0.5 rounded bg-black/60 text-white/70 backdrop-blur-sm max-w-[50%] truncate pointer-events-none">
             {team}
           </span>
         )}
@@ -371,7 +378,9 @@ function HighlightCard({
               {tag}
             </span>
             <span className="text-[11px] text-muted-foreground/40 tabular-nums">
-              @ {formatDuration(highlight.start)}
+              {t('highlight.atTime', {
+                time: formatDuration(highlight.start),
+              })}
             </span>
           </div>
           {videoUrl && (
@@ -381,21 +390,21 @@ function HighlightCard({
                   `${(tag || 'highlight').replace(/[^A-Za-z0-9._-]/g, '_')}_${formatDuration(highlight.start).replace(/:/g, '-')}.mp4`
                 )}`}
                 onClick={(e) => e.stopPropagation()}
-                title="Download highlight clip"
-                aria-label="Download highlight clip"
+                title={t('highlight.downloadClip')}
+                aria-label={t('highlight.downloadClip')}
                 className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-white/[0.06] text-[var(--timberwolf)] active:bg-white/[0.12] transition-colors sm:gap-1 sm:px-2 sm:py-1 sm:text-[10px] sm:bg-white/[0.04] sm:text-muted-foreground sm:hover:text-[var(--timberwolf)] sm:hover:bg-white/[0.08] sm:opacity-0 sm:group-hover:opacity-100"
               >
                 <Download className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
-                <span className="sm:hidden">Download</span>
+                <span className="sm:hidden">{t('highlight.download')}</span>
               </a>
               <button
                 onClick={openInEditor}
-                title="Open in portrait-crop editor"
-                aria-label="Open in portrait-crop editor"
+                title={t('highlight.openInEditor')}
+                aria-label={t('highlight.openInEditor')}
                 className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-white/[0.06] text-[var(--timberwolf)] active:bg-white/[0.12] transition-colors sm:gap-1 sm:px-2 sm:py-1 sm:text-[10px] sm:bg-white/[0.04] sm:text-muted-foreground sm:hover:text-[var(--timberwolf)] sm:hover:bg-white/[0.08] sm:opacity-0 sm:group-hover:opacity-100"
               >
                 <Scissors className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
-                <span className="sm:hidden">Portrait</span>
+                <span className="sm:hidden">{t('highlight.portrait')}</span>
               </button>
             </div>
           )}
@@ -416,6 +425,7 @@ function ExpandedRecording({
   recording: VeoRecording
   clubSlug: string
 }) {
+  const t = useTranslations('academy.content')
   const [content, setContent] = useState<MatchContent | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -445,7 +455,7 @@ function ExpandedRecording({
         }
         setContent(json)
       } catch {
-        setError('Failed to load match content')
+        setError(t('match.loadFailed'))
       } finally {
         setLoading(false)
       }
@@ -457,7 +467,7 @@ function ExpandedRecording({
     return (
       <div className="px-4 py-6 flex items-center justify-center gap-2 text-muted-foreground/40">
         <Loader2 className="h-4 w-4 animate-spin" />
-        <span className="text-sm">Loading match content...</span>
+        <span className="text-sm">{t('match.loading')}</span>
       </div>
     )
   }
@@ -465,7 +475,9 @@ function ExpandedRecording({
   if (error) {
     return (
       <div className="px-4 py-4">
-        <p className="text-sm text-red-400/70">{error}</p>
+        <p dir="auto" className="text-sm text-red-400/70">
+          {error}
+        </p>
       </div>
     )
   }
@@ -515,7 +527,7 @@ function ExpandedRecording({
           <div className="flex items-center gap-2 mb-2">
             <BarChart3 className="h-3 w-3 text-muted-foreground/30" />
             <span className="text-[11px] text-muted-foreground/50 uppercase tracking-wider">
-              Match Stats
+              {t('match.stats')}
             </span>
           </div>
           <StatBar stats={content.stats} />
@@ -545,7 +557,7 @@ function ExpandedRecording({
               <div className="flex items-center gap-2 mb-2">
                 <Play className="h-3 w-3 text-muted-foreground/30" />
                 <span className="text-[11px] text-muted-foreground/50 uppercase tracking-wider">
-                  Full Match ({playable.length})
+                  {t('match.fullMatch', { count: playable.length })}
                 </span>
               </div>
 
@@ -567,7 +579,7 @@ function ExpandedRecording({
                         : 'bg-white/[0.04] border-white/[0.06] text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-white/[0.08]'
                     }`}
                   >
-                    {videoLabel(video)}
+                    {videoLabel(t, video)}
                   </button>
                 ))}
               </div>
@@ -579,8 +591,8 @@ function ExpandedRecording({
                   onClick={() => setPlayingHighlight(null)}
                   className="flex items-center gap-1.5 mb-3 text-[11px] px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
                 >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                  Back to full match
+                  <ChevronLeft className="h-3.5 w-3.5 rtl:rotate-180" />
+                  {t('match.backToFullMatch')}
                 </button>
               )}
 
@@ -593,8 +605,7 @@ function ExpandedRecording({
                 />
               ) : (
                 <div className="aspect-video flex items-center justify-center bg-black/30 rounded-lg border border-white/[0.04] text-sm text-muted-foreground/40">
-                  Select a full-match render above, or click a highlight to
-                  play.
+                  {t('match.selectPrompt')}
                 </div>
               )}
             </div>
@@ -607,11 +618,14 @@ function ExpandedRecording({
           <div className="flex items-center gap-2 mb-2">
             <Film className="h-3 w-3 text-muted-foreground/30" />
             <span className="text-[11px] text-muted-foreground/50 uppercase tracking-wider">
-              Highlights ({filteredHighlights.length}
               {filteredHighlights.length !== content.highlights.length
-                ? ` of ${content.highlights.length}`
-                : ''}
-              )
+                ? t('match.highlightsFiltered', {
+                    filtered: filteredHighlights.length,
+                    total: content.highlights.length,
+                  })
+                : t('match.highlights', {
+                    count: filteredHighlights.length,
+                  })}
             </span>
           </div>
 
@@ -626,7 +640,7 @@ function ExpandedRecording({
                     : 'bg-transparent border-white/[0.06] text-muted-foreground/40 hover:text-muted-foreground/70'
                 }`}
               >
-                All
+                {t('match.all')}
               </button>
               {allTags.map((tag) => (
                 <button
@@ -647,12 +661,16 @@ function ExpandedRecording({
           {/* Team filter — only show if team_association data exists */}
           {hasTeamData && (
             <div className="flex flex-wrap items-center gap-1.5 mb-3">
-              <span className="text-[10px] text-muted-foreground/30 mr-1">
-                Team:
+              <span className="text-[10px] text-muted-foreground/30 me-1">
+                {t('match.teamLabel')}
               </span>
               {(['all', 'own', 'opponent'] as const).map((opt) => {
                 const label =
-                  opt === 'all' ? 'All' : opt === 'own' ? 'Ours' : 'Opponent'
+                  opt === 'all'
+                    ? t('match.all')
+                    : opt === 'own'
+                      ? t('match.ours')
+                      : t('match.opponent')
                 return (
                   <button
                     key={opt}
@@ -684,13 +702,13 @@ function ExpandedRecording({
             </div>
           ) : (
             <p className="text-sm text-muted-foreground/30">
-              No highlights match the selected filters.
+              {t('match.noHighlightsMatch')}
             </p>
           )}
         </div>
       ) : (
         <p className="text-sm text-muted-foreground/30">
-          No highlights available for this match.
+          {t('match.noHighlights')}
         </p>
       )}
     </div>
@@ -705,6 +723,9 @@ const PAGE_SIZE = 25
 const PRIVACY_OPTIONS = ['all', 'public', 'private', 'unlisted'] as const
 
 export default function AcademyContentPage() {
+  const t = useTranslations('academy.content')
+  const tTabs = useTranslations('academy.tabs')
+  const format = useFormatter()
   const params = useParams()
   const clubSlug = params.clubSlug as string
 
@@ -722,6 +743,14 @@ export default function AcademyContentPage() {
   // Multi-select team filter — empty list = all teams.
   const [selectedTeams, setSelectedTeams] = useState<string[]>([])
   const [page, setPage] = useState(1)
+
+  function formatMatchDate(dateStr: string): string {
+    try {
+      return format.dateTime(new Date(dateStr), 'short')
+    } catch {
+      return dateStr
+    }
+  }
 
   // Distinct teams appearing across all recordings, with their match count.
   // The multi-select shows every team (including opponents) so admins can
@@ -758,7 +787,7 @@ export default function AcademyContentPage() {
           typeof json.clubName === 'string' ? json.clubName : clubSlug
         )
       } catch {
-        setError('Failed to load recordings')
+        setError(t('loadFailed'))
       } finally {
         setLoading(false)
       }
@@ -840,7 +869,9 @@ export default function AcademyContentPage() {
         <div className="rounded-xl border border-red-500/20 bg-red-500/[0.04] p-6">
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-300">{error}</p>
+            <p dir="auto" className="text-sm text-red-300">
+              {error}
+            </p>
           </div>
         </div>
       </div>
@@ -852,7 +883,7 @@ export default function AcademyContentPage() {
       {/* Header */}
       <div className="mb-8">
         <p className="text-muted-foreground/70 text-[11px] font-medium tracking-[0.2em] uppercase mb-1.5">
-          Content
+          {tTabs('content')}
         </p>
         <h1 className="text-2xl sm:text-3xl font-semibold text-[var(--timberwolf)] tracking-tight">
           {clubName}
@@ -862,18 +893,18 @@ export default function AcademyContentPage() {
       {/* Search + Privacy */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/30" />
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/30" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by title or team..."
-            className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg pl-9 pr-8 py-2 text-sm text-[var(--timberwolf)] placeholder:text-muted-foreground/25 focus:outline-none focus:border-white/[0.12] transition-colors"
+            placeholder={t('searchPlaceholder')}
+            className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg ps-9 pe-8 py-2 text-sm text-[var(--timberwolf)] placeholder:text-muted-foreground/25 focus:outline-none focus:border-white/[0.12] transition-colors"
           />
           {search && (
             <button
               onClick={() => setSearch('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/30 hover:text-muted-foreground/60"
+              className="absolute end-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/30 hover:text-muted-foreground/60"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -884,13 +915,13 @@ export default function AcademyContentPage() {
             <button
               key={opt}
               onClick={() => setPrivacyFilter(opt)}
-              className={`flex-1 sm:flex-none text-[11px] px-3 py-1.5 rounded-md capitalize transition-colors whitespace-nowrap text-center ${
+              className={`flex-1 sm:flex-none text-[11px] px-3 py-1.5 rounded-md transition-colors whitespace-nowrap text-center ${
                 privacyFilter === opt
                   ? 'bg-white/[0.08] text-[var(--timberwolf)]'
                   : 'text-muted-foreground/40 hover:text-muted-foreground/70'
               }`}
             >
-              {opt}
+              {t(`privacy.${opt}`)}
             </button>
           ))}
         </div>
@@ -914,10 +945,10 @@ export default function AcademyContentPage() {
                 options={teamOptions}
                 selected={selectedTeams}
                 onChange={setSelectedTeams}
-                placeholder="All teams"
-                searchPlaceholder="Search teams..."
-                emptyLabel="No teams match"
-                aria-label="Filter by team"
+                placeholder={t('allTeams')}
+                searchPlaceholder={t('searchTeamsPlaceholder')}
+                emptyLabel={t('noTeamsMatch')}
+                aria-label={t('filterByTeam')}
                 className="min-w-[200px] sm:min-w-[240px]"
               />
             )}
@@ -926,7 +957,7 @@ export default function AcademyContentPage() {
                 value={dateFrom}
                 onChange={setDateFrom}
                 max={dateTo || undefined}
-                placeholder="From date"
+                placeholder={t('fromDate')}
                 className="w-full"
               />
             </div>
@@ -935,7 +966,7 @@ export default function AcademyContentPage() {
                 value={dateTo}
                 onChange={setDateTo}
                 min={dateFrom || undefined}
-                placeholder="To date"
+                placeholder={t('toDate')}
                 className="w-full"
               />
             </div>
@@ -948,11 +979,11 @@ export default function AcademyContentPage() {
                   setDateTo('')
                   setSelectedTeams([])
                 }}
-                aria-label="Clear all filters"
+                aria-label={t('clearAllFilters')}
                 className="flex items-center gap-1.5 px-3 h-10 rounded-md text-[12px] text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-white/[0.06] transition-colors"
               >
                 <X className="h-3.5 w-3.5" />
-                Clear filters
+                {t('clearFilters')}
               </button>
             )}
           </div>
@@ -963,12 +994,15 @@ export default function AcademyContentPage() {
       <div className="flex items-center justify-between mb-3">
         <p className="text-[11px] text-muted-foreground/40 tabular-nums">
           {filtered.length === recordings.length
-            ? `${recordings.length} recordings`
-            : `${filtered.length} of ${recordings.length} recordings`}
+            ? t('recordingsCount', { count: recordings.length })
+            : t('recordingsCountFiltered', {
+                filtered: filtered.length,
+                total: recordings.length,
+              })}
         </p>
         {totalPages > 1 && (
           <p className="text-[11px] text-muted-foreground/30 tabular-nums">
-            Page {safePage} of {totalPages}
+            {t('pageOf', { page: safePage, total: totalPages })}
           </p>
         )}
       </div>
@@ -979,8 +1013,8 @@ export default function AcademyContentPage() {
           <Film className="h-8 w-8 text-muted-foreground/20 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground/50">
             {search || privacyFilter !== 'all' || dateFrom || dateTo
-              ? 'No recordings match your filters.'
-              : 'No recordings found for this club.'}
+              ? t('noMatchFilters')
+              : t('noRecordings')}
           </p>
           {(search ||
             privacyFilter !== 'all' ||
@@ -997,7 +1031,7 @@ export default function AcademyContentPage() {
               }}
               className="mt-3 text-[11px] text-muted-foreground/40 hover:text-muted-foreground/70 underline underline-offset-2 transition-colors"
             >
-              Clear filters
+              {t('clearFilters')}
             </button>
           )}
         </div>
@@ -1020,7 +1054,7 @@ export default function AcademyContentPage() {
                     onClick={() =>
                       setExpandedSlug(isExpanded ? null : rec.slug)
                     }
-                    className="w-full flex items-center gap-3 px-3 sm:px-4 py-3 hover:bg-muted/50 transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-3 sm:px-4 py-3 hover:bg-muted/50 transition-colors text-start"
                   >
                     {/* Thumbnail */}
                     <div className="w-12 h-8 sm:w-16 sm:h-10 rounded-md overflow-hidden bg-black/30 flex-shrink-0">
@@ -1045,7 +1079,7 @@ export default function AcademyContentPage() {
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
                         {rec.match_date && (
                           <span className="text-[11px] text-muted-foreground/40">
-                            {formatDate(rec.match_date)}
+                            {formatMatchDate(rec.match_date)}
                           </span>
                         )}
                         {hasTeams && hasScore && (
@@ -1060,7 +1094,7 @@ export default function AcademyContentPage() {
                           <span className="text-[11px] text-muted-foreground/40">
                             {teamName(rec.home_team)}
                             {rec.away_team
-                              ? ` vs ${teamName(rec.away_team)}`
+                              ? ` ${t('vs')} ${teamName(rec.away_team)}`
                               : ''}
                           </span>
                         )}
@@ -1082,7 +1116,7 @@ export default function AcademyContentPage() {
                         className={`text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-1 ${privacyColor(rec.privacy)}`}
                       >
                         {privacyIcon(rec.privacy)}
-                        {String(rec.privacy || '')}
+                        {privacyLabel(t, rec.privacy)}
                       </span>
                       {(() => {
                         const status = parseProcessingStatus(
@@ -1099,7 +1133,7 @@ export default function AcademyContentPage() {
 
                     <ChevronDown
                       className={`h-3.5 w-3.5 text-muted-foreground/30 flex-shrink-0 transition-transform ${
-                        isExpanded ? '' : '-rotate-90'
+                        isExpanded ? '' : '-rotate-90 rtl:rotate-90'
                       }`}
                     />
                   </button>
@@ -1123,7 +1157,7 @@ export default function AcademyContentPage() {
                 disabled={safePage <= 1}
                 className="p-2 rounded-lg text-muted-foreground/40 hover:text-[var(--timberwolf)] hover:bg-white/[0.04] disabled:opacity-20 disabled:pointer-events-none transition-colors"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
               </button>
 
               {Array.from({ length: totalPages }, (_, i) => i + 1)
@@ -1166,7 +1200,7 @@ export default function AcademyContentPage() {
                 disabled={safePage >= totalPages}
                 className="p-2 rounded-lg text-muted-foreground/40 hover:text-[var(--timberwolf)] hover:bg-white/[0.04] disabled:opacity-20 disabled:pointer-events-none transition-colors"
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-4 w-4 rtl:rotate-180" />
               </button>
             </div>
           )}

@@ -33,7 +33,9 @@ export function meshBaseUrl(gameId: string | null | undefined): string | null {
  * only when a mesh actually exists, so users never hit a broken de-warp.
  * Any absence (404) or error → false (degrade to Auto-only), never throws.
  */
-export async function meshExists(gameId: string | null | undefined): Promise<boolean> {
+export async function meshExists(
+  gameId: string | null | undefined
+): Promise<boolean> {
   const base = meshBaseUrl(gameId)
   if (!base) return false
   try {

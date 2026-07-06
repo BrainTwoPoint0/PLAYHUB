@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useRef } from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from '@/i18n/navigation'
 import { Button, Badge } from '@braintwopoint0/playback-commons/ui'
 import { ShieldCheck } from 'lucide-react'
@@ -21,6 +22,7 @@ export function VerifyPlayerButton({
   organizationId,
   initialVerified,
 }: VerifyPlayerButtonProps) {
+  const t = useTranslations('org.verify')
   const [verified, setVerified] = useState(initialVerified)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
@@ -50,14 +52,16 @@ export function VerifyPlayerButton({
         })
         if (!res.ok) {
           const payload = await res.json().catch(() => ({}))
-          throw new Error(payload.error ?? `Request failed: ${res.status}`)
+          throw new Error(
+            payload.error ?? t('requestFailed', { status: res.status })
+          )
         }
         // Re-fetch the server component so the verification count + downstream
         // public profile reflect the new state on next nav.
         router.refresh()
       } catch (err) {
         setVerified(!next)
-        setError(err instanceof Error ? err.message : 'Failed')
+        setError(err instanceof Error ? err.message : t('failed'))
       } finally {
         inFlightRef.current = false
       }
@@ -71,7 +75,7 @@ export function VerifyPlayerButton({
           variant="secondary"
           className="bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/15"
         >
-          <ShieldCheck className="mr-1 h-3 w-3" /> Verified
+          <ShieldCheck className="me-1 h-3 w-3" /> {t('verified')}
         </Badge>
         <Button
           variant="ghost"
@@ -80,9 +84,13 @@ export function VerifyPlayerButton({
           disabled={pending}
           className="text-xs text-muted-foreground hover:text-destructive"
         >
-          Revoke
+          {t('revoke')}
         </Button>
-        {error && <span className="text-xs text-destructive">{error}</span>}
+        {error && (
+          <span dir="auto" className="text-xs text-destructive">
+            {error}
+          </span>
+        )}
       </div>
     )
   }
@@ -90,10 +98,14 @@ export function VerifyPlayerButton({
   return (
     <div className="flex items-center gap-2">
       <Button variant="outline" size="sm" onClick={toggle} disabled={pending}>
-        <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
-        {pending ? 'Verifying…' : 'Verify'}
+        <ShieldCheck className="me-1.5 h-3.5 w-3.5" />
+        {pending ? t('verifying') : t('verify')}
       </Button>
-      {error && <span className="text-xs text-destructive">{error}</span>}
+      {error && (
+        <span dir="auto" className="text-xs text-destructive">
+          {error}
+        </span>
+      )}
     </div>
   )
 }

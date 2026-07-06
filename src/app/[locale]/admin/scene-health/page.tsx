@@ -8,7 +8,8 @@
 // render); the /api/admin/scene-health routes re-check on every request.
 // Belt-and-braces, matches the existing /admin/* pattern.
 
-import { redirect } from 'next/navigation' // i18n-todo: locale-unaware redirect (drops /ar prefix); migrate with next-intl redirect in a later pass
+import { getLocale } from 'next-intl/server'
+import { redirect } from '@/i18n/navigation'
 import { getAuthUserStrict } from '@/lib/supabase/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { SceneHealthClient } from './SceneHealthClient'
@@ -20,8 +21,13 @@ export const dynamic = 'force-dynamic'
 
 export default async function SceneHealthAdminPage() {
   const { user } = await getAuthUserStrict()
-  if (!user) redirect('/auth/login?redirect=/admin/scene-health')
-  if (!(await isPlatformAdmin(user.id))) redirect('/')
+  if (!user)
+    return redirect({
+      href: '/auth/login?redirect=/admin/scene-health',
+      locale: await getLocale(),
+    })
+  if (!(await isPlatformAdmin(user.id)))
+    return redirect({ href: '/', locale: await getLocale() })
 
   return <SceneHealthClient />
 }

@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { useAuthErrorMessages } from '@/lib/auth/use-auth-error-messages'
 import {
   LumaSpin,
   ResetPasswordForm,
@@ -10,6 +11,7 @@ import {
 
 function ResetPasswordScreen() {
   const t = useTranslations('auth.resetPassword')
+  const authErrorMessages = useAuthErrorMessages()
   const searchParams = useSearchParams()
   const [initialError, setInitialError] = useState<string | undefined>(
     undefined
@@ -26,6 +28,7 @@ function ResetPasswordScreen() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <ResetPasswordForm
+          authErrorMessages={authErrorMessages}
           initialError={initialError}
           title={t('title')}
           subtitle={t('subtitle')}

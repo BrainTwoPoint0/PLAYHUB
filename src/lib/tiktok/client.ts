@@ -36,9 +36,12 @@ const BUFFER_MS = 5 * 60 * 1000 // refresh 5 min before expiry
 // when present; once approved, clear TIKTOK_CLIENT_SANDBOX_* to fall back to the
 // production TIKTOK_CLIENT_KEY/SECRET without a code change.
 function getClientKey(): string {
-  const key = process.env.TIKTOK_CLIENT_SANDBOX_KEY || process.env.TIKTOK_CLIENT_KEY
+  const key =
+    process.env.TIKTOK_CLIENT_SANDBOX_KEY || process.env.TIKTOK_CLIENT_KEY
   if (!key) {
-    throw new Error('TIKTOK_CLIENT_KEY (or TIKTOK_CLIENT_SANDBOX_KEY) is not configured')
+    throw new Error(
+      'TIKTOK_CLIENT_KEY (or TIKTOK_CLIENT_SANDBOX_KEY) is not configured'
+    )
   }
   return key
 }
@@ -322,8 +325,13 @@ async function getUserAccessToken(userId: string): Promise<string> {
   if (updErr) {
     // TikTok rotated the refresh token but we failed to store it — the stored
     // one is now dead. Surface loudly; the next call will require a reconnect.
-    console.error('[tiktok] failed to persist refreshed tokens:', updErr.message)
-    throw new Error('Could not save refreshed TikTok credentials. Please try again.')
+    console.error(
+      '[tiktok] failed to persist refreshed tokens:',
+      updErr.message
+    )
+    throw new Error(
+      'Could not save refreshed TikTok credentials. Please try again.'
+    )
   }
   return fresh.accessToken
 }

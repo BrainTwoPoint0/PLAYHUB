@@ -25,9 +25,7 @@ export default async function VerifyEmailPage({
             <h1 className="text-2xl font-bold text-[var(--timberwolf)] mb-2">
               {t('title')}
             </h1>
-            <p className="text-sm text-[var(--ash-grey)]">
-              {t('description')}
-            </p>
+            <p className="text-sm text-[var(--ash-grey)]">{t('description')}</p>
           </div>
 
           <div className="pt-4 space-y-3">

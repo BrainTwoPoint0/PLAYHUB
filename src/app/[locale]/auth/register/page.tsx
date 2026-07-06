@@ -11,6 +11,7 @@ import {
   validatePassword,
   validateUsername,
   getAuthErrorMessage,
+  getAuthErrorCode,
 } from '@braintwopoint0/playback-commons/auth'
 import { createClient } from '@braintwopoint0/playback-commons/supabase'
 import {
@@ -154,20 +155,15 @@ function RegisterForm() {
       const { data, error } = await signUp(email, password, metadata)
 
       if (error) {
-        setError(getAuthErrorMessage(error))
+        const code = getAuthErrorCode(error)
+        setError(
+          code ? tAuth(`serverErrors.${code}`) : getAuthErrorMessage(error)
+        )
       } else if (data?.user) {
         if (data.user.identities && data.user.identities.length === 0) {
           setError(t('errors.emailExists'))
         } else {
-          const raw = searchParams.get('redirect') || '/'
-          const safe =
-            raw.startsWith('/') &&
-            !raw.startsWith('//') &&
-            !raw.includes('@') &&
-            !raw.includes('\\')
-              ? raw
-              : '/'
-          router.push(safe)
+          router.push(sanitizeRedirect(searchParams.get('redirect')))
         }
       } else {
         setError(t('errors.createFailed'))

@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { useAuthErrorMessages } from '@/lib/auth/use-auth-error-messages'
 import { ForgotPasswordForm } from '@braintwopoint0/playback-commons/ui'
 
 export default function ForgotPasswordPage() {
   const t = useTranslations('auth.forgotPassword')
+  const authErrorMessages = useAuthErrorMessages()
   // window.location.origin must be read on the client; pre-compute once mounted.
   const [redirectTo, setRedirectTo] = useState('')
 
@@ -27,6 +29,7 @@ export default function ForgotPasswordPage() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <ForgotPasswordForm
+          authErrorMessages={authErrorMessages}
           redirectTo={redirectTo}
           title={t('title')}
           subtitle={t('subtitle')}

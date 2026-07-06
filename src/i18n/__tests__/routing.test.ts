@@ -3,7 +3,7 @@ import { routing } from '../routing'
 
 describe('i18n routing config', () => {
   it('supports exactly en, ar, es', () => {
-    expect(routing.locales).toEqual(['en', 'ar'])
+    expect(routing.locales).toEqual(['en', 'ar', 'es'])
   })
 
   it('defaults to English', () => {

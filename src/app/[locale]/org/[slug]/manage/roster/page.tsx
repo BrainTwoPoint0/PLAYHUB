@@ -1,4 +1,7 @@
-import { redirect, notFound } from 'next/navigation' // i18n-todo: locale-unaware redirect (drops /ar prefix); migrate with next-intl redirect in a later pass
+import { notFound } from 'next/navigation'
+import { getLocale } from 'next-intl/server'
+import { redirect } from '@/i18n/navigation'
+import { getTranslations } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
 import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
@@ -13,8 +16,9 @@ import {
 import { VerifyPlayerButton } from './verify-player-button'
 import { ChevronLeft } from 'lucide-react'
 
-export const metadata = {
-  title: 'Roster · Manage',
+export async function generateMetadata() {
+  const t = await getTranslations('org.roster')
+  return { title: t('metaTitle') }
 }
 
 interface PageProps {
@@ -33,7 +37,11 @@ interface RosterRow {
 export default async function RosterPage({ params }: PageProps) {
   const { slug } = await params
   const { user } = await getAuthUser()
-  if (!user) redirect(`/login?next=/org/${slug}/manage/roster`)
+  if (!user)
+    return redirect({
+      href: `/auth/login?redirect=${encodeURIComponent(`/org/${slug}/manage/roster`)}`,
+      locale: await getLocale(),
+    })
 
   const supabase = createServiceClient() as any
 
@@ -47,7 +55,7 @@ export default async function RosterPage({ params }: PageProps) {
   const isAdmin =
     (await isVenueAdmin(user.id, org.id)) || (await isPlatformAdmin(user.id))
   if (!isAdmin) {
-    redirect(`/org/${slug}`)
+    return redirect({ href: `/org/${slug}`, locale: await getLocale() })
   }
 
   // Roster: org_members where role='player' AND active. Join profiles for display.
@@ -91,29 +99,32 @@ export default async function RosterPage({ params }: PageProps) {
 
   const verifiedCount = roster.filter((r) => r.isVerified).length
 
+  const t = await getTranslations('org.roster')
+
   return (
     <div className="container mx-auto py-8 px-4 max-w-4xl">
       <Link
         href={`/org/${slug}/manage`}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6"
       >
-        <ChevronLeft className="h-4 w-4" />
-        Back to manage
+        <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
+        {t('backToManage')}
       </Link>
 
       <Card>
         <CardHeader>
-          <CardTitle>{org.name} · Roster</CardTitle>
+          <CardTitle>{t('title', { name: org.name })}</CardTitle>
           <CardDescription>
-            {roster.length} active player
-            {roster.length === 1 ? '' : 's'} · {verifiedCount} verified by this
-            club
+            {t('description', {
+              count: roster.length,
+              verified: verifiedCount,
+            })}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {roster.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">
-              No active players on the roster yet.
+              {t('empty')}
             </p>
           ) : (
             <div className="divide-y divide-border">
@@ -128,7 +139,7 @@ export default async function RosterPage({ params }: PageProps) {
                     </div>
                     <div className="min-w-0">
                       <div className="text-sm font-medium truncate">
-                        {row.fullName ?? row.username ?? 'Unknown player'}
+                        {row.fullName ?? row.username ?? t('unknownPlayer')}
                       </div>
                       {row.username && (
                         <Link

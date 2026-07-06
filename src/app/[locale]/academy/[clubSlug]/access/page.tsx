@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useRouter } from '@/i18n/navigation'
 import {
   ChevronDown,
@@ -67,6 +68,8 @@ interface VeoException {
   created_at: string
 }
 
+type Translator = ReturnType<typeof useTranslations>
+
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -95,35 +98,37 @@ function stripeStatusColor(
 }
 
 function stripeStatusLabel(
+  t: Translator,
   status: string | null,
   hasSub: boolean,
   isExempt = false
 ): string {
-  if (!hasSub) return isExempt ? 'exempt' : 'No subscription'
-  return status || 'unknown'
+  if (!hasSub) return isExempt ? t('status.exempt') : t('status.noSubscription')
+  // Stripe statuses ('active', 'trialing', ...) are provider values — raw.
+  return status || t('status.unknown')
 }
 
-function timeAgo(dateString: string): string {
+function timeAgo(t: Translator, dateString: string): string {
   const seconds = Math.floor(
     (Date.now() - new Date(dateString).getTime()) / 1000
   )
-  if (seconds < 60) return 'just now'
+  if (seconds < 60) return t('justNow')
   const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
+  if (minutes < 60) return t('minutesAgo', { count: minutes })
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
+  if (hours < 24) return t('hoursAgo', { count: hours })
   const days = Math.floor(hours / 24)
-  return `${days}d ago`
+  return t('daysAgo', { count: days })
 }
 
-function roleLabel(veoRole: string): string {
+function roleLabel(t: Translator, veoRole: string): string {
   switch (veoRole) {
     case 'coach':
-      return 'Coach'
+      return t('roles.coach')
     case 'admin':
-      return 'Admin'
+      return t('roles.admin')
     case 'owner':
-      return 'Owner'
+      return t('roles.owner')
     default:
       return veoRole
   }
@@ -134,6 +139,8 @@ function roleLabel(veoRole: string): string {
 // ============================================================================
 
 export default function AcademyAccessPage() {
+  const t = useTranslations('academy.access')
+  const tTabs = useTranslations('academy.tabs')
   const params = useParams()
   const clubSlug = params.clubSlug as string
   const router = useRouter()
@@ -202,7 +209,7 @@ export default function AcademyAccessPage() {
 
       setData(json)
     } catch {
-      setError('Failed to load Veo data')
+      setError(t('loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -227,7 +234,7 @@ export default function AcademyAccessPage() {
       })
       const json = await res.json()
       if (!res.ok) {
-        setError(json.error || 'Sync failed')
+        setError(json.error || t('syncFailed'))
         return
       }
       // Lambda runs async — poll until data refreshes (~20-30s)
@@ -242,7 +249,7 @@ export default function AcademyAccessPage() {
         }
       }
     } catch {
-      setError('Sync request failed')
+      setError(t('syncRequestFailed'))
     } finally {
       setSyncing(false)
     }
@@ -307,13 +314,13 @@ export default function AcademyAccessPage() {
       })
       const json = await res.json()
       if (res.ok) {
-        setAdminMessage('Admin removed')
+        setAdminMessage(t('admins.removed'))
         await fetchAdmins()
       } else {
-        setAdminMessage(json.error || 'Failed to remove admin')
+        setAdminMessage(json.error || t('admins.removeFailed'))
       }
     } catch {
-      setAdminMessage('Failed to remove admin')
+      setAdminMessage(t('admins.removeFailed'))
     } finally {
       setAdminsLoading(false)
     }
@@ -332,15 +339,13 @@ export default function AcademyAccessPage() {
       const json = await res.json()
       if (res.ok) {
         setNewAdminEmail('')
-        setAdminMessage(
-          json.invited ? json.message : 'Admin added successfully'
-        )
+        setAdminMessage(json.invited ? json.message : t('admins.added'))
         await fetchAdmins()
       } else {
-        setAdminMessage(json.error || 'Failed to invite admin')
+        setAdminMessage(json.error || t('admins.inviteFailed'))
       }
     } catch {
-      setAdminMessage('Failed to invite admin')
+      setAdminMessage(t('admins.inviteFailed'))
     } finally {
       setAdminsLoading(false)
     }
@@ -404,7 +409,9 @@ export default function AcademyAccessPage() {
             <div className="flex items-start gap-3">
               <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
               <div className="space-y-3">
-                <p className="text-sm text-red-300">{error}</p>
+                <p dir="auto" className="text-sm text-red-300">
+                  {error}
+                </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={triggerCacheSync}
@@ -412,15 +419,15 @@ export default function AcademyAccessPage() {
                     className="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[var(--timberwolf)] hover:bg-white/10 transition-colors disabled:opacity-50"
                   >
                     <RefreshCw
-                      className={`h-3 w-3 inline mr-1.5 ${syncing ? 'animate-spin' : ''}`}
+                      className={`h-3 w-3 inline me-1.5 ${syncing ? 'animate-spin' : ''}`}
                     />
-                    {syncing ? 'Syncing...' : 'Sync Now'}
+                    {syncing ? t('syncingEllipsis') : t('syncNow')}
                   </button>
                   <button
                     onClick={() => router.push('/academy')}
                     className="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[var(--timberwolf)] hover:bg-white/10 transition-colors"
                   >
-                    Switch Club
+                    {t('switchClub')}
                   </button>
                 </div>
               </div>
@@ -476,33 +483,33 @@ export default function AcademyAccessPage() {
   // Stat card config
   const stats = [
     {
-      label: 'Active Subs',
+      label: t('stats.activeSubs'),
       value: academySubs,
       color: 'text-emerald-400',
       dot: 'bg-emerald-400',
     },
     {
-      label: 'Veo Members',
+      label: t('stats.veoMembers'),
       value: totalMembers,
       color: 'text-[var(--timberwolf)]',
       dot: 'bg-muted-foreground',
     },
     {
-      label: 'No Sub',
+      label: t('stats.noSub'),
       value: noSub,
       color: 'text-red-400',
       dot: 'bg-red-400',
       alert: noSub > 0,
     },
     {
-      label: 'Not in Veo',
+      label: t('stats.notInVeo'),
       value: data.stripeOnlySubscribers?.length ?? 0,
       color: 'text-orange-400',
       dot: 'bg-orange-400',
       alert: (data.stripeOnlySubscribers?.length ?? 0) > 0,
     },
     {
-      label: 'Staff',
+      label: t('stats.staff'),
       value: staff.length,
       color: 'text-amber-400',
       dot: 'bg-amber-400',
@@ -510,7 +517,7 @@ export default function AcademyAccessPage() {
     ...(data.hasScholarships && scholarships > 0
       ? [
           {
-            label: 'Scholarships',
+            label: t('stats.scholarships'),
             value: scholarships,
             color: 'text-purple-400',
             dot: 'bg-purple-400',
@@ -528,14 +535,14 @@ export default function AcademyAccessPage() {
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
               <div>
                 <p className="text-muted-foreground/70 text-[11px] font-medium tracking-[0.2em] uppercase mb-1.5">
-                  Access Audit
+                  {tTabs('accessAudit')}
                 </p>
                 <h1 className="text-2xl sm:text-3xl font-semibold text-[var(--timberwolf)] tracking-tight">
                   {data.clubName}
                 </h1>
                 {data.lastSyncedAt && (
                   <p className="text-[11px] text-muted-foreground/50 mt-1.5">
-                    Last synced {timeAgo(data.lastSyncedAt)}
+                    {t('lastSynced', { ago: timeAgo(t, data.lastSyncedAt) })}
                   </p>
                 )}
               </div>
@@ -548,16 +555,16 @@ export default function AcademyAccessPage() {
                       className="text-[11px] px-3 py-1.5 rounded-lg bg-muted text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted transition-all disabled:opacity-50"
                     >
                       <RefreshCw
-                        className={`h-3 w-3 inline mr-1 ${syncing ? 'animate-spin' : ''}`}
+                        className={`h-3 w-3 inline me-1 ${syncing ? 'animate-spin' : ''}`}
                       />
-                      {syncing ? 'Syncing' : 'Sync'}
+                      {syncing ? t('syncing') : t('sync')}
                     </button>
                     <button
                       onClick={() => fetchVeoData(true)}
                       className="text-[11px] px-3 py-1.5 rounded-lg bg-muted text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted transition-all"
                     >
-                      <ArrowLeftRight className="h-3 w-3 inline mr-1" />
-                      Refresh
+                      <ArrowLeftRight className="h-3 w-3 inline me-1" />
+                      {t('refresh')}
                     </button>
                   </>
                 )}
@@ -565,7 +572,7 @@ export default function AcademyAccessPage() {
                   onClick={() => router.push('/academy')}
                   className="text-[11px] px-3 py-1.5 rounded-lg bg-muted text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted transition-all"
                 >
-                  Switch
+                  {t('switch')}
                 </button>
               </div>
             </div>
@@ -613,17 +620,17 @@ export default function AcademyAccessPage() {
               <div className="rounded-xl bg-card overflow-hidden">
                 <button
                   onClick={() => setExceptionsOpen(!exceptionsOpen)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-start"
                 >
                   <Shield className="h-3.5 w-3.5 text-blue-400/70" />
                   <span className="text-sm font-medium text-[var(--timberwolf)]">
-                    Exceptions
+                    {t('exceptions.title')}
                   </span>
                   <span className="text-[11px] text-muted-foreground/50">
                     {exceptions.length}
                   </span>
                   <ChevronDown
-                    className={`h-3 w-3 text-muted-foreground/40 ml-auto transition-transform ${exceptionsOpen ? '' : '-rotate-90'}`}
+                    className={`h-3 w-3 text-muted-foreground/40 ms-auto transition-transform ${exceptionsOpen ? '' : '-rotate-90 rtl:rotate-90'}`}
                   />
                 </button>
                 {exceptionsOpen && (
@@ -631,19 +638,20 @@ export default function AcademyAccessPage() {
                     <div className="flex flex-col sm:flex-row sm:items-end gap-2">
                       <div className="flex-1">
                         <label className="text-[10px] text-muted-foreground/50 uppercase tracking-wider mb-1 block">
-                          Email
+                          {t('exceptions.email')}
                         </label>
                         <input
                           type="email"
+                          dir="ltr"
                           value={newExceptionEmail}
                           onChange={(e) => setNewExceptionEmail(e.target.value)}
-                          placeholder="user@example.com"
+                          placeholder={t('exceptions.emailPlaceholder')}
                           className="w-full text-sm px-3 py-1.5 rounded-lg bg-muted border border-border text-[var(--timberwolf)] placeholder-muted-foreground outline-none focus:border-ring transition-colors"
                         />
                       </div>
                       <div className="flex-1">
                         <label className="text-[10px] text-muted-foreground/50 uppercase tracking-wider mb-1 block">
-                          Reason
+                          {t('exceptions.reason')}
                         </label>
                         <input
                           type="text"
@@ -651,7 +659,7 @@ export default function AcademyAccessPage() {
                           onChange={(e) =>
                             setNewExceptionReason(e.target.value)
                           }
-                          placeholder="Optional"
+                          placeholder={t('exceptions.reasonPlaceholder')}
                           className="w-full text-sm px-3 py-1.5 rounded-lg bg-muted border border-border text-[var(--timberwolf)] placeholder-muted-foreground outline-none focus:border-ring transition-colors"
                         />
                       </div>
@@ -662,7 +670,7 @@ export default function AcademyAccessPage() {
                         }
                         className="text-xs px-4 py-1.5 rounded-lg bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors disabled:opacity-30"
                       >
-                        Add
+                        {t('exceptions.add')}
                       </button>
                     </div>
                     {exceptions.length > 0 && (
@@ -673,7 +681,10 @@ export default function AcademyAccessPage() {
                             className="flex items-center justify-between gap-2 py-1.5 group"
                           >
                             <div className="flex items-center gap-2 min-w-0 text-sm">
-                              <span className="text-[var(--timberwolf)]/80 truncate">
+                              <span
+                                dir="ltr"
+                                className="text-[var(--timberwolf)]/80 truncate"
+                              >
                                 {exc.email}
                               </span>
                               {exc.reason && (
@@ -701,17 +712,17 @@ export default function AcademyAccessPage() {
               <div className="rounded-xl bg-card overflow-hidden">
                 <button
                   onClick={() => setAdminsOpen(!adminsOpen)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-start"
                 >
                   <UserCog className="h-3.5 w-3.5 text-muted-foreground/50" />
                   <span className="text-sm font-medium text-[var(--timberwolf)]">
-                    Admins
+                    {t('admins.title')}
                   </span>
                   <span className="text-[11px] text-muted-foreground/50">
                     {admins.length}
                   </span>
                   <ChevronDown
-                    className={`h-3 w-3 text-muted-foreground/40 ml-auto transition-transform ${adminsOpen ? '' : '-rotate-90'}`}
+                    className={`h-3 w-3 text-muted-foreground/40 ms-auto transition-transform ${adminsOpen ? '' : '-rotate-90 rtl:rotate-90'}`}
                   />
                 </button>
                 {adminsOpen && (
@@ -719,13 +730,14 @@ export default function AcademyAccessPage() {
                     <div className="flex flex-col sm:flex-row sm:items-end gap-2">
                       <div className="flex-1">
                         <label className="text-[10px] text-muted-foreground/50 uppercase tracking-wider mb-1 block">
-                          Email
+                          {t('admins.email')}
                         </label>
                         <input
                           type="email"
+                          dir="ltr"
                           value={newAdminEmail}
                           onChange={(e) => setNewAdminEmail(e.target.value)}
-                          placeholder="admin@example.com"
+                          placeholder={t('admins.emailPlaceholder')}
                           className="w-full text-sm px-3 py-1.5 rounded-lg bg-muted border border-border text-[var(--timberwolf)] placeholder-muted-foreground outline-none focus:border-ring transition-colors"
                         />
                       </div>
@@ -734,11 +746,14 @@ export default function AcademyAccessPage() {
                         disabled={adminsLoading || !newAdminEmail.trim()}
                         className="text-xs px-4 py-1.5 rounded-lg bg-muted text-[var(--timberwolf)] hover:bg-white/[0.1] transition-colors disabled:opacity-30"
                       >
-                        Invite
+                        {t('admins.invite')}
                       </button>
                     </div>
                     {adminMessage && (
-                      <p className="text-[11px] text-muted-foreground/60">
+                      <p
+                        dir="auto"
+                        className="text-[11px] text-muted-foreground/60"
+                      >
                         {adminMessage}
                       </p>
                     )}
@@ -751,21 +766,24 @@ export default function AcademyAccessPage() {
                           >
                             <div className="min-w-0">
                               <span className="text-sm text-[var(--timberwolf)]/80 truncate block">
-                                {admin.fullName || 'Unknown'}
+                                {admin.fullName || t('unknown')}
                               </span>
-                              <span className="text-[11px] text-muted-foreground/40 truncate block">
+                              <span
+                                dir="ltr"
+                                className="text-[11px] text-muted-foreground/40 truncate block"
+                              >
                                 {admin.email}
                               </span>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
                               <span className="text-[10px] text-muted-foreground/40">
                                 {admin.role === 'admin'
-                                  ? 'Admin'
+                                  ? t('admins.roleAdmin')
                                   : admin.role === 'manager'
-                                    ? 'Manager'
+                                    ? t('admins.roleManager')
                                     : admin.role === 'league_admin'
-                                      ? 'League'
-                                      : 'Admin'}
+                                      ? t('admins.roleLeague')
+                                      : t('admins.roleAdmin')}
                               </span>
                               <button
                                 onClick={() => removeAdmin(admin.id)}
@@ -793,17 +811,19 @@ export default function AcademyAccessPage() {
               <div className="rounded-xl bg-card overflow-hidden mb-8">
                 <button
                   onClick={() => setStripeOnlyOpen(!stripeOnlyOpen)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-start"
                 >
                   <AlertTriangle className="h-3.5 w-3.5 text-orange-400/70" />
                   <span className="text-sm font-medium text-[var(--timberwolf)]">
-                    Not in Veo
+                    {t('stripeOnly.title')}
                   </span>
                   <span className="text-[11px] text-orange-400/70">
-                    {data.stripeOnlySubscribers.length} paying but missing
+                    {t('stripeOnly.payingButMissing', {
+                      count: data.stripeOnlySubscribers.length,
+                    })}
                   </span>
                   <ChevronDown
-                    className={`h-3 w-3 text-muted-foreground/40 ml-auto transition-transform ${stripeOnlyOpen ? '' : '-rotate-90'}`}
+                    className={`h-3 w-3 text-muted-foreground/40 ms-auto transition-transform ${stripeOnlyOpen ? '' : '-rotate-90 rtl:rotate-90'}`}
                   />
                 </button>
                 {stripeOnlyOpen && (
@@ -817,10 +837,12 @@ export default function AcademyAccessPage() {
                       >
                         <div className="min-w-0">
                           <div className="text-sm text-[var(--timberwolf)]/90 truncate">
-                            {sub.name || 'Unknown'}
+                            {sub.name || t('unknown')}
                           </div>
                           <div className="text-[11px] text-muted-foreground/40 truncate flex items-center gap-1.5">
-                            <span className="truncate">{sub.email}</span>
+                            <span dir="ltr" className="truncate">
+                              {sub.email}
+                            </span>
                             {sub.registrationTeam && (
                               <span className="flex-shrink-0 px-1.5 py-0.5 rounded-full bg-white/[0.06] text-[var(--timberwolf)]/70">
                                 {sub.registrationTeam}
@@ -831,7 +853,7 @@ export default function AcademyAccessPage() {
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           {data.hasScholarships && sub.isScholarship && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400/80">
-                              scholarship
+                              {t('scholarship')}
                             </span>
                           )}
                           <span
@@ -852,13 +874,13 @@ export default function AcademyAccessPage() {
         <FadeIn delay={140}>
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <div className="relative w-full sm:w-auto sm:flex-1 sm:max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/30" />
+              <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/30" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search members..."
-                className="w-full text-sm pl-9 pr-3 py-2 rounded-lg bg-muted border border-border text-[var(--timberwolf)] placeholder-muted-foreground outline-none focus:border-ring transition-colors"
+                placeholder={t('searchPlaceholder')}
+                className="w-full text-sm ps-9 pe-3 py-2 rounded-lg bg-muted border border-border text-[var(--timberwolf)] placeholder-muted-foreground outline-none focus:border-ring transition-colors"
               />
             </div>
             <div className="flex items-center gap-1.5">
@@ -870,19 +892,19 @@ export default function AcademyAccessPage() {
                     : 'bg-muted text-muted-foreground/60 hover:text-[var(--timberwolf)] hover:bg-muted'
                 }`}
               >
-                No sub
+                {t('filterNoSub')}
               </button>
               <button
                 onClick={expandAll}
                 className="text-[11px] px-3 py-2 rounded-lg bg-muted text-muted-foreground/60 hover:text-[var(--timberwolf)] hover:bg-muted transition-all"
               >
-                Expand
+                {t('expand')}
               </button>
               <button
                 onClick={collapseAll}
                 className="text-[11px] px-3 py-2 rounded-lg bg-muted text-muted-foreground/60 hover:text-[var(--timberwolf)] hover:bg-muted transition-all"
               >
-                Collapse
+                {t('collapse')}
               </button>
             </div>
           </div>
@@ -936,10 +958,10 @@ export default function AcademyAccessPage() {
                   {/* Team header */}
                   <button
                     onClick={() => toggleTeam(team.slug)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-start"
                   >
                     <ChevronDown
-                      className={`h-3.5 w-3.5 text-muted-foreground/40 flex-shrink-0 transition-transform ${isExpanded ? '' : '-rotate-90'}`}
+                      className={`h-3.5 w-3.5 text-muted-foreground/40 flex-shrink-0 transition-transform ${isExpanded ? '' : '-rotate-90 rtl:rotate-90'}`}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -980,12 +1002,12 @@ export default function AcademyAccessPage() {
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       {teamStaff > 0 && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400/70">
-                          {teamStaff} staff
+                          {t('teamStaffCount', { count: teamStaff })}
                         </span>
                       )}
                       {teamNoSub > 0 && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400/70">
-                          {teamNoSub} no sub
+                          {t('teamNoSubCount', { count: teamNoSub })}
                         </span>
                       )}
                     </div>
@@ -997,8 +1019,8 @@ export default function AcademyAccessPage() {
                       {displayMembers.length === 0 ? (
                         <p className="text-[11px] text-muted-foreground/40 px-4 py-3">
                           {filterNoSub
-                            ? 'All members have subscriptions'
-                            : 'No members'}
+                            ? t('allHaveSubscriptions')
+                            : t('noMembers')}
                         </p>
                       ) : (
                         displayMembers.map((member, i) => {
@@ -1028,9 +1050,12 @@ export default function AcademyAccessPage() {
                               {/* Name & email */}
                               <div className="flex-1 min-w-0">
                                 <div className="text-sm text-[var(--timberwolf)]/90 truncate">
-                                  {member.name || 'Unknown'}
+                                  {member.name || t('unknown')}
                                 </div>
-                                <div className="text-[11px] text-muted-foreground/35 truncate">
+                                <div
+                                  dir="ltr"
+                                  className="text-[11px] text-muted-foreground/35 truncate"
+                                >
                                   {member.email}
                                 </div>
                               </div>
@@ -1039,7 +1064,7 @@ export default function AcademyAccessPage() {
                                 {data.hasScholarships &&
                                   member.isScholarship && (
                                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400/80">
-                                      scholarship
+                                      {t('scholarship')}
                                     </span>
                                   )}
                                 {member.isPlayer ? (
@@ -1051,6 +1076,7 @@ export default function AcademyAccessPage() {
                                     )}`}
                                   >
                                     {stripeStatusLabel(
+                                      t,
                                       member.stripeStatus,
                                       member.hasSubscription,
                                       isExempt
@@ -1058,7 +1084,7 @@ export default function AcademyAccessPage() {
                                   </span>
                                 ) : (
                                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400/70">
-                                    {roleLabel(member.veoRole)}
+                                    {roleLabel(t, member.veoRole)}
                                   </span>
                                 )}
                               </div>

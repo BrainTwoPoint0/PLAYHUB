@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from '@/i18n/navigation'
 import {
   Button,
@@ -17,6 +18,8 @@ interface Club {
 }
 
 export default function AcademySelectorPage() {
+  const t = useTranslations('academy.selector')
+  const tTabs = useTranslations('academy.tabs')
   const router = useRouter()
   const [clubs, setClubs] = useState<Club[]>([])
   const [role, setRole] = useState<string | null>(null)
@@ -47,7 +50,7 @@ export default function AcademySelectorPage() {
         router.replace(`/academy/${clubList[0].slug}/content`)
       }
     } catch (err) {
-      setError('Failed to load clubs')
+      setError(t('loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -86,13 +89,15 @@ export default function AcademySelectorPage() {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
         <div className="rounded-xl border border-border bg-card p-6">
-          <p className="text-red-400">{error}</p>
+          <p dir="auto" className="text-red-400">
+            {error}
+          </p>
           <Button
             className="mt-4"
             variant="outline"
             onClick={() => router.push('/')}
           >
-            Back to Home
+            {t('backToHome')}
           </Button>
         </div>
       </div>
@@ -104,11 +109,11 @@ export default function AcademySelectorPage() {
       <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
         <EmptyState
           icon={<Building2 className="h-10 w-10" />}
-          title="No Clubs"
-          description="You do not have access to any academy clubs."
+          title={t('noClubsTitle')}
+          description={t('noClubsDescription')}
           action={
             <Button variant="outline" onClick={() => router.push('/')}>
-              Back to Home
+              {t('backToHome')}
             </Button>
           }
         />
@@ -120,14 +125,12 @@ export default function AcademySelectorPage() {
     <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
       <FadeIn>
         <p className="text-muted-foreground text-xs font-semibold tracking-[0.25em] uppercase mb-3">
-          Academy Subscriptions
+          {t('eyebrow')}
         </p>
         <h1 className="text-3xl md:text-4xl font-bold text-[var(--timberwolf)] mb-2">
-          Your Clubs
+          {t('title')}
         </h1>
-        <p className="text-muted-foreground mb-10">
-          Select a club to manage content and subscriptions
-        </p>
+        <p className="text-muted-foreground mb-10">{t('subtitle')}</p>
       </FadeIn>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -157,10 +160,10 @@ export default function AcademySelectorPage() {
                       <span
                         className={`text-xs px-1.5 py-0.5 rounded ${role === 'platform_admin' ? 'bg-amber-500/15 text-amber-400' : 'bg-muted text-muted-foreground'}`}
                       >
-                        {role === 'platform_admin' ? 'Admin' : 'Viewer'}
+                        {role === 'platform_admin' ? t('admin') : t('viewer')}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground" dir="ltr">
                       {club.slug.toUpperCase()}
                     </p>
                   </div>
@@ -171,14 +174,14 @@ export default function AcademySelectorPage() {
                     className="flex-1"
                     onClick={() => router.push(`/academy/${club.slug}/content`)}
                   >
-                    Content
+                    {tTabs('content')}
                   </Button>
                   <Button
                     variant="outline"
                     className="flex-1"
                     onClick={() => router.push(`/academy/${club.slug}/access`)}
                   >
-                    Access Audit
+                    {tTabs('accessAudit')}
                   </Button>
                 </div>
               </div>

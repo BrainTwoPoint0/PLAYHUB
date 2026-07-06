@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useFormatter, useTranslations } from 'next-intl'
 import { useParams } from 'next/navigation'
 import {
   Button,
@@ -36,6 +37,8 @@ interface MarketplaceRecording {
 }
 
 export default function OrgMarketplacePage() {
+  const t = useTranslations('org.public')
+  const format = useFormatter()
   const params = useParams()
   const slug = params.slug as string
 
@@ -55,35 +58,37 @@ export default function OrgMarketplacePage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'Not found')
+        setError(data.error || t('notFound'))
         return
       }
 
       setOrg(data.organization)
       setRecordings(data.recordings)
     } catch {
-      setError('Failed to load')
+      setError(t('loadFailed'))
     } finally {
       setLoading(false)
     }
   }
 
   function formatDate(dateString: string) {
-    return new Date(dateString).toLocaleDateString('en-GB', {
+    return format.dateTime(new Date(dateString), {
       weekday: 'short',
       day: 'numeric',
       month: 'short',
       year: 'numeric',
+      numberingSystem: 'latn',
     })
   }
 
   function formatPrice(amount: number, currency: string) {
-    return new Intl.NumberFormat('en-GB', {
+    return format.number(amount, {
+      numberingSystem: 'latn',
       style: 'currency',
       currency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
-    }).format(amount)
+    })
   }
 
   if (loading) {
@@ -114,7 +119,9 @@ export default function OrgMarketplacePage() {
   if (error || !org) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
-        <p className="text-muted-foreground">{error || 'Not found'}</p>
+        <p dir="auto" className="text-muted-foreground">
+          {error || t('notFound')}
+        </p>
       </div>
     )
   }
@@ -141,7 +148,9 @@ export default function OrgMarketplacePage() {
             <h1 className="text-2xl font-bold text-[var(--timberwolf)]">
               {org.name}
             </h1>
-            <p className="text-sm text-muted-foreground">Match Recordings</p>
+            <p className="text-sm text-muted-foreground">
+              {t('matchRecordings')}
+            </p>
           </div>
         </div>
       </FadeIn>
@@ -150,8 +159,8 @@ export default function OrgMarketplacePage() {
       {recordings.length === 0 ? (
         <EmptyState
           icon={<Film className="h-10 w-10" />}
-          title="No recordings available"
-          description="Check back soon for new content"
+          title={t('emptyTitle')}
+          description={t('emptyDescription')}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -170,7 +179,7 @@ export default function OrgMarketplacePage() {
                     />
                   ) : (
                     <span className="text-xs text-muted-foreground">
-                      {rec.homeTeam} vs {rec.awayTeam}
+                      {t('vs', { home: rec.homeTeam, away: rec.awayTeam })}
                     </span>
                   )}
                 </div>
@@ -201,12 +210,12 @@ export default function OrgMarketplacePage() {
                           window.location.href = `/api/checkout/session?productId=${rec.product!.id}`
                         }}
                       >
-                        Buy
+                        {t('buy')}
                       </Button>
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground pt-2">
-                      Coming soon
+                      {t('comingSoon')}
                     </p>
                   )}
                 </div>
@@ -217,7 +226,7 @@ export default function OrgMarketplacePage() {
       )}
 
       <p className="text-center text-xs text-muted-foreground mt-12">
-        Powered by PLAYHUB
+        {t('poweredBy')}
       </p>
     </div>
   )

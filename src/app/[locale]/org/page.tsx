@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from '@/i18n/navigation'
 import {
   Button,
@@ -19,6 +20,7 @@ interface Org {
 }
 
 export default function OrgSelectorPage() {
+  const t = useTranslations('org.selector')
   const router = useRouter()
   const [orgs, setOrgs] = useState<Org[]>([])
   const [loading, setLoading] = useState(true)
@@ -46,7 +48,7 @@ export default function OrgSelectorPage() {
         router.replace(`/org/${orgList[0].slug}/manage`)
       }
     } catch {
-      setError('Failed to load organizations')
+      setError(t('loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -85,13 +87,15 @@ export default function OrgSelectorPage() {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
         <div className="rounded-xl border border-border bg-card p-6">
-          <p className="text-red-400">{error}</p>
+          <p dir="auto" className="text-red-400">
+            {error}
+          </p>
           <Button
             className="mt-4"
             variant="outline"
             onClick={() => router.push('/')}
           >
-            Back to Home
+            {t('backToHome')}
           </Button>
         </div>
       </div>
@@ -103,11 +107,11 @@ export default function OrgSelectorPage() {
       <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
         <EmptyState
           icon={<Building2 className="h-10 w-10" />}
-          title="No Organizations"
-          description="You don't manage any organizations yet."
+          title={t('noOrgsTitle')}
+          description={t('noOrgsDescription')}
           action={
             <Button variant="outline" onClick={() => router.push('/')}>
-              Back to Home
+              {t('backToHome')}
             </Button>
           }
         />
@@ -115,25 +119,18 @@ export default function OrgSelectorPage() {
     )
   }
 
-  const typeLabel: Record<string, string> = {
-    group: 'Group',
-    league: 'League',
-    academy: 'Academy',
-    venue: 'Venue',
-  }
+  const knownTypes = ['group', 'league', 'academy', 'venue']
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
       <FadeIn>
         <p className="text-muted-foreground text-xs font-semibold tracking-[0.25em] uppercase mb-3">
-          Organization Management
+          {t('eyebrow')}
         </p>
         <h1 className="text-3xl md:text-4xl font-bold text-[var(--timberwolf)] mb-2">
-          Your Organizations
+          {t('title')}
         </h1>
-        <p className="text-muted-foreground mb-10">
-          Select an organization to manage
-        </p>
+        <p className="text-muted-foreground mb-10">{t('subtitle')}</p>
       </FadeIn>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -163,12 +160,14 @@ export default function OrgSelectorPage() {
                       {org.name}
                     </h2>
                     <p className="text-sm text-muted-foreground">
-                      {typeLabel[org.type] || org.type}
+                      {knownTypes.includes(org.type)
+                        ? t(`types.${org.type}`)
+                        : org.type}
                     </p>
                   </div>
                 </div>
                 <Button variant="outline" className="w-full">
-                  Manage
+                  {t('manage')}
                 </Button>
               </div>
             </div>

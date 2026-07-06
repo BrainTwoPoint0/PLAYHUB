@@ -1,5 +1,6 @@
 import { getAuthUserStrict, createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation' // i18n-todo: locale-unaware redirect (drops /ar prefix); migrate with next-intl redirect in a later pass
+import { getLocale } from 'next-intl/server'
+import { redirect } from '@/i18n/navigation'
 import { User } from '@supabase/supabase-js'
 
 // Server-side auth utilities (for server components and API routes only)
@@ -11,7 +12,7 @@ export async function getUser(): Promise<User | null> {
 export async function requireAuth(): Promise<User> {
   const user = await getUser()
   if (!user) {
-    redirect('/auth/login')
+    return redirect({ href: '/auth/login', locale: await getLocale() })
   }
   return user
 }
@@ -19,7 +20,7 @@ export async function requireAuth(): Promise<User> {
 export async function requireNoAuth(): Promise<void> {
   const user = await getUser()
   if (user) {
-    redirect('/dashboard')
+    redirect({ href: '/dashboard', locale: await getLocale() })
   }
 }
 

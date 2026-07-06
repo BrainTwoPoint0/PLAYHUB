@@ -8,7 +8,9 @@
 // All other entry points (matches detail, library, venue admin, post-purchase
 // email) link here. Editing remains on /recordings/[id].
 
-import { notFound, redirect } from 'next/navigation' // i18n-todo: locale-unaware redirect (drops /ar prefix); migrate with next-intl redirect in a later pass
+import { notFound } from 'next/navigation'
+import { getLocale } from 'next-intl/server'
+import { redirect } from '@/i18n/navigation'
 import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { getPlaybackUrl } from '@/lib/s3/client'
 import {
@@ -50,7 +52,10 @@ export default async function WatchPage({
       .eq('share_token', id)
       .maybeSingle()
     if (legacy?.id) {
-      redirect(`/watch/${legacy.id}?token=${id}`)
+      redirect({
+        href: `/watch/${legacy.id}?token=${id}`,
+        locale: await getLocale(),
+      })
     }
     notFound()
   }

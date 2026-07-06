@@ -224,9 +224,11 @@ describe('tiktok.getAccessToken', () => {
     vi.mocked(createServiceClient).mockReturnValue(client as any)
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValueOnce(
-        fetchOnce(400, { error: 'invalid_grant' }, false)
-      )
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          fetchOnce(400, { error: 'invalid_grant' }, false)
+        )
     )
 
     await expect(tiktok.getAccessToken('user-1')).rejects.toThrow(/reconnect/i)
@@ -413,8 +415,7 @@ function makeClientSeq(
       calls.upsert(obj, opts)
       return Promise.resolve({ error: null })
     },
-    single: () =>
-      Promise.resolve(queue.length > 1 ? queue.shift() : queue[0]),
+    single: () => Promise.resolve(queue.length > 1 ? queue.shift() : queue[0]),
     then: (resolve: (v: unknown) => void) => resolve(thenResult),
   }
   return { client: { from: () => builder }, calls }
@@ -429,7 +430,10 @@ describe('tiktok.getAccessToken — refresh failure handling', () => {
   it('does NOT deactivate on a transient (5xx) refresh failure', async () => {
     const { client, calls } = makeClient({ data: expired, error: null })
     vi.mocked(createServiceClient).mockReturnValue(client as any)
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(fetchOnce(500, {}, false)))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(fetchOnce(500, {}, false))
+    )
 
     await expect(tiktok.getAccessToken('user-1')).rejects.toThrow(
       /temporarily unavailable/i
@@ -445,7 +449,11 @@ describe('tiktok.getAccessToken — refresh failure handling', () => {
     vi.mocked(createServiceClient).mockReturnValue(client as any)
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValueOnce(fetchOnce(400, { error: 'invalid_grant' }, false))
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          fetchOnce(400, { error: 'invalid_grant' }, false)
+        )
     )
     await expect(tiktok.getAccessToken('user-1')).rejects.toMatchObject({
       code: 'needs_reconnect',
@@ -466,7 +474,11 @@ describe('tiktok.getAccessToken — refresh failure handling', () => {
     // Our own refresh fails: the single-use refresh token was already consumed.
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValueOnce(fetchOnce(400, { error: 'invalid_grant' }, false))
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          fetchOnce(400, { error: 'invalid_grant' }, false)
+        )
     )
 
     const token = await tiktok.getAccessToken('user-1')
@@ -502,7 +514,11 @@ describe('tiktok.getAccessToken — refresh failure handling', () => {
     vi.mocked(createServiceClient).mockReturnValue(client as any)
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValueOnce(fetchOnce(400, { error: 'invalid_grant' }, false))
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          fetchOnce(400, { error: 'invalid_grant' }, false)
+        )
     )
 
     await expect(tiktok.getAccessToken('user-1')).rejects.toMatchObject({
@@ -512,7 +528,10 @@ describe('tiktok.getAccessToken — refresh failure handling', () => {
     expect(calls.update).toHaveBeenCalledWith(
       expect.objectContaining({ is_active: false })
     )
-    expect(calls.eq).toHaveBeenCalledWith('refresh_token', expired.refresh_token)
+    expect(calls.eq).toHaveBeenCalledWith(
+      'refresh_token',
+      expired.refresh_token
+    )
   })
 
   it('does NOT deactivate on a malformed 2xx refresh body (treated as transient)', async () => {

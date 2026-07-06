@@ -399,6 +399,375 @@
     "perCourtLast30": "Recordings per court — last 30 days",
     "courtSummary": "{court}: {count, plural, one {# recording} other {# recordings}} in the last 30 days"
   },
+  "academy": {
+    "tabs": {
+      "content": "Content",
+      "accessAudit": "Access Audit",
+      "ariaLabel": "Academy tabs"
+    },
+    "selector": {
+      "eyebrow": "Academy Subscriptions",
+      "title": "Your Clubs",
+      "subtitle": "Select a club to manage content and subscriptions",
+      "loadFailed": "Failed to load clubs",
+      "backToHome": "Back to Home",
+      "noClubsTitle": "No Clubs",
+      "noClubsDescription": "You do not have access to any academy clubs.",
+      "admin": "Admin",
+      "viewer": "Viewer"
+    },
+    "access": {
+      "lastSynced": "Last synced {ago}",
+      "justNow": "just now",
+      "minutesAgo": "{count}m ago",
+      "hoursAgo": "{count}h ago",
+      "daysAgo": "{count}d ago",
+      "sync": "Sync",
+      "syncing": "Syncing",
+      "syncNow": "Sync Now",
+      "syncingEllipsis": "Syncing...",
+      "refresh": "Refresh",
+      "switch": "Switch",
+      "switchClub": "Switch Club",
+      "loadFailed": "Failed to load Veo data",
+      "syncFailed": "Sync failed",
+      "syncRequestFailed": "Sync request failed",
+      "unknown": "Unknown",
+      "scholarship": "scholarship",
+      "searchPlaceholder": "Search members...",
+      "filterNoSub": "No sub",
+      "expand": "Expand",
+      "collapse": "Collapse",
+      "teamStaffCount": "{count} staff",
+      "teamNoSubCount": "{count} no sub",
+      "allHaveSubscriptions": "All members have subscriptions",
+      "noMembers": "No members",
+      "stats": {
+        "activeSubs": "Active Subs",
+        "veoMembers": "Veo Members",
+        "noSub": "No Sub",
+        "notInVeo": "Not in Veo",
+        "staff": "Staff",
+        "scholarships": "Scholarships"
+      },
+      "status": {
+        "exempt": "exempt",
+        "noSubscription": "No subscription",
+        "unknown": "unknown"
+      },
+      "roles": {
+        "coach": "Coach",
+        "admin": "Admin",
+        "owner": "Owner"
+      },
+      "exceptions": {
+        "title": "Exceptions",
+        "email": "Email",
+        "emailPlaceholder": "user@example.com",
+        "reason": "Reason",
+        "reasonPlaceholder": "Optional",
+        "add": "Add"
+      },
+      "admins": {
+        "title": "Admins",
+        "email": "Email",
+        "emailPlaceholder": "admin@example.com",
+        "invite": "Invite",
+        "removed": "Admin removed",
+        "removeFailed": "Failed to remove admin",
+        "added": "Admin added successfully",
+        "inviteFailed": "Failed to invite admin",
+        "roleAdmin": "Admin",
+        "roleManager": "Manager",
+        "roleLeague": "League"
+      },
+      "stripeOnly": {
+        "title": "Not in Veo",
+        "payingButMissing": "{count} paying but missing"
+      }
+    },
+    "content": {
+      "loadFailed": "Failed to load recordings",
+      "searchPlaceholder": "Search by title or team...",
+      "allTeams": "All teams",
+      "searchTeamsPlaceholder": "Search teams...",
+      "noTeamsMatch": "No teams match",
+      "filterByTeam": "Filter by team",
+      "fromDate": "From date",
+      "toDate": "To date",
+      "clearFilters": "Clear filters",
+      "clearAllFilters": "Clear all filters",
+      "recordingsCount": "{count, plural, one {# recording} other {# recordings}}",
+      "recordingsCountFiltered": "{filtered} of {total} recordings",
+      "pageOf": "Page {page} of {total}",
+      "noMatchFilters": "No recordings match your filters.",
+      "noRecordings": "No recordings found for this club.",
+      "vs": "vs",
+      "privacy": {
+        "all": "All",
+        "public": "Public",
+        "private": "Private",
+        "unlisted": "Unlisted"
+      },
+      "match": {
+        "loadFailed": "Failed to load match content",
+        "loading": "Loading match content...",
+        "stats": "Match Stats",
+        "fullMatch": "Full Match ({count})",
+        "backToFullMatch": "Back to full match",
+        "selectPrompt": "Select a full-match render above, or click a highlight to play.",
+        "highlights": "Highlights ({count})",
+        "highlightsFiltered": "Highlights ({filtered} of {total})",
+        "all": "All",
+        "teamLabel": "Team:",
+        "ours": "Ours",
+        "opponent": "Opponent",
+        "noHighlightsMatch": "No highlights match the selected filters.",
+        "noHighlights": "No highlights available for this match."
+      },
+      "video": {
+        "panorama": "Panorama",
+        "panoramaWithSize": "Panorama ({width}x{height})",
+        "standardWithSize": "Standard ({width}x{height})",
+        "video": "Video"
+      },
+      "highlight": {
+        "ai": "AI",
+        "atTime": "@ {time}",
+        "downloadClip": "Download highlight clip",
+        "download": "Download",
+        "openInEditor": "Open in portrait-crop editor",
+        "portrait": "Portrait"
+      }
+    }
+  },
+  "recordingDetail": {
+    "backToRecordings": "Back to Recordings",
+    "notFound": "Recording not found",
+    "loadFailed": "Failed to load recording",
+    "download": "Download",
+    "status": {
+      "scheduled": "Recording not yet available",
+      "processing": "Recording is being processed...",
+      "unavailable": "Video not available"
+    },
+    "tags": {
+      "title": "Event Tags",
+      "addTag": "Add Tag",
+      "emptyReadOnly": "No events tagged yet.",
+      "emptyCanTag": "No events tagged yet. Click \"Add Tag\" to get started."
+    },
+    "form": {
+      "eventType": "Event Type",
+      "timestamp": "Timestamp",
+      "teamOptional": "Team (optional)",
+      "none": "None",
+      "labelOptional": "Label (optional)",
+      "labelPlaceholder": "e.g. Player name, notes...",
+      "visibility": "Visibility",
+      "public": "Public",
+      "private": "Private"
+    },
+    "matchDetails": {
+      "title": "Match Details",
+      "homeTeam": "Home Team",
+      "awayTeam": "Away Team",
+      "venue": "Venue",
+      "pitch": "Pitch",
+      "description": "Description"
+    }
+  },
+  "org": {
+    "selector": {
+      "eyebrow": "Organization Management",
+      "title": "Your Organizations",
+      "subtitle": "Select an organization to manage",
+      "manage": "Manage",
+      "backToHome": "Back to Home",
+      "loadFailed": "Failed to load organizations",
+      "noOrgsTitle": "No Organizations",
+      "noOrgsDescription": "You don't manage any organizations yet.",
+      "types": {
+        "group": "Group",
+        "league": "League",
+        "academy": "Academy",
+        "venue": "Venue"
+      }
+    },
+    "public": {
+      "notFound": "Not found",
+      "loadFailed": "Failed to load",
+      "matchRecordings": "Match Recordings",
+      "emptyTitle": "No recordings available",
+      "emptyDescription": "Check back soon for new content",
+      "vs": "{home} vs {away}",
+      "buy": "Buy",
+      "comingSoon": "Coming soon",
+      "poweredBy": "Powered by PLAYHUB"
+    },
+    "manage": {
+      "notFound": "Not found",
+      "loadFailed": "Failed to load organization",
+      "groupDashboard": "Group Dashboard",
+      "orgSettings": "Organization Settings",
+      "tabs": {
+        "overview": "Overview",
+        "graphics": "Graphic Packages",
+        "marketplace": "Marketplace",
+        "recordings": "Recordings",
+        "team": "Team"
+      },
+      "graphics": {
+        "loadFailed": "Failed to load graphic packages",
+        "uploadFailed": "Upload failed",
+        "packageUpdated": "Package updated",
+        "packageCreated": "Package created",
+        "saveFailed": "Failed to save",
+        "savePackageFailed": "Failed to save package",
+        "deleteConfirm": "Delete \"{name}\"?",
+        "packageDeleted": "Package deleted",
+        "deleteFailed": "Failed to delete",
+        "setDefaultFailed": "Failed to set default",
+        "fetchSpiideoFailed": "Failed to fetch Spiideo packages",
+        "imported": "Imported \"{name}\"",
+        "importFailed": "Import failed",
+        "importPackageFailed": "Failed to import package",
+        "positions": {
+          "topLeft": "Top Left",
+          "topRight": "Top Right",
+          "bottomLeft": "Bottom Left",
+          "bottomRight": "Bottom Right"
+        },
+        "emptyTitle": "No graphic packages yet",
+        "emptyDescription": "Create one to add logo overlays to your recordings",
+        "newPackage": "+ New Package",
+        "importFromSpiideo": "Import from Spiideo",
+        "hideSpiideo": "Hide Spiideo",
+        "noLogo": "No logo",
+        "defaultBadge": "Default",
+        "logoPosition": "Logo: {position}",
+        "sponsorPosition": "Sponsor: {position}",
+        "setDefault": "Set Default",
+        "edit": "Edit",
+        "editPackage": "Edit Package",
+        "newPackageTitle": "New Package",
+        "packageName": "Package Name",
+        "packageNamePlaceholder": "e.g. DAFL Season 2025-26",
+        "logo": "Logo",
+        "sponsorLogo": "Sponsor Logo",
+        "urlPlaceholder": "https://... or upload",
+        "upload": "Upload",
+        "logoSize": "Logo Size — {percent}%",
+        "sponsorSize": "Sponsor Size — {percent}%",
+        "dragToPosition": "Drag to position overlays",
+        "previewLabel": "16:9 Preview",
+        "setAsDefault": "Set as default package",
+        "saving": "Saving...",
+        "update": "Update",
+        "create": "Create",
+        "noSpiideoPackages": "No Spiideo packages found",
+        "importedBadge": "Imported",
+        "import": "Import"
+      },
+      "marketplace": {
+        "saved": "Saved",
+        "saveFailed": "Failed to save",
+        "enable": "Enable marketplace",
+        "enableDescription": "Allow recordings to be sold through the PLAYHUB marketplace",
+        "defaultPrice": "Default Price",
+        "pricePlaceholder": "25.00",
+        "currency": "Currency",
+        "saving": "Saving...",
+        "saveSettings": "Save Settings"
+      },
+      "recordings": {
+        "count": "{count, plural, one {# recording} other {# recordings}}",
+        "allStatuses": "All statuses",
+        "statuses": {
+          "published": "Published",
+          "processing": "Processing",
+          "draft": "Draft",
+          "archived": "Archived"
+        },
+        "empty": "No recordings found",
+        "marketplaceBadge": "Marketplace",
+        "previous": "Previous",
+        "next": "Next",
+        "pageOf": "{page} / {total}"
+      },
+      "team": {
+        "addedSuccess": "Added successfully",
+        "failed": "Failed",
+        "inviteFailed": "Failed to send invite",
+        "removeConfirm": "Remove this team member?",
+        "removed": "Removed",
+        "removeFailed": "Failed to remove",
+        "emailPlaceholder": "Email address",
+        "roles": {
+          "admin": "Admin",
+          "manager": "Manager"
+        },
+        "invite": "Invite",
+        "you": "(you)",
+        "remove": "Remove",
+        "pendingInvites": "Pending invites",
+        "pendingBadge": "Pending"
+      },
+      "group": {
+        "portfolioOverview": "Portfolio Overview",
+        "totalRecordings": "Total Recordings",
+        "publishedCount": "{count} published",
+        "thisMonth": "This Month",
+        "recordingsSub": "recordings",
+        "monthlyRevenue": "Monthly Revenue",
+        "billable": "billable",
+        "today": "Today",
+        "dailyPerformance": "Daily Performance",
+        "avgPerDay": "Avg {avg}/day",
+        "targetPerDay": "Target: {target}/day",
+        "venuesCount": "Venues ({count})",
+        "recordingsCount": "{count, plural, one {# recording} other {# recordings}}",
+        "thisMonthCount": "{count} this month",
+        "todayProgress": "Today: {today}/{target}",
+        "manage": "Manage",
+        "noChildVenues": "No child venues found"
+      }
+    },
+    "roster": {
+      "metaTitle": "Roster · Manage",
+      "backToManage": "Back to manage",
+      "title": "{name} · Roster",
+      "description": "{count, plural, one {# active player} other {# active players}} · {verified} verified by this club",
+      "empty": "No active players on the roster yet.",
+      "unknownPlayer": "Unknown player"
+    },
+    "verify": {
+      "verified": "Verified",
+      "revoke": "Revoke",
+      "verify": "Verify",
+      "verifying": "Verifying…",
+      "failed": "Failed",
+      "requestFailed": "Request failed: {status}"
+    },
+    "jerseyMap": {
+      "metaTitle": "Jersey Map",
+      "backToManage": "Back to manage",
+      "vs": "{home} vs {away}",
+      "lockedBanner": "This map was already locked. Saving again rewrites the row in place — clip attributions for new entries will derive on the next lock transition.",
+      "intro": "Map a jersey number to each player who took the field. Players left blank are not attributed. {count, plural, one {# active player} other {# active players}} on the roster.",
+      "unknownPlayer": "Unknown player",
+      "jerseyNumberFor": "Jersey number for {name}",
+      "duplicateError": "Two players have the same jersey number — fix before saving.",
+      "rangeError": "{name}: jersey number must be 0-99.",
+      "lockedSuccess": "Locked {count, plural, one {# jersey assignment} other {# jersey assignments}}. Clip attribution running…",
+      "savedSuccess": "Saved {count, plural, one {# jersey assignment} other {# jersey assignments}}.",
+      "saveFailed": "Failed to save",
+      "requestFailed": "Request failed: {status}",
+      "saving": "Saving…",
+      "saveDraft": "Save draft",
+      "saveAndLock": "Save & lock"
+    }
+  },
   "library": {
     "eyebrow": "Your Library",
     "title": "My Recordings",
@@ -765,6 +1134,16 @@
       "description": "We've sent you a confirmation link. Click the link in your email to verify your account.",
       "spamHint": "Didn't receive the email? Check your spam folder.",
       "backToSignIn": "Back to sign in"
+    },
+    "serverErrors": {
+      "invalid_credentials": "Invalid email or password. Please check your credentials and try again.",
+      "email_not_confirmed": "Please check your email and click the confirmation link before signing in.",
+      "user_exists": "An account with this email address already exists. Please sign in instead.",
+      "password_too_short": "Password must be at least 6 characters long.",
+      "invalid_password": "Please provide a valid password.",
+      "invalid_email": "Please provide a valid email address.",
+      "email_rate_limit": "Too many emails sent. Please wait before requesting another.",
+      "username_taken": "This username is already taken. Please choose a different username."
     }
   },
   "matches": {

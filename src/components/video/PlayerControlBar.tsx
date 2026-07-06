@@ -19,7 +19,10 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import type { RecordingEvent } from '@/lib/recordings/event-types'
-import { EVENT_TYPE_COLORS, formatTimestamp } from '@/lib/recordings/event-types'
+import {
+  EVENT_TYPE_COLORS,
+  formatTimestamp,
+} from '@/lib/recordings/event-types'
 import { useEventTypeLabels } from '@/lib/recordings/use-event-labels'
 import type { QualityLevel, PlayerCapabilities } from './player-transport'
 

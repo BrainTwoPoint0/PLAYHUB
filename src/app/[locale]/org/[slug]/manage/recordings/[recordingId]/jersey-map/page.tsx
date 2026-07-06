@@ -1,4 +1,7 @@
-import { redirect, notFound } from 'next/navigation' // i18n-todo: locale-unaware redirect (drops /ar prefix); migrate with next-intl redirect in a later pass
+import { notFound } from 'next/navigation'
+import { getLocale } from 'next-intl/server'
+import { redirect } from '@/i18n/navigation'
+import { getTranslations } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
 import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
@@ -6,8 +9,9 @@ import { isPlatformAdmin } from '@/lib/admin/auth'
 import { ChevronLeft } from 'lucide-react'
 import { JerseyMapEditor } from './jersey-map-editor'
 
-export const metadata = {
-  title: 'Jersey Map',
+export async function generateMetadata() {
+  const t = await getTranslations('org.jerseyMap')
+  return { title: t('metaTitle') }
 }
 
 interface PageProps {
@@ -18,9 +22,10 @@ export default async function JerseyMapPage({ params }: PageProps) {
   const { slug, recordingId } = await params
   const { user } = await getAuthUser()
   if (!user) {
-    redirect(
-      `/login?next=/org/${slug}/manage/recordings/${recordingId}/jersey-map`
-    )
+    return redirect({
+      href: `/auth/login?redirect=${encodeURIComponent(`/org/${slug}/manage/recordings/${recordingId}/jersey-map`)}`,
+      locale: await getLocale(),
+    })
   }
 
   const supabase = createServiceClient() as any
@@ -34,7 +39,8 @@ export default async function JerseyMapPage({ params }: PageProps) {
 
   const isAdmin =
     (await isVenueAdmin(user.id, org.id)) || (await isPlatformAdmin(user.id))
-  if (!isAdmin) redirect(`/org/${slug}`)
+  if (!isAdmin)
+    return redirect({ href: `/org/${slug}`, locale: await getLocale() })
 
   const { data: recording } = await supabase
     .from('playhub_match_recordings')
@@ -86,14 +92,16 @@ export default async function JerseyMapPage({ params }: PageProps) {
 
   const alreadyLocked = existingEntries.some((e) => e.lockedAt !== null)
 
+  const t = await getTranslations('org.jerseyMap')
+
   return (
     <div className="container mx-auto py-8 px-4 max-w-3xl">
       <Link
         href={`/org/${slug}/manage`}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6"
       >
-        <ChevronLeft className="h-4 w-4" />
-        Back to manage
+        <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
+        {t('backToManage')}
       </Link>
 
       <JerseyMapEditor

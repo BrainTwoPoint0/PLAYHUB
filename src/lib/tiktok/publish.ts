@@ -36,7 +36,9 @@ function assertOk(error: TikTokError | undefined, httpStatus: number): void {
     )
   }
   if (error && error.code && error.code !== 'ok') {
-    throw new Error(`TikTok publish error (${error.code}): ${error.message ?? ''}`)
+    throw new Error(
+      `TikTok publish error (${error.code}): ${error.message ?? ''}`
+    )
   }
 }
 

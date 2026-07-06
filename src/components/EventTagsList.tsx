@@ -48,7 +48,8 @@ export function EventTagsList({
           {/* Timestamp — clickable */}
           <button
             onClick={() => seekToEvent(event.timestamp_seconds)}
-            className="text-xs font-mono text-emerald-400 hover:text-emerald-300 w-14 text-left flex-shrink-0"
+            dir="ltr"
+            className="text-xs font-mono text-emerald-400 hover:text-emerald-300 w-14 text-start flex-shrink-0"
           >
             {formatTimestamp(event.timestamp_seconds)}
           </button>
@@ -82,7 +83,7 @@ export function EventTagsList({
 
           {/* Visibility icon */}
           {event.visibility === 'private' && (
-            <Lock className="w-3 h-3 text-[var(--ash-grey)] flex-shrink-0 ml-auto" />
+            <Lock className="w-3 h-3 text-[var(--ash-grey)] flex-shrink-0 ms-auto" />
           )}
         </div>
       ))}

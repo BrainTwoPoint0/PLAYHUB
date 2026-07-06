@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { useAuthErrorMessages } from '@/lib/auth/use-auth-error-messages'
 import { useRouter } from '@/i18n/navigation'
 import { useAuth } from '@braintwopoint0/playback-commons/auth'
 import { LumaSpin, SignInForm } from '@braintwopoint0/playback-commons/ui'
@@ -10,6 +11,7 @@ import { sanitizeRedirect } from '@braintwopoint0/playback-commons/utils'
 
 function LoginScreen() {
   const t = useTranslations('auth')
+  const authErrorMessages = useAuthErrorMessages()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
@@ -49,6 +51,7 @@ function LoginScreen() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <SignInForm
+          authErrorMessages={authErrorMessages}
           title={t('login.title')}
           subtitle={t('login.subtitle')}
           emailPlaceholder={t('common.emailPlaceholder')}

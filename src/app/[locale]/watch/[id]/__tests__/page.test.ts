@@ -21,9 +21,17 @@ const {
   }),
 }))
 
+vi.mock('next-intl/server', () => ({
+  getLocale: async () => 'en',
+}))
+
 vi.mock('next/navigation', () => ({
   notFound: () => mockNotFound(),
   redirect: (url: string) => mockRedirect(url),
+  // required at module init by next-intl's createNavigation
+  permanentRedirect: (url: string) => mockRedirect(url),
+  useRouter: () => ({ push: () => {}, replace: () => {} }),
+  usePathname: () => '/',
 }))
 
 vi.mock('@/lib/supabase/server', () => ({

@@ -765,6 +765,16 @@
         "createFailed": "تعذّر إنشاء الحساب",
         "unexpected": "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى."
       }
+    },
+    "serverErrors": {
+      "invalid_credentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة. تحقق من بياناتك وحاول مرة أخرى.",
+      "email_not_confirmed": "يرجى فتح بريدك الإلكتروني والنقر على رابط التأكيد قبل تسجيل الدخول.",
+      "user_exists": "يوجد حساب بهذا البريد الإلكتروني بالفعل. سجّل الدخول بدلاً من ذلك.",
+      "password_too_short": "يجب أن تكون كلمة المرور 6 أحرف على الأقل.",
+      "invalid_password": "يرجى إدخال كلمة مرور صحيحة.",
+      "invalid_email": "يرجى إدخال بريد إلكتروني صحيح.",
+      "email_rate_limit": "تم إرسال رسائل كثيرة. يرجى الانتظار قبل طلب رسالة أخرى.",
+      "username_taken": "اسم المستخدم محجوز بالفعل. اختر اسماً آخر."
     }
   },
   "matches": {
@@ -801,6 +811,375 @@
         "watchUnlimited": "مشاهدات غير محدودة",
         "securePayment": "دفع آمن عبر Stripe"
       }
+    }
+  },
+  "academy": {
+    "tabs": {
+      "content": "المحتوى",
+      "accessAudit": "سجل الصلاحيات",
+      "ariaLabel": "تبويبات الأكاديمية"
+    },
+    "selector": {
+      "eyebrow": "اشتراكات الأكاديميات",
+      "title": "أنديتك",
+      "subtitle": "اختر نادياً لإدارة المحتوى والاشتراكات",
+      "loadFailed": "تعذّر تحميل الأندية",
+      "backToHome": "العودة إلى الرئيسية",
+      "noClubsTitle": "لا توجد أندية",
+      "noClubsDescription": "لا تملك صلاحية الوصول إلى أي نادٍ أكاديمي.",
+      "admin": "مشرف",
+      "viewer": "مشاهد"
+    },
+    "access": {
+      "lastSynced": "آخر مزامنة {ago}",
+      "justNow": "الآن",
+      "minutesAgo": "قبل {count, number, latn} د",
+      "hoursAgo": "قبل {count, number, latn} س",
+      "daysAgo": "{count, plural, one {قبل يوم} two {قبل يومين} few {قبل # أيام} other {قبل # يوم}}",
+      "sync": "مزامنة",
+      "syncing": "جارٍ المزامنة",
+      "syncNow": "مزامنة الآن",
+      "syncingEllipsis": "جارٍ المزامنة...",
+      "refresh": "تحديث",
+      "switch": "تبديل",
+      "switchClub": "تبديل النادي",
+      "loadFailed": "تعذّر تحميل بيانات Veo",
+      "syncFailed": "فشلت المزامنة",
+      "syncRequestFailed": "فشل طلب المزامنة",
+      "unknown": "غير معروف",
+      "scholarship": "منحة",
+      "searchPlaceholder": "ابحث عن الأعضاء...",
+      "filterNoSub": "بدون اشتراك",
+      "expand": "توسيع",
+      "collapse": "طي",
+      "teamStaffCount": "{count, number, latn} من الطاقم",
+      "teamNoSubCount": "{count, number, latn} بدون اشتراك",
+      "allHaveSubscriptions": "جميع الأعضاء لديهم اشتراكات",
+      "noMembers": "لا يوجد أعضاء",
+      "stats": {
+        "activeSubs": "اشتراكات نشطة",
+        "veoMembers": "أعضاء Veo",
+        "noSub": "بدون اشتراك",
+        "notInVeo": "ليسوا في Veo",
+        "staff": "الطاقم",
+        "scholarships": "المنح"
+      },
+      "status": {
+        "exempt": "معفى",
+        "noSubscription": "بدون اشتراك",
+        "unknown": "غير معروف"
+      },
+      "roles": {
+        "coach": "مدرب",
+        "admin": "مشرف",
+        "owner": "مالك"
+      },
+      "exceptions": {
+        "title": "الاستثناءات",
+        "email": "البريد الإلكتروني",
+        "emailPlaceholder": "user@example.com",
+        "reason": "السبب",
+        "reasonPlaceholder": "اختياري",
+        "add": "إضافة"
+      },
+      "admins": {
+        "title": "المشرفون",
+        "email": "البريد الإلكتروني",
+        "emailPlaceholder": "admin@example.com",
+        "invite": "دعوة",
+        "removed": "تمت إزالة المشرف",
+        "removeFailed": "تعذّرت إزالة المشرف",
+        "added": "تمت إضافة المشرف بنجاح",
+        "inviteFailed": "تعذّرت دعوة المشرف",
+        "roleAdmin": "مشرف",
+        "roleManager": "مدير",
+        "roleLeague": "دوري"
+      },
+      "stripeOnly": {
+        "title": "ليسوا في Veo",
+        "payingButMissing": "{count, number, latn} يدفعون لكنهم غير موجودين"
+      }
+    },
+    "content": {
+      "loadFailed": "تعذّر تحميل التسجيلات",
+      "searchPlaceholder": "ابحث بالعنوان أو الفريق...",
+      "allTeams": "كل الفرق",
+      "searchTeamsPlaceholder": "ابحث عن الفرق...",
+      "noTeamsMatch": "لا توجد فرق مطابقة",
+      "filterByTeam": "تصفية حسب الفريق",
+      "fromDate": "من تاريخ",
+      "toDate": "إلى تاريخ",
+      "clearFilters": "مسح التصفية",
+      "clearAllFilters": "مسح كل التصفيات",
+      "recordingsCount": "{count, plural, zero {لا تسجيلات} one {تسجيل واحد} two {تسجيلان} few {{count, number, latn} تسجيلات} many {{count, number, latn} تسجيلاً} other {{count, number, latn} تسجيل}}",
+      "recordingsCountFiltered": "{filtered, number, latn} من {total, number, latn} تسجيل",
+      "pageOf": "صفحة {page, number, latn} من {total, number, latn}",
+      "noMatchFilters": "لا توجد تسجيلات مطابقة للتصفية.",
+      "noRecordings": "لا توجد تسجيلات لهذا النادي.",
+      "vs": "ضد",
+      "privacy": {
+        "all": "الكل",
+        "public": "عام",
+        "private": "خاص",
+        "unlisted": "غير مدرج"
+      },
+      "match": {
+        "loadFailed": "تعذّر تحميل محتوى المباراة",
+        "loading": "جارٍ تحميل محتوى المباراة...",
+        "stats": "إحصائيات المباراة",
+        "fullMatch": "المباراة كاملة ({count, number, latn})",
+        "backToFullMatch": "العودة إلى المباراة كاملة",
+        "selectPrompt": "اختر نسخة المباراة كاملة أعلاه، أو انقر على لقطة لتشغيلها.",
+        "highlights": "اللقطات ({count, number, latn})",
+        "highlightsFiltered": "اللقطات ({filtered, number, latn} من {total, number, latn})",
+        "all": "الكل",
+        "teamLabel": "الفريق:",
+        "ours": "فريقنا",
+        "opponent": "الخصم",
+        "noHighlightsMatch": "لا توجد لقطات مطابقة للتصفية المحددة.",
+        "noHighlights": "لا توجد لقطات متاحة لهذه المباراة."
+      },
+      "video": {
+        "panorama": "بانوراما",
+        "panoramaWithSize": "بانوراما ({width, number, latn}x{height, number, latn})",
+        "standardWithSize": "قياسي ({width, number, latn}x{height, number, latn})",
+        "video": "فيديو"
+      },
+      "highlight": {
+        "ai": "ذكاء اصطناعي",
+        "atTime": "عند ⁦{time}⁩",
+        "downloadClip": "تحميل مقطع اللقطة",
+        "download": "تحميل",
+        "openInEditor": "فتح في محرر المقاطع العمودية",
+        "portrait": "عمودي"
+      }
+    }
+  },
+  "recordingDetail": {
+    "backToRecordings": "العودة إلى التسجيلات",
+    "notFound": "التسجيل غير موجود",
+    "loadFailed": "تعذّر تحميل التسجيل",
+    "download": "تحميل",
+    "status": {
+      "scheduled": "التسجيل غير متاح بعد",
+      "processing": "جارٍ معالجة التسجيل...",
+      "unavailable": "الفيديو غير متاح"
+    },
+    "tags": {
+      "title": "وسوم الأحداث",
+      "addTag": "إضافة وسم",
+      "emptyReadOnly": "لا أحداث موسومة بعد.",
+      "emptyCanTag": "لا أحداث موسومة بعد. انقر على \"إضافة وسم\" للبدء."
+    },
+    "form": {
+      "eventType": "نوع الحدث",
+      "timestamp": "التوقيت",
+      "teamOptional": "الفريق (اختياري)",
+      "none": "بدون",
+      "labelOptional": "التسمية (اختيارية)",
+      "labelPlaceholder": "مثال: اسم اللاعب، ملاحظات...",
+      "visibility": "الظهور",
+      "public": "عام",
+      "private": "خاص"
+    },
+    "matchDetails": {
+      "title": "تفاصيل المباراة",
+      "homeTeam": "الفريق المضيف",
+      "awayTeam": "الفريق الضيف",
+      "venue": "النادي",
+      "pitch": "الملعب",
+      "description": "الوصف"
+    }
+  },
+  "org": {
+    "selector": {
+      "eyebrow": "إدارة المؤسسات",
+      "title": "مؤسساتك",
+      "subtitle": "اختر مؤسسة لإدارتها",
+      "manage": "إدارة",
+      "backToHome": "العودة إلى الرئيسية",
+      "loadFailed": "تعذّر تحميل المؤسسات",
+      "noOrgsTitle": "لا توجد مؤسسات",
+      "noOrgsDescription": "لا تدير أي مؤسسة بعد.",
+      "types": {
+        "group": "مجموعة",
+        "league": "دوري",
+        "academy": "أكاديمية",
+        "venue": "نادٍ"
+      }
+    },
+    "public": {
+      "notFound": "غير موجود",
+      "loadFailed": "تعذّر التحميل",
+      "matchRecordings": "تسجيلات المباريات",
+      "emptyTitle": "لا توجد تسجيلات متاحة",
+      "emptyDescription": "عُد قريباً لمحتوى جديد",
+      "vs": "{home} ضد {away}",
+      "buy": "شراء",
+      "comingSoon": "قريباً",
+      "poweredBy": "مقدَّم من PLAYHUB"
+    },
+    "manage": {
+      "notFound": "غير موجود",
+      "loadFailed": "تعذّر تحميل المؤسسة",
+      "groupDashboard": "لوحة المجموعة",
+      "orgSettings": "إعدادات المؤسسة",
+      "tabs": {
+        "overview": "نظرة عامة",
+        "graphics": "حزم الشعارات",
+        "marketplace": "المتجر",
+        "recordings": "التسجيلات",
+        "team": "الفريق"
+      },
+      "graphics": {
+        "loadFailed": "تعذّر تحميل حزم الشعارات",
+        "uploadFailed": "فشل الرفع",
+        "packageUpdated": "تم تحديث الحزمة",
+        "packageCreated": "تم إنشاء الحزمة",
+        "saveFailed": "تعذّر الحفظ",
+        "savePackageFailed": "تعذّر حفظ الحزمة",
+        "deleteConfirm": "حذف \"{name}\"؟",
+        "packageDeleted": "تم حذف الحزمة",
+        "deleteFailed": "تعذّر الحذف",
+        "setDefaultFailed": "تعذّر تعيينها كافتراضية",
+        "fetchSpiideoFailed": "تعذّر جلب حزم Spiideo",
+        "imported": "تم استيراد \"{name}\"",
+        "importFailed": "فشل الاستيراد",
+        "importPackageFailed": "تعذّر استيراد الحزمة",
+        "positions": {
+          "topLeft": "أعلى اليسار",
+          "topRight": "أعلى اليمين",
+          "bottomLeft": "أسفل اليسار",
+          "bottomRight": "أسفل اليمين"
+        },
+        "emptyTitle": "لا توجد حزم شعارات بعد",
+        "emptyDescription": "أنشئ حزمة لإضافة شعارات على تسجيلاتك",
+        "newPackage": "+ حزمة جديدة",
+        "importFromSpiideo": "استيراد من Spiideo",
+        "hideSpiideo": "إخفاء Spiideo",
+        "noLogo": "بدون شعار",
+        "defaultBadge": "افتراضية",
+        "logoPosition": "الشعار: {position}",
+        "sponsorPosition": "الراعي: {position}",
+        "setDefault": "تعيين كافتراضية",
+        "edit": "تعديل",
+        "editPackage": "تعديل الحزمة",
+        "newPackageTitle": "حزمة جديدة",
+        "packageName": "اسم الحزمة",
+        "packageNamePlaceholder": "مثال: DAFL موسم 2025-26",
+        "logo": "الشعار",
+        "sponsorLogo": "شعار الراعي",
+        "urlPlaceholder": "https://... أو ارفع ملفاً",
+        "upload": "رفع",
+        "logoSize": "حجم الشعار — {percent, number, latn}%",
+        "sponsorSize": "حجم شعار الراعي — {percent, number, latn}%",
+        "dragToPosition": "اسحب لتحديد مواضع الشعارات",
+        "previewLabel": "معاينة 16:9",
+        "setAsDefault": "تعيين كحزمة افتراضية",
+        "saving": "جارٍ الحفظ...",
+        "update": "تحديث",
+        "create": "إنشاء",
+        "noSpiideoPackages": "لم يُعثر على حزم Spiideo",
+        "importedBadge": "مستوردة",
+        "import": "استيراد"
+      },
+      "marketplace": {
+        "saved": "تم الحفظ",
+        "saveFailed": "تعذّر الحفظ",
+        "enable": "تفعيل المتجر",
+        "enableDescription": "السماح ببيع التسجيلات عبر متجر PLAYHUB",
+        "defaultPrice": "السعر الافتراضي",
+        "pricePlaceholder": "25.00",
+        "currency": "العملة",
+        "saving": "جارٍ الحفظ...",
+        "saveSettings": "حفظ الإعدادات"
+      },
+      "recordings": {
+        "count": "{count, plural, zero {لا تسجيلات} one {تسجيل واحد} two {تسجيلان} few {{count, number, latn} تسجيلات} many {{count, number, latn} تسجيلاً} other {{count, number, latn} تسجيل}}",
+        "allStatuses": "كل الحالات",
+        "statuses": {
+          "published": "منشور",
+          "processing": "قيد المعالجة",
+          "draft": "مسودة",
+          "archived": "مؤرشف"
+        },
+        "empty": "لا توجد تسجيلات",
+        "marketplaceBadge": "المتجر",
+        "previous": "السابق",
+        "next": "التالي",
+        "pageOf": "{page, number, latn} / {total, number, latn}"
+      },
+      "team": {
+        "addedSuccess": "تمت الإضافة بنجاح",
+        "failed": "فشل",
+        "inviteFailed": "تعذّر إرسال الدعوة",
+        "removeConfirm": "إزالة هذا العضو من الفريق؟",
+        "removed": "تمت الإزالة",
+        "removeFailed": "تعذّرت الإزالة",
+        "emailPlaceholder": "البريد الإلكتروني",
+        "roles": {
+          "admin": "مشرف",
+          "manager": "مدير"
+        },
+        "invite": "دعوة",
+        "you": "(أنت)",
+        "remove": "إزالة",
+        "pendingInvites": "دعوات معلّقة",
+        "pendingBadge": "معلّقة"
+      },
+      "group": {
+        "portfolioOverview": "نظرة عامة على المحفظة",
+        "totalRecordings": "إجمالي التسجيلات",
+        "publishedCount": "{count, number, latn} منشور",
+        "thisMonth": "هذا الشهر",
+        "recordingsSub": "تسجيلات",
+        "monthlyRevenue": "الإيراد الشهري",
+        "billable": "قابل للفوترة",
+        "today": "اليوم",
+        "dailyPerformance": "الأداء اليومي",
+        "avgPerDay": "المعدل {avg, number, latn}/يوم",
+        "targetPerDay": "الهدف: {target, number, latn}/يوم",
+        "venuesCount": "الأندية ({count, number, latn})",
+        "recordingsCount": "{count, plural, zero {لا تسجيلات} one {تسجيل واحد} two {تسجيلان} few {{count, number, latn} تسجيلات} many {{count, number, latn} تسجيلاً} other {{count, number, latn} تسجيل}}",
+        "thisMonthCount": "{count, number, latn} هذا الشهر",
+        "todayProgress": "اليوم: {today, number, latn}/{target, number, latn}",
+        "manage": "إدارة",
+        "noChildVenues": "لا توجد أندية فرعية"
+      }
+    },
+    "roster": {
+      "metaTitle": "قائمة اللاعبين · الإدارة",
+      "backToManage": "العودة إلى الإدارة",
+      "title": "{name} · قائمة اللاعبين",
+      "description": "{count, plural, one {لاعب نشط واحد} two {لاعبان نشطان} few {# لاعبين نشطين} many {# لاعباً نشطاً} other {# لاعب نشط}} · {verified} موثّق من هذا النادي",
+      "empty": "لا يوجد لاعبون نشطون في القائمة بعد.",
+      "unknownPlayer": "لاعب غير معروف"
+    },
+    "verify": {
+      "verified": "موثّق",
+      "revoke": "سحب التوثيق",
+      "verify": "توثيق",
+      "verifying": "جارٍ التوثيق…",
+      "failed": "فشل",
+      "requestFailed": "فشل الطلب: {status}"
+    },
+    "jerseyMap": {
+      "metaTitle": "خريطة الأرقام",
+      "backToManage": "العودة إلى الإدارة",
+      "vs": "{home} ضد {away}",
+      "lockedBanner": "هذه الخريطة مقفلة بالفعل. الحفظ مجدداً يعيد كتابة الصف نفسه — وستُحتسب نسب المقاطع للإدخالات الجديدة عند القفل التالي.",
+      "intro": "اربط رقم القميص بكل لاعب شارك في المباراة. اللاعبون المتروكون فارغين لن تُنسب لهم مقاطع. {count, plural, one {لاعب نشط واحد} two {لاعبان نشطان} few {# لاعبين نشطين} many {# لاعباً نشطاً} other {# لاعب نشط}} في القائمة.",
+      "unknownPlayer": "لاعب غير معروف",
+      "jerseyNumberFor": "رقم قميص {name}",
+      "duplicateError": "لاعبان لديهما نفس رقم القميص — صحّح ذلك قبل الحفظ.",
+      "rangeError": "{name}: يجب أن يكون رقم القميص بين 0 و99.",
+      "lockedSuccess": "تم قفل {count, plural, one {تخصيص رقم واحد} two {تخصيصي رقمين} few {# تخصيصات أرقام} many {# تخصيص رقم} other {# تخصيص رقم}}. جارٍ احتساب نسب المقاطع…",
+      "savedSuccess": "تم حفظ {count, plural, one {تخصيص رقم واحد} two {تخصيصي رقمين} few {# تخصيصات أرقام} many {# تخصيص رقم} other {# تخصيص رقم}}.",
+      "saveFailed": "تعذّر الحفظ",
+      "requestFailed": "فشل الطلب: {status}",
+      "saving": "جارٍ الحفظ…",
+      "saveDraft": "حفظ مسودة",
+      "saveAndLock": "حفظ وقفل"
     }
   }
 }

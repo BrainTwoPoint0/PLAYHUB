@@ -11,8 +11,7 @@ export function isSameOrigin(request: Request): boolean {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL
   if (!appUrl) return true // no configured host to compare against
   const appHost = new URL(appUrl).host
-  const source =
-    request.headers.get('origin') || request.headers.get('referer')
+  const source = request.headers.get('origin') || request.headers.get('referer')
   if (!source) return true
   try {
     return new URL(source).host === appHost

@@ -11,7 +11,8 @@
 // before render); the API routes the client component calls re-check on
 // every request. Belt-and-braces, matches existing /admin/* pattern.
 
-import { redirect } from 'next/navigation' // i18n-todo: locale-unaware redirect (drops /ar prefix); migrate with next-intl redirect in a later pass
+import { getLocale } from 'next-intl/server'
+import { redirect } from '@/i18n/navigation'
 import { getAuthUserStrict } from '@/lib/supabase/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { LylRecordingsClient } from './LylRecordingsClient'
@@ -23,8 +24,13 @@ export const dynamic = 'force-dynamic'
 
 export default async function LylRecordingsAdminPage() {
   const { user } = await getAuthUserStrict()
-  if (!user) redirect('/auth/login?redirect=/admin/lyl/recordings')
-  if (!(await isPlatformAdmin(user.id))) redirect('/')
+  if (!user)
+    return redirect({
+      href: '/auth/login?redirect=/admin/lyl/recordings',
+      locale: await getLocale(),
+    })
+  if (!(await isPlatformAdmin(user.id)))
+    return redirect({ href: '/', locale: await getLocale() })
 
   return <LylRecordingsClient />
 }

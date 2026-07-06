@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
+import { useFormatter, useTranslations } from 'next-intl'
 import { useRouter } from '@/i18n/navigation'
 import {
   Button,
@@ -84,6 +85,8 @@ function TagForm({
   onCancel: () => void
   submitLabel: string
 }) {
+  const t = useTranslations('recordingDetail.form')
+  const tc = useTranslations('common')
   const eventLabels = useEventTypeLabels()
   const [form, setForm] = useState<TagFormData>(initial)
 
@@ -92,7 +95,7 @@ function TagForm({
       {/* Event type */}
       <div className="space-y-1.5">
         <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-muted-foreground">
-          Event Type
+          {t('eventType')}
         </Label>
         <Select
           value={form.event_type}
@@ -116,7 +119,7 @@ function TagForm({
       {/* Timestamp */}
       <div className="space-y-1.5">
         <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-muted-foreground">
-          Timestamp
+          {t('timestamp')}
         </Label>
         <div className="flex items-center gap-2">
           <Input
@@ -132,7 +135,7 @@ function TagForm({
             }
             className="w-24"
           />
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-muted-foreground" dir="ltr">
             {formatTimestamp(form.timestamp_seconds)}
           </span>
         </div>
@@ -141,11 +144,11 @@ function TagForm({
       {/* Team */}
       <div className="space-y-1.5">
         <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-muted-foreground">
-          Team (optional)
+          {t('teamOptional')}
         </Label>
         <div className="flex gap-2">
           {[
-            { value: null, label: 'None' },
+            { value: null, label: t('none') },
             { value: 'home' as const, label: homeTeam },
             { value: 'away' as const, label: awayTeam },
           ].map((opt) => (
@@ -170,25 +173,25 @@ function TagForm({
       {/* Label */}
       <div className="space-y-1.5">
         <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-muted-foreground">
-          Label (optional)
+          {t('labelOptional')}
         </Label>
         <Input
           type="text"
           value={form.label}
           onChange={(e) => setForm({ ...form, label: e.target.value })}
-          placeholder="e.g. Player name, notes..."
+          placeholder={t('labelPlaceholder')}
         />
       </div>
 
       {/* Visibility */}
       <div className="space-y-1.5">
         <Label className="text-xs font-semibold tracking-[0.15em] uppercase text-muted-foreground">
-          Visibility
+          {t('visibility')}
         </Label>
         <div className="flex gap-2">
           {[
-            { value: 'public' as const, label: 'Public', icon: Globe },
-            { value: 'private' as const, label: 'Private', icon: Lock },
+            { value: 'public' as const, label: t('public'), icon: Globe },
+            { value: 'private' as const, label: t('private'), icon: Lock },
           ].map((opt) => (
             <Button
               key={opt.value}
@@ -224,7 +227,7 @@ function TagForm({
           variant="ghost"
           className="text-muted-foreground hover:bg-muted/50 text-xs"
         >
-          Cancel
+          {tc('cancel')}
         </Button>
       </div>
     </div>
@@ -234,6 +237,9 @@ function TagForm({
 // ─── Main Page ───────────────────────────────────────────────────
 
 export default function RecordingPage() {
+  const t = useTranslations('recordingDetail')
+  const tc = useTranslations('common')
+  const format = useFormatter()
   const eventLabels = useEventTypeLabels()
   const params = useParams()
   const router = useRouter()
@@ -284,7 +290,7 @@ export default function RecordingPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'Failed to load recording')
+        setError(data.error || t('loadFailed'))
         return
       }
 
@@ -296,7 +302,7 @@ export default function RecordingPage() {
       // Fetch events after recording loads successfully
       fetchEvents()
     } catch (err) {
-      setError('Failed to load recording')
+      setError(t('loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -415,17 +421,6 @@ export default function RecordingPage() {
     }
   }
 
-  function formatDate(dateString: string) {
-    return new Date(dateString).toLocaleDateString('en-GB', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--night)]">
@@ -458,14 +453,16 @@ export default function RecordingPage() {
       <div className="min-h-screen bg-[var(--night)]">
         <div className="container mx-auto px-5 py-16 max-w-4xl">
           <div className="rounded-xl border border-border bg-card p-6">
-            <p className="text-red-400 mb-4">{error}</p>
+            <p dir="auto" className="text-red-400 mb-4">
+              {error}
+            </p>
             <Button
               variant="outline"
               onClick={() => router.push('/recordings')}
               className="border-border text-[var(--timberwolf)] hover:bg-muted/50"
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Recordings
+              <ArrowLeft className="w-4 h-4 me-2 rtl:rotate-180" />
+              {t('backToRecordings')}
             </Button>
           </div>
         </div>
@@ -478,14 +475,14 @@ export default function RecordingPage() {
       <div className="min-h-screen bg-[var(--night)]">
         <div className="container mx-auto px-5 py-16 max-w-4xl">
           <div className="rounded-xl border border-border bg-card p-6">
-            <p className="text-muted-foreground">Recording not found</p>
+            <p className="text-muted-foreground">{t('notFound')}</p>
             <Button
               variant="outline"
               onClick={() => router.push('/recordings')}
               className="mt-4 border-border text-[var(--timberwolf)] hover:bg-muted/50"
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Recordings
+              <ArrowLeft className="w-4 h-4 me-2 rtl:rotate-180" />
+              {t('backToRecordings')}
             </Button>
           </div>
         </div>
@@ -503,8 +500,8 @@ export default function RecordingPage() {
           onClick={() => router.push('/recordings')}
           className="mb-4 md:mb-6 text-[var(--timberwolf)] hover:bg-muted/50"
         >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Recordings
+          <ArrowLeft className="w-4 h-4 me-2 rtl:rotate-180" />
+          {t('backToRecordings')}
         </Button>
 
         <FadeIn>
@@ -514,7 +511,7 @@ export default function RecordingPage() {
                 {recording.title}
               </h1>
               <p className="text-xs md:text-sm text-muted-foreground mt-1">
-                {formatDate(recording.matchDate)}
+                {format.dateTime(new Date(recording.matchDate), 'full')}
               </p>
               <div className="flex gap-2 mt-3">
                 <Button
@@ -524,7 +521,7 @@ export default function RecordingPage() {
                   className="border-border text-[var(--timberwolf)] hover:bg-muted/50 gap-1.5"
                 >
                   <Share2 className="w-3.5 h-3.5" />
-                  Share
+                  {tc('share')}
                 </Button>
                 <Button
                   variant="outline"
@@ -533,7 +530,7 @@ export default function RecordingPage() {
                   className="border-border text-[var(--timberwolf)] hover:bg-muted/50 gap-1.5"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  Download
+                  {t('download')}
                 </Button>
               </div>
             </div>
@@ -555,10 +552,10 @@ export default function RecordingPage() {
                 <div className="aspect-video bg-black/30 md:rounded-lg flex items-center justify-center border-y md:border border-border -mx-4 md:mx-0">
                   <p className="text-muted-foreground">
                     {recording.status === 'scheduled'
-                      ? 'Recording not yet available'
+                      ? t('status.scheduled')
                       : recording.status === 'processing'
-                        ? 'Recording is being processed...'
-                        : 'Video not available'}
+                        ? t('status.processing')
+                        : t('status.unavailable')}
                   </p>
                 </div>
               )}
@@ -580,7 +577,7 @@ export default function RecordingPage() {
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-                  Event Tags
+                  {t('tags.title')}
                 </h2>
                 {canEdit && !showAddForm && (
                   <Button
@@ -590,7 +587,7 @@ export default function RecordingPage() {
                     className="text-emerald-400 hover:bg-emerald-500/10 text-xs gap-1"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    Add Tag
+                    {t('tags.addTag')}
                   </Button>
                 )}
               </div>
@@ -610,7 +607,7 @@ export default function RecordingPage() {
                     awayTeam={recording.awayTeam}
                     onSubmit={handleCreateEvent}
                     onCancel={() => setShowAddForm(false)}
-                    submitLabel="Add Tag"
+                    submitLabel={t('tags.addTag')}
                   />
                 </div>
               )}
@@ -618,8 +615,7 @@ export default function RecordingPage() {
               {/* Events list */}
               {events.length === 0 && !showAddForm ? (
                 <p className="text-sm text-muted-foreground">
-                  No events tagged yet.
-                  {canEdit ? ' Click "Add Tag" to get started.' : ''}
+                  {canEdit ? t('tags.emptyCanTag') : t('tags.emptyReadOnly')}
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -642,7 +638,7 @@ export default function RecordingPage() {
                           awayTeam={recording.awayTeam}
                           onSubmit={(data) => handleUpdateEvent(event.id, data)}
                           onCancel={() => setEditingEventId(null)}
-                          submitLabel="Save"
+                          submitLabel={tc('save')}
                         />
                       )
                     }
@@ -672,7 +668,8 @@ export default function RecordingPage() {
                               )
                             }
                           }}
-                          className="text-xs font-mono text-emerald-400 hover:text-emerald-300 w-14 text-left flex-shrink-0"
+                          dir="ltr"
+                          className="text-xs font-mono text-emerald-400 hover:text-emerald-300 w-14 text-start flex-shrink-0"
                         >
                           {formatTimestamp(event.timestamp_seconds)}
                         </button>
@@ -710,12 +707,12 @@ export default function RecordingPage() {
 
                         {/* Visibility icon */}
                         {event.visibility === 'private' && (
-                          <Lock className="w-3 h-3 text-muted-foreground flex-shrink-0 ml-auto" />
+                          <Lock className="w-3 h-3 text-muted-foreground flex-shrink-0 ms-auto" />
                         )}
 
                         {/* Edit/Delete buttons (own events only) */}
                         {isOwn && (
-                          <div className="flex gap-1 ml-auto opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                          <div className="flex gap-1 ms-auto opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                             <Button
                               variant="ghost"
                               size="icon"

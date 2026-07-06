@@ -1,19 +1,21 @@
 'use client'
 
 import { useParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { usePathname } from '@/i18n/navigation'
 import { Link } from '@/i18n/navigation'
 
 const tabs = [
-  { label: 'Content', segment: 'content' },
-  { label: 'Access Audit', segment: 'access' },
-]
+  { labelKey: 'content', segment: 'content' },
+  { labelKey: 'accessAudit', segment: 'access' },
+] as const
 
 export default function AcademyClubLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const t = useTranslations('academy.tabs')
   const pathname = usePathname()
   const params = useParams()
   const clubSlug = params.clubSlug as string
@@ -35,7 +37,7 @@ export default function AcademyClubLayout({
           style={{ borderColor: 'rgba(185,186,163,0.08)' }}
         >
           <div className="container mx-auto max-w-5xl px-4 sm:px-6">
-            <nav className="flex gap-6" aria-label="Academy tabs">
+            <nav className="flex gap-6" aria-label={t('ariaLabel')}>
               {tabs.map((tab) => {
                 const href = `${basePath}/${tab.segment}`
                 const isActive = activeSegment === tab.segment
@@ -49,7 +51,7 @@ export default function AcademyClubLayout({
                         : 'text-muted-foreground/50 hover:text-muted-foreground'
                     }`}
                   >
-                    {tab.label}
+                    {t(tab.labelKey)}
                     {isActive && (
                       <span className="absolute bottom-0 left-0 right-0 h-px bg-[var(--timberwolf)]" />
                     )}

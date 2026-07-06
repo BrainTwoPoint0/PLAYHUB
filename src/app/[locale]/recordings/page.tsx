@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations, useLocale } from 'next-intl'
 import { Link, useRouter } from '@/i18n/navigation'
 import {
   Select,
@@ -35,6 +35,7 @@ interface Recording {
 
 export default function RecordingsPage() {
   const t = useTranslations('library')
+  const pickerLocale = useLocale()
   const tc = useTranslations('common')
   const format = useFormatter()
   const router = useRouter()
@@ -153,6 +154,7 @@ export default function RecordingsPage() {
           {!loading && !loginRequired && recordings.length > 0 ? (
             <div className="flex items-center gap-3">
               <DatePicker
+                locale={pickerLocale}
                 value={dateFrom}
                 onChange={(v) => {
                   setDateFrom(v)
@@ -163,6 +165,7 @@ export default function RecordingsPage() {
                 className="h-10 min-w-[130px]"
               />
               <DatePicker
+                locale={pickerLocale}
                 value={dateTo}
                 onChange={(v) => {
                   setDateTo(v)

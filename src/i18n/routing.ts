@@ -1,10 +1,7 @@
 import { defineRouting } from 'next-intl/routing'
 
 export const routing = defineRouting({
-  // Spanish is wired (deep-merge fallback, messages/es.json) but NOT listed
-  // until it has content — an empty es locale would serve an indexable
-  // all-English tree labeled lang="es". Re-add 'es' + fill es.json to launch.
-  locales: ['en', 'ar'],
+  locales: ['en', 'ar', 'es'],
   defaultLocale: 'en',
   // English URLs stay unprefixed (/venue); other locales get a prefix (/ar/venue)
   localePrefix: 'as-needed',

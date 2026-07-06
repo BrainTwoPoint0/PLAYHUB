@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 
 interface MatchDetailsProps {
@@ -18,6 +19,7 @@ export function MatchDetails({
   pitchName,
   description,
 }: MatchDetailsProps) {
+  const t = useTranslations('recordingDetail.matchDetails')
   const [open, setOpen] = useState(false)
 
   return (
@@ -31,7 +33,7 @@ export function MatchDetails({
         ) : (
           <ChevronDown className="h-4 w-4" />
         )}
-        Match Details
+        {t('title')}
       </button>
 
       {open && (
@@ -39,20 +41,20 @@ export function MatchDetails({
           <div className="grid grid-cols-2 gap-3 md:gap-4">
             <div>
               <p className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)] mb-1">
-                Home Team
+                {t('homeTeam')}
               </p>
               <p className="font-medium text-[var(--timberwolf)]">{homeTeam}</p>
             </div>
             <div>
               <p className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)] mb-1">
-                Away Team
+                {t('awayTeam')}
               </p>
               <p className="font-medium text-[var(--timberwolf)]">{awayTeam}</p>
             </div>
             {venue && (
               <div>
                 <p className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)] mb-1">
-                  Venue
+                  {t('venue')}
                 </p>
                 <p className="font-medium text-[var(--timberwolf)]">{venue}</p>
               </div>
@@ -60,7 +62,7 @@ export function MatchDetails({
             {pitchName && (
               <div>
                 <p className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)] mb-1">
-                  Pitch
+                  {t('pitch')}
                 </p>
                 <p className="font-medium text-[var(--timberwolf)]">
                   {pitchName}
@@ -72,7 +74,7 @@ export function MatchDetails({
           {description && (
             <div className="pt-4 border-t border-[var(--ash-grey)]/10">
               <p className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--ash-grey)] mb-1">
-                Description
+                {t('description')}
               </p>
               <p className="text-[var(--timberwolf)]">{description}</p>
             </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useMemo, useRef } from 'react'
+import { useFormatter, useTranslations } from 'next-intl'
 import { useRouter } from '@/i18n/navigation'
 import {
   Button,
@@ -54,6 +55,8 @@ export function JerseyMapEditor({
   existingEntries,
   alreadyLocked,
 }: JerseyMapEditorProps) {
+  const t = useTranslations('org.jerseyMap')
+  const format = useFormatter()
   // Seed each row's jersey number from (existing map → roster default → blank).
   const seeded: Record<string, string> = useMemo(() => {
     const fromExisting = new Map<string, number>()
@@ -112,7 +115,7 @@ export function JerseyMapEditor({
     setSuccess(null)
 
     if (duplicates.size > 0) {
-      setError('Two players have the same jersey number — fix before saving.')
+      setError(t('duplicateError'))
       return
     }
 
@@ -122,7 +125,7 @@ export function JerseyMapEditor({
       if (!v) continue // unassigned players are skipped; trial players go unmapped
       const num = parseInt(v, 10)
       if (Number.isNaN(num) || num < 0 || num > 99) {
-        setError(`${p.fullName ?? p.username}: jersey number must be 0-99.`)
+        setError(t('rangeError', { name: p.fullName ?? p.username ?? '' }))
         return
       }
       entries.push({ jerseyNumber: num, profileId: p.profileId })
@@ -139,20 +142,22 @@ export function JerseyMapEditor({
         })
         if (!res.ok) {
           const payload = await res.json().catch(() => ({}))
-          throw new Error(payload.error ?? `Request failed: ${res.status}`)
+          throw new Error(
+            payload.error ?? t('requestFailed', { status: res.status })
+          )
         }
         const result = await res.json()
         setSuccess(
           lock
-            ? `Locked ${result.count} jersey assignments. Clip attribution running…`
-            : `Saved ${result.count} jersey assignments.`
+            ? t('lockedSuccess', { count: result.count })
+            : t('savedSuccess', { count: result.count })
         )
         // Re-fetch the server page so `alreadyLocked` + the existing-entries
         // seed reflect the new state. Without this the lock banner doesn't
         // appear until manual reload.
         router.refresh()
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to save')
+        setError(err instanceof Error ? err.message : t('saveFailed'))
       } finally {
         inFlightRef.current = false
       }
@@ -173,30 +178,20 @@ export function JerseyMapEditor({
         <CardHeader>
           <CardTitle>{recordingTitle}</CardTitle>
           <CardDescription>
-            {homeTeam} vs {awayTeam} ·{' '}
-            {new Date(matchDate).toLocaleDateString(undefined, {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-            })}
+            {t('vs', { home: homeTeam, away: awayTeam })} ·{' '}
+            {format.dateTime(new Date(matchDate), 'short')}
           </CardDescription>
           {alreadyLocked && (
             <div className="mt-3 flex items-start gap-2 text-xs rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-2">
               <Lock className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-              <span>
-                This map was already locked. Saving again rewrites the row in
-                place — clip attributions for new entries will derive on the
-                next lock transition.
-              </span>
+              <span>{t('lockedBanner')}</span>
             </div>
           )}
         </CardHeader>
 
         <CardContent>
           <p className="text-xs text-muted-foreground mb-4">
-            Map a jersey number to each player who took the field. Players left
-            blank are not attributed. {roster.length} active player
-            {roster.length === 1 ? '' : 's'} on the roster.
+            {t('intro', { count: roster.length })}
           </p>
 
           <div className="divide-y divide-border">
@@ -209,7 +204,7 @@ export function JerseyMapEditor({
                 >
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate">
-                      {p.fullName ?? p.username ?? 'Unknown player'}
+                      {p.fullName ?? p.username ?? t('unknownPlayer')}
                     </div>
                     {p.username && (
                       <div className="text-xs text-muted-foreground">
@@ -225,7 +220,9 @@ export function JerseyMapEditor({
                       value={values[p.profileId] ?? ''}
                       onChange={(e) => setNumber(p.profileId, e.target.value)}
                       placeholder="–"
-                      aria-label={`Jersey number for ${p.fullName ?? p.username}`}
+                      aria-label={t('jerseyNumberFor', {
+                        name: p.fullName ?? p.username ?? '',
+                      })}
                       className={`w-16 text-center font-mono ${
                         isDuplicate
                           ? 'border-destructive focus-visible:ring-destructive'
@@ -245,7 +242,7 @@ export function JerseyMapEditor({
           {error && (
             <div className="flex items-start gap-2 text-sm text-destructive">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>{error}</span>
+              <span dir="auto">{error}</span>
             </div>
           )}
           {success && <div className="text-sm text-emerald-400">{success}</div>}
@@ -256,16 +253,16 @@ export function JerseyMapEditor({
               onClick={() => submit(false)}
               disabled={pending}
             >
-              <Save className="mr-1.5 h-4 w-4" />
-              {pending ? 'Saving…' : 'Save draft'}
+              <Save className="me-1.5 h-4 w-4" />
+              {pending ? t('saving') : t('saveDraft')}
             </Button>
             <Button
               type="button"
               onClick={() => submit(true)}
               disabled={pending}
             >
-              <Lock className="mr-1.5 h-4 w-4" />
-              {pending ? 'Saving…' : 'Save & lock'}
+              <Lock className="me-1.5 h-4 w-4" />
+              {pending ? t('saving') : t('saveAndLock')}
             </Button>
           </div>
         </CardFooter>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useLocale, useTranslations } from 'next-intl'
 import { useParams } from 'next/navigation'
 import { useRouter } from '@/i18n/navigation'
 import {
@@ -227,6 +227,7 @@ function MarketplaceRevenue({
 }) {
   const t = useTranslations('venue.marketplace')
   const format = useFormatter()
+  const pickerLocale = useLocale()
   const [expanded, setExpanded] = useState(false)
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<{
@@ -381,6 +382,7 @@ export default function VenueManagementPage() {
   const t = useTranslations('venue')
   const tc = useTranslations('common')
   const format = useFormatter()
+  const pickerLocale = useLocale()
 
   const [venue, setVenue] = useState<Venue | null>(null)
   const [venueCount, setVenueCount] = useState(0)
@@ -2711,6 +2713,7 @@ export default function VenueManagementPage() {
                                 {t('schedule.startTime')}
                               </label>
                               <DateTimePicker
+                                locale={pickerLocale}
                                 value={startTime}
                                 onChange={handleStartTimeChange}
                                 required
@@ -2732,6 +2735,7 @@ export default function VenueManagementPage() {
                                 {t('schedule.endTime')}
                               </label>
                               <DateTimePicker
+                                locale={pickerLocale}
                                 value={endTime}
                                 onChange={setEndTime}
                                 required
@@ -2911,15 +2915,17 @@ export default function VenueManagementPage() {
                           )}
 
                           {error && (
-                            <div dir="auto" className="bg-red-500/10 text-red-400 p-3 rounded-lg">
-
-                            </div>
+                            <div
+                              dir="auto"
+                              className="bg-red-500/10 text-red-400 p-3 rounded-lg"
+                            ></div>
                           )}
 
                           {success && (
-                            <div dir="auto" className="bg-green-500/10 text-green-400 p-3 rounded-lg">
-
-                            </div>
+                            <div
+                              dir="auto"
+                              className="bg-green-500/10 text-green-400 p-3 rounded-lg"
+                            ></div>
                           )}
 
                           <div className="flex gap-2">
@@ -3084,6 +3090,7 @@ export default function VenueManagementPage() {
                                 {t('schedule.startTime')}
                               </label>
                               <DateTimePicker
+                                locale={pickerLocale}
                                 value={streamStartTime}
                                 onChange={setStreamStartTime}
                                 required
@@ -3096,6 +3103,7 @@ export default function VenueManagementPage() {
                                 {t('schedule.endTime')}
                               </label>
                               <DateTimePicker
+                                locale={pickerLocale}
                                 value={streamEndTime}
                                 onChange={setStreamEndTime}
                                 required
@@ -3270,9 +3278,9 @@ export default function VenueManagementPage() {
                                     </span>
                                     <div className="flex items-center gap-2">
                                       <code
-                                      dir="ltr"
-                                      className="flex-1 min-w-0 bg-black/30 px-2 py-1 rounded text-xs truncate text-[var(--timberwolf)]"
-                                    >
+                                        dir="ltr"
+                                        className="flex-1 min-w-0 bg-black/30 px-2 py-1 rounded text-xs truncate text-[var(--timberwolf)]"
+                                      >
                                         {channel.playbackUrl}
                                       </code>
                                       <Button
@@ -3918,14 +3926,16 @@ export default function VenueManagementPage() {
                 <div className="px-6 pb-6 space-y-4">
                   {/* Success/Error messages */}
                   {success && (
-                    <div dir="auto" className="bg-green-500/10 text-green-400 p-3 rounded-lg text-sm">
-
-                    </div>
+                    <div
+                      dir="auto"
+                      className="bg-green-500/10 text-green-400 p-3 rounded-lg text-sm"
+                    ></div>
                   )}
                   {error && (
-                    <div dir="auto" className="bg-red-500/10 text-red-400 p-3 rounded-lg text-sm">
-
-                    </div>
+                    <div
+                      dir="auto"
+                      className="bg-red-500/10 text-red-400 p-3 rounded-lg text-sm"
+                    ></div>
                   )}
 
                   {/* Add new admin */}
@@ -4254,7 +4264,8 @@ export default function VenueManagementPage() {
                       // Arabic keyboards make the Latin token disproportionate
                       // friction — the localized equivalent also passes.
                       (deleteConfirmText !== 'DELETE' &&
-                        deleteConfirmText !== 'حذف') ||
+                        deleteConfirmText !== 'حذف' &&
+                        deleteConfirmText.toUpperCase() !== 'ELIMINAR') ||
                       deletingRecording === deleteConfirmRecording.id
                     }
                   >
