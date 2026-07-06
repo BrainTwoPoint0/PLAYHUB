@@ -10,13 +10,13 @@
     "deploy": "npm run package && npm run package:layer && cd ../../terraform && terraform apply -target=aws_lambda_layer_version.chromium -target=aws_lambda_function.veo_sync"
   },
   "dependencies": {
-    "playwright-core": "^1.49.0",
     "@sparticuz/chromium": "^131.0.0",
-    "@supabase/supabase-js": "^2.50.0"
+    "@supabase/supabase-js": "^2.50.0",
+    "playwright-core": "^1.49.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "esbuild": "^0.20.0",
+    "esbuild": "^0.25.12",
     "typescript": "^5.0.0"
   }
 }

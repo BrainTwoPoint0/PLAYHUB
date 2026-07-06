@@ -2,6 +2,12 @@ import { defineConfig } from 'vitest/config'
 import path from 'path'
 
 export default defineConfig({
+  // Next's tsconfig sets jsx: 'preserve' (required by Next). Vite 8/rolldown
+  // respects that and refuses to transform JSX in imported .tsx files —
+  // override to the automatic runtime for tests.
+  oxc: {
+    jsx: { runtime: 'automatic' },
+  },
   resolve: {
     alias: {
       'next/navigation': path.resolve(
