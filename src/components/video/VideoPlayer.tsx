@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { Play } from 'lucide-react'
 import type { RecordingEvent } from '@/lib/recordings/event-types'
 import { useVideoTransport } from './useVideoTransport'
@@ -70,6 +71,7 @@ export function VideoPlayer({
     onAddTag,
   })
   const { state, commands } = t
+  const tp = useTranslations('player')
 
   return (
     <div
@@ -105,6 +107,7 @@ export function VideoPlayer({
         <div className="absolute inset-0 flex items-center justify-center bg-black/30 pb-14">
           <button
             onClick={commands.togglePlayPause}
+            aria-label={tp('play')}
             className="w-16 h-16 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-sm flex items-center justify-center transition-colors"
           >
             <Play className="h-8 w-8 text-white ml-1" fill="white" />

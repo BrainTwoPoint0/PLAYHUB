@@ -98,6 +98,7 @@ export function WatchPlayer({
   })
   const { state, commands } = t
   const tw = useTranslations('watch')
+  const tp = useTranslations('player')
 
   const [surface, setSurface] = useState<'flat' | 'dewarp'>('flat')
   // Intent to switch once the capture is ready (the toggle can be clicked before
@@ -171,7 +172,9 @@ export function WatchPlayer({
       {busy ? (
         <>
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          <span className="hidden md:inline">{tw('explore.preparingLabel')}</span>
+          <span className="hidden md:inline">
+            {tw('explore.preparingLabel')}
+          </span>
         </>
       ) : isDewarp ? (
         <>
@@ -211,7 +214,10 @@ export function WatchPlayer({
       />
 
       {!isDewarp && (
-        <GraphicsOverlay graphicPackage={graphicPackage} mediaPack={mediaPack} />
+        <GraphicsOverlay
+          graphicPackage={graphicPackage}
+          mediaPack={mediaPack}
+        />
       )}
 
       {/* De-warp SURFACE — WebGL canvas slaved to the master clock. Lazily
@@ -240,6 +246,7 @@ export function WatchPlayer({
         <div className="absolute inset-0 flex items-center justify-center bg-black/30 pb-14">
           <button
             onClick={commands.togglePlayPause}
+            aria-label={tp('play')}
             className="w-16 h-16 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-sm flex items-center justify-center transition-colors"
           >
             <Play className="h-8 w-8 text-white ml-1" fill="white" />
