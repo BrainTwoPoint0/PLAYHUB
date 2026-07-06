@@ -6,7 +6,7 @@
 // tag overlay so it feels native to the new watch surface.
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import { Link } from '@/i18n/navigation'
 import {
   Card,
   CardContent,

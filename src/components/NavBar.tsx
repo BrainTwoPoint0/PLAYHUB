@@ -1,7 +1,7 @@
 'use client'
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { Link } from '@/i18n/navigation'
+import { usePathname } from '@/i18n/navigation'
 import { useEffect, useState } from 'react'
 import { useAuth, useProfile } from '@braintwopoint0/playback-commons/auth'
 import {

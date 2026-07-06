@@ -7,7 +7,7 @@
 // into who invited them and a one-click decline.
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import { Link } from '@/i18n/navigation'
 import {
   Card,
   CardContent,

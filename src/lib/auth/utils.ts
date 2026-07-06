@@ -1,5 +1,5 @@
 import { getAuthUserStrict, createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import { redirect } from 'next/navigation' // i18n-todo: locale-unaware redirect (drops /ar prefix); migrate with next-intl redirect in a later pass
 import { User } from '@supabase/supabase-js'
 
 // Server-side auth utilities (for server components and API routes only)

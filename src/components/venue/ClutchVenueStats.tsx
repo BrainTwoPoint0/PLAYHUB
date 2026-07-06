@@ -5,7 +5,7 @@
 // zero Clutch recordings — Spiideo-only venues never see it.
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import { Link } from '@/i18n/navigation'
 import {
   ChartContainer,
   ChartLegend,

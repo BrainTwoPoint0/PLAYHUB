@@ -8,6 +8,12 @@ export default defineConfig({
         __dirname,
         './src/lib/__mocks__/next-navigation.ts'
       ),
+      // next-intl's ESM build imports the extensionless 'next/server',
+      // which Node's ESM resolver rejects outside the Next runtime.
+      'next/server': path.resolve(
+        __dirname,
+        './node_modules/next/server.js'
+      ),
       '@braintwopoint0/playback-commons/playerdata': path.resolve(
         __dirname,
         '../packages/commons/src/playerdata/index.ts'
@@ -23,7 +29,9 @@ export default defineConfig({
     },
     server: {
       deps: {
-        inline: ['@braintwopoint0/playback-commons'],
+        // next-intl must be inlined so the 'next/server' alias above applies
+        // to its ESM imports.
+        inline: ['@braintwopoint0/playback-commons', 'next-intl'],
       },
     },
   },
