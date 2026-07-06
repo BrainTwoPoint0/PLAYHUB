@@ -3,6 +3,8 @@
 import { Link } from '@/i18n/navigation'
 import { usePathname } from '@/i18n/navigation'
 import { useEffect, useState } from 'react'
+import { useLocale, useTranslations } from 'next-intl'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { useAuth, useProfile } from '@braintwopoint0/playback-commons/auth'
 import {
   Popover,
@@ -46,6 +48,8 @@ function getUserInitials(
 }
 
 export default function NavBar() {
+  const t = useTranslations('nav')
+  const locale = useLocale()
   const pathname = usePathname()
   const { user, loading } = useAuth()
   const { profile } = useProfile()
@@ -88,13 +92,13 @@ export default function NavBar() {
 
   // Build nav links — static ones always, conditional ones only after all checks complete
   const navLinks = [
-    { href: '/recordings', label: 'My Recordings', icon: Film },
+    { href: '/recordings', label: t('myRecordings'), icon: Film },
     { href: '/tiktok', label: 'TikTok', icon: Music2 },
     ...(navReady && hasVenues
-      ? [{ href: '/venue', label: 'Manage Venue', icon: Building2 }]
+      ? [{ href: '/venue', label: t('manageVenue'), icon: Building2 }]
       : []),
     ...(navReady && hasAcademy
-      ? [{ href: '/academy', label: 'Academy', icon: GraduationCap }]
+      ? [{ href: '/academy', label: t('academy'), icon: GraduationCap }]
       : []),
     ...(navReady && managedOrgs.length > 0
       ? [
@@ -103,13 +107,13 @@ export default function NavBar() {
               managedOrgs.length === 1
                 ? `/org/${managedOrgs[0].slug}/manage`
                 : '/org',
-            label: 'Manage Org',
+            label: t('manageOrg'),
             icon: Building2,
           },
         ]
       : []),
     ...(navReady && isAdmin
-      ? [{ href: '/admin', label: 'Admin', icon: ShieldCheck }]
+      ? [{ href: '/admin', label: t('admin'), icon: ShieldCheck }]
       : []),
   ]
 
@@ -129,7 +133,7 @@ export default function NavBar() {
           </Link>
 
           {/* Desktop Navigation */}
-          <NavigationMenu className="hidden md:flex ml-8">
+          <NavigationMenu className="hidden md:flex ms-8">
             <NavigationMenuList>
               {navLinks.map(({ href, label }) => (
                 <NavigationMenuItem key={href}>
@@ -154,16 +158,17 @@ export default function NavBar() {
           </NavigationMenu>
 
           {/* Right side */}
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ms-auto flex items-center gap-2">
             {/* Desktop auth controls */}
             <div className="hidden md:flex items-center gap-4">
+              <LanguageSwitcher className="px-2 py-1.5" />
               {loading ? (
                 <div className="h-8 w-8 animate-pulse rounded-full bg-muted" />
               ) : user ? (
                 <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                   <PopoverTrigger asChild>
                     <button
-                      aria-label="Account menu"
+                      aria-label={t('accountMenu')}
                       aria-haspopup="menu"
                       aria-expanded={popoverOpen}
                       className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-secondary text-xs font-medium text-[var(--timberwolf)] hover:bg-secondary/80 transition-colors ring-1 ring-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--timberwolf)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--night)]"
@@ -194,7 +199,7 @@ export default function NavBar() {
                         onClick={() => setPopoverOpen(false)}
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
-                        Edit Profile
+                        {t('editProfile')}
                       </a>
                     </div>
                     <div className="border-t border-border py-1">
@@ -205,7 +210,7 @@ export default function NavBar() {
                         className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-muted/50 transition-colors"
                       >
                         <LogOut className="h-3.5 w-3.5" />
-                        Sign out
+                        {t('signOut')}
                       </button>
                     </div>
                   </PopoverContent>
@@ -216,13 +221,13 @@ export default function NavBar() {
                     href="/auth/login"
                     className="text-sm text-muted-foreground hover:text-[var(--timberwolf)] transition-colors"
                   >
-                    Sign in
+                    {t('signIn')}
                   </Link>
                   <Link
                     href="/auth/register"
                     className="text-sm bg-[var(--timberwolf)] text-[var(--night)] px-3.5 py-1.5 rounded-md hover:bg-[var(--ash-grey)] transition-colors font-medium"
                   >
-                    Sign up
+                    {t('signUp')}
                   </Link>
                 </>
               )}
@@ -232,17 +237,17 @@ export default function NavBar() {
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
                 <button
-                  aria-label="Open menu"
-                  className="md:hidden inline-flex h-11 w-11 -mr-1 items-center justify-center rounded-md text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--timberwolf)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--night)]"
+                  aria-label={t('openMenu')}
+                  className="md:hidden inline-flex h-11 w-11 -me-1 items-center justify-center rounded-md text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--timberwolf)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--night)]"
                 >
                   <Menu className="h-5 w-5" />
                 </button>
               </SheetTrigger>
               <SheetContent
-                side="right"
+                side={locale === 'ar' ? 'left' : 'right'}
                 className="w-72 bg-card border-border p-0"
               >
-                <SheetTitle className="sr-only">Navigation</SheetTitle>
+                <SheetTitle className="sr-only">{t('navigation')}</SheetTitle>
 
                 {/* User card (when logged in) */}
                 {user && (
@@ -254,7 +259,7 @@ export default function NavBar() {
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-[var(--timberwolf)] truncate">
-                            {profile.data?.full_name || 'Account'}
+                            {profile.data?.full_name || t('account')}
                           </p>
                           <p className="text-xs text-muted-foreground truncate">
                             {user.email}
@@ -288,6 +293,16 @@ export default function NavBar() {
 
                 <Separator className="bg-border" />
 
+                {/* Language */}
+                <div className="px-2 py-2">
+                  <LanguageSwitcher
+                    className="w-full justify-start gap-3 px-3 py-2.5"
+                    onSwitched={() => setMobileOpen(false)}
+                  />
+                </div>
+
+                <Separator className="bg-border" />
+
                 {/* Bottom actions */}
                 <div className="px-2 py-2">
                   {user ? (
@@ -300,7 +315,7 @@ export default function NavBar() {
                         className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm text-muted-foreground hover:text-[var(--timberwolf)] hover:bg-accent/50 transition-colors"
                       >
                         <ExternalLink className="h-4 w-4 shrink-0" />
-                        Edit Profile
+                        {t('editProfile')}
                       </a>
                       <button
                         onClick={() =>
@@ -309,7 +324,7 @@ export default function NavBar() {
                         className="flex items-center gap-3 w-full rounded-md px-3 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-accent/50 transition-colors"
                       >
                         <LogOut className="h-4 w-4 shrink-0" />
-                        Sign out
+                        {t('signOut')}
                       </button>
                     </>
                   ) : (
@@ -319,14 +334,14 @@ export default function NavBar() {
                         onClick={() => setMobileOpen(false)}
                         className="flex items-center justify-center w-full py-2 rounded-md text-sm font-medium text-[var(--timberwolf)] border border-border hover:bg-accent/50 transition-colors"
                       >
-                        Sign in
+                        {t('signIn')}
                       </Link>
                       <Link
                         href="/auth/register"
                         onClick={() => setMobileOpen(false)}
                         className="flex items-center justify-center w-full py-2 rounded-md text-sm font-medium bg-[var(--timberwolf)] text-[var(--night)] hover:bg-[var(--ash-grey)] transition-colors"
                       >
-                        Sign up
+                        {t('signUp')}
                       </Link>
                     </div>
                   )}

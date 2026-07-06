@@ -1,20 +1,25 @@
 import type { Metadata } from 'next'
+import { getTranslations } from 'next-intl/server'
 import { NotFound } from '@braintwopoint0/playback-commons/ui'
 
-export const metadata: Metadata = {
-  title: 'Page not found',
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('notFound')
+  return { title: t('metaTitle') }
 }
 
-export default function NotFoundPage() {
+export default async function NotFoundPage() {
+  const t = await getTranslations('notFound')
   return (
     <NotFound
       brand="PLAYHUB"
-      ctaLabel="Browse matches"
+      title={t('title')}
+      description={t('description')}
+      ctaLabel={t('browseMatches')}
       ctaHref="/matches"
       links={[
-        { label: 'Home', href: '/' },
-        { label: 'Browse matches', href: '/matches' },
-        { label: 'My recordings', href: '/recordings' },
+        { label: t('home'), href: '/' },
+        { label: t('browseMatches'), href: '/matches' },
+        { label: t('myRecordings'), href: '/recordings' },
       ]}
     />
   )

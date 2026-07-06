@@ -9,5 +9,47 @@
     "close": "Close",
     "confirm": "Confirm",
     "copied": "Copied to clipboard"
+  },
+  "nav": {
+    "myRecordings": "My Recordings",
+    "manageVenue": "Manage Venue",
+    "academy": "Academy",
+    "manageOrg": "Manage Org",
+    "admin": "Admin",
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "signOut": "Sign out",
+    "editProfile": "Edit Profile",
+    "account": "Account",
+    "accountMenu": "Account menu",
+    "openMenu": "Open menu",
+    "navigation": "Navigation"
+  },
+  "footer": {
+    "browse": "Browse",
+    "matches": "Matches",
+    "academy": "Academy",
+    "account": "Account",
+    "recordings": "Recordings",
+    "signIn": "Sign in",
+    "company": "Company",
+    "aboutPlayback": "About PLAYBACK",
+    "press": "Press",
+    "contact": "Contact",
+    "legal": "Legal",
+    "terms": "Terms",
+    "privacy": "Privacy",
+    "cookies": "Cookies",
+    "newsletterLabel": "Newsletter",
+    "newsletterTitle": "Updates from the Network.",
+    "newsletterSubtitle": "Only when relevant. No spam."
+  },
+  "notFound": {
+    "metaTitle": "Page not found",
+    "title": "You've gone off the pitch.",
+    "description": "We can't find the page you're looking for. It may have been moved, renamed, or never existed.",
+    "browseMatches": "Browse matches",
+    "home": "Home",
+    "myRecordings": "My recordings"
   }
 }
