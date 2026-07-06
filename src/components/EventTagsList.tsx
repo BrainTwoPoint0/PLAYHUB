@@ -4,10 +4,10 @@ import { Badge } from '@braintwopoint0/playback-commons/ui'
 import { Lock } from 'lucide-react'
 import type { RecordingEvent } from '@/lib/recordings/event-types'
 import {
-  EVENT_TYPE_LABELS,
   EVENT_TYPE_COLORS,
   formatTimestamp,
 } from '@/lib/recordings/event-types'
+import { useEventTypeLabels } from '@/lib/recordings/use-event-labels'
 
 const PRE_ROLL_SECONDS = 5
 
@@ -29,6 +29,7 @@ export function EventTagsList({
   homeTeam,
   awayTeam,
 }: EventTagsListProps) {
+  const eventLabels = useEventTypeLabels()
   if (events.length === 0) return null
 
   return (
@@ -62,7 +63,7 @@ export function EventTagsList({
               borderColor: EVENT_TYPE_COLORS[event.event_type] + '40',
             }}
           >
-            {EVENT_TYPE_LABELS[event.event_type]}
+            {eventLabels[event.event_type]}
           </Badge>
 
           {/* Team */}

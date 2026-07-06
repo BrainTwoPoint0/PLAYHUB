@@ -74,6 +74,9 @@ export function VideoPlayer({
   return (
     <div
       ref={t.containerRef}
+      // Media-player chrome stays LTR by convention — the progress bar fills
+      // left→right and the time readout must not mirror in RTL locales.
+      dir="ltr"
       className={`relative bg-black rounded-lg overflow-hidden group aspect-video ${className}`}
       onMouseMove={t.handleMouseMove}
       onTouchStart={t.handleMouseMove}

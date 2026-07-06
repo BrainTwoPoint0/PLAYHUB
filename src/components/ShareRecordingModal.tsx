@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Loader2, Mail, Send } from 'lucide-react'
 import {
   Dialog,
@@ -23,6 +24,7 @@ export function ShareRecordingModal({
   recordingId,
   recordingTitle,
 }: ShareRecordingModalProps) {
+  const t = useTranslations('shareModal')
   const [emailInput, setEmailInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
@@ -38,7 +40,7 @@ export function ShareRecordingModal({
       .filter(Boolean)
 
     if (emails.length === 0) {
-      setError('Please enter at least one email address')
+      setError(t('noEmails'))
       return
     }
 
@@ -53,18 +55,18 @@ export function ShareRecordingModal({
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'Failed to share recording')
+        setError(data.error || t('shareFailed'))
         return
       }
 
       setSuccess(
         emails.length === 1
-          ? `Shared with ${emails[0]}`
-          : `Shared with ${emails.length} people`
+          ? t('successOne', { email: emails[0] })
+          : t('successMany', { count: emails.length })
       )
       setEmailInput('')
     } catch {
-      setError('Something went wrong. Please try again.')
+      setError(t('genericError'))
     } finally {
       setLoading(false)
     }
@@ -101,15 +103,13 @@ export function ShareRecordingModal({
           <div className="relative p-5 sm:p-6">
             <DialogHeader className="space-y-2 mb-5">
               <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                Share recording
+                {t('eyebrow')}
               </p>
               <DialogTitle className="text-lg leading-tight text-[var(--timberwolf)]">
                 {recordingTitle}
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                Each recipient gets the recording on their own account — no
-                payment needed. They&apos;ll sign up with the same email to
-                claim access. Great for sharing with the whole team.
+                {t('description')}
               </DialogDescription>
             </DialogHeader>
 
@@ -119,7 +119,7 @@ export function ShareRecordingModal({
                 className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground"
               >
                 <Mail className="h-3 w-3" />
-                Email addresses
+                {t('emailsLabel')}
               </label>
               <input
                 id="share-emails"
@@ -136,7 +136,8 @@ export function ShareRecordingModal({
                     handleShare()
                   }
                 }}
-                placeholder="email@example.com, another@example.com"
+                placeholder={t('emailsPlaceholder')}
+                dir="ltr"
                 autoComplete="off"
                 spellCheck={false}
                 className="w-full rounded-lg border border-white/[0.08] bg-white/[0.02]
@@ -147,13 +148,16 @@ export function ShareRecordingModal({
                          focus:ring-2 focus:ring-emerald-400/15"
               />
               <p className="text-[11px] text-muted-foreground/70">
-                Separate multiple emails with commas. Up to 50 at once.
+                {t('emailsHint')}
               </p>
             </div>
 
             {/* Error — matches the tag overlay's inline error block */}
             {error && (
-              <div className="mt-4 flex items-center gap-2 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2 text-xs text-red-300">
+              <div
+                dir="auto"
+                className="mt-4 flex items-center gap-2 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2 text-xs text-red-300"
+              >
                 <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
                 {error}
               </div>
@@ -181,12 +185,12 @@ export function ShareRecordingModal({
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Sharing…
+                  {t('sharing')}
                 </>
               ) : (
                 <>
                   <Send className="h-3.5 w-3.5" />
-                  Send invitations
+                  {t('sendInvitations')}
                 </>
               )}
             </button>

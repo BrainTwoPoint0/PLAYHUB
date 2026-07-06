@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@braintwopoint0/playback-commons/ui'
 import { Play, Compass, Film, Loader2 } from 'lucide-react'
 import type { RecordingEvent } from '@/lib/recordings/event-types'
@@ -96,6 +97,7 @@ export function WatchPlayer({
     onAddTag,
   })
   const { state, commands } = t
+  const tw = useTranslations('watch')
 
   const [surface, setSurface] = useState<'flat' | 'dewarp'>('flat')
   // Intent to switch once the capture is ready (the toggle can be clicked before
@@ -162,29 +164,25 @@ export function WatchPlayer({
       variant="ghost"
       disabled={busy}
       aria-pressed={isDewarp}
-      aria-label={isDewarp ? 'Back to video' : 'Explore the pitch'}
-      title={
-        isDewarp
-          ? 'Back to the broadcast view'
-          : 'Pan and zoom freely around the whole pitch'
-      }
+      aria-label={isDewarp ? tw('explore.backLabel') : tw('explore.cta')}
+      title={isDewarp ? tw('explore.backTitle') : tw('explore.title')}
       className="text-white hover:bg-white/20 h-9 w-9 md:h-8 md:w-auto md:px-2 p-0 gap-1 text-xs disabled:opacity-80"
     >
       {busy ? (
         <>
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          <span className="hidden md:inline">Preparing…</span>
+          <span className="hidden md:inline">{tw('explore.preparingLabel')}</span>
         </>
       ) : isDewarp ? (
         <>
           <Film className="h-3.5 w-3.5" />
-          <span className="hidden md:inline">Video</span>
+          <span className="hidden md:inline">{tw('explore.videoLabel')}</span>
         </>
       ) : (
         <>
           <Compass className="h-3.5 w-3.5" />
           <span className="hidden md:inline">
-            {retryable ? 'Retry 3D' : 'Explore'}
+            {retryable ? tw('explore.retryLabel') : tw('explore.exploreLabel')}
           </span>
         </>
       )}
@@ -194,6 +192,8 @@ export function WatchPlayer({
   return (
     <div
       ref={t.containerRef}
+      // Media-player chrome stays LTR by convention (progress fills left→right).
+      dir="ltr"
       className={`relative bg-black rounded-lg overflow-hidden group aspect-video ${className}`}
       onMouseMove={t.handleMouseMove}
       onTouchStart={t.handleMouseMove}

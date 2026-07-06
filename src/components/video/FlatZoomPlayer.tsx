@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import Hls from 'hls.js'
 import { Button } from '@braintwopoint0/playback-commons/ui'
 import {
@@ -60,6 +61,7 @@ export function FlatZoomPlayer({
   maxZoom = 6,
   className = '',
 }: FlatZoomPlayerProps) {
+  const t = useTranslations('player')
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -106,7 +108,7 @@ export function FlatZoomPlayer({
         else {
           hls.destroy()
           setIsLoading(false)
-          setError('This recording could not be loaded.')
+          setError(t('loadFailed'))
         }
       })
       hlsRef.current = hls
@@ -123,7 +125,7 @@ export function FlatZoomPlayer({
     const onPause = () => setIsPlaying(false)
     const onError = () => {
       setIsLoading(false)
-      setError('This recording could not be loaded.')
+      setError(t('loadFailed'))
     }
     video.addEventListener('loadedmetadata', onLoaded)
     video.addEventListener('timeupdate', onTime)
@@ -269,6 +271,8 @@ export function FlatZoomPlayer({
   return (
     <div
       ref={containerRef}
+      // Media-player chrome stays LTR by convention (seek bar, time readout).
+      dir="ltr"
       className={cn(
         'relative w-full overflow-hidden rounded-lg bg-[#050907] select-none',
         className
@@ -279,7 +283,7 @@ export function FlatZoomPlayer({
         <div
           ref={stageRef}
           role="application"
-          aria-label="Full-pitch recording. Zoom with scroll or +/-, then drag or use arrow keys to pan."
+          aria-label={t('flatZoomAria')}
           tabIndex={canInteract ? 0 : -1}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -323,7 +327,7 @@ export function FlatZoomPlayer({
             <AlertTriangle className="h-6 w-6 text-[var(--ash-grey)]" />
             <p className="text-sm text-[var(--timberwolf)]">{error}</p>
             <Button variant="outline" size="sm" onClick={reload}>
-              Try again
+              {t('tryAgain')}
             </Button>
           </div>
         )}
@@ -332,7 +336,7 @@ export function FlatZoomPlayer({
           <button
             type="button"
             onClick={togglePlay}
-            aria-label="Play"
+            aria-label={t('play')}
             className="absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm transition hover:bg-white/30"
           >
             <Play className="h-7 w-7 translate-x-0.5" />
@@ -343,7 +347,7 @@ export function FlatZoomPlayer({
           <div className="pointer-events-none absolute inset-x-0 top-4 flex justify-center">
             <div className="flex items-center gap-2 rounded-full bg-black/60 px-4 py-2 text-sm text-[var(--timberwolf)] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2">
               <Move className="h-4 w-4" />
-              Scroll to zoom · drag to pan
+              {t('flatZoomHint')}
             </div>
           </div>
         )}
@@ -366,8 +370,11 @@ export function FlatZoomPlayer({
               step={0.1}
               value={Math.min(currentTime, duration || 0)}
               onChange={onSeek}
-              aria-label="Seek"
-              aria-valuetext={`${fmtTime(currentTime)} of ${fmtTime(duration)}`}
+              aria-label={t('seek')}
+              aria-valuetext={t('seekValue', {
+                current: fmtTime(currentTime),
+                duration: fmtTime(duration),
+              })}
               style={{
                 background: `linear-gradient(to right, #10b981 ${seekPct}%, rgba(255,255,255,0.25) ${seekPct}%)`,
               }}
@@ -378,7 +385,7 @@ export function FlatZoomPlayer({
                 variant="ghost"
                 size="icon"
                 onClick={togglePlay}
-                aria-label={isPlaying ? 'Pause' : 'Play'}
+                aria-label={isPlaying ? t('pause') : t('play')}
                 className="h-9 w-9 text-white hover:bg-white/20 md:h-8 md:w-8"
               >
                 {isPlaying ? (
@@ -395,7 +402,7 @@ export function FlatZoomPlayer({
                   variant="ghost"
                   size="icon"
                   onClick={() => applyZoom(1 / ZOOM_STEP)}
-                  aria-label="Zoom out"
+                  aria-label={t('zoomOut')}
                   className="h-9 w-9 text-white hover:bg-white/20 md:h-8 md:w-8"
                 >
                   <Minus className="h-4 w-4" />
@@ -404,7 +411,7 @@ export function FlatZoomPlayer({
                   variant="ghost"
                   size="icon"
                   onClick={() => applyZoom(ZOOM_STEP)}
-                  aria-label="Zoom in"
+                  aria-label={t('zoomIn')}
                   className="h-9 w-9 text-white hover:bg-white/20 md:h-8 md:w-8"
                 >
                   <Plus className="h-4 w-4" />
@@ -413,7 +420,7 @@ export function FlatZoomPlayer({
                   variant="ghost"
                   size="icon"
                   onClick={resetView}
-                  aria-label="Reset view"
+                  aria-label={t('resetView')}
                   className="h-9 w-9 text-white hover:bg-white/20 md:h-8 md:w-8"
                 >
                   <Frame className="h-4 w-4" />
@@ -422,7 +429,9 @@ export function FlatZoomPlayer({
                   variant="ghost"
                   size="icon"
                   onClick={toggleFullscreen}
-                  aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+                  aria-label={
+                    isFullscreen ? t('exitFullscreen') : t('fullscreen')
+                  }
                   className="h-9 w-9 text-white hover:bg-white/20 md:h-8 md:w-8"
                 >
                   <Maximize className="h-4 w-4" />

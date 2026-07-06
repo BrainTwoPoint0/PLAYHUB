@@ -1,6 +1,7 @@
 'use client'
 
 import { Link } from '@/i18n/navigation'
+import { useFormatter, useTranslations } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
@@ -26,7 +27,6 @@ import {
   CardTitle,
   Button,
 } from '@braintwopoint0/playback-commons/ui'
-import { formatDate } from '@braintwopoint0/playback-commons/utils'
 import {
   type MediaPack,
   type GraphicPackageOverlay,
@@ -34,12 +34,12 @@ import {
 import { FlatZoomPlayer } from '@/components/video/FlatZoomPlayer'
 import { WatchPlayer } from '@/components/video/WatchPlayer'
 import {
-  EVENT_TYPE_LABELS,
   EVENT_TYPE_COLORS,
   formatTimestamp,
   type EventType,
   type RecordingEvent,
 } from '@/lib/recordings/event-types'
+import { useEventTypeLabels } from '@/lib/recordings/use-event-labels'
 
 // Frequency-weighted order for the quick-tag grid. Coaches reach for Goal /
 // Shot / Save / Foul most; admin-only events (Kick Off / Half Time) sit
@@ -149,21 +149,26 @@ const FILTER_GROUP_FOR: Record<EventType, FilterGroup> = {
   full_time: 'phase',
   other: 'other',
 }
-const FILTER_GROUPS: { id: FilterGroup; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'scoring', label: 'Scoring' },
-  { id: 'cards', label: 'Cards' },
-  { id: 'phase', label: 'Phase' },
-  { id: 'other', label: 'Other' },
+// Filter pill labels are translated at render via `watch.filters.<id>`.
+const FILTER_GROUPS: FilterGroup[] = [
+  'all',
+  'scoring',
+  'cards',
+  'phase',
+  'other',
 ]
 
-function backLink(from: string | null): { href: string; label: string } {
-  if (from === 'matches') return { href: '/matches', label: 'Back to Matches' }
+// labelKey === null → the PLAYHUB brand name (not translated).
+function backLink(from: string | null): {
+  href: string
+  labelKey: 'matches' | 'myRecordings' | 'venue' | null
+} {
+  if (from === 'matches') return { href: '/matches', labelKey: 'matches' }
   if (from === 'recordings')
-    return { href: '/recordings', label: 'Back to My Recordings' }
+    return { href: '/recordings', labelKey: 'myRecordings' }
   if (from?.startsWith('venue:'))
-    return { href: `/venue/${from.slice(6)}`, label: 'Back to venue' }
-  return { href: '/', label: 'PLAYHUB' }
+    return { href: `/venue/${from.slice(6)}`, labelKey: 'venue' }
+  return { href: '/', labelKey: null }
 }
 
 export default function WatchClient({
@@ -183,6 +188,10 @@ export default function WatchClient({
   resumeSeconds,
   meshBaseUrl,
 }: WatchClientProps) {
+  const t = useTranslations('watch')
+  const eventLabels = useEventTypeLabels()
+  const tc = useTranslations('common')
+  const format = useFormatter()
   const back = backLink(from)
   // Panorama player: on when the recording is flagged panorama, or when
   // ?view=panorama is present (a test override for footage not yet flagged).
@@ -249,7 +258,11 @@ export default function WatchClient({
     try {
       const res = await fetch(
         `/api/recordings/${recording.id}/panorama-source${token ? `?token=${encodeURIComponent(token)}` : ''}`,
-        { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: '{}',
+        }
       )
       // fetch doesn't throw on 4xx/5xx. 5xx is transient → retry; 4xx (403/404) →
       // not available to this viewer → stop (keeps the Auto production).
@@ -433,7 +446,7 @@ export default function WatchClient({
           ...tagOverlay,
           posting: false,
           pendingType: null,
-          error: data.error || 'Failed to add tag',
+          error: data.error || t('tags.addFailed'),
         })
         return
       }
@@ -468,7 +481,7 @@ export default function WatchClient({
         ...tagOverlay,
         posting: false,
         pendingType: null,
-        error: 'Network error — please try again',
+        error: t('tags.networkError'),
       })
     }
   }
@@ -546,10 +559,10 @@ export default function WatchClient({
         setSaved(true)
       } else {
         const data = await res.json().catch(() => ({}))
-        setSaveError(data.error || 'Failed to save recording')
+        setSaveError(data.error || t('save.failed'))
       }
     } catch {
-      setSaveError('Failed to save recording')
+      setSaveError(t('save.failed'))
     } finally {
       setSaving(false)
     }
@@ -596,8 +609,8 @@ export default function WatchClient({
           href={back.href}
           className="text-muted-foreground hover:text-[var(--timberwolf)] inline-flex items-center text-sm transition-colors duration-300 gap-2"
         >
-          <ArrowLeft className="h-4 w-4" />
-          {back.label}
+          <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
+          {back.labelKey ? t(`back.${back.labelKey}`) : 'PLAYHUB'}
         </Link>
         {/* Only signed-in viewers with a real grant get a share affordance —
             anonymous bearer-link viewers don't have a share-token endpoint
@@ -609,8 +622,8 @@ export default function WatchClient({
             onClick={() => setShareOpen(true)}
             className="h-8 px-3 text-xs border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.06] hover:border-white/[0.16]"
           >
-            <Share2 className="h-3.5 w-3.5 mr-1.5" />
-            Share
+            <Share2 className="h-3.5 w-3.5 me-1.5" />
+            {tc('share')}
           </Button>
         )}
       </div>
@@ -654,7 +667,7 @@ export default function WatchClient({
               )
             ) : (
               <div className="aspect-video flex items-center justify-center text-muted-foreground text-sm">
-                Video unavailable. Try refreshing.
+                {t('videoUnavailable')}
               </div>
             )}
           </div>
@@ -672,29 +685,29 @@ export default function WatchClient({
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <h1 className="text-xl md:text-2xl font-semibold text-[var(--timberwolf)]">
                   {recording.homeTeam}{' '}
-                  <span className="text-muted-foreground">vs</span>{' '}
+                  <span className="text-muted-foreground">{t('vs')}</span>{' '}
                   {recording.awayTeam}
                 </h1>
                 {resumeLabel && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300 ring-1 ring-emerald-400/20">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                    Resumed at {resumeLabel}
+                    {t('resumedAt', { time: resumeLabel })}
                   </span>
                 )}
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                 <div className="p-3 bg-muted rounded-lg">
                   <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
-                    Date
+                    {t('info.date')}
                   </p>
                   <p className="text-[var(--timberwolf)] font-medium">
-                    {formatDate(recording.matchDate)}
+                    {format.dateTime(new Date(recording.matchDate), 'short')}
                   </p>
                 </div>
                 {recording.competition && (
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
-                      Competition
+                      {t('info.competition')}
                     </p>
                     <p className="text-[var(--timberwolf)] font-medium truncate">
                       {recording.competition}
@@ -704,7 +717,7 @@ export default function WatchClient({
                 {recording.pitchName && (
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
-                      Pitch
+                      {t('info.pitch')}
                     </p>
                     <p className="text-[var(--timberwolf)] font-medium truncate">
                       {recording.pitchName}
@@ -714,9 +727,12 @@ export default function WatchClient({
                 {durationLabel && (
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
-                      Duration
+                      {t('info.duration')}
                     </p>
-                    <p className="text-[var(--timberwolf)] font-medium font-mono tabular-nums">
+                    <p
+                      dir="ltr"
+                      className="text-[var(--timberwolf)] font-medium font-mono tabular-nums"
+                    >
                       {durationLabel}
                     </p>
                   </div>
@@ -724,7 +740,7 @@ export default function WatchClient({
                 {recording.venue && !recording.pitchName && (
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-muted-foreground mb-1 text-[10px] uppercase tracking-[0.14em]">
-                      Venue
+                      {t('info.venue')}
                     </p>
                     <p className="text-[var(--timberwolf)] font-medium truncate">
                       {recording.venue}
@@ -749,13 +765,12 @@ export default function WatchClient({
             <Card className="bg-card border-border">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base text-[var(--timberwolf)]">
-                  Keep this recording
+                  {t('save.title')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  You&apos;re watching via a public link. Save it to your
-                  library to keep access even if the link is later revoked.
+                  {t('save.description')}
                 </p>
                 {canSave && !saved && (
                   <Button
@@ -765,13 +780,13 @@ export default function WatchClient({
                   >
                     {saving ? (
                       <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Saving…
+                        <Loader2 className="h-4 w-4 me-2 animate-spin" />
+                        {t('save.saving')}
                       </>
                     ) : (
                       <>
-                        <Bookmark className="h-4 w-4 mr-2" />
-                        Save to library
+                        <Bookmark className="h-4 w-4 me-2" />
+                        {t('save.cta')}
                       </>
                     )}
                   </Button>
@@ -779,7 +794,7 @@ export default function WatchClient({
                 {canSave && saved && (
                   <div className="flex items-center gap-2 text-sm text-emerald-400 border border-emerald-400/30 rounded-md bg-emerald-400/[0.06] px-3 py-2">
                     <BookmarkCheck className="h-4 w-4" />
-                    Saved to your library
+                    {t('save.saved')}
                   </div>
                 )}
                 {canSignInToSave && (
@@ -788,13 +803,15 @@ export default function WatchClient({
                     className="w-full bg-[var(--timberwolf)] text-[var(--night)] hover:bg-[var(--ash-grey)]"
                   >
                     <Link href={signInUrl}>
-                      <Bookmark className="h-4 w-4 mr-2" />
-                      Sign in to save
+                      <Bookmark className="h-4 w-4 me-2" />
+                      {t('save.signIn')}
                     </Link>
                   </Button>
                 )}
                 {saveError && (
-                  <p className="text-xs text-red-400">{saveError}</p>
+                  <p dir="auto" className="text-xs text-red-400">
+                    {saveError}
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -805,7 +822,7 @@ export default function WatchClient({
             <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2 space-y-0">
               <div className="flex items-center gap-2.5">
                 <CardTitle className="text-base text-[var(--timberwolf)]">
-                  Tags
+                  {t('tags.title')}
                 </CardTitle>
                 <span className="grid h-5 min-w-[20px] place-items-center rounded-full bg-white/[0.06] px-1.5 text-[10px] font-medium tabular-nums text-muted-foreground">
                   {events.length}
@@ -813,11 +830,11 @@ export default function WatchClient({
                 {/* Soft hint that auto-detection is on the roadmap so coaches
                     don't feel like manual tagging is permanent. */}
                 <span
-                  title="AI auto-detected tags coming soon"
+                  title={t('tags.aiSoonTitle')}
                   className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-400/[0.06] px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.1em] text-emerald-300/70 ring-1 ring-emerald-400/15"
                 >
                   <Sparkles className="h-2.5 w-2.5" />
-                  AI soon
+                  {t('tags.aiSoon')}
                 </span>
               </div>
               {canTag && (
@@ -830,8 +847,8 @@ export default function WatchClient({
                   }}
                   className="h-8 px-3 text-xs border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.06] hover:border-white/[0.16]"
                 >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  Add
+                  <Plus className="h-3.5 w-3.5 me-1" />
+                  {t('tags.add')}
                 </Button>
               )}
             </CardHeader>
@@ -841,20 +858,20 @@ export default function WatchClient({
               {events.length >= 4 && (
                 <div className="mb-3 flex flex-wrap gap-1.5">
                   {FILTER_GROUPS.map((g) => {
-                    const count = groupCounts[g.id] || 0
-                    if (g.id !== 'all' && count === 0) return null
-                    const active = filterGroup === g.id
+                    const count = groupCounts[g] || 0
+                    if (g !== 'all' && count === 0) return null
+                    const active = filterGroup === g
                     return (
                       <button
-                        key={g.id}
-                        onClick={() => setFilterGroup(g.id)}
+                        key={g}
+                        onClick={() => setFilterGroup(g)}
                         className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
                           active
                             ? 'bg-[var(--timberwolf)] text-[var(--night)]'
                             : 'bg-white/[0.04] text-muted-foreground hover:bg-white/[0.08] hover:text-[var(--timberwolf)]'
                         }`}
                       >
-                        {g.label}
+                        {t(`filters.${g}`)}
                         <span
                           className={`tabular-nums ${
                             active ? 'opacity-70' : 'opacity-50'
@@ -871,14 +888,12 @@ export default function WatchClient({
                 <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-white/[0.06] bg-white/[0.01] py-8 text-center">
                   <TagIcon className="h-5 w-5 text-muted-foreground/50" />
                   <p className="text-xs text-muted-foreground max-w-[220px]">
-                    {canTag
-                      ? 'No tags yet. Hit T or click Add to mark a moment.'
-                      : 'No tags on this recording yet.'}
+                    {canTag ? t('tags.emptyCanTag') : t('tags.emptyReadOnly')}
                   </p>
                 </div>
               ) : visibleEvents.length === 0 ? (
                 <p className="py-4 text-center text-xs text-muted-foreground">
-                  No tags in this filter.
+                  {t('tags.emptyFilter')}
                 </p>
               ) : (
                 <ul className="-mx-2 space-y-0.5">
@@ -923,7 +938,10 @@ export default function WatchClient({
                         <button
                           onClick={seek}
                           className="absolute inset-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
-                          aria-label={`Seek to ${formatTimestamp(event.timestamp_seconds)} — ${EVENT_TYPE_LABELS[event.event_type]}`}
+                          aria-label={t('tags.seekTo', {
+                            time: formatTimestamp(event.timestamp_seconds),
+                            label: eventLabels[event.event_type],
+                          })}
                         />
                         {/* Colored dot with halo */}
                         <span
@@ -935,7 +953,10 @@ export default function WatchClient({
                         />
                         {/* Timestamp — right-aligned in a fixed column for a
                             clean ladder of times across mixed mm:ss / h:mm:ss. */}
-                        <span className="relative z-[1] w-16 flex-shrink-0 text-right font-mono text-xs tabular-nums text-[var(--timberwolf)]">
+                        <span
+                          dir="ltr"
+                          className="relative z-[1] w-16 flex-shrink-0 text-end font-mono text-xs tabular-nums text-[var(--timberwolf)]"
+                        >
                           {formatTimestamp(event.timestamp_seconds)}
                         </span>
                         {/* Type pill */}
@@ -946,7 +967,7 @@ export default function WatchClient({
                             color,
                           }}
                         >
-                          {EVENT_TYPE_LABELS[event.event_type]}
+                          {eventLabels[event.event_type]}
                         </span>
                         {/* Optional label */}
                         {event.label && (
@@ -955,12 +976,14 @@ export default function WatchClient({
                           </span>
                         )}
                         {/* Right-side: lock + delete (mine only) */}
-                        <span className="ml-auto flex flex-shrink-0 items-center gap-1">
+                        <span className="ms-auto flex flex-shrink-0 items-center gap-1">
                           {isPrivate && !isConfirming && (
                             <Lock
                               className="h-3 w-3 text-muted-foreground/60"
                               aria-label={
-                                isMine ? 'Your private tag' : 'Private'
+                                isMine
+                                  ? t('tags.privateMine')
+                                  : t('tags.private')
                               }
                             />
                           )}
@@ -980,7 +1003,9 @@ export default function WatchClient({
                                 }
                               }}
                               aria-label={
-                                isConfirming ? 'Confirm delete' : 'Delete tag'
+                                isConfirming
+                                  ? t('tags.confirmDelete')
+                                  : t('tags.delete')
                               }
                               className={`relative z-[2] grid place-items-center rounded-md transition-all ${
                                 isConfirming
@@ -990,7 +1015,7 @@ export default function WatchClient({
                             >
                               {isConfirming ? (
                                 <span className="text-[10px] font-medium">
-                                  Delete?
+                                  {t('tags.deletePrompt')}
                                 </span>
                               ) : (
                                 <Trash2 className="h-3 w-3" />
@@ -1067,10 +1092,15 @@ export default function WatchClient({
                     boxShadow: `0 0 10px ${EVENT_TYPE_COLORS[tagSavedFlash.eventType]}`,
                   }}
                 />
-                {EVENT_TYPE_LABELS[tagSavedFlash.eventType]} tagged at{' '}
-                <span className="font-mono tabular-nums">
-                  {formatTimestamp(tagSavedFlash.timestamp)}
-                </span>
+                {t.rich('tags.savedFlash', {
+                  label: eventLabels[tagSavedFlash.eventType],
+                  time: formatTimestamp(tagSavedFlash.timestamp),
+                  timeWrap: (chunks) => (
+                    <span dir="ltr" className="font-mono tabular-nums">
+                      {chunks}
+                    </span>
+                  ),
+                })}
               </motion.div>
             )}
           </AnimatePresence>,
@@ -1111,6 +1141,9 @@ function TagOverlayInner({
   closeTagOverlay: () => void
   reduceMotion: boolean
 }) {
+  const t = useTranslations('watch')
+  const eventLabels = useEventTypeLabels()
+  const tc = useTranslations('common')
   // Focus first tile on mount so keyboard users can fire shortcuts or arrow
   // through the grid immediately. We also expose the dialog's id chain for
   // SR (aria-labelledby points at the timestamp heading).
@@ -1168,13 +1201,13 @@ function TagOverlayInner({
                   {formatTimestamp(Math.floor(tagOverlay.timestamp))}
                 </p>
                 <p className="mt-1.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                  New tag
+                  {t('tagOverlay.newTag')}
                 </p>
               </div>
             </div>
             <button
               onClick={closeTagOverlay}
-              aria-label="Close"
+              aria-label={tc('close')}
               className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition-all hover:bg-white/[0.06] hover:text-[var(--timberwolf)] active:scale-95"
             >
               <X className="h-4 w-4" />
@@ -1194,7 +1227,10 @@ function TagOverlayInner({
                   }
                   className="absolute inset-y-1 w-[calc(50%-4px)] rounded-md bg-[var(--timberwolf)] shadow-[0_2px_8px_rgba(0,0,0,0.25)]"
                   style={{
-                    left: tagOverlay.visibility === 'public' ? 4 : 'calc(50%)',
+                    // Logical property so the indicator tracks the correct
+                    // segment in RTL as well as LTR.
+                    insetInlineStart:
+                      tagOverlay.visibility === 'public' ? 4 : 'calc(50%)',
                   }}
                 />
                 {(['public', 'private'] as const).map((v) => {
@@ -1212,25 +1248,24 @@ function TagOverlayInner({
                       }`}
                     >
                       {v === 'private' && <Lock className="h-3 w-3" />}
-                      {v === 'public' ? 'Public' : 'Private'}
+                      {v === 'public'
+                        ? t('tagOverlay.public')
+                        : t('tagOverlay.private')}
                     </button>
                   )
                 })}
               </div>
               <p className="mt-1.5 text-[11px] text-muted-foreground/80">
                 {tagOverlay.visibility === 'public'
-                  ? 'Visible to everyone with access to this recording.'
-                  : 'Only visible to you.'}
+                  ? t('tagOverlay.publicHint')
+                  : t('tagOverlay.privateHint')}
               </p>
             </div>
           )}
           {!canPublish && (
             <div className="mb-5 flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-xs text-muted-foreground">
               <Lock className="h-3 w-3 flex-shrink-0" />
-              <span>
-                Private tag — only you can see it. Buyers and venue admins can
-                add public tags.
-              </span>
+              <span>{t('tagOverlay.privateOnly')}</span>
             </div>
           )}
 
@@ -1279,12 +1314,12 @@ function TagOverlayInner({
                       }}
                     />
                   )}
-                  <span className="relative">{EVENT_TYPE_LABELS[type]}</span>
+                  <span className="relative">{eventLabels[type]}</span>
                   {/* Keyboard shortcut chip */}
                   {shortcut && (
                     <span
                       aria-hidden
-                      className="absolute right-1.5 top-1.5 hidden rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[9px] text-muted-foreground/80 sm:block"
+                      className="absolute end-1.5 top-1.5 hidden rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[9px] text-muted-foreground/80 sm:block"
                     >
                       {shortcut}
                     </span>
@@ -1302,6 +1337,7 @@ function TagOverlayInner({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: reduceMotion ? 0 : 0.16 }}
+                dir="auto"
                 className="mt-4 flex items-center gap-2 rounded-lg border border-red-400/20 bg-red-400/[0.06] px-3 py-2 text-xs text-red-300"
                 role="alert"
               >
@@ -1320,13 +1356,16 @@ function TagOverlayInner({
                 onChange={(e) => setKeepOpenAfterSave(e.target.checked)}
                 className="h-3 w-3 cursor-pointer accent-emerald-400"
               />
-              Keep open after saving
+              {t('tagOverlay.keepOpen')}
             </label>
             <span className="hidden text-[10px] text-muted-foreground/70 sm:block">
-              <kbd className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[9px]">
-                esc
-              </kbd>{' '}
-              to cancel
+              {t.rich('tagOverlay.escHint', {
+                kbd: (chunks) => (
+                  <kbd className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[9px]">
+                    {chunks}
+                  </kbd>
+                ),
+              })}
             </span>
           </div>
         </div>
