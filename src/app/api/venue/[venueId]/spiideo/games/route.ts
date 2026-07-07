@@ -229,8 +229,13 @@ export async function POST(
       // self-service flow (`/api/start/[cameraId]`) is the only path that
       // sets collected_by = 'playhub'.
       collectedBy: 'venue' as const,
-      isBillable: isBillable ?? true,
-      billableAmount,
+      // Tenants (ownerOrgId set — scheduling via organization_venue_access)
+      // don't control billing: the recording is always billable and priced
+      // from the venue's billing config (billableAmount undefined → the
+      // venue's hourly rate scaled by duration). Only the venue's own
+      // admins may mark a session comp or override the amount.
+      isBillable: ownerOrgId ? true : (isBillable ?? true),
+      billableAmount: ownerOrgId ? undefined : billableAmount,
       accessEmails,
       homeTeam,
       awayTeam,

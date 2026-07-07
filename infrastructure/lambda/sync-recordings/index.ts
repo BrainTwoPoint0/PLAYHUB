@@ -15,6 +15,7 @@ import {
   sweepZombie,
   type ZombieCandidate,
 } from './zombies'
+import { fetchAllRows } from './paginate'
 
 // Environment variables
 const S3_BUCKET = process.env.S3_BUCKET!
@@ -316,54 +317,51 @@ async function getExistingGameIds(): Promise<{
   //   - tombstoned by a user-initiated PLAYHUB delete (Spiideo's DELETE only
   //     unschedules; without this the orphan branch re-creates the row).
   // This guarantees a broken game can never stall the queue across runs.
-  // PostgREST caps .select() at 1000 rows by default — raise the ceiling
-  // so we never silently truncate the exclusion set at scale (a truncated
-  // set would re-admit already-synced or permanently-failed games into
-  // the queue on every run).
+  //
+  // Both queries page through fetchAllRows: PostgREST truncates ANY request
+  // (even explicit .range() calls) at the server's max-rows setting, so a
+  // single big range would silently cap at 1000 rows — and a truncated
+  // exclusion set re-admits already-synced or permanently-failed games into
+  // the queue on every run. Errors throw loudly for the same reason.
+  // Ordering makes offset pagination stable across pages.
   const EXCLUSION_CAP = 49999
-  const [recordingsResult, tombstonesResult] = await Promise.all([
-    supabase
-      .from('playhub_match_recordings')
-      .select('id, spiideo_game_id, s3_key, s3_bucket, sync_attempts, status')
-      .not('spiideo_game_id', 'is', null)
-      .range(0, EXCLUSION_CAP),
-    supabase
-      .from('playhub_deleted_spiideo_games')
-      .select('spiideo_game_id')
-      .range(0, EXCLUSION_CAP),
+  const [recordings, tombstones] = await Promise.all([
+    fetchAllRows(
+      async (from, to) => {
+        const { data, error } = await supabase
+          .from('playhub_match_recordings')
+          .select(
+            'id, spiideo_game_id, s3_key, s3_bucket, sync_attempts, status'
+          )
+          .not('spiideo_game_id', 'is', null)
+          .order('id')
+          .range(from, to)
+        if (error) {
+          throw new Error(
+            `getExistingGameIds: recordings query failed: ${error.message}`
+          )
+        }
+        return data || []
+      },
+      { cap: EXCLUSION_CAP, label: 'recordings' }
+    ),
+    fetchAllRows(
+      async (from, to) => {
+        const { data, error } = await supabase
+          .from('playhub_deleted_spiideo_games')
+          .select('spiideo_game_id')
+          .order('spiideo_game_id')
+          .range(from, to)
+        if (error) {
+          throw new Error(
+            `getExistingGameIds: tombstones query failed: ${error.message}`
+          )
+        }
+        return data || []
+      },
+      { cap: EXCLUSION_CAP, label: 'tombstones' }
+    ),
   ])
-
-  // Fail loudly on either query error. A swallowed error would leave the
-  // excluded set incomplete and the orphan branch would re-create rows for
-  // already-synced or tombstoned games — exactly the failure mode the
-  // tombstone table exists to prevent.
-  if (recordingsResult.error) {
-    throw new Error(
-      `getExistingGameIds: recordings query failed: ${recordingsResult.error.message}`
-    )
-  }
-  if (tombstonesResult.error) {
-    throw new Error(
-      `getExistingGameIds: tombstones query failed: ${tombstonesResult.error.message}`
-    )
-  }
-
-  // Hard-stop if either query hits the 50K cap. Silent truncation here
-  // re-admits already-synced games into the sync queue and burns S3/Spiideo
-  // bandwidth on redundant transfers. When this fires, switch to keyset
-  // pagination (or aggressive cleanup) rather than just raising the cap.
-  const recordings = recordingsResult.data || []
-  const tombstones = tombstonesResult.data || []
-  if (recordings.length > EXCLUSION_CAP) {
-    throw new Error(
-      `getExistingGameIds: recordings query hit ${EXCLUSION_CAP + 1}-row cap — paginate before more rows are silently excluded`
-    )
-  }
-  if (tombstones.length > EXCLUSION_CAP) {
-    throw new Error(
-      `getExistingGameIds: tombstones query hit ${EXCLUSION_CAP + 1}-row cap — paginate before more rows are silently excluded`
-    )
-  }
 
   const excluded = new Set<string>()
   for (const r of recordings) {
@@ -1232,8 +1230,14 @@ export const handler = async (): Promise<{
     // backlog. Games marked `sync_attempts >= RETRY_THRESHOLD` drop to
     // the tail because they've already taken their turn; we still try
     // them this run but only after fresh work is drained.
+    // Snapshot games are throwaway internals of the spiideo-snapshot Lambda
+    // (camera previews). It deletes them after grabbing the frame, but
+    // Spiideo's DELETE only unschedules — they linger as finished games
+    // with no production, and the orphan branch would otherwise mint a
+    // 'failed' marker row per snapshot into the venue's recordings list.
     const gamesToSync = finishedGames
       .filter((g) => !existingGameIds.has(g.id))
+      .filter((g) => !g.title?.startsWith('[PLAYHUB Snapshot]'))
       .sort(
         (a, b) =>
           new Date(b.scheduledStartTime).getTime() -

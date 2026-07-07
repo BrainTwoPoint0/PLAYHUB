@@ -107,4 +107,87 @@ describe('persistScheduledRecording — is_billable', () => {
       expect.objectContaining({ is_billable: false })
     )
   })
+
+  it('downgrades is_billable to false when no amount is resolvable (no caller amount, no venue billing config)', async () => {
+    // Venue has no billing config row → scaledFallback is null. A billable
+    // row with a null amount would get invoiced at an invented fallback
+    // figure downstream — refuse to mark it billable instead.
+    mockServiceFrom.mockImplementation((table: string) => {
+      if (table === 'playhub_venue_billing_config') {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      }
+      if (table === 'playhub_match_recordings') {
+        return {
+          insert: recordingInsert.mockImplementation(() => ({
+            select: vi.fn().mockReturnValue({
+              single: vi
+                .fn()
+                .mockResolvedValue({ data: { id: 'rec-1' }, error: null }),
+            }),
+          })),
+        }
+      }
+      return {
+        insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      }
+    })
+
+    await persistScheduledRecording(
+      baseInput({ isBillable: true }),
+      { spiideoGameId: 'game-1', spiideoProductionId: 'prod-1' },
+      '2026-07-06T22:00:00Z',
+      '2026-07-06T23:00:00Z'
+    )
+
+    expect(recordingInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ is_billable: false, billable_amount: null })
+    )
+  })
+
+  it('keeps is_billable true when the caller supplies an explicit amount even without venue config', async () => {
+    mockServiceFrom.mockImplementation((table: string) => {
+      if (table === 'playhub_venue_billing_config') {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      }
+      if (table === 'playhub_match_recordings') {
+        return {
+          insert: recordingInsert.mockImplementation(() => ({
+            select: vi.fn().mockReturnValue({
+              single: vi
+                .fn()
+                .mockResolvedValue({ data: { id: 'rec-1' }, error: null }),
+            }),
+          })),
+        }
+      }
+      return {
+        insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      }
+    })
+
+    await persistScheduledRecording(
+      baseInput({ isBillable: true, billableAmount: 5 }),
+      { spiideoGameId: 'game-1', spiideoProductionId: 'prod-1' },
+      '2026-07-06T22:00:00Z',
+      '2026-07-06T23:00:00Z'
+    )
+
+    expect(recordingInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ is_billable: true, billable_amount: 5 })
+    )
+  })
 })

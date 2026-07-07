@@ -102,6 +102,12 @@ export async function persistScheduledRecording(
       : null
   const resolvedBillableAmount = billableAmount ?? scaledFallback
 
+  // Billable requires a resolvable amount. A billable row with a null
+  // amount gets priced at an invented fallback figure by the billing
+  // dashboards — refuse to mark it billable instead; configuring the
+  // venue's billing config makes future recordings billable again.
+  const resolvedIsBillable = (isBillable ?? false) && resolvedBillableAmount !== null
+
   const { data: recording, error: recordingError } = await serviceClient
     .from('playhub_match_recordings')
     .insert({
@@ -131,7 +137,7 @@ export async function persistScheduledRecording(
       stripe_payment_intent_id: input.stripePaymentIntentId || null,
       // Callers that omit isBillable (e.g. the Stripe-paid QR flow, where
       // PLAYHUB already collected the money) must stay non-billable.
-      is_billable: isBillable ?? false,
+      is_billable: resolvedIsBillable,
       billable_amount: resolvedBillableAmount,
       billable_currency: billingConfig?.currency ?? 'KWD',
       collected_by: collectedBy,
