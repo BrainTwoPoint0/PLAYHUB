@@ -147,7 +147,7 @@ describe('scheduleRecording', () => {
     expect(insertCall.spiideo_production_id).toBe('prod-1')
     expect(insertCall.collected_by).toBe('venue')
     expect(insertCall.created_by).toBe('user-42')
-    expect(insertCall.is_billable).toBe(false)
+    expect(insertCall.is_billable).toBe(true)
     expect(insertCall.status).toBe('scheduled')
   })
 

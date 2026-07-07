@@ -2,10 +2,19 @@
 // Uses shared Spiideo account, maps scenes to venues
 // Triggered by EventBridge every 15 minutes
 
-import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3'
+import {
+  S3Client,
+  HeadObjectCommand,
+  DeleteObjectCommand,
+} from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
 import { Readable } from 'stream'
 import { createClient } from '@supabase/supabase-js'
+import {
+  findZombieRecordings,
+  sweepZombie,
+  type ZombieCandidate,
+} from './zombies'
 
 // Environment variables
 const S3_BUCKET = process.env.S3_BUCKET!
@@ -292,7 +301,14 @@ async function uploadToS3(
 }
 
 // Database helpers
-async function getExistingGameIds(): Promise<Set<string>> {
+interface ZombieRow extends ZombieCandidate {
+  sync_attempts: number | null
+}
+
+async function getExistingGameIds(): Promise<{
+  excluded: Set<string>
+  zombies: ZombieRow[]
+}> {
   // A game is excluded from the sync queue if:
   //   - already synced to S3 (s3_key not null), OR
   //   - permanently given up on (sync_attempts >= GIVE_UP_THRESHOLD), OR
@@ -308,7 +324,7 @@ async function getExistingGameIds(): Promise<Set<string>> {
   const [recordingsResult, tombstonesResult] = await Promise.all([
     supabase
       .from('playhub_match_recordings')
-      .select('spiideo_game_id, s3_key, sync_attempts, status')
+      .select('id, spiideo_game_id, s3_key, s3_bucket, sync_attempts, status')
       .not('spiideo_game_id', 'is', null)
       .range(0, EXCLUSION_CAP),
     supabase
@@ -358,10 +374,77 @@ async function getExistingGameIds(): Promise<Set<string>> {
       excluded.add(r.spiideo_game_id)
     }
   }
+  const tombstonedGameIds = new Set<string>()
   for (const t of tombstones) {
     excluded.add(t.spiideo_game_id)
+    tombstonedGameIds.add(t.spiideo_game_id)
   }
-  return excluded
+
+  // A surviving row whose game is tombstoned means the app's DELETE flow
+  // died between the tombstone write and the row delete — hand these to
+  // the handler so the sweep can finish the deletion.
+  const zombies = findZombieRecordings(
+    recordings as ZombieRow[],
+    tombstonedGameIds
+  )
+
+  return { excluded, zombies }
+}
+
+// Finish deletions the app's DELETE endpoint started but never completed
+// (tombstone written, row still present). Per zombie: stop the game if it
+// is somehow still recording, delete it on Spiideo, remove the S3 object,
+// then the row (orchestration + gating rules live in zombies.ts). The
+// tombstone stays — it is the permanent exclusion marker.
+async function sweepZombieRecordings(zombies: ZombieRow[]): Promise<number> {
+  let swept = 0
+  for (const zombie of zombies) {
+    try {
+      const result = await sweepZombie(zombie, {
+        getGameState: async (gameId) => {
+          const game = await spiideoFetch(`/v1/games/${gameId}`)
+          return game?.state ?? 'unknown'
+        },
+        stopGame: async (gameId) => {
+          // Spiideo requires the stop time to be in the future.
+          const stopTime = new Date(Date.now() + 60 * 1000).toISOString()
+          await spiideoFetch(`/v1/games/${gameId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+              action: 'updateGame',
+              scheduledStopTime: { action: 'replace', value: stopTime },
+            }),
+          })
+        },
+        deleteGame: async (gameId) => {
+          await spiideoFetch(`/v1/games/${gameId}`, { method: 'DELETE' })
+        },
+        deleteS3Object: async (bucket, key) => {
+          // The IAM policy only covers our recordings bucket — a row
+          // pointing anywhere else would AccessDeny and silently orphan.
+          if (bucket !== S3_BUCKET) {
+            throw new Error(
+              `refusing S3 delete: row bucket '${bucket}' is not the recordings bucket '${S3_BUCKET}'`
+            )
+          }
+          await s3Client.send(
+            new DeleteObjectCommand({ Bucket: bucket, Key: key })
+          )
+        },
+        deleteRow: async (id) => {
+          const { error } = await supabase
+            .from('playhub_match_recordings')
+            .delete()
+            .eq('id', id)
+          if (error) throw new Error(error.message)
+        },
+      })
+      if (result === 'swept') swept++
+    } catch (err) {
+      console.error(`Zombie sweep: unexpected error for ${zombie.id}:`, err)
+    }
+  }
+  return swept
 }
 
 async function getSceneMappings(): Promise<Map<string, SceneMapping>> {
@@ -1079,6 +1162,9 @@ interface SyncMetrics {
   syncSuccessCount: number
   syncErrorCount: number
   syncLagSeconds: number
+  // Interrupted app-side deletions this run finished. A non-zero trend
+  // means the app's DELETE endpoint is dying mid-flow (Netlify 26s cap).
+  zombiesSwept: number
 }
 
 function emitSyncMetrics(m: SyncMetrics): void {
@@ -1096,6 +1182,7 @@ function emitSyncMetrics(m: SyncMetrics): void {
               { Name: 'SyncSuccessCount', Unit: 'Count' },
               { Name: 'SyncErrorCount', Unit: 'Count' },
               { Name: 'SyncLagSeconds', Unit: 'Seconds' },
+              { Name: 'ZombiesSwept', Unit: 'Count' },
             ],
           },
         ],
@@ -1105,6 +1192,7 @@ function emitSyncMetrics(m: SyncMetrics): void {
       SyncSuccessCount: m.syncSuccessCount,
       SyncErrorCount: m.syncErrorCount,
       SyncLagSeconds: m.syncLagSeconds,
+      ZombiesSwept: m.zombiesSwept,
       message: 'sync_metrics',
     })
   )
@@ -1119,16 +1207,21 @@ export const handler = async (): Promise<{
 
   try {
     // Load scene mappings and scenes
-    const [sceneMappings, scenes, existingGameIds] = await Promise.all([
-      getSceneMappings(),
-      getScenes(),
-      getExistingGameIds(),
-    ])
+    const [sceneMappings, scenes, { excluded: existingGameIds, zombies }] =
+      await Promise.all([getSceneMappings(), getScenes(), getExistingGameIds()])
 
     console.log(
       `Loaded ${sceneMappings.size} scene mappings, ${scenes.length} scenes`
     )
     console.log(`Found ${existingGameIds.size} existing recordings`)
+
+    // Finish interrupted deletions before syncing (and before
+    // detectStaleBookings, so zombies can't fire spurious stale alerts).
+    let zombiesSwept = 0
+    if (zombies.length > 0) {
+      console.log(`Sweeping ${zombies.length} zombie recording(s)...`)
+      zombiesSwept = await sweepZombieRecordings(zombies)
+    }
 
     // Get finished games
     const finishedGames = await getFinishedGames()
@@ -1162,6 +1255,7 @@ export const handler = async (): Promise<{
         syncSuccessCount: 0,
         syncErrorCount: 0,
         syncLagSeconds: 0,
+        zombiesSwept,
       })
 
       return {
@@ -1249,6 +1343,7 @@ export const handler = async (): Promise<{
       syncSuccessCount: syncSuccesses,
       syncErrorCount: syncErrors,
       syncLagSeconds: Math.round(maxLagSec),
+      zombiesSwept,
     })
 
     return {

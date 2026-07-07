@@ -67,6 +67,7 @@ export async function persistScheduledRecording(
     email,
     createdBy,
     collectedBy,
+    isBillable,
     billableAmount,
     accessEmails = [],
     homeTeam = 'Home',
@@ -128,7 +129,9 @@ export async function persistScheduledRecording(
       access_type: 'private_link',
       created_by: createdBy || null,
       stripe_payment_intent_id: input.stripePaymentIntentId || null,
-      is_billable: false,
+      // Callers that omit isBillable (e.g. the Stripe-paid QR flow, where
+      // PLAYHUB already collected the money) must stay non-billable.
+      is_billable: isBillable ?? false,
       billable_amount: resolvedBillableAmount,
       billable_currency: billingConfig?.currency ?? 'KWD',
       collected_by: collectedBy,

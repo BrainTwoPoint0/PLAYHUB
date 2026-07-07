@@ -76,7 +76,8 @@ resource "aws_iam_role_policy_attachment" "sync_lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# S3 permissions for uploading recordings
+# S3 permissions for uploading recordings (DeleteObject: the zombie sweep
+# removes objects for deletions the app started but never completed)
 resource "aws_iam_role_policy" "sync_lambda_s3" {
   name = "${var.project_name}-sync-lambda-s3"
   role = aws_iam_role.sync_lambda.id
@@ -89,7 +90,8 @@ resource "aws_iam_role_policy" "sync_lambda_s3" {
         Action = [
           "s3:PutObject",
           "s3:HeadObject",
-          "s3:GetObject"
+          "s3:GetObject",
+          "s3:DeleteObject"
         ]
         Resource = "arn:aws:s3:::${var.s3_bucket}/*"
       }

@@ -60,6 +60,26 @@ export async function POST(
     )
   }
 
+  // Billing inputs land verbatim in invoicing data — reject anything that
+  // isn't a real boolean / non-negative number instead of coercing.
+  if (isBillable != null && typeof isBillable !== 'boolean') {
+    return NextResponse.json(
+      { error: 'isBillable must be a boolean' },
+      { status: 400 }
+    )
+  }
+  if (
+    billableAmount != null &&
+    (typeof billableAmount !== 'number' ||
+      !Number.isFinite(billableAmount) ||
+      billableAmount < 0)
+  ) {
+    return NextResponse.json(
+      { error: 'billableAmount must be a non-negative number' },
+      { status: 400 }
+    )
+  }
+
   const serviceClient = createServiceClient()
 
   // Verify scene is mapped to this venue and resolve which provider owns

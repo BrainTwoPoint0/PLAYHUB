@@ -227,7 +227,7 @@ export async function DELETE(
   const { data: recording } = await (serviceClient as any)
     .from('playhub_match_recordings')
     .select(
-      'organization_id, s3_key, s3_bucket, spiideo_game_id, clutch_video_id, status'
+      'organization_id, s3_key, s3_bucket, spiideo_game_id, clutch_video_id, status, match_date, duration_seconds'
     )
     .eq('id', id)
     .single()
@@ -266,9 +266,44 @@ export async function DELETE(
       )
     }
 
+    // Spiideo's DELETE only unschedules — it does NOT stop a recording
+    // that's already rolling (a deleted live game records to its scheduled
+    // stop). If the recording window is currently open, reschedule the stop
+    // to now (+60s, Spiideo requires a future stop time) before deleting.
+    // Both calls are best-effort with tight timeouts: the tombstone above
+    // plus the sync Lambda's zombie sweep guarantee eventual cleanup, and
+    // an unbounded Spiideo hang would blow Netlify's 26s cap before the
+    // row delete below ever runs.
+    const SPIIDEO_CALL_TIMEOUT_MS = 8000
+    const startMs = recording.match_date
+      ? new Date(recording.match_date).getTime()
+      : null
+    // Match detectStaleBookings' assumption for rows without a duration.
+    const durationMs = (recording.duration_seconds ?? 3 * 3600) * 1000
+    const isLive =
+      startMs !== null &&
+      Date.now() >= startMs &&
+      Date.now() < startMs + durationMs
+
+    if (isLive) {
+      try {
+        const { stopGame } = await import('@/lib/spiideo/client')
+        await stopGame(recording.spiideo_game_id, {
+          timeoutMs: SPIIDEO_CALL_TIMEOUT_MS,
+        })
+      } catch (stopErr) {
+        console.error(
+          'Failed to stop live Spiideo game (continuing with delete):',
+          stopErr
+        )
+      }
+    }
+
     try {
       const { deleteGame } = await import('@/lib/spiideo/client')
-      await deleteGame(recording.spiideo_game_id)
+      await deleteGame(recording.spiideo_game_id, {
+        timeoutMs: SPIIDEO_CALL_TIMEOUT_MS,
+      })
     } catch (spiideoErr) {
       console.error(
         'Failed to delete Spiideo game (continuing with S3/DB delete):',

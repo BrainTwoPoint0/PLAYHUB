@@ -318,6 +318,10 @@ async function getAccessToken(): Promise<string> {
       grant_type: 'client_credentials',
     }),
     cache: 'no-store',
+    // Without this, a hanging auth endpoint defeats any per-request
+    // timeoutMs — the token fetch runs before the timed API call and a
+    // cold cache would stall callers unboundedly (Netlify's 26s cap).
+    signal: AbortSignal.timeout(8000),
   })
 
   if (!response.ok) {
@@ -346,6 +350,10 @@ async function spiideoRequest<T>(
   options: {
     method?: string
     body?: unknown
+    /** Abort the request after this many ms. Callers on a bounded runtime
+     * (Netlify's 26s function cap) must set this — an unbounded Spiideo
+     * hang otherwise kills the whole request mid-flow. */
+    timeoutMs?: number
   } = {}
 ): Promise<T> {
   const token = await getAccessToken()
@@ -363,6 +371,9 @@ async function spiideoRequest<T>(
     headers,
     body: options.body ? JSON.stringify(options.body) : undefined,
     cache: 'no-store',
+    signal: options.timeoutMs
+      ? AbortSignal.timeout(options.timeoutMs)
+      : undefined,
   })
 
   if (!response.ok) {
@@ -508,9 +519,13 @@ export async function createGame(input: CreateGameInput): Promise<SpiideoGame> {
   })
 }
 
-export async function deleteGame(gameId: string): Promise<void> {
+export async function deleteGame(
+  gameId: string,
+  options: { timeoutMs?: number } = {}
+): Promise<void> {
   await spiideoRequest<void>(`/v1/games/${gameId}`, {
     method: 'DELETE',
+    timeoutMs: options.timeoutMs,
   })
 }
 
@@ -529,7 +544,8 @@ export interface UpdateGameInput {
 
 export async function updateGame(
   gameId: string,
-  input: UpdateGameInput
+  input: UpdateGameInput,
+  options: { timeoutMs?: number } = {}
 ): Promise<SpiideoGame> {
   // Convert to Spiideo's patch format
   // Each field update requires: { action: 'replace', value: ... }
@@ -569,6 +585,7 @@ export async function updateGame(
   return spiideoRequest<SpiideoGame>(`/v1/games/${gameId}`, {
     method: 'PATCH',
     body: patchBody,
+    timeoutMs: options.timeoutMs,
   })
 }
 
@@ -576,11 +593,18 @@ export async function updateGame(
  * Stop a game by setting the scheduledStopTime to 1 minute from now
  * Spiideo requires stop time to be in the future, so we can't stop immediately
  */
-export async function stopGame(gameId: string): Promise<SpiideoGame> {
+export async function stopGame(
+  gameId: string,
+  options: { timeoutMs?: number } = {}
+): Promise<SpiideoGame> {
   const stopTime = new Date(Date.now() + 60 * 1000) // 1 minute from now
-  return updateGame(gameId, {
-    scheduledStopTime: stopTime.toISOString(),
-  })
+  return updateGame(
+    gameId,
+    {
+      scheduledStopTime: stopTime.toISOString(),
+    },
+    options
+  )
 }
 
 // ============================================================================
