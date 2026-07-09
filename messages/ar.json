@@ -168,7 +168,7 @@
       "perDayAvg": "/يوم كمعدل",
       "atVenue": "في النادي",
       "qrCode": "رمز QR",
-      "yourProfit": "أرباحك",
+      "yourShare": "حصتك ({pct})",
       "netSettlement": "صافي التسوية",
       "recordingsCount": "{count, plural, zero {لا تسجيلات} one {تسجيل واحد} two {تسجيلان} few {{count, number, latn} تسجيلات} many {{count, number, latn} تسجيلاً} other {{count, number, latn} تسجيل}}",
       "recordingsInMonth": "{count, plural, zero {لا تسجيلات} one {تسجيل واحد} two {تسجيلان} few {{count, number, latn} تسجيلات} many {{count, number, latn} تسجيلاً} other {{count, number, latn} تسجيل}} في {month}",

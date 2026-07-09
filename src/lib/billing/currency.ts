@@ -41,3 +41,17 @@ export function minorUnitFactor(currency: string): number {
   if (THREE_DECIMAL_CURRENCIES.has(c)) return 1000
   return 100
 }
+
+// Amount to send to Stripe, in minor units, correctly rounded.
+//
+// For 3-decimal currencies (KWD/BHD/JOD/OMR/TND) Stripe requires the minor-unit
+// amount to be a multiple of 10 — card networks only settle 2 decimals, so the
+// third digit must be 0. A percentage-of-gross model produces fractional fils
+// constantly (e.g. 47.531 KWD → 47531 fils), which Stripe REJECTS. Round those
+// to the nearest 10 minor units. Other currencies round to the nearest minor unit.
+export function stripeMinorAmount(amount: number, currency: string): number {
+  const factor = minorUnitFactor(currency)
+  const minor = Math.round(amount * factor)
+  if (factor === 1000) return Math.round(minor / 10) * 10
+  return minor
+}

@@ -87,6 +87,16 @@ resource "aws_lambda_function" "monthly_invoicing" {
   }
 }
 
+# Disable EventBridge async auto-retries. This Lambda moves money via Stripe; an
+# automatic re-invocation of a partially-completed batch could double-invoice a
+# venue whose Stripe invoice succeeded before its DB row was written. Stripe
+# idempotency keys make a retry safe, but suppressing retries entirely is the
+# repo convention for money/side-effect Lambdas (see lyl_sync, veo_sync).
+resource "aws_lambda_function_event_invoke_config" "monthly_invoicing" {
+  function_name          = aws_lambda_function.monthly_invoicing.function_name
+  maximum_retry_attempts = 0
+}
+
 # EventBridge Rule — 1st of every month at 9am UTC
 resource "aws_cloudwatch_event_rule" "invoicing_schedule" {
   name                = "${var.project_name}-invoicing-schedule"

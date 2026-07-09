@@ -17,8 +17,16 @@
 
 import Stripe from 'stripe'
 import { sendInvoiceEmail } from '@/lib/email'
-import { getKwdToEurRate, getEurToAedRate } from '@/lib/fx/rates'
-import { minorUnitFactor } from '@/lib/billing/currency'
+import { stripeMinorAmount } from '@/lib/billing/currency'
+import {
+  resolveGroupId,
+  isGroupTiered,
+  computeSharePct,
+  sportForBilling,
+  grossForRecording,
+  DEFAULT_SHARE_PCT,
+  type Sport,
+} from '@/lib/billing/share-tier'
 
 export interface InvoiceResult {
   invoice: any
@@ -35,13 +43,13 @@ interface LineItemSnapshot {
   recording_title: string | null
   recording_match_date: string | null
   duration_seconds: number
-  billable_amount: number
-  fixed_cost_local: number
-  ambassador_fee: number
+  sport: Sport | null
+  gross_amount: number
+  partner_share_pct: number
+  partner_share: number
+  playback_share: number
   currency: string
   collected_by: 'venue' | 'playhub'
-  fixed_cost_eur_per_hour: number
-  fx_rate: number | null
 }
 
 export async function generateMonthlyInvoice(
@@ -83,7 +91,7 @@ export async function generateMonthlyInvoice(
   const { data: recordings } = await supabase
     .from('playhub_match_recordings')
     .select(
-      'id, title, match_date, billable_amount, collected_by, duration_seconds'
+      'id, title, match_date, billable_amount, collected_by, duration_seconds, spiideo_game_id, clutch_video_id'
     )
     .eq('organization_id', venueId)
     .eq('is_billable', true)
@@ -92,39 +100,32 @@ export async function generateMonthlyInvoice(
     .lte('created_at', periodEndTs)
 
   const items = recordings || []
-  const fixedCostEurPerHour = Number(config.fixed_cost_eur || 0)
   const venueCurrency = (config.currency || 'KWD').trim().toUpperCase()
+  const defaultAmount = Number(config.default_billable_amount) || 5
 
-  // Convert per-hour EUR fixed cost into venue's local currency.
-  // Throw on unknown currencies rather than silently equate EUR to local —
-  // this path moves money via Stripe and a wrong rate produces real losses.
-  let perHourFixedCostLocal = 0
-  let fxRate: number | null = null
-  if (fixedCostEurPerHour > 0) {
-    if (venueCurrency === 'KWD') {
-      const kwdToEur = await getKwdToEurRate()
-      perHourFixedCostLocal = fixedCostEurPerHour / kwdToEur
-      fxRate = kwdToEur
-    } else if (venueCurrency === 'AED') {
-      const eurToAed = await getEurToAedRate()
-      perHourFixedCostLocal = fixedCostEurPerHour * eurToAed
-      fxRate = eurToAed
-    } else if (venueCurrency === 'EUR') {
-      perHourFixedCostLocal = fixedCostEurPerHour
-      fxRate = 1
-    } else {
-      throw new Error(
-        `Unsupported venue currency for cost conversion: ${venueCurrency}`
-      )
-    }
-  }
-  const venuePct = Number(config.venue_profit_share_pct || 30)
-  const ambassadorPct = Number(config.ambassador_pct || 0)
+  // Resolve the partner (group) revenue share per the Li3ib annex. Tiered groups
+  // get 15%/5% of gross by monthly utilisation per sport; non-tiered groups get
+  // a flat 5%. Tier %s are computed ONCE for the whole month (portfolio-level) so
+  // every recording in this invoice snapshots a consistent rate.
+  const groupId = await resolveGroupId(supabase, venueId)
+  const tiered = await isGroupTiered(supabase, groupId)
+  const tierPctBySport: Record<Sport, number> | null = tiered
+    ? {
+        football: await computeSharePct(
+          supabase,
+          groupId,
+          year,
+          month,
+          'football'
+        ),
+        padel: await computeSharePct(supabase, groupId, year, month, 'padel'),
+      }
+    : null
 
   // Build per-recording snapshots in a single pass. Each line item freezes the
-  // billable_amount, computed fixed_cost_local, ambassador_fee, currency, and
-  // fx_rate that produced the totals. Future edits to recordings or billing
-  // config cannot move these once persisted.
+  // gross amount, the sport, the partner share % that applied this month, and
+  // the resulting split. Future edits to camera counts or recordings cannot move
+  // these once persisted.
   // Bad collected_by values throw rather than silently coercing to 'playhub' —
   // a typo or null in the source row would otherwise misallocate revenue
   // between the venue-collected and PLAYHUB-collected ledgers.
@@ -135,22 +136,27 @@ export async function generateMonthlyInvoice(
       )
     }
     const seconds = r.duration_seconds ?? 3600
-    const hours = (Number(seconds) || 3600) / 3600
-    const billable = Number(r.billable_amount) || 0
-    const fixed = perHourFixedCostLocal * hours
-    const ambassadorFee = billable * (ambassadorPct / 100)
+    // Explicit 0 stays 0 (free recording); only null/undefined falls back.
+    const gross = grossForRecording(r.billable_amount, defaultAmount)
+    // Sport is only needed to pick a tier; non-tiered groups (and recordings
+    // with no provider discriminator, e.g. hosted/YouTube) apply the flat rate.
+    const sport = tiered ? sportForBilling(r) : null
+    const pct = tiered && sport ? tierPctBySport![sport] : DEFAULT_SHARE_PCT
+    // Round each split to the currency's 3-decimal precision so the persisted
+    // line items sum exactly to the header totals (round-then-sum).
+    const partnerShare = Number((gross * (pct / 100)).toFixed(3))
     return {
       recording_id: r.id,
       recording_title: r.title ?? null,
       recording_match_date: r.match_date ?? null,
       duration_seconds: Number(seconds) || 3600,
-      billable_amount: billable,
-      fixed_cost_local: fixed,
-      ambassador_fee: ambassadorFee,
+      sport,
+      gross_amount: Number(gross.toFixed(3)),
+      partner_share_pct: pct,
+      partner_share: partnerShare,
+      playback_share: Number((gross - partnerShare).toFixed(3)),
       currency: venueCurrency,
       collected_by: r.collected_by,
-      fixed_cost_eur_per_hour: fixedCostEurPerHour,
-      fx_rate: fxRate,
     }
   })
 
@@ -159,37 +165,29 @@ export async function generateMonthlyInvoice(
   const playhubLines = lineItems.filter((l) => l.collected_by === 'playhub')
 
   const venueCollectedRevenue = venueLines.reduce(
-    (s, l) => s + l.billable_amount,
+    (s, l) => s + l.gross_amount,
     0
   )
   const playhubCollectedRevenue = playhubLines.reduce(
-    (s, l) => s + l.billable_amount,
+    (s, l) => s + l.gross_amount,
     0
   )
 
-  const totalCost = (lines: LineItemSnapshot[]) =>
-    lines.reduce((s, l) => s + l.fixed_cost_local + l.ambassador_fee, 0)
-
-  // Venue-collected: deduct costs, then split profit
-  const venueCosts = totalCost(venueLines)
-  const venueProfit = Math.max(0, venueCollectedRevenue - venueCosts)
-  const venueKeeps = venueProfit * (venuePct / 100)
-  const venueOwesPlayhub = venueCollectedRevenue - venueKeeps
-
-  // PLAYHUB-collected: deduct costs, then split profit
-  const playhubCosts = totalCost(playhubLines)
-  const playhubProfit = Math.max(0, playhubCollectedRevenue - playhubCosts)
-  const playhubOwesVenue = playhubProfit * (venuePct / 100)
+  // Settlement (share of gross, no cost deduction):
+  //  - venue-collected: partner holds the cash, so owes PLAYBACK the playback share
+  //  - online-collected: PLAYBACK holds the cash, so owes the partner the partner share
+  const venueOwesPlayhub = venueLines.reduce((s, l) => s + l.playback_share, 0)
+  const playhubOwesVenue = playhubLines.reduce((s, l) => s + l.partner_share, 0)
 
   // Net: positive = venue owes PLAYHUB, negative = PLAYHUB owes venue
   const netAmount = venueOwesPlayhub - playhubOwesVenue
 
-  // Total hours and total fixed cost for the email template (per-hour-aware).
-  const totalHours = lineItems.reduce(
-    (s, l) => s + (l.duration_seconds || 3600) / 3600,
-    0
-  )
-  const totalFixedCosts = totalCost(lineItems)
+  // Totals for the email template.
+  const grossRevenue = venueCollectedRevenue + playhubCollectedRevenue
+  const partnerShareTotal = lineItems.reduce((s, l) => s + l.partner_share, 0)
+  const playbackShareTotal = lineItems.reduce((s, l) => s + l.playback_share, 0)
+  const sharePctFootball = tierPctBySport?.football ?? DEFAULT_SHARE_PCT
+  const sharePctPadel = tierPctBySport?.padel ?? DEFAULT_SHARE_PCT
 
   // ─── DB-FIRST ORDERING ───────────────────────────────────────────────
   // 1. Insert invoice row as 'draft' with no Stripe ID. If Stripe creation
@@ -234,13 +232,21 @@ export async function generateMonthlyInvoice(
           recording_title: l.recording_title,
           recording_match_date: l.recording_match_date,
           duration_seconds: l.duration_seconds,
-          billable_amount: Number(l.billable_amount.toFixed(3)),
-          fixed_cost_local: Number(l.fixed_cost_local.toFixed(3)),
-          ambassador_fee: Number(l.ambassador_fee.toFixed(3)),
+          // billable_amount == gross under the share-of-gross model; keep it
+          // populated so the historical column stays meaningful.
+          billable_amount: Number(l.gross_amount.toFixed(3)),
+          sport: l.sport,
+          gross_amount: Number(l.gross_amount.toFixed(3)),
+          partner_share_pct: Number(l.partner_share_pct.toFixed(2)),
+          partner_share: Number(l.partner_share.toFixed(3)),
+          playback_share: Number(l.playback_share.toFixed(3)),
           currency: l.currency,
           collected_by: l.collected_by,
-          fixed_cost_eur_per_hour: Number(l.fixed_cost_eur_per_hour.toFixed(4)),
-          fx_rate: l.fx_rate !== null ? Number(l.fx_rate.toFixed(6)) : null,
+          // Legacy cost-recovery columns — not applicable under this model.
+          fixed_cost_local: null,
+          ambassador_fee: null,
+          fixed_cost_eur_per_hour: null,
+          fx_rate: null,
         }))
       )
 
@@ -266,7 +272,11 @@ export async function generateMonthlyInvoice(
   //    Stripe invoice rather than creating duplicates.
   let stripeInvoiceId: string | null = null
   let stripeInvoiceUrl: string | null = null
-  if (config.stripe_customer_id && netAmount > 0) {
+  // Guard on the rounded minor-unit amount, not the raw float: a sub-milli net
+  // (0 < net < 0.0005 KWD) rounds to 0 minor units and must not create a
+  // zero-amount Stripe invoice.
+  const stripeAmount = stripeMinorAmount(netAmount, venueCurrency)
+  if (config.stripe_customer_id && stripeAmount > 0) {
     try {
       const periodLabel = new Date(periodStart).toLocaleDateString('en-GB', {
         month: 'long',
@@ -288,7 +298,7 @@ export async function generateMonthlyInvoice(
         {
           customer: config.stripe_customer_id,
           invoice: stripeInvoice.id,
-          amount: Math.round(netAmount * minorUnitFactor(venueCurrency)),
+          amount: stripeAmount,
           currency: venueCurrency.toLowerCase(),
           description: `PLAYHUB net settlement - ${items.length} recording${items.length === 1 ? '' : 's'} (${periodLabel})`,
         },
@@ -341,11 +351,12 @@ export async function generateMonthlyInvoice(
       currency: venueCurrency,
       periodStart,
       stripeInvoiceUrl,
-      fixedCostPerHour: perHourFixedCostLocal,
-      totalHours,
-      totalFixedCosts,
-      ambassadorPct,
-      venueProfitSharePct: venuePct,
+      tiered,
+      sharePctFootball,
+      sharePctPadel,
+      grossRevenue,
+      partnerShareTotal,
+      playbackShareTotal,
       venueCollectedCount: venueLines.length,
       venueCollectedRevenue,
       venueOwesPlayhub,
@@ -369,11 +380,12 @@ async function notifyVenueAdmins(
     currency: string
     periodStart: string
     stripeInvoiceUrl: string | null
-    fixedCostPerHour: number
-    totalHours: number
-    totalFixedCosts: number
-    ambassadorPct: number
-    venueProfitSharePct: number
+    tiered: boolean
+    sharePctFootball: number
+    sharePctPadel: number
+    grossRevenue: number
+    partnerShareTotal: number
+    playbackShareTotal: number
     venueCollectedCount: number
     venueCollectedRevenue: number
     venueOwesPlayhub: number
@@ -438,11 +450,12 @@ async function notifyVenueAdmins(
       periodLabel,
       currency: details.currency,
       stripeInvoiceUrl: details.stripeInvoiceUrl || undefined,
-      fixedCostPerHour: details.fixedCostPerHour,
-      totalHours: details.totalHours,
-      totalFixedCosts: details.totalFixedCosts,
-      ambassadorPct: details.ambassadorPct,
-      venueProfitSharePct: details.venueProfitSharePct,
+      tiered: details.tiered,
+      sharePctFootball: details.sharePctFootball,
+      sharePctPadel: details.sharePctPadel,
+      grossRevenue: details.grossRevenue,
+      partnerShareTotal: details.partnerShareTotal,
+      playbackShareTotal: details.playbackShareTotal,
       venueCollectedCount: details.venueCollectedCount,
       venueCollectedRevenue: details.venueCollectedRevenue,
       venueOwesPlayhub: details.venueOwesPlayhub,

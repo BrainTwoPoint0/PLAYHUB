@@ -173,13 +173,16 @@ interface BillingSummary {
   playhubCollectedCount: number
   playhubCollectedRevenue: number
   playhubOwesVenue: number
-  venueKeeps: number // venue's profit share they retain (venue-collected only)
-  venueTotalProfit: number // total venue profit from both sources
   netBalance: number // positive = venue owes PLAYHUB, negative = PLAYHUB owes venue
   dailyTarget: number
   todayCount: number
-  venueProfitSharePct?: number
-  ambassadorPct?: number
+  // Partner share of gross (Li3ib annex model)
+  tiered?: boolean
+  partnerSharePctFootball?: number
+  partnerSharePctPadel?: number
+  partnerShareTotal?: number
+  playbackShareTotal?: number
+  isEstimate?: boolean
 }
 
 interface DailyStats {
@@ -2133,15 +2136,20 @@ export default function VenueManagementPage() {
                       </div>
                     </div>
 
-                    {/* Financial summary — hide profit/settlement cards when no profit-share or ambassador relationship */}
+                    {/* Financial summary — show share/settlement cards once there are recordings to settle */}
                     {billingSummary &&
                       (() => {
-                        const hasProfitShare =
-                          (billingSummary.venueProfitSharePct ?? 0) > 0 ||
-                          (billingSummary.ambassadorPct ?? 0) > 0
-                        const gridCols = hasProfitShare
+                        const hasShare = billingSummary.count > 0
+                        const gridCols = hasShare
                           ? 'md:grid-cols-4'
                           : 'md:grid-cols-2'
+                        const pctF =
+                          billingSummary.partnerSharePctFootball ?? 5
+                        const pctP = billingSummary.partnerSharePctPadel ?? 5
+                        const shareLabel =
+                          !billingSummary.tiered || pctF === pctP
+                            ? `${pctF}%`
+                            : `${pctF}% / ${pctP}%`
                         return (
                           <div
                             className={`grid grid-cols-2 ${gridCols} gap-px rounded-lg overflow-hidden bg-muted mb-4`}
@@ -2200,14 +2208,16 @@ export default function VenueManagementPage() {
                                 })}
                               </p>
                             </div>
-                            {hasProfitShare && (
+                            {hasShare && (
                               <>
-                                {/* Venue profit share */}
+                                {/* Partner share of gross */}
                                 <div className="bg-[var(--night)] p-3.5">
                                   <div className="flex items-center gap-1.5 mb-1.5">
                                     <div className="h-1.5 w-1.5 rounded-full bg-emerald-400/60" />
                                     <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">
-                                      {t('billing.yourProfit')}
+                                      {t('billing.yourShare', {
+                                        pct: shareLabel,
+                                      })}
                                     </p>
                                   </div>
                                   <p
@@ -2217,9 +2227,9 @@ export default function VenueManagementPage() {
                                     }}
                                   >
                                     <span dir="ltr" className="inline-block">
-                                      {billingSummary.venueTotalProfit.toFixed(
-                                        3
-                                      )}
+                                      {(
+                                        billingSummary.partnerShareTotal ?? 0
+                                      ).toFixed(3)}
                                       <span className="text-[10px] font-normal text-muted-foreground/50 ms-1">
                                         {billingSummary.currency}
                                       </span>

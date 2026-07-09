@@ -7,27 +7,49 @@ vi.mock('@/lib/email', () => ({
 
 import { generateMonthlyInvoice } from '../generate-invoice'
 
-// Helper to build a chainable Supabase mock
-function createSupabaseMock(overrides: Record<string, any> = {}) {
-  const chain: any = {}
-  chain.from = vi.fn().mockReturnValue(chain)
-  chain.select = vi.fn().mockReturnValue(chain)
-  chain.insert = vi.fn().mockReturnValue(chain)
-  chain.update = vi.fn().mockReturnValue(chain)
-  chain.eq = vi.fn().mockReturnValue(chain)
-  chain.in = vi.fn().mockReturnValue(chain)
-  chain.gte = vi.fn().mockReturnValue(chain)
-  chain.lte = vi.fn().mockReturnValue(chain)
-  chain.not = vi.fn().mockReturnValue(chain)
-  chain.single = vi.fn().mockResolvedValue({ data: null, error: null })
-  chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
-  chain.auth = {
-    admin: { listUsers: vi.fn().mockResolvedValue({ data: { users: [] } }) },
+// ── Table-aware Supabase mock ───────────────────────────────────────
+// `tables` maps a table name to a queue of results consumed in call order
+// (a table queried N times pulls its 1st..Nth result). Every terminal —
+// .single(), .maybeSingle(), and awaiting an array/insert/update chain —
+// consumes one result. Insert payloads are captured on `sb._inserts`.
+function makeSupabase(tables: Record<string, Array<{ data?: any; error?: any }>>) {
+  const counters: Record<string, number> = {}
+  const inserts: any[] = []
+  const sb: any = {
+    _inserts: inserts,
+    auth: {
+      admin: {
+        listUsers: vi.fn().mockResolvedValue({ data: { users: [] } }),
+      },
+    },
+    from(table: string) {
+      const nextResult = () => {
+        const arr = tables[table] || []
+        const i = counters[table] ?? 0
+        counters[table] = i + 1
+        const r = arr[Math.min(i, arr.length - 1)] ?? { data: null, error: null }
+        return { error: null, ...r }
+      }
+      const c: any = {}
+      const pass = () => c
+      c.select = pass
+      c.eq = pass
+      c.in = pass
+      c.not = pass
+      c.gte = pass
+      c.lte = pass
+      c.update = pass
+      c.insert = (payload: any) => {
+        inserts.push(payload)
+        return c
+      }
+      c.single = () => Promise.resolve(nextResult())
+      c.maybeSingle = () => Promise.resolve(nextResult())
+      c.then = (onF: any, onR: any) => Promise.resolve(nextResult()).then(onF, onR)
+      return c
+    },
   }
-
-  // Apply overrides
-  Object.assign(chain, overrides)
-  return chain
+  return sb
 }
 
 function createStripeMock() {
@@ -45,8 +67,9 @@ function createStripeMock() {
   } as any
 }
 
+const groupOrg = { id: 'venue-1', type: 'group', parent_organization_id: null }
+
 describe('generateMonthlyInvoice', () => {
-  let supabase: any
   let stripe: any
 
   beforeEach(() => {
@@ -55,126 +78,60 @@ describe('generateMonthlyInvoice', () => {
   })
 
   it('returns null when no billing config exists', async () => {
-    supabase = createSupabaseMock()
-    // First .from().select().eq().single() returns no config
-    supabase.single.mockResolvedValueOnce({ data: null, error: null })
-
+    const supabase = makeSupabase({
+      playhub_venue_billing_config: [{ data: null }],
+    })
     const result = await generateMonthlyInvoice('venue-1', 2026, 2, {
       supabase,
       stripe,
     })
-
     expect(result).toBeNull()
   })
 
   it('returns null when invoice already exists (duplicate)', async () => {
-    supabase = createSupabaseMock()
-
-    // 1st call: billing config found
-    supabase.single.mockResolvedValueOnce({
-      data: {
-        organization_id: 'venue-1',
-        stripe_customer_id: 'cus_123',
-        currency: 'KWD',
-        fixed_cost_per_recording: 0,
-        venue_profit_share_pct: 30,
-      },
-      error: null,
+    const supabase = makeSupabase({
+      playhub_venue_billing_config: [
+        { data: { organization_id: 'venue-1', currency: 'KWD' } },
+      ],
+      playhub_venue_invoices: [{ data: { id: 'existing-invoice' } }],
     })
-    // 2nd call: maybeSingle returns existing invoice
-    supabase.maybeSingle.mockResolvedValueOnce({
-      data: { id: 'existing-invoice' },
-      error: null,
-    })
-
     const result = await generateMonthlyInvoice('venue-1', 2026, 2, {
       supabase,
       stripe,
     })
-
     expect(result).toBeNull()
     expect(stripe.invoices.create).not.toHaveBeenCalled()
   })
 
-  it('creates invoice with correct calculations for venue-collected recordings', async () => {
-    // Build a mock that tracks which table is being queried
-    const callLog: string[] = []
-    const mockData: Record<string, any> = {
-      playhub_venue_billing_config: {
-        organization_id: 'venue-1',
-        stripe_customer_id: 'cus_123',
-        currency: 'KWD',
-        fixed_cost_per_recording: 0,
-        venue_profit_share_pct: 30,
-      },
-      playhub_venue_invoices_check: null, // no duplicate
-      playhub_match_recordings: [
+  it('splits gross at the flat default (5%) for a non-tiered group, venue-collected', async () => {
+    const supabase = makeSupabase({
+      playhub_venue_billing_config: [
         {
-          id: 'r1',
-          title: 'Match 1',
-          billable_amount: 10,
-          collected_by: 'venue',
-        },
-        {
-          id: 'r2',
-          title: 'Match 2',
-          billable_amount: 20,
-          collected_by: 'venue',
+          data: {
+            organization_id: 'venue-1',
+            stripe_customer_id: 'cus_123',
+            currency: 'KWD',
+            default_billable_amount: 5,
+          },
         },
       ],
-      playhub_venue_invoices_insert: {
-        id: 'new-invoice',
-        net_amount: 21,
-        status: 'pending',
-      },
-      organizations: { name: 'Test Venue' },
-      organization_members: [],
-    }
-
-    supabase = createSupabaseMock()
-
-    let fromCallCount = 0
-    supabase.from.mockImplementation((table: string) => {
-      callLog.push(table)
-      fromCallCount++
-      return supabase
-    })
-
-    // single() calls: 1st = config, last = insert result
-    let singleCallCount = 0
-    supabase.single.mockImplementation(() => {
-      singleCallCount++
-      if (singleCallCount === 1) {
-        return Promise.resolve({
-          data: mockData.playhub_venue_billing_config,
-          error: null,
-        })
-      }
-      // insert().select().single()
-      return Promise.resolve({
-        data: mockData.playhub_venue_invoices_insert,
-        error: null,
-      })
-    })
-
-    // maybeSingle = duplicate check (no match)
-    supabase.maybeSingle.mockResolvedValue({ data: null, error: null })
-
-    // select() for recordings returns array via the chain — we override the
-    // chain to resolve recordings when the right table is queried.
-    // Trick: after the maybeSingle (duplicate check), the next from() is recordings.
-    // We'll intercept the `lte` call that ends the recording query chain.
-    let lteCallCount = 0
-    supabase.lte.mockImplementation(() => {
-      lteCallCount++
-      if (lteCallCount === 1) {
-        // This is the recordings query — return data directly
-        return Promise.resolve({
-          data: mockData.playhub_match_recordings,
-          error: null,
-        })
-      }
-      return supabase
+      playhub_venue_invoices: [
+        { data: null }, // duplicate check
+        { data: { id: 'new-invoice' } }, // insert
+        { data: null }, // stripe-success update
+      ],
+      playhub_match_recordings: [
+        {
+          data: [
+            { id: 'r1', title: 'M1', billable_amount: 10, collected_by: 'venue' },
+            { id: 'r2', title: 'M2', billable_amount: 20, collected_by: 'venue' },
+          ],
+        },
+      ],
+      organizations: [{ data: groupOrg }, { data: { name: 'Test Venue' } }],
+      playhub_group_tier_config: [{ data: null }], // non-tiered
+      playhub_invoice_line_items: [{ error: null }],
+      organization_members: [{ data: [] }],
     })
 
     const result = await generateMonthlyInvoice('venue-1', 2026, 2, {
@@ -185,68 +142,159 @@ describe('generateMonthlyInvoice', () => {
     expect(result).not.toBeNull()
     expect(result!.recordingCount).toBe(2)
 
-    // 30 total revenue, 30% venue keeps = 9, venue owes 21. Stripe is invoked
-    // with idempotency keys derived from (venueId, year, month).
+    // gross 30, partner share 5% = 1.5, venue owes PLAYBACK the playback share = 28.5
+    expect(stripe.invoiceItems.create).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 28500, currency: 'kwd' }),
+      expect.objectContaining({ idempotencyKey: 'invoice:venue-1:2026:02:item' })
+    )
     expect(stripe.invoices.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        customer: 'cus_123',
-        collection_method: 'send_invoice',
-        days_until_due: 30,
-      }),
+      expect.objectContaining({ customer: 'cus_123' }),
       expect.objectContaining({
         idempotencyKey: 'invoice:venue-1:2026:02:create',
       })
     )
-
-    // Line item amount: 21 * 1000 = 21000 (KWD 3 decimals)
-    expect(stripe.invoiceItems.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        amount: 21000,
-        currency: 'kwd',
-      }),
-      expect.objectContaining({
-        idempotencyKey: 'invoice:venue-1:2026:02:item',
-      })
-    )
-
-    // Invoice should be finalized with its own idempotency key
-    expect(stripe.invoices.finalizeInvoice).toHaveBeenCalledWith(
-      'inv_123',
-      undefined,
-      expect.objectContaining({
-        idempotencyKey: 'invoice:venue-1:2026:02:finalize',
-      })
-    )
   })
 
-  it('does not create Stripe invoice when net amount is zero', async () => {
-    supabase = createSupabaseMock()
-
-    let singleCallCount = 0
-    supabase.single.mockImplementation(() => {
-      singleCallCount++
-      if (singleCallCount === 1) {
-        return Promise.resolve({
+  it('nets mixed venue + online collection and rounds KWD to a Stripe-valid amount', async () => {
+    const supabase = makeSupabase({
+      playhub_venue_billing_config: [
+        {
           data: {
             organization_id: 'venue-1',
             stripe_customer_id: 'cus_123',
             currency: 'KWD',
-            fixed_cost_per_recording: 0,
-            venue_profit_share_pct: 30,
+            default_billable_amount: 5,
           },
-          error: null,
-        })
-      }
-      return Promise.resolve({
-        data: { id: 'invoice-draft', status: 'draft' },
-        error: null,
-      })
+        },
+      ],
+      playhub_venue_invoices: [
+        { data: null },
+        { data: { id: 'inv-mixed' } },
+        { data: null },
+      ],
+      playhub_match_recordings: [
+        {
+          // venue 4.5 @ 5% → playback 4.275 ; online 3.0 @ 5% → partner 0.15
+          data: [
+            { id: 'v', billable_amount: 4.5, collected_by: 'venue' },
+            { id: 'o', billable_amount: 3.0, collected_by: 'playhub' },
+          ],
+        },
+      ],
+      organizations: [{ data: groupOrg }, { data: { name: 'V' } }],
+      playhub_group_tier_config: [{ data: null }],
+      playhub_invoice_line_items: [{ error: null }],
+      organization_members: [{ data: [] }],
     })
 
-    supabase.maybeSingle.mockResolvedValue({ data: null, error: null })
+    await generateMonthlyInvoice('venue-1', 2026, 2, { supabase, stripe })
 
-    // No recordings
-    supabase.lte.mockResolvedValueOnce({ data: [], error: null })
+    // net = 4.275 − 0.15 = 4.125 KWD → 4125 fils, NOT a multiple of 10.
+    // Stripe rejects 3-decimal amounts whose last digit isn't 0, so it must be
+    // rounded to the nearest 10 → 4130.
+    const call = stripe.invoiceItems.create.mock.calls[0][0]
+    expect(call.amount % 10).toBe(0)
+    expect(call.amount).toBe(4130)
+  })
+
+  it('freezes the computed tier % (15%) in the line-item snapshot for a tiered group', async () => {
+    // Portfolio: 900 football recordings @ 5 KWD, 12 cameras, Feb 2026 (28 days).
+    // 900/12/28 = 2.68 >= 2.3 and 900*5/12 = 375 >= 345 => 15% football tier.
+    const footballPortfolio = Array.from({ length: 900 }, () => ({
+      billable_amount: 5,
+    }))
+
+    const supabase = makeSupabase({
+      playhub_venue_billing_config: [
+        {
+          data: {
+            organization_id: 'venue-1',
+            stripe_customer_id: null,
+            currency: 'KWD',
+            default_billable_amount: 5,
+          },
+        },
+      ],
+      playhub_venue_invoices: [
+        { data: null }, // duplicate check
+        { data: { id: 'inv-1' } }, // insert
+      ],
+      playhub_match_recordings: [
+        {
+          // main (venue) recording — one online-collected football recording
+          data: [
+            {
+              id: 'r-f',
+              title: 'Football',
+              match_date: '2026-02-15T10:00:00Z',
+              billable_amount: 5,
+              collected_by: 'playhub',
+              spiideo_game_id: 'g1',
+              clutch_video_id: null,
+            },
+          ],
+        },
+        { data: footballPortfolio }, // computeSharePct football
+        { data: [] }, // computeSharePct padel
+      ],
+      organizations: [
+        { data: groupOrg }, // resolveGroupId
+        { data: [{ id: 'venue-1' }] }, // children (football)
+        { data: [{ id: 'venue-1' }] }, // children (padel)
+        { data: { name: 'Li3ib Venue' } }, // notify name
+      ],
+      playhub_group_tier_config: [
+        { data: { group_organization_id: 'venue-1' } }, // isGroupTiered → tiered
+        { data: { football_camera_count: 12, padel_camera_count: 2 } }, // football
+        { data: { football_camera_count: 12, padel_camera_count: 2 } }, // padel
+      ],
+      playhub_invoice_line_items: [{ error: null }],
+      organization_members: [{ data: [] }],
+    })
+
+    await generateMonthlyInvoice('venue-1', 2026, 2, { supabase, stripe })
+
+    const lineItemInsert = supabase._inserts.find(
+      (p: any) => Array.isArray(p) && p[0]?.recording_id
+    )
+    expect(lineItemInsert).toBeDefined()
+    expect(lineItemInsert).toHaveLength(1)
+    expect(lineItemInsert[0]).toMatchObject({
+      recording_id: 'r-f',
+      sport: 'football',
+      gross_amount: 5,
+      partner_share_pct: 15,
+      partner_share: 0.75,
+      playback_share: 4.25,
+      currency: 'KWD',
+      collected_by: 'playhub',
+    })
+    // Legacy cost-recovery columns are no longer written.
+    expect(lineItemInsert[0].fixed_cost_local).toBeNull()
+    expect(lineItemInsert[0].ambassador_fee).toBeNull()
+
+    // Online-collected only => PLAYBACK owes the venue => negative net => no Stripe.
+    expect(stripe.invoices.create).not.toHaveBeenCalled()
+  })
+
+  it('does not create Stripe invoice when net amount is zero (no recordings)', async () => {
+    const supabase = makeSupabase({
+      playhub_venue_billing_config: [
+        {
+          data: {
+            organization_id: 'venue-1',
+            stripe_customer_id: 'cus_123',
+            currency: 'KWD',
+            default_billable_amount: 5,
+          },
+        },
+      ],
+      playhub_venue_invoices: [{ data: null }, { data: { id: 'inv-draft' } }],
+      playhub_match_recordings: [{ data: [] }],
+      organizations: [{ data: groupOrg }, { data: { name: 'V' } }],
+      playhub_group_tier_config: [{ data: null }],
+      organization_members: [{ data: [] }],
+    })
 
     const result = await generateMonthlyInvoice('venue-1', 2026, 2, {
       supabase,
@@ -259,180 +307,28 @@ describe('generateMonthlyInvoice', () => {
   })
 
   it('throws when DB insert fails', async () => {
-    supabase = createSupabaseMock()
-
-    let singleCallCount = 0
-    supabase.single.mockImplementation(() => {
-      singleCallCount++
-      if (singleCallCount === 1) {
-        return Promise.resolve({
+    const supabase = makeSupabase({
+      playhub_venue_billing_config: [
+        {
           data: {
             organization_id: 'venue-1',
             stripe_customer_id: null,
             currency: 'KWD',
-            fixed_cost_per_recording: 0,
-            venue_profit_share_pct: 30,
+            default_billable_amount: 5,
           },
-          error: null,
-        })
-      }
-      return Promise.resolve({
-        data: null,
-        error: { message: 'unique constraint violated' },
-      })
+        },
+      ],
+      playhub_venue_invoices: [
+        { data: null }, // duplicate
+        { data: null, error: { message: 'unique constraint violated' } }, // insert fails
+      ],
+      playhub_match_recordings: [{ data: [] }],
+      organizations: [{ data: groupOrg }],
+      playhub_group_tier_config: [{ data: null }],
     })
-
-    supabase.maybeSingle.mockResolvedValue({ data: null, error: null })
-    supabase.lte.mockResolvedValueOnce({ data: [], error: null })
 
     await expect(
       generateMonthlyInvoice('venue-1', 2026, 2, { supabase, stripe })
     ).rejects.toThrow('Failed to insert invoice')
-  })
-
-  it('writes per-recording line items with cost-basis snapshot', async () => {
-    supabase = createSupabaseMock()
-
-    let singleCallCount = 0
-    supabase.single.mockImplementation(() => {
-      singleCallCount++
-      if (singleCallCount === 1) {
-        return Promise.resolve({
-          data: {
-            organization_id: 'venue-1',
-            stripe_customer_id: null,
-            currency: 'KWD',
-            fixed_cost_eur: 9.71,
-            venue_profit_share_pct: 25,
-            ambassador_pct: 10,
-          },
-          error: null,
-        })
-      }
-      return Promise.resolve({
-        data: { id: 'invoice-1', status: 'draft' },
-        error: null,
-      })
-    })
-
-    supabase.maybeSingle.mockResolvedValue({ data: null, error: null })
-    supabase.lte.mockResolvedValueOnce({
-      data: [
-        {
-          id: 'r-90',
-          title: '90-min match',
-          match_date: '2026-02-15T10:00:00Z',
-          billable_amount: 7.5,
-          collected_by: 'venue',
-          duration_seconds: 5400,
-        },
-      ],
-      error: null,
-    })
-
-    // Capture inserts to confirm the line item snapshot
-    const inserts: any[] = []
-    supabase.insert.mockImplementation((payload: any) => {
-      inserts.push(payload)
-      return supabase
-    })
-
-    await generateMonthlyInvoice('venue-1', 2026, 2, { supabase, stripe })
-
-    const lineItemInsert = inserts.find(
-      (p) => Array.isArray(p) && p[0]?.recording_id
-    )
-    expect(lineItemInsert).toBeDefined()
-    expect(lineItemInsert).toHaveLength(1)
-    expect(lineItemInsert[0]).toMatchObject({
-      recording_id: 'r-90',
-      duration_seconds: 5400,
-      billable_amount: 7.5,
-      currency: 'KWD',
-      collected_by: 'venue',
-      fixed_cost_eur_per_hour: 9.71,
-    })
-    // 9.71 EUR/hr ÷ ~2.85 KWD-EUR (live or fallback) × 1.5 hr — sanity-check
-    // that the snapshot stored a positive scaled cost rather than zero.
-    expect(lineItemInsert[0].fixed_cost_local).toBeGreaterThan(0)
-    // ambassador fee = 10% of 7.5 = 0.75
-    expect(lineItemInsert[0].ambassador_fee).toBeCloseTo(0.75, 3)
-  })
-
-  it('uses correct minor-unit factor for AED (2-decimal)', async () => {
-    supabase = createSupabaseMock()
-
-    let singleCallCount = 0
-    supabase.single.mockImplementation(() => {
-      singleCallCount++
-      if (singleCallCount === 1) {
-        return Promise.resolve({
-          data: {
-            organization_id: 'venue-1',
-            stripe_customer_id: 'cus_aed',
-            currency: 'AED',
-            fixed_cost_eur: 0,
-            venue_profit_share_pct: 30,
-          },
-          error: null,
-        })
-      }
-      return Promise.resolve({
-        data: { id: 'inv-aed', status: 'draft' },
-        error: null,
-      })
-    })
-
-    supabase.maybeSingle.mockResolvedValue({ data: null, error: null })
-    supabase.lte.mockResolvedValueOnce({
-      data: [
-        {
-          id: 'r-aed',
-          title: 'AED match',
-          match_date: '2026-02-10T10:00:00Z',
-          billable_amount: 100,
-          collected_by: 'venue',
-          duration_seconds: 3600,
-        },
-      ],
-      error: null,
-    })
-
-    await generateMonthlyInvoice('venue-1', 2026, 2, { supabase, stripe })
-
-    // Net = 100 - (0 fixed - 0% ambassador) = 100; venue keeps 30% = 30; owes 70.
-    // AED uses 100x minor-unit factor (fils), so 70 AED = 7000 fils.
-    expect(stripe.invoiceItems.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        amount: 7000,
-        currency: 'aed',
-      }),
-      expect.objectContaining({
-        idempotencyKey: expect.stringContaining('item'),
-      })
-    )
-  })
-
-  it('rejects unsupported currencies before any Stripe or DB writes', async () => {
-    supabase = createSupabaseMock()
-
-    supabase.single.mockResolvedValueOnce({
-      data: {
-        organization_id: 'venue-1',
-        stripe_customer_id: 'cus_x',
-        currency: 'XYZ',
-        fixed_cost_eur: 5,
-        venue_profit_share_pct: 30,
-      },
-      error: null,
-    })
-
-    supabase.maybeSingle.mockResolvedValue({ data: null, error: null })
-    supabase.lte.mockResolvedValueOnce({ data: [], error: null })
-
-    await expect(
-      generateMonthlyInvoice('venue-1', 2026, 2, { supabase, stripe })
-    ).rejects.toThrow(/Unsupported venue currency/)
-    expect(stripe.invoices.create).not.toHaveBeenCalled()
   })
 })

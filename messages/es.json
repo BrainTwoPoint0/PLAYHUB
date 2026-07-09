@@ -168,7 +168,7 @@
       "perDayAvg": "/día de media",
       "atVenue": "En el club",
       "qrCode": "Código QR",
-      "yourProfit": "Tu beneficio",
+      "yourShare": "Tu parte ({pct})",
       "netSettlement": "Liquidación neta",
       "recordingsCount": "{count, plural, one {# grabación} other {# grabaciones}}",
       "recordingsInMonth": "{count, plural, one {# grabación} other {# grabaciones}} en {month}",

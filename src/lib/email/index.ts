@@ -348,11 +348,13 @@ export interface InvoiceEmailParams {
   periodLabel: string
   currency: string
   stripeInvoiceUrl?: string
-  // Costs (per-hour cost basis)
-  fixedCostPerHour: number
-  totalHours: number
-  totalFixedCosts: number
-  ambassadorPct: number
+  // Partner share of gross (Li3ib annex model)
+  tiered: boolean
+  sharePctFootball: number
+  sharePctPadel: number
+  grossRevenue: number
+  partnerShareTotal: number
+  playbackShareTotal: number
   // Breakdown
   venueCollectedCount: number
   venueCollectedRevenue: number
@@ -360,7 +362,6 @@ export interface InvoiceEmailParams {
   playhubCollectedCount: number
   playhubCollectedRevenue: number
   playhubOwesVenue: number
-  venueProfitSharePct: number
   netAmount: number
 }
 
@@ -372,17 +373,18 @@ export function renderInvoiceEmailHtml(params: InvoiceEmailParams): string {
     periodLabel,
     currency,
     stripeInvoiceUrl,
-    fixedCostPerHour,
-    totalHours,
-    totalFixedCosts,
-    ambassadorPct,
+    tiered,
+    sharePctFootball,
+    sharePctPadel,
+    grossRevenue,
+    partnerShareTotal,
+    playbackShareTotal,
     venueCollectedCount,
     venueCollectedRevenue,
     venueOwesPlayhub,
     playhubCollectedCount,
     playhubCollectedRevenue,
     playhubOwesVenue,
-    venueProfitSharePct,
     netAmount,
   } = params
   const venueName = escapeHtml(params.venueName)
@@ -391,14 +393,14 @@ export function renderInvoiceEmailHtml(params: InvoiceEmailParams): string {
     new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(n)
 
   const totalCount = venueCollectedCount + playhubCollectedCount
-  const totalRevenue = venueCollectedRevenue + playhubCollectedRevenue
-  const totalAmbassadorCost = totalRevenue * (ambassadorPct / 100)
-  const totalProfit = Math.max(
-    0,
-    totalRevenue - totalFixedCosts - totalAmbassadorCost
-  )
-  const hoursLabel =
-    totalHours % 1 === 0 ? totalHours.toString() : totalHours.toFixed(1)
+  const totalRevenue = grossRevenue
+
+  // Partner-share label: a flat rate for non-tiered groups; when the two sports
+  // resolved to different tiers, show both.
+  const shareLabel =
+    !tiered || sharePctFootball === sharePctPadel
+      ? `${sharePctFootball}%`
+      : `${sharePctFootball}% football / ${sharePctPadel}% padel`
 
   // Build collector-specific breakdown rows
   let venueSection = ''
@@ -470,30 +472,21 @@ export function renderInvoiceEmailHtml(params: InvoiceEmailParams): string {
           </table>
         </div>
 
-        <!-- Costs -->
+        <!-- Revenue share -->
         <div style="background-color: #1a1f1c; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
-          <p style="font-size: 13px; font-weight: 600; color: #b9baa3; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 0.5px;">Costs</p>
+          <p style="font-size: 13px; font-weight: 600; color: #b9baa3; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 0.5px;">Revenue share</p>
           <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
             <tr>
-              <td style="padding: 4px 0; color: #b9baa3;">Fixed cost (${hoursLabel} hr × ${fmt(fixedCostPerHour)}/hr)</td>
-              <td style="padding: 4px 0; text-align: right;">-${fmt(totalFixedCosts)}</td>
-            </tr>
-            ${
-              ambassadorPct > 0
-                ? `
-            <tr>
-              <td style="padding: 4px 0; color: #b9baa3;">Ambassador (${ambassadorPct}%)</td>
-              <td style="padding: 4px 0; text-align: right;">-${fmt(totalAmbassadorCost)}</td>
-            </tr>`
-                : ''
-            }
-            <tr>
-              <td style="padding: 8px 0 4px 0; color: #d6d5c9; font-weight: 500;">Profit</td>
-              <td style="padding: 8px 0 4px 0; text-align: right; font-weight: 500;">${fmt(totalProfit)}</td>
+              <td style="padding: 4px 0; color: #b9baa3;">Gross revenue</td>
+              <td style="padding: 4px 0; text-align: right;">${fmt(totalRevenue)}</td>
             </tr>
             <tr>
-              <td style="padding: 4px 0; color: #b9baa3;">Venue share (${venueProfitSharePct}%)</td>
-              <td style="padding: 4px 0; text-align: right;">${fmt(totalProfit * (venueProfitSharePct / 100))}</td>
+              <td style="padding: 4px 0; color: #d6d5c9; font-weight: 500;">Your share (${shareLabel})</td>
+              <td style="padding: 4px 0; text-align: right; font-weight: 500;">${fmt(partnerShareTotal)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0; color: #b9baa3;">PLAYBACK share</td>
+              <td style="padding: 4px 0; text-align: right;">${fmt(playbackShareTotal)}</td>
             </tr>
           </table>
         </div>

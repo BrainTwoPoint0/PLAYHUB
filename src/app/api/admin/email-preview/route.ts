@@ -7,8 +7,15 @@ import { getAuthUserStrict, createServiceClient } from '@/lib/supabase/server'
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { renderInvoiceEmailHtml } from '@/lib/email'
-import { getEurToAedRate } from '@/lib/fx/rates'
-import { getKwdToEurRate } from '@/lib/fx/rates'
+import {
+  resolveGroupId,
+  isGroupTiered,
+  computeSharePct,
+  sportForBilling,
+  grossForRecording,
+  DEFAULT_SHARE_PCT,
+  type Sport,
+} from '@/lib/billing/share-tier'
 
 export async function GET(request: NextRequest) {
   const { user } = await getAuthUserStrict()
@@ -34,28 +41,30 @@ export async function GET(request: NextRequest) {
     }
 
     // Otherwise use manual params
-    const fixedCostPerHour = Number(p.get('fixedCostPerHour') || '4.15')
-    const totalHours = Number(p.get('totalHours') || '24')
+    const sharePct = Number(p.get('sharePct') || String(DEFAULT_SHARE_PCT))
+    const grossRevenue = Number(p.get('grossRevenue') || '120')
+    const partnerShareTotal = Number(
+      p.get('partnerShare') || (grossRevenue * (sharePct / 100)).toFixed(3)
+    )
     const html = renderInvoiceEmailHtml({
       venueName: p.get('venueName') || 'CFA Indoor Arena',
       periodLabel: p.get('period') || 'February 2026',
       currency: p.get('currency') || 'KWD',
       stripeInvoiceUrl:
         p.get('stripeUrl') || 'https://invoice.stripe.com/example',
-      fixedCostPerHour,
-      totalHours,
-      totalFixedCosts: Number(
-        p.get('totalFixedCosts') || (fixedCostPerHour * totalHours).toFixed(3)
-      ),
-      ambassadorPct: Number(p.get('ambassadorPct') || '10'),
-      venueProfitSharePct: Number(p.get('sharePct') || '30'),
+      tiered: p.get('tiered') === 'true',
+      sharePctFootball: Number(p.get('sharePctFootball') || String(sharePct)),
+      sharePctPadel: Number(p.get('sharePctPadel') || String(sharePct)),
+      grossRevenue,
+      partnerShareTotal,
+      playbackShareTotal: grossRevenue - partnerShareTotal,
       venueCollectedCount: Number(p.get('venueCount') || '18'),
       venueCollectedRevenue: Number(p.get('venueRevenue') || '90'),
-      venueOwesPlayhub: Number(p.get('venueOwes') || '63'),
+      venueOwesPlayhub: Number(p.get('venueOwes') || '85.5'),
       playhubCollectedCount: Number(p.get('playhubCount') || '6'),
       playhubCollectedRevenue: Number(p.get('playhubRevenue') || '30'),
-      playhubOwesVenue: Number(p.get('playhubOwes') || '9'),
-      netAmount: Number(p.get('amount') || '54'),
+      playhubOwesVenue: Number(p.get('playhubOwes') || '1.5'),
+      netAmount: Number(p.get('amount') || '84'),
     })
 
     return new NextResponse(html, {
@@ -77,10 +86,10 @@ async function renderLiveInvoicePreview(
   venueId: string,
   p: URLSearchParams
 ): Promise<NextResponse> {
-  const serviceClient = createServiceClient()
+  const serviceClient = createServiceClient() as any
 
   // Get venue name
-  const { data: org } = await (serviceClient as any)
+  const { data: org } = await serviceClient
     .from('organizations')
     .select('name')
     .eq('id', venueId)
@@ -91,7 +100,7 @@ async function renderLiveInvoicePreview(
   }
 
   // Get billing config
-  const { data: config } = await (serviceClient as any)
+  const { data: config } = await serviceClient
     .from('playhub_venue_billing_config')
     .select('*')
     .eq('organization_id', venueId)
@@ -116,9 +125,11 @@ async function renderLiveInvoicePreview(
   const periodEndTs = new Date(`${periodEnd}T23:59:59Z`).toISOString()
 
   // Query billable recordings
-  const { data: recordings } = await (serviceClient as any)
+  const { data: recordings } = await serviceClient
     .from('playhub_match_recordings')
-    .select('id, title, billable_amount, collected_by, duration_seconds')
+    .select(
+      'id, title, billable_amount, collected_by, spiideo_game_id, clutch_video_id'
+    )
     .eq('organization_id', venueId)
     .eq('is_billable', true)
     .eq('status', 'published')
@@ -126,65 +137,55 @@ async function renderLiveInvoicePreview(
     .lte('created_at', periodEndTs)
 
   const items = (recordings || []) as any[]
-  const fixedCostEurPerHour = Number(config.fixed_cost_eur || 0)
   const venueCurrency = (config.currency || 'KWD').trim().toUpperCase()
+  const defaultAmount = Number(config.default_billable_amount) || 5
 
-  // Mirror generate-invoice's currency branching so the preview matches what
-  // venues will actually receive. Unsupported currencies render as zero cost.
-  let perHourFixedCostLocal = 0
-  if (fixedCostEurPerHour > 0) {
-    if (venueCurrency === 'KWD') {
-      const kwdToEur = await getKwdToEurRate()
-      perHourFixedCostLocal = fixedCostEurPerHour / kwdToEur
-    } else if (venueCurrency === 'AED') {
-      const eurToAed = await getEurToAedRate()
-      perHourFixedCostLocal = fixedCostEurPerHour * eurToAed
-    } else if (venueCurrency === 'EUR') {
-      perHourFixedCostLocal = fixedCostEurPerHour
-    }
+  // Resolve partner share via the shared tiering module (matches generate-invoice).
+  const groupId = await resolveGroupId(serviceClient, venueId)
+  const tiered = await isGroupTiered(serviceClient, groupId)
+  const tierPctBySport: Record<Sport, number> | null = tiered
+    ? {
+        football: await computeSharePct(
+          serviceClient,
+          groupId,
+          year,
+          month,
+          'football'
+        ),
+        padel: await computeSharePct(
+          serviceClient,
+          groupId,
+          year,
+          month,
+          'padel'
+        ),
+      }
+    : null
+
+  const shareOf = (r: any): { gross: number; partner: number } => {
+    const gross = grossForRecording(r.billable_amount, defaultAmount)
+    const sport = tiered ? sportForBilling(r) : null
+    const pct = tiered && sport ? tierPctBySport![sport] : DEFAULT_SHARE_PCT
+    return { gross, partner: gross * (pct / 100) }
   }
-  const venuePct = Number(config.venue_profit_share_pct || 30)
-  const ambassadorPct = Number(config.ambassador_pct || 0)
 
-  const venueCollected = items.filter((r) => r.collected_by === 'venue')
+  const venueCollected = items.filter((r) => r.collected_by !== 'playhub')
   const playhubCollected = items.filter((r) => r.collected_by === 'playhub')
 
-  const hoursOf = (r: any) =>
-    ((Number(r.duration_seconds ?? 3600) || 3600) as number) / 3600
+  const sum = (recs: any[], pick: (s: { gross: number; partner: number }) => number) =>
+    recs.reduce((acc, r) => acc + pick(shareOf(r)), 0)
 
-  const venueCollectedRevenue = venueCollected.reduce(
-    (sum, r) => sum + (Number(r.billable_amount) || 0),
-    0
-  )
-  const playhubCollectedRevenue = playhubCollected.reduce(
-    (sum, r) => sum + (Number(r.billable_amount) || 0),
-    0
-  )
-
-  function totalCost(recs: any[]) {
-    return recs.reduce((sum, r) => {
-      const price = Number(r.billable_amount) || 0
-      const ambassadorFee = price * (ambassadorPct / 100)
-      return sum + perHourFixedCostLocal * hoursOf(r) + ambassadorFee
-    }, 0)
-  }
-
-  const venueCosts = totalCost(venueCollected)
-  const venueProfit = Math.max(0, venueCollectedRevenue - venueCosts)
-  const venueKeeps = venueProfit * (venuePct / 100)
-  const venueOwesPlayhub = venueCollectedRevenue - venueKeeps
-
-  const playhubCosts = totalCost(playhubCollected)
-  const playhubProfit = Math.max(0, playhubCollectedRevenue - playhubCosts)
-  const playhubOwesVenue = playhubProfit * (venuePct / 100)
-
+  const venueCollectedRevenue = sum(venueCollected, (s) => s.gross)
+  const playhubCollectedRevenue = sum(playhubCollected, (s) => s.gross)
+  // venue-collected: partner owes PLAYBACK the playback share (gross - partner)
+  const venueOwesPlayhub = sum(venueCollected, (s) => s.gross - s.partner)
+  // online-collected: PLAYBACK owes partner the partner share
+  const playhubOwesVenue = sum(playhubCollected, (s) => s.partner)
   const netAmount = venueOwesPlayhub - playhubOwesVenue
 
-  const totalHours = items.reduce((s, r) => s + hoursOf(r), 0)
-  const totalFixedCosts = items.reduce(
-    (s, r) => s + perHourFixedCostLocal * hoursOf(r),
-    0
-  )
+  const grossRevenue = venueCollectedRevenue + playhubCollectedRevenue
+  const partnerShareTotal = sum(items, (s) => s.partner)
+  const playbackShareTotal = sum(items, (s) => s.gross - s.partner)
 
   const periodLabel = new Date(year, month - 1).toLocaleDateString('en-GB', {
     month: 'long',
@@ -195,11 +196,12 @@ async function renderLiveInvoicePreview(
     venueName: org.name,
     periodLabel,
     currency: venueCurrency,
-    fixedCostPerHour: perHourFixedCostLocal,
-    totalHours,
-    totalFixedCosts,
-    ambassadorPct,
-    venueProfitSharePct: venuePct,
+    tiered,
+    sharePctFootball: tierPctBySport?.football ?? DEFAULT_SHARE_PCT,
+    sharePctPadel: tierPctBySport?.padel ?? DEFAULT_SHARE_PCT,
+    grossRevenue,
+    partnerShareTotal,
+    playbackShareTotal,
     venueCollectedCount: venueCollected.length,
     venueCollectedRevenue,
     venueOwesPlayhub,

@@ -168,7 +168,7 @@
       "perDayAvg": "/day avg",
       "atVenue": "At venue",
       "qrCode": "QR Code",
-      "yourProfit": "Your profit",
+      "yourShare": "Your share ({pct})",
       "netSettlement": "Net settlement",
       "recordingsCount": "{count, plural, one {# recording} other {# recordings}}",
       "recordingsInMonth": "{count, plural, one {# recording} other {# recordings}} in {month}",

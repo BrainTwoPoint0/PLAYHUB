@@ -4,6 +4,17 @@
 
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
+// Dependency-free shared modules (no `@/` aliases), safe to bundle into the Lambda.
+import {
+  resolveGroupId,
+  isGroupTiered,
+  computeSharePct,
+  sportForBilling,
+  grossForRecording,
+  DEFAULT_SHARE_PCT,
+  type Sport,
+} from '../../../src/lib/billing/share-tier'
+import { stripeMinorAmount } from '../../../src/lib/billing/currency'
 
 const SUPABASE_URL = process.env.SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
@@ -17,20 +28,24 @@ const stripe = new Stripe(STRIPE_SECRET_KEY, {
 
 const FROM_EMAIL = 'PLAYHUB <admin@playbacksports.ai>'
 
-// FX rate helper (matches src/lib/fx/rates.ts logic)
-const FALLBACK_KWD_TO_EUR = 2.75
-async function getKwdToEurRate(): Promise<number> {
-  try {
-    const res = await fetch('https://open.er-api.com/v6/latest/KWD', {
-      signal: AbortSignal.timeout(5000),
-    })
-    const data = await res.json()
-    return data.result === 'success' && data.rates?.EUR
-      ? data.rates.EUR
-      : FALLBACK_KWD_TO_EUR
-  } catch {
-    return FALLBACK_KWD_TO_EUR
-  }
+// Per-run memo for the portfolio tier %, keyed by (group, year, month, sport).
+// The tier is a group-level property, so every sibling venue in one run shares
+// it — this both avoids re-scanning the portfolio per venue and guarantees
+// siblings snapshot the SAME tier for the month.
+type TierCache = Map<string, number>
+async function tierPct(
+  cache: TierCache,
+  groupId: string,
+  year: number,
+  month: number,
+  sport: Sport
+): Promise<number> {
+  const key = `${groupId}:${year}:${month}:${sport}`
+  const cached = cache.get(key)
+  if (cached !== undefined) return cached
+  const pct = await computeSharePct(supabase, groupId, year, month, sport)
+  cache.set(key, pct)
+  return pct
 }
 
 interface InvoiceResult {
@@ -70,13 +85,20 @@ export async function handler() {
   }
 
   const results: InvoiceResult[] = []
+  const tierCache: TierCache = new Map()
 
   for (const config of configs as any[]) {
     const venueId = config.organization_id
     const venueName = config.organizations?.name || venueId
 
     try {
-      const result = await generateInvoiceForVenue(venueId, year, month, config)
+      const result = await generateInvoiceForVenue(
+        venueId,
+        year,
+        month,
+        config,
+        tierCache
+      )
 
       if (result) {
         results.push({
@@ -87,8 +109,14 @@ export async function handler() {
           recordingCount: result.recordingCount,
         })
 
-        // Send email notifications
-        await notifyAdmins(venueId, venueName, year, month, result)
+        // Email is best-effort: a notification failure must NOT flip an
+        // already-created invoice to 'error' (which would prompt a manual
+        // re-run and risk a duplicate).
+        try {
+          await notifyAdmins(venueId, venueName, year, month, result)
+        } catch (emailErr) {
+          console.error(`Invoice emails failed for venue ${venueId}:`, emailErr)
+        }
       } else {
         results.push({ venueId, venueName, status: 'skipped' })
       }
@@ -120,12 +148,9 @@ async function generateInvoiceForVenue(
   venueId: string,
   year: number,
   month: number,
-  config: any
-): Promise<{
-  netAmount: number
-  recordingCount: number
-  stripeInvoiceUrl: string | null
-} | null> {
+  config: any,
+  tierCache: TierCache
+): Promise<InvoiceBreakdown | null> {
   // Period boundaries
   const periodStart = `${year}-${String(month).padStart(2, '0')}-01`
   const lastDay = new Date(year, month, 0).getDate()
@@ -144,10 +169,12 @@ async function generateInvoiceForVenue(
 
   if (existing) return null
 
-  // Query billable recordings
+  // Query billable recordings (provider ids drive the sport tier)
   const { data: recordings } = await supabase
     .from('playhub_match_recordings' as any)
-    .select('id, title, billable_amount, collected_by')
+    .select(
+      'id, title, billable_amount, collected_by, spiideo_game_id, clutch_video_id'
+    )
     .eq('organization_id', venueId)
     .eq('is_billable', true)
     .eq('status', 'published')
@@ -155,68 +182,96 @@ async function generateInvoiceForVenue(
     .lte('created_at', periodEndTs)
 
   const items = (recordings || []) as any[]
-  const fixedCostEur = Number(config.fixed_cost_eur || 0)
-  const kwdToEurRate = await getKwdToEurRate()
-  const fixedCostKwd = fixedCostEur > 0 ? fixedCostEur / kwdToEurRate : 0
-  const venuePct = Number(config.venue_profit_share_pct || 30)
-  const ambassadorPct = Number(config.ambassador_pct || 0)
+  const venueCurrency = (config.currency || 'KWD').trim().toUpperCase()
+  const defaultAmount = Number(config.default_billable_amount) || 5
 
-  const venueCollected = items.filter((r) => r.collected_by === 'venue')
-  const playhubCollected = items.filter((r) => r.collected_by === 'playhub')
+  // Resolve the partner (group) share per the Li3ib annex: tiered groups get
+  // 15%/5% of gross by monthly utilisation per sport; others a flat 5%.
+  const groupId = await resolveGroupId(supabase, venueId)
+  const tiered = await isGroupTiered(supabase, groupId)
+  const footballPct = tiered
+    ? await tierPct(tierCache, groupId, year, month, 'football')
+    : DEFAULT_SHARE_PCT
+  const padelPct = tiered
+    ? await tierPct(tierCache, groupId, year, month, 'padel')
+    : DEFAULT_SHARE_PCT
 
-  const venueCollectedRevenue = venueCollected.reduce(
-    (sum, r) => sum + (Number(r.billable_amount) || 0),
-    0
-  )
-  const playhubCollectedRevenue = playhubCollected.reduce(
-    (sum, r) => sum + (Number(r.billable_amount) || 0),
-    0
-  )
-
-  function totalCost(recs: any[]) {
-    return recs.reduce((sum: number, r: any) => {
-      const price = Number(r.billable_amount) || 0
-      const ambassadorFee = price * (ambassadorPct / 100)
-      return sum + fixedCostKwd + ambassadorFee
-    }, 0)
+  const shareOf = (r: any) => {
+    const gross = grossForRecording(r.billable_amount, defaultAmount)
+    const sport = tiered ? sportForBilling(r) : null
+    const pct =
+      sport === 'football'
+        ? footballPct
+        : sport === 'padel'
+          ? padelPct
+          : DEFAULT_SHARE_PCT
+    const partner = Number((gross * (pct / 100)).toFixed(3))
+    return {
+      gross: Number(gross.toFixed(3)),
+      partner,
+      playback: Number((gross - partner).toFixed(3)),
+      // Anything not explicitly online-collected settles as venue-collected.
+      online: r.collected_by === 'playhub',
+    }
   }
 
-  const venueCosts = totalCost(venueCollected)
-  const venueProfit = Math.max(0, venueCollectedRevenue - venueCosts)
-  const venueKeeps = venueProfit * (venuePct / 100)
-  const venueOwesPlayhub = venueCollectedRevenue - venueKeeps
+  const lines = items.map(shareOf)
+  const venueLines = lines.filter((l) => !l.online)
+  const playhubLines = lines.filter((l) => l.online)
 
-  const playhubCosts = totalCost(playhubCollected)
-  const playhubProfit = Math.max(0, playhubCollectedRevenue - playhubCosts)
-  const playhubOwesVenue = playhubProfit * (venuePct / 100)
-
+  const venueCollectedRevenue = venueLines.reduce((s, l) => s + l.gross, 0)
+  const playhubCollectedRevenue = playhubLines.reduce((s, l) => s + l.gross, 0)
+  // venue-collected → partner owes PLAYBACK the playback share;
+  // online-collected → PLAYBACK owes the partner the partner share.
+  const venueOwesPlayhub = venueLines.reduce((s, l) => s + l.playback, 0)
+  const playhubOwesVenue = playhubLines.reduce((s, l) => s + l.partner, 0)
   const netAmount = venueOwesPlayhub - playhubOwesVenue
 
-  // Create and finalize Stripe invoice
+  const grossRevenue = venueCollectedRevenue + playhubCollectedRevenue
+  const partnerShareTotal = lines.reduce((s, l) => s + l.partner, 0)
+  const playbackShareTotal = lines.reduce((s, l) => s + l.playback, 0)
+
+  // Create and finalize Stripe invoice. Round to a Stripe-valid minor amount
+  // (3-decimal currencies must be multiples of 10) and guard on the rounded value.
   let stripeInvoiceId: string | null = null
   let stripeInvoiceUrl: string | null = null
-  if (config.stripe_customer_id && netAmount > 0) {
+  const stripeAmount = stripeMinorAmount(netAmount, venueCurrency)
+  if (config.stripe_customer_id && stripeAmount > 0) {
     const periodLabel = new Date(periodStart).toLocaleDateString('en-GB', {
       month: 'long',
       year: 'numeric',
     })
+    // Idempotency keys scoped to (venue, month) so an EventBridge retry that
+    // re-enters this venue before its DB row exists resolves to the SAME Stripe
+    // invoice instead of billing the customer twice.
+    const idempotencyBase = `invoice:${venueId}:${year}:${String(month).padStart(2, '0')}`
 
-    const stripeInvoice = await stripe.invoices.create({
-      customer: config.stripe_customer_id,
-      collection_method: 'send_invoice',
-      days_until_due: 30,
-      currency: config.currency.toLowerCase(),
-    })
+    const stripeInvoice = await stripe.invoices.create(
+      {
+        customer: config.stripe_customer_id,
+        collection_method: 'send_invoice',
+        days_until_due: 30,
+        currency: venueCurrency.toLowerCase(),
+      },
+      { idempotencyKey: `${idempotencyBase}:create` }
+    )
 
-    await stripe.invoiceItems.create({
-      customer: config.stripe_customer_id,
-      invoice: stripeInvoice.id,
-      amount: Math.round(netAmount * 1000),
-      currency: config.currency.toLowerCase(),
-      description: `PLAYHUB net settlement - ${items.length} recording${items.length === 1 ? '' : 's'} (${periodLabel})`,
-    })
+    await stripe.invoiceItems.create(
+      {
+        customer: config.stripe_customer_id,
+        invoice: stripeInvoice.id,
+        amount: stripeAmount,
+        currency: venueCurrency.toLowerCase(),
+        description: `PLAYHUB net settlement - ${items.length} recording${items.length === 1 ? '' : 's'} (${periodLabel})`,
+      },
+      { idempotencyKey: `${idempotencyBase}:item` }
+    )
 
-    const finalized = await stripe.invoices.finalizeInvoice(stripeInvoice.id)
+    const finalized = await stripe.invoices.finalizeInvoice(
+      stripeInvoice.id,
+      undefined,
+      { idempotencyKey: `${idempotencyBase}:finalize` }
+    )
     stripeInvoiceId = stripeInvoice.id
     stripeInvoiceUrl = finalized.hosted_invoice_url || null
   }
@@ -228,14 +283,14 @@ async function generateInvoiceForVenue(
       organization_id: venueId,
       period_start: periodStart,
       period_end: periodEnd,
-      venue_collected_count: venueCollected.length,
+      venue_collected_count: venueLines.length,
       venue_collected_revenue: Number(venueCollectedRevenue.toFixed(3)),
       venue_owes_playhub: Number(venueOwesPlayhub.toFixed(3)),
-      playhub_collected_count: playhubCollected.length,
+      playhub_collected_count: playhubLines.length,
       playhub_collected_revenue: Number(playhubCollectedRevenue.toFixed(3)),
       playhub_owes_venue: Number(playhubOwesVenue.toFixed(3)),
       net_amount: Number(netAmount.toFixed(3)),
-      currency: config.currency,
+      currency: venueCurrency,
       stripe_invoice_id: stripeInvoiceId,
       status: stripeInvoiceId ? 'pending' : 'draft',
     } as any)
@@ -248,16 +303,19 @@ async function generateInvoiceForVenue(
     netAmount,
     recordingCount: items.length,
     stripeInvoiceUrl,
-    fixedCostPerRecording: fixedCostKwd,
-    ambassadorPct,
-    venueProfitSharePct: venuePct,
-    venueCollectedCount: venueCollected.length,
+    tiered,
+    sharePctFootball: footballPct,
+    sharePctPadel: padelPct,
+    grossRevenue,
+    partnerShareTotal,
+    playbackShareTotal,
+    venueCollectedCount: venueLines.length,
     venueCollectedRevenue,
     venueOwesPlayhub,
-    playhubCollectedCount: playhubCollected.length,
+    playhubCollectedCount: playhubLines.length,
     playhubCollectedRevenue,
     playhubOwesVenue,
-    currency: config.currency as string,
+    currency: venueCurrency,
   }
 }
 
@@ -265,9 +323,12 @@ interface InvoiceBreakdown {
   netAmount: number
   recordingCount: number
   stripeInvoiceUrl: string | null
-  fixedCostPerRecording: number
-  ambassadorPct: number
-  venueProfitSharePct: number
+  tiered: boolean
+  sharePctFootball: number
+  sharePctPadel: number
+  grossRevenue: number
+  partnerShareTotal: number
+  playbackShareTotal: number
   venueCollectedCount: number
   venueCollectedRevenue: number
   venueOwesPlayhub: number
@@ -328,14 +389,11 @@ async function notifyAdmins(
     new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(n)
 
   const totalCount = result.venueCollectedCount + result.playhubCollectedCount
-  const totalRevenue =
-    result.venueCollectedRevenue + result.playhubCollectedRevenue
-  const totalFixedCosts = result.fixedCostPerRecording * totalCount
-  const totalAmbassadorCost = totalRevenue * (result.ambassadorPct / 100)
-  const totalProfit = Math.max(
-    0,
-    totalRevenue - totalFixedCosts - totalAmbassadorCost
-  )
+  const totalRevenue = result.grossRevenue
+  const shareLabel =
+    !result.tiered || result.sharePctFootball === result.sharePctPadel
+      ? `${result.sharePctFootball}%`
+      : `${result.sharePctFootball}% football / ${result.sharePctPadel}% padel`
 
   // Build collector breakdown rows
   let venueSection = ''
@@ -386,12 +444,11 @@ async function notifyAdmins(
                 </div>
 
                 <div style="background-color:#1a1f1c;padding:16px;border-radius:8px;margin-bottom:16px;">
-                  <p style="font-size:13px;font-weight:600;color:#b9baa3;margin:0 0 10px 0;text-transform:uppercase;letter-spacing:0.5px;">Costs</p>
+                  <p style="font-size:13px;font-weight:600;color:#b9baa3;margin:0 0 10px 0;text-transform:uppercase;letter-spacing:0.5px;">Revenue share</p>
                   <table style="width:100%;border-collapse:collapse;font-size:14px;">
-                    <tr><td style="padding:4px 0;color:#b9baa3;">Fixed cost (${totalCount} &times; ${fmt(result.fixedCostPerRecording)})</td><td style="padding:4px 0;text-align:right;">-${fmt(totalFixedCosts)}</td></tr>
-                    ${result.ambassadorPct > 0 ? `<tr><td style="padding:4px 0;color:#b9baa3;">Ambassador (${result.ambassadorPct}%)</td><td style="padding:4px 0;text-align:right;">-${fmt(totalAmbassadorCost)}</td></tr>` : ''}
-                    <tr><td style="padding:8px 0 4px 0;color:#d6d5c9;font-weight:500;">Profit</td><td style="padding:8px 0 4px 0;text-align:right;font-weight:500;">${fmt(totalProfit)}</td></tr>
-                    <tr><td style="padding:4px 0;color:#b9baa3;">Venue share (${result.venueProfitSharePct}%)</td><td style="padding:4px 0;text-align:right;">${fmt(totalProfit * (result.venueProfitSharePct / 100))}</td></tr>
+                    <tr><td style="padding:4px 0;color:#b9baa3;">Gross revenue</td><td style="padding:4px 0;text-align:right;">${fmt(totalRevenue)}</td></tr>
+                    <tr><td style="padding:4px 0;color:#d6d5c9;font-weight:500;">Your share (${shareLabel})</td><td style="padding:4px 0;text-align:right;font-weight:500;">${fmt(result.partnerShareTotal)}</td></tr>
+                    <tr><td style="padding:4px 0;color:#b9baa3;">PLAYBACK share</td><td style="padding:4px 0;text-align:right;">${fmt(result.playbackShareTotal)}</td></tr>
                   </table>
                 </div>
 
