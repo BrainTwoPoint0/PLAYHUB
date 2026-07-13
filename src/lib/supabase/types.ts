@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: '12.2.3 (519615d)'
-  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -1334,13 +1329,6 @@ export type Database = {
             referencedRelation: 'organizations'
             referencedColumns: ['id']
           },
-          {
-            foreignKeyName: 'playhub_audit_log_target_recording_id_fkey'
-            columns: ['target_recording_id']
-            isOneToOne: false
-            referencedRelation: 'playhub_match_recordings'
-            referencedColumns: ['id']
-          },
         ]
       }
       playhub_clutch_player_labels: {
@@ -1380,6 +1368,33 @@ export type Database = {
             referencedColumns: ['id']
           },
         ]
+      }
+      playhub_crop_detections: {
+        Row: {
+          created_at: string
+          detection: Json
+          modal_app_version: string | null
+          modal_inference_ms: number | null
+          updated_at: string
+          veo_highlight_id: string
+        }
+        Insert: {
+          created_at?: string
+          detection: Json
+          modal_app_version?: string | null
+          modal_inference_ms?: number | null
+          updated_at?: string
+          veo_highlight_id: string
+        }
+        Update: {
+          created_at?: string
+          detection?: Json
+          modal_app_version?: string | null
+          modal_inference_ms?: number | null
+          updated_at?: string
+          veo_highlight_id?: string
+        }
+        Relationships: []
       }
       playhub_crop_feedback: {
         Row: {
@@ -1871,6 +1886,11 @@ export type Database = {
           marketplace_enabled: boolean | null
           match_date: string
           organization_id: string | null
+          panorama_capture_attempts: number | null
+          panorama_capture_error: string | null
+          panorama_capture_started_at: string | null
+          panorama_capture_status: string | null
+          panorama_s3_key: string | null
           pitch_name: string | null
           preview_url: string | null
           price_amount: number | null
@@ -1880,6 +1900,7 @@ export type Database = {
           share_token: string | null
           spiideo_game_id: string | null
           spiideo_production_id: string | null
+          spiideo_scene_id: string | null
           sport_id: string | null
           status: string | null
           stripe_payment_intent_id: string | null
@@ -1922,6 +1943,11 @@ export type Database = {
           marketplace_enabled?: boolean | null
           match_date: string
           organization_id?: string | null
+          panorama_capture_attempts?: number | null
+          panorama_capture_error?: string | null
+          panorama_capture_started_at?: string | null
+          panorama_capture_status?: string | null
+          panorama_s3_key?: string | null
           pitch_name?: string | null
           preview_url?: string | null
           price_amount?: number | null
@@ -1931,6 +1957,7 @@ export type Database = {
           share_token?: string | null
           spiideo_game_id?: string | null
           spiideo_production_id?: string | null
+          spiideo_scene_id?: string | null
           sport_id?: string | null
           status?: string | null
           stripe_payment_intent_id?: string | null
@@ -1973,6 +2000,11 @@ export type Database = {
           marketplace_enabled?: boolean | null
           match_date?: string
           organization_id?: string | null
+          panorama_capture_attempts?: number | null
+          panorama_capture_error?: string | null
+          panorama_capture_started_at?: string | null
+          panorama_capture_status?: string | null
+          panorama_s3_key?: string | null
           pitch_name?: string | null
           preview_url?: string | null
           price_amount?: number | null
@@ -1982,6 +2014,7 @@ export type Database = {
           share_token?: string | null
           spiideo_game_id?: string | null
           spiideo_production_id?: string | null
+          spiideo_scene_id?: string | null
           sport_id?: string | null
           status?: string | null
           stripe_payment_intent_id?: string | null
@@ -2026,6 +2059,75 @@ export type Database = {
             referencedColumns: ['id']
           },
         ]
+      }
+      playhub_music_beds: {
+        Row: {
+          bpm: number | null
+          created_at: string
+          duration_seconds: number
+          genre: string | null
+          id: string
+          intensity: number | null
+          is_active: boolean
+          license_ref: string | null
+          mood: string | null
+          mubert_track_id: string | null
+          source: string
+          storage_path: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          bpm?: number | null
+          created_at?: string
+          duration_seconds: number
+          genre?: string | null
+          id?: string
+          intensity?: number | null
+          is_active?: boolean
+          license_ref?: string | null
+          mood?: string | null
+          mubert_track_id?: string | null
+          source?: string
+          storage_path: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          bpm?: number | null
+          created_at?: string
+          duration_seconds?: number
+          genre?: string | null
+          id?: string
+          intensity?: number | null
+          is_active?: boolean
+          license_ref?: string | null
+          mood?: string | null
+          mubert_track_id?: string | null
+          source?: string
+          storage_path?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      playhub_panorama_scene_meshes: {
+        Row: {
+          scene_id: string
+          source_game_id: string
+          updated_at: string
+        }
+        Insert: {
+          scene_id: string
+          source_game_id: string
+          updated_at?: string
+        }
+        Update: {
+          scene_id?: string
+          source_game_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       playhub_pending_academy_subscriptions: {
         Row: {
@@ -2537,6 +2639,77 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: 'playhub_scene_venue_mapping_organization_id_fkey'
+            columns: ['organization_id']
+            isOneToOne: false
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      playhub_spiideo_scene_health: {
+        Row: {
+          account_id: string | null
+          alert_state: string | null
+          available_for_recording: boolean | null
+          camera_count: number | null
+          created_at: string
+          last_checked_at: string
+          last_online_change: string | null
+          last_snapshot_at: string | null
+          last_snapshot_error: string | null
+          last_snapshot_status: string | null
+          online: boolean | null
+          online_cameras: number | null
+          organization_id: string | null
+          outages: number | null
+          scene_id: string
+          scene_name: string | null
+          status_raw: Json | null
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          alert_state?: string | null
+          available_for_recording?: boolean | null
+          camera_count?: number | null
+          created_at?: string
+          last_checked_at?: string
+          last_online_change?: string | null
+          last_snapshot_at?: string | null
+          last_snapshot_error?: string | null
+          last_snapshot_status?: string | null
+          online?: boolean | null
+          online_cameras?: number | null
+          organization_id?: string | null
+          outages?: number | null
+          scene_id: string
+          scene_name?: string | null
+          status_raw?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          alert_state?: string | null
+          available_for_recording?: boolean | null
+          camera_count?: number | null
+          created_at?: string
+          last_checked_at?: string
+          last_online_change?: string | null
+          last_snapshot_at?: string | null
+          last_snapshot_error?: string | null
+          last_snapshot_status?: string | null
+          online?: boolean | null
+          online_cameras?: number | null
+          organization_id?: string | null
+          outages?: number | null
+          scene_id?: string
+          scene_name?: string | null
+          status_raw?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'playhub_spiideo_scene_health_organization_id_fkey'
             columns: ['organization_id']
             isOneToOne: false
             referencedRelation: 'organizations'
@@ -3899,6 +4072,51 @@ export type Database = {
           },
         ]
       }
+      tiktok_connections: {
+        Row: {
+          access_token: string
+          created_at: string
+          expires_at: string
+          id: string
+          is_active: boolean
+          open_id: string
+          refresh_expires_at: string | null
+          refresh_token: string
+          scope: string
+          union_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          is_active?: boolean
+          open_id: string
+          refresh_expires_at?: string | null
+          refresh_token: string
+          scope?: string
+          union_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          is_active?: boolean
+          open_id?: string
+          refresh_expires_at?: string | null
+          refresh_token?: string
+          scope?: string
+          union_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_preferences: {
         Row: {
           category: Database['public']['Enums']['preference_category']
@@ -3936,7 +4154,13 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      goal_precompute_queue: {
+        Row: {
+          url: string | null
+          veo_highlight_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       _handle_new_user_version: { Args: never; Returns: string }
@@ -4027,10 +4251,7 @@ export type Database = {
         | 'discovery'
         | 'analytics'
       profile_module_visibility:
-        | 'public'
-        | 'authenticated'
-        | 'club_only'
-        | 'private'
+        'public' | 'authenticated' | 'club_only' | 'private'
       profile_variant_type:
         | 'player'
         | 'coach'
@@ -4060,12 +4281,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4087,13 +4308,12 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema['Tables']
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4112,13 +4332,12 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema['Tables']
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4137,13 +4356,12 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema['Enums']
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    keyof DefaultSchema['Enums'] | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4156,11 +4374,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema['CompositeTypes']
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
