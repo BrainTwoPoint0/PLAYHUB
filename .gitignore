@@ -73,3 +73,27 @@ training-data/
 
 # Dev-server build dir (separate from .next so `next build` cannot clobber a running dev server)
 .next-dev/
+
+# Local judge assets for /panorama-test — the deployed page takes URL params;
+# these raw VP videos + mesh copies are local-only (~165MB, regenerable from
+# Supabase storage / CloudFront)
+public/vp-mesh*/
+public/vp-*.mp4
+public/panorama-test.mp4
+
+# Lambda layer build artifacts (rebuilt from layer scripts)
+infrastructure/lambda/layers/
+
+# Phase-4 training workspace — clips + model outputs, multi-GB
+scripts/phase4/
+
+# Portrait-crop mining data (raw match footage + detections, 14GB)
+scripts/portrait-crop/mining/
+
+# Eval-dataset detection caches — regenerable by re-running the detectors;
+# labels/ (human + oracle ground truth) stays tracked
+scripts/portrait-crop/eval-dataset/clips/*.json
+
+# Fetched Spiideo calibration meshes — re-fetchable via fetch_spiideo_mesh.mjs;
+# canonical copies live in Supabase storage
+scripts/follow-re/spiideo-real-mesh-*/
