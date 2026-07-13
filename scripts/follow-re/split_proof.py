@@ -1,0 +1,81 @@
+"""Simplest legible 'identical?' test: our flat frame and Spiideo's at the same view,
+brightened, plus a SPLIT — left half OURS, right half SPIIDEO, one seam down the middle.
+Identical ⇒ pitch lines / goal / fence cross the seam with no jump.
+
+  python3 split_proof.py <raw.mp4> <play.mp4> --times 41,94
+"""
+from __future__ import annotations
+
+import sys
+import numpy as np
+import cv2
+from scipy.optimize import minimize
+
+import mesh_dewarp as MD
+
+PW, PH = 960, 540
+F, CX, W_ = 1158.15, 1820.72, 3840.0
+projs, _ = MD.load_mesh("/tmp/follow-pair/mesh")
+sift = cv2.SIFT_create(5000); bf = cv2.BFMatcher()
+
+
+def render(rawf, pan, tilt, fov):
+    u, v = MD.bake_uv_map(projs, np.radians(pan), np.radians(tilt), fov, PW, PH)
+    th, tw = rawf.shape[:2]; m1 = (u * tw).astype("f4"); m2 = (v * th).astype("f4"); m1[u < 0] = -1; m2[u < 0] = -1
+    return cv2.remap(rawf, m1, m2, cv2.INTER_LINEAR)
+
+
+def homog(our, pl):
+    k1, d1 = sift.detectAndCompute(cv2.cvtColor(our, cv2.COLOR_BGR2GRAY), None)
+    k2, d2 = sift.detectAndCompute(cv2.cvtColor(pl, cv2.COLOR_BGR2GRAY), None)
+    if d1 is None or d2 is None: return None
+    good = [a for a, b in bf.knnMatch(d1, d2, k=2) if a.distance < 0.8 * b.distance]
+    if len(good) < 25: return None
+    src = np.float32([k1[x.queryIdx].pt for x in good]).reshape(-1, 1, 2)
+    dst = np.float32([k2[x.trainIdx].pt for x in good]).reshape(-1, 1, 2)
+    H, inl = cv2.findHomography(src, dst, cv2.RANSAC, 3.0)
+    if H is None: return None
+    return cv2.warpPerspective(our, H, (PW, PH))
+
+
+def bright(im):
+    return cv2.convertScaleAbs(im, alpha=1.7, beta=25)
+
+
+def main():
+    raw, play = sys.argv[1:3]
+    times = [float(x) for x in (sys.argv[sys.argv.index("--times") + 1] if "--times" in sys.argv else "41,94").split(",")]
+    capr = cv2.VideoCapture(raw); capp = cv2.VideoCapture(play)
+    def lab(im, tx):
+        im = im.copy(); cv2.rectangle(im, (0, 0), (PW, 28), (0, 0, 0), -1); cv2.putText(im, tx, (8, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2); return im
+    rows = []
+    for tv in times:
+        capr.set(cv2.CAP_PROP_POS_MSEC, tv * 1000); _, rawf = capr.read()
+        capp.set(cv2.CAP_PROP_POS_MSEC, tv * 1000); _, pf = capp.read()
+        pl = cv2.resize(pf, (PW, PH))
+        # optimize framing to Spiideo
+        def resid(x):
+            a = homog(render(rawf, *x), pl)
+            if a is None: return 1e9
+            m = cv2.cvtColor(a, cv2.COLOR_BGR2GRAY) > 0
+            return float(cv2.absdiff(a, pl)[m].mean()) if m.mean() > 0.5 else 1e9
+        k1r, d1r = sift.detectAndCompute(cv2.cvtColor(cv2.resize(rawf, (1920, 1080)), cv2.COLOR_BGR2GRAY), None)
+        k2, d2 = sift.detectAndCompute(cv2.cvtColor(pl, cv2.COLOR_BGR2GRAY), None)
+        g = [a for a, b in bf.knnMatch(d2, d1r, k=2) if a.distance < 0.75 * b.distance]
+        Hm, _ = cv2.findHomography(np.float32([[k2[x.queryIdx].pt] for x in g]), np.float32([[k1r[x.trainIdx].pt] for x in g]), cv2.RANSAC, 5.0)
+        c = cv2.perspectiveTransform(np.float32([[[PW / 2, PH / 2]]]), Hm)[0, 0]
+        pan0 = np.degrees(-1.0 * (c[0] / 1920 * W_ - CX) / F)
+        res = minimize(resid, [pan0, -20, 32], method="Nelder-Mead", options=dict(xatol=0.05, fatol=0.02, maxiter=120))
+        ours = bright(homog(render(rawf, *res.x), pl)); spi = bright(pl)
+        # split: left half ours, right half Spiideo, yellow seam
+        split = spi.copy(); split[:, :PW // 2] = ours[:, :PW // 2]
+        cv2.line(split, (PW // 2, 0), (PW // 2, PH), (0, 255, 255), 1)
+        rows.append(np.hstack([lab(ours, f"OURS (our dewarp) t={tv:.0f}s"), lab(spi, "SPIIDEO"),
+                               lab(split, "SPLIT: left=OURS | right=SPIIDEO")]))
+    capr.release(); capp.release()
+    cv2.imwrite("/tmp/imitation/split_proof.png", np.vstack(rows))
+    print("wrote /tmp/imitation/split_proof.png")
+
+
+if __name__ == "__main__":
+    main()
