@@ -37,6 +37,18 @@ import {
   Crosshair,
 } from 'lucide-react'
 import { cn } from '@braintwopoint0/playback-commons/utils'
+import {
+  BLEND_FOV_LO,
+  BLEND_FOV_HI,
+  BLEND_FOV_DOWN_LO,
+  BLEND_FOV_DOWN_HI,
+  BLEND_MAX_DEFAULT,
+  blendFactor,
+  blendHalfExtents,
+  blendPanHalfAngleDeg,
+  curvedFovMax,
+  CURVED_FOV_MAX_CEIL,
+} from '@/lib/panorama/projection'
 
 interface SceneJson {
   minPan: number
@@ -109,6 +121,30 @@ interface VirtualPanoramaPlayerProps {
   apiRef?: React.MutableRefObject<DewarpSurfaceApi | null>
   /** Reports pan-state changes (auto-follow toggled by button OR by a drag; zoom %) up to the shared bar's extras. */
   onStateChange?: (s: { autoFollow: boolean; zoomPct: number }) => void
+  /**
+   * Debug: disable the fov-adaptive pinhole↔cylindrical blend and render with
+   * the stock pinhole projection (the pre-blend look). A/B via `?flat=1`.
+   */
+  flatProjection?: boolean
+  /**
+   * Blend ramp overrides (vertical fov, deg) — a mid-range BUMP: pure pinhole
+   * at/below `blendFovLo`, `blendMax` (≤1, 1 = full cylindrical) between
+   * `blendFovHi` and `blendFovDownLo`, back to pure pinhole at/above
+   * `blendFovDownHi` (the whole-window zoom-out stays pinhole, Spiideo
+   * parity). Defaults from projection.ts; exposed for live eye-tuning on
+   * /panorama-test.
+   */
+  blendFovLo?: number
+  blendFovHi?: number
+  blendMax?: number
+  blendFovDownLo?: number
+  blendFovDownHi?: number
+  /**
+   * Keystone (vertical perspective) strength — a pure homography, straight
+   * lines stay straight. k > 0 narrows the near side / widens the far side
+   * (reduces ground-trapezoid splay). Sensible range ~0–0.3. Default 0.
+   */
+  keystone?: number
 }
 
 /** Imperative surface controls, surfaced so DewarpControls can drive them from the shared bar. */
@@ -121,8 +157,20 @@ export interface DewarpSurfaceApi {
 
 const FOV_MIN = 12
 const FOV_MAX = 100
-/** Curved mode: widest fov whose vertical extent still fits inside the panorama's tilt range. */
-const CURVED_FOV_MAX = 62
+/** Curved mode: full zoom-out shows the ENTIRE panorama window as a wide
+ * PINHOLE, matching Spiideo's live viewer exactly (their cloud-control bundle
+ * shader is pure `.xyzz` pinhole at every zoom — the "flattened cylinder"
+ * look is the scene WINDOW boundary imaged as conics, not a projection; see
+ * AIM_RESUME §0l). Spiideo ties the zoom-out floor to the window's tilt
+ * height, so the cap is PER-SCENE (`curvedFovMax` from the mesh's tilt
+ * extents): Nazwa −90°..+37° → 127°, HCT −26.5°..+20.4° → ~47°. A cap wider
+ * than the window lets clampView's pan bounds collapse and drag a corner-
+ * pinned aim during zoom (the corner-zoom "rotation"), with the frame mostly
+ * black at extreme edge stretch. Straight world lines stay straight at every
+ * zoom. */
+/** Legacy motion-auto zoom target keeps the old ceiling — it should frame play,
+ * never the whole-window overview. */
+const CURVED_FOV_FOLLOW_MAX = 62
 const clamp = (v: number, min: number, max: number) =>
   Math.min(max, Math.max(min, v))
 const DEG = Math.PI / 180
@@ -359,6 +407,105 @@ const MOUNT_S = [
   [0, -0.975762, -0.218884],
 ] // R · S = textureToWorld (recovered from Perform's captured matrices)
 
+/*
+ * Fov-adaptive pinhole↔cylindrical view projection (uBlend b: 0 = pinhole,
+ * 1 = cylindrical). Replaces three's `#include <project_vertex>` — the mesh
+ * positions are world rays from the camera at origin, so modelViewMatrix
+ * yields the camera-frame ray directly (dz = −mvPosition.z, camera looks
+ * down −Z). Keeping w = dz makes b=0 bit-identical to the stock pipeline
+ * (same NDC, same perspective-correct interpolation, behind-camera clipping
+ * for free) — at b=0 this IS Spiideo's own captured `.xyzz` shader form.
+ * Math twin: blendProject() in src/lib/panorama/projection.ts — keep in sync.
+ */
+const CYL_PROJECT_GLSL = /* glsl */ `
+vec4 mvPosition = vec4( transformed, 1.0 );
+mvPosition = modelViewMatrix * mvPosition;
+if ( uBlend >= 0.999 ) {
+  // PURE CYLINDRICAL (including the wide overview): atan2 covers the full
+  // circle and w = hyp never flips sign, so rays past ±90° off-axis — the
+  // overview's wing content, which the dz-form below cannot represent —
+  // render correctly. Same NDC as the dz-form at b=1 on its shared domain
+  // (xc/wc = theta/uHalf.x, yc/wc = tanphi/uHalf.y), just multiplied
+  // through by w = hyp instead of w = dz. Collapse only true wrap-around
+  // geometry (>149° off-axis, far outside any extent) to a same-side
+  // off-screen point.
+  float dxc = mvPosition.x;
+  float dyc = mvPosition.y;
+  float dzc = -mvPosition.z;
+  float theta = atan( dxc, dzc );
+  float hyp = length( vec2( dxc, dzc ) );
+  if ( abs( theta ) > 2.6 || hyp < 1e-5 ) {
+    float sx = dxc >= 0.0 ? 8.0 : -8.0;
+    float sy = dyc >= 0.0 ? 8.0 : -8.0;
+    gl_Position = vec4( sx, sy, 2.0, 1.0 );
+  } else {
+    float xc = theta * hyp / uHalf.x;
+    float yc = dyc / uHalf.y;            // tanphi·hyp = dy
+    float wc = hyp - uKey * yc;
+    gl_Position = vec4( xc, yc, 0.5 * wc, wc );
+  }
+} else if ( -mvPosition.z <= 0.0 ) {
+  // Behind the camera. The stock pinhole is a true projective map, so the
+  // hardware clipper handles camera-plane-straddling triangles exactly — but
+  // the blended x = theta·dz term is NOT projective, and those triangles get
+  // garbage clip intersections that smear across the whole frame (the mesh
+  // wraps ±135° + a full-wrap floor bowl, so they always exist). Collapse
+  // behind-camera vertices to a far off-screen point ON THE VERTEX'S OWN
+  // SIDE (sign of its camera-frame x/y): all-behind triangles vanish
+  // (z=2 > w clips them), and straddling triangles stretch AWAY from the
+  // frame instead of across it. Collapsing to centre (0,0) — the first
+  // version — dragged straddler slivers through the visible frame once the
+  // zoom-out cap exceeded ~62°: a straddling edge runs from its on/near-
+  // screen vertex to the collapse point, so the collapse point must lie
+  // beyond the frame on the same side, never at the centre.
+  float sx = mvPosition.x >= 0.0 ? 8.0 : -8.0;
+  float sy = mvPosition.y >= 0.0 ? 8.0 : -8.0;
+  gl_Position = vec4( sx, sy, 2.0, 1.0 );
+} else {
+  float dx = mvPosition.x;
+  float dy = mvPosition.y;
+  float dz = -mvPosition.z;
+  float theta = atan( dx, dz );
+  float hyp = length( vec2( dx, dz ) );
+  float tanphi = dy / hyp;
+  // Projection multiplied through by w = dz (tan(theta)·dz = dx and
+  // dz/cos(theta) = hyp); at uBlend = 0 this collapses to LITERALLY the
+  // stock pinhole clip coords (dx/uHalf.x, dy/uHalf.y, ·, dz).
+  float xc = ( ( 1.0 - uBlend ) * dx + uBlend * theta * dz ) / uHalf.x;
+  float yc = ( ( 1.0 - uBlend ) * hyp + uBlend * dz ) * tanphi / uHalf.y;
+  // Keystone: w' = w − k·y_clip is an exact homography on NDC (straight lines
+  // stay straight); k > 0 narrows the near side / widens the far side.
+  float wc = dz - uKey * yc;
+  gl_Position = vec4( xc, yc, 0.5 * wc, wc );
+}`
+
+interface BlendUniforms {
+  uBlend: { value: number }
+  uHalf: { value: THREE.Vector2 }
+  uKey: { value: number }
+}
+
+/** Patch a MeshBasicMaterial with the blend projection. Must be applied to BOTH
+ *  the base and the seam-blend materials or the seam overlay diverges. */
+function patchBlendProjection(
+  mat: THREE.MeshBasicMaterial,
+  uniforms: BlendUniforms
+) {
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uBlend = uniforms.uBlend
+    shader.uniforms.uHalf = uniforms.uHalf
+    shader.uniforms.uKey = uniforms.uKey
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nuniform float uBlend;\nuniform vec2 uHalf;\nuniform float uKey;'
+      )
+      .replace('#include <project_vertex>', CYL_PROJECT_GLSL)
+  }
+  // Stock MeshBasicMaterial programs must not be reused for the patched shader.
+  mat.customProgramCacheKey = () => 'cyl-blend-v2'
+}
+
 interface PanoramaView {
   geometries: THREE.BufferGeometry[] // one per projection (≥1)
   forward: THREE.Vector3
@@ -374,10 +521,109 @@ interface PanoramaView {
   lookup: (u: number, v: number) => { pan: number; tilt: number } | null
 }
 
+/** Optional per-scene render tuning, served next to the mesh files
+ *  (scripts/vp-calibration/color_match_overlap.py). All values LINEAR-light
+ *  (the sRGB video texture is hardware-decoded before they apply).
+ *  colorGains: per-projection RGB multipliers — the simple cross-camera
+ *  exposure match; rides the vertex-colour path in the seam-blend material.
+ *  Normalised so the BASE projection (the last, drawn opaque) is [1,1,1].
+ *  colorLuts: per-projection tone curves for cameras whose difference is
+ *  brightness-dependent (HCT: ratio ~1.8 in shadows → ~1.1 in highlights —
+ *  no gain can flatten that seam). `rgb` = size×3 linear outputs indexed by
+ *  the sRGB-encoded input; applied as a fragment LUT on the overlay
+ *  material. */
+interface MeshTuning {
+  colorGains?: number[][]
+  colorLuts?: ({ size: number; encoding: string; rgb: number[] } | null)[]
+}
+
+/** Validate + build the overlay tone-LUT texture from tuning.colorLuts (first
+ *  non-null overlay entry). CDN-served and unvalidated, so anything malformed
+ *  → null (identity), never NaN into a texture. */
+function buildLutTexture(
+  tuning: MeshTuning | null | undefined,
+  nProjs: number
+): THREE.DataTexture | null {
+  const luts = tuning?.colorLuts
+  if (!Array.isArray(luts)) return null
+  for (let pi = 0; pi < nProjs - 1; pi++) {
+    const l = luts[pi]
+    if (!l || l.encoding !== 'srgb-index' || !Array.isArray(l.rgb)) continue
+    const size = l.size
+    if (!Number.isInteger(size) || size < 2 || size > 4096) continue
+    if (l.rgb.length !== size * 3) continue
+    const data = new Uint16Array(size * 4)
+    let ok = true
+    for (let i = 0; i < size; i++) {
+      for (let c = 0; c < 3; c++) {
+        const v = Number(l.rgb[i * 3 + c])
+        if (!Number.isFinite(v) || v < 0 || v > 4) {
+          ok = false
+          break
+        }
+        data[i * 4 + c] = THREE.DataUtils.toHalfFloat(v)
+      }
+      if (!ok) break
+      data[i * 4 + 3] = THREE.DataUtils.toHalfFloat(1)
+    }
+    if (!ok) continue
+    // half-float: filterable in core WebGL2 (FloatType would need
+    // OES_texture_float_linear) with ~10-bit precision — beats 8-bit
+    const tex = new THREE.DataTexture(
+      data,
+      size,
+      1,
+      THREE.RGBAFormat,
+      THREE.HalfFloatType
+    )
+    tex.minFilter = THREE.LinearFilter
+    tex.magFilter = THREE.LinearFilter
+    tex.wrapS = THREE.ClampToEdgeWrapping
+    tex.wrapT = THREE.ClampToEdgeWrapping
+    tex.needsUpdate = true
+    return tex
+  }
+  return null
+}
+
+/** Patch the overlay material with the per-channel tone LUT: sample by the
+ *  sRGB-encoded texel value (shadow-resolving index) right after
+ *  map_fragment, i.e. on the LINEAR texel before the vertex-colour multiply.
+ *  Chains any existing onBeforeCompile (the blend projection patch). */
+function patchColorLut(mat: THREE.MeshBasicMaterial, lut: THREE.DataTexture) {
+  const prevCompile = mat.onBeforeCompile
+  const prevKey = mat.customProgramCacheKey.bind(mat)
+  mat.onBeforeCompile = (shader, renderer) => {
+    prevCompile?.call(mat, shader, renderer)
+    shader.uniforms.uColorLut = { value: lut }
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nuniform sampler2D uColorLut;'
+      )
+      .replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>
+{
+  // half-texel-centred index into the tone LUT (see MeshTuning.colorLuts)
+  vec3 lutIdx = pow( clamp( diffuseColor.rgb, 0.0, 1.0 ), vec3( 1.0 / 2.4 ) );
+  lutIdx = lutIdx * ${'0.99609375'} + ${'0.001953125'};
+  diffuseColor.rgb = vec3(
+    texture2D( uColorLut, vec2( lutIdx.r, 0.5 ) ).r,
+    texture2D( uColorLut, vec2( lutIdx.g, 0.5 ) ).g,
+    texture2D( uColorLut, vec2( lutIdx.b, 0.5 ) ).b
+  );
+}`
+      )
+  }
+  mat.customProgramCacheKey = () => `${prevKey()}|lut-v1`
+}
+
 function buildExactPanorama(
   vbuf: ArrayBuffer,
   ibuf: ArrayBuffer,
-  sceneProjs: SceneProjection[]
+  sceneProjs: SceneProjection[],
+  tuning?: MeshTuning | null
 ): PanoramaView {
   const F = new Float32Array(vbuf)
   const I = new Uint32Array(ibuf)
@@ -426,6 +672,19 @@ function buildExactPanorama(
   const gPan = new Float64Array(LG * LG),
     gTilt = new Float64Array(LG * LG),
     gCnt = new Float64Array(LG * LG)
+  // per-projection triangle-referenced vertex masks (filled by the map below)
+  const refMasks: Uint8Array[] = []
+  // per-projection colour gains, sanitised: tuning.json is CDN-served and
+  // unvalidated at runtime — a non-numeric/negative/huge entry must degrade
+  // to identity, not write NaN into the vertex buffer (black/flickering seam)
+  const saneGain = (x: unknown): number => {
+    const v = Number(x)
+    return Number.isFinite(v) && v > 0 && v < 4 ? v : 1
+  }
+  const projGains = projs.map((P) => {
+    const g = tuning?.colorGains?.[P.pi]
+    return [saneGain(g?.[0]), saneGain(g?.[1]), saneGain(g?.[2])]
+  })
   const geometries = projs.map((P) => {
     const pos = new Float32Array(P.count * 3)
     const uv = new Float32Array(P.count * 2)
@@ -466,11 +725,17 @@ function buildExactPanorama(
       gPan[gi] += Math.atan2(x, z)
       gTilt[gi] += Math.asin(clamp(-y / rlen, -1, 1))
       gCnt[gi] += 1
-      // Spiideo's baked feather alpha (f4)
+      // Spiideo's baked feather alpha (f4); rgb = the per-projection colour
+      // gain (cross-camera exposure match — identity when no tuning; LINEAR-
+      // light values, since the sRGB texture is hardware-decoded before the
+      // vertex colour multiplies). Only the seam-blend material reads vertex
+      // colours, and the tool normalises the base projection to [1,1,1], so
+      // the opaque base stays untouched.
       const a = F[j * 5 + 4]
-      rgba[k * 4] = 1
-      rgba[k * 4 + 1] = 1
-      rgba[k * 4 + 2] = 1
+      const gain = projGains[P.pi]
+      rgba[k * 4] = gain[0]
+      rgba[k * 4 + 1] = gain[1]
+      rgba[k * 4 + 2] = gain[2]
       rgba[k * 4 + 3] = a
     }
     // Use the mesh's OWN complete per-projection indices (a full regular-grid
@@ -499,6 +764,11 @@ function buildExactPanorama(
       )
         tris.push(a0, a1, a2)
     }
+    // triangle-referenced mask: culled vertices remain in vertices.bin with
+    // garbage f0/f1/UV (2026-07-12 invariant) — extents below must skip them
+    const mask = new Uint8Array(P.count)
+    for (const t of tris) mask[t] = 1
+    refMasks[P.pi] = mask
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2))
@@ -522,14 +792,18 @@ function buildExactPanorama(
   void rrAcc
   void ruAcc // raster accumulators no longer needed
 
-  // angular extents of the panorama about (forward, right, up) → pan/tilt limits
+  // angular extents of the panorama about (forward, right, up) → pan/tilt
+  // limits. TRIANGLE-REFERENCED vertices only: culled vertices keep garbage
+  // f0/f1 in vertices.bin, and these extents now also set the zoom-out cap
+  // (curvedFovMax) and the opening tilt — garbage would silently inflate both.
   let panMin = Infinity,
     panMax = -Infinity,
     tiltMin = Infinity,
     tiltMax = -Infinity
   const d = new THREE.Vector3()
   for (const P of projs)
-    for (let j = P.vStart; j < P.vStart + P.count; j += 5) {
+    for (let j = P.vStart; j < P.vStart + P.count; j++) {
+      if (!refMasks[P.pi][j - P.vStart]) continue
       const f0 = F[j * 5],
         f1 = F[j * 5 + 1]
       d.set(
@@ -613,6 +887,13 @@ export function VirtualPanoramaPlayer({
   hideChrome = false,
   apiRef,
   onStateChange,
+  flatProjection = false,
+  blendFovLo = BLEND_FOV_LO,
+  blendFovHi = BLEND_FOV_HI,
+  blendMax = BLEND_MAX_DEFAULT,
+  blendFovDownLo = BLEND_FOV_DOWN_LO,
+  blendFovDownHi = BLEND_FOV_DOWN_HI,
+  keystone = 0,
 }: VirtualPanoramaPlayerProps) {
   const t = useTranslations('player')
   const containerRef = useRef<HTMLDivElement>(null)
@@ -630,6 +911,9 @@ export function VirtualPanoramaPlayer({
     maxTilt: 0.34,
   })
   const panoRef = useRef<PanoramaView | null>(null)
+  // scene-derived zoom-out cap (deg) — set from the mesh's tilt window on
+  // load (see curvedFovMax); the ceiling is only a pre-load fallback
+  const curvedFovMaxRef = useRef(CURVED_FOV_MAX_CEIL)
 
   // curved mode = the product path: composed panorama + perspective camera
   const curved = proj === 'both'
@@ -656,7 +940,8 @@ export function VirtualPanoramaPlayer({
     () =>
       setZoomPct(
         Math.round(
-          ((curved ? CURVED_FOV_MAX : FOV_MAX) / viewRef.current.fov) * 100
+          ((curved ? curvedFovMaxRef.current : FOV_MAX) / viewRef.current.fov) *
+            100
         )
       ),
     [curved]
@@ -678,15 +963,40 @@ export function VirtualPanoramaPlayer({
         }
       }
       // keep the whole frame on the panorama: shrink the pan/tilt range by half
-      // the view's angular size (collapsing to the midpoint when it inverts)
-      const fov = clamp(v.fov, FOV_MIN, CURVED_FOV_MAX)
+      // the view's angular size (collapsing to the midpoint when it inverts).
+      // Holds under the fov-adaptive blend too: horizontally, the frame's
+      // ANGULAR half-extent is invariant in the blend by construction (the
+      // edge ray at hHalf always projects to the frame edge — see the
+      // extent-invariance test in projection.test.ts); vertically, the
+      // blended frame's max elevation anywhere is atan(yHalf_blend) <
+      // atan(tan(fov/2)) = vHalf (yHalf shrinks with b and sy ≥ 1), so the
+      // pinhole margin stays conservative. Caveat (pre-existing): hHalf
+      // assumes 16:9 while the render uses the live canvas aspect — fine
+      // while the container enforces aspect-video.
+      const fov = clamp(v.fov, FOV_MIN, curvedFovMaxRef.current)
       const vHalf = (fov / 2) * DEG
-      const hHalf = Math.atan(Math.tan(vHalf) * (16 / 9))
+      // horizontal half-extent matches the render exactly, including the
+      // overview widening (blendPanHalfAngleDeg is the render's clamp twin)
+      const b = flatProjection
+        ? 0
+        : blendFactor(
+            fov,
+            blendFovLo,
+            blendFovHi,
+            blendMax,
+            blendFovDownLo,
+            blendFovDownHi
+          )
+      const hHalf = blendPanHalfAngleDeg(fov, 16 / 9, b) * DEG
       const panMid = (l.minPan + l.maxPan) / 2
       const tiltMid = (l.minTilt + l.maxTilt) / 2
       const panMin = Math.min(l.minPan + hHalf, panMid)
       const panMax = Math.max(l.maxPan - hHalf, panMid)
-      const tiltMin = Math.min(l.minTilt + vHalf, tiltMid)
+      // tilt-down is FREE to the window floor (aim straight below the
+      // camera; the frame bottom past the nadir shows honest black, exactly
+      // like the pan ends past the mesh) — only the ceiling keeps the
+      // frame-on-mesh rule (sky-black above the top edge is useless).
+      const tiltMin = Math.min(l.minTilt, tiltMid)
       const tiltMax = Math.max(l.maxTilt - vHalf, tiltMid)
       return {
         pan: clamp(v.pan, panMin, panMax),
@@ -694,7 +1004,15 @@ export function VirtualPanoramaPlayer({
         fov,
       }
     },
-    [curved]
+    [
+      curved,
+      flatProjection,
+      blendFovLo,
+      blendFovHi,
+      blendMax,
+      blendFovDownLo,
+      blendFovDownHi,
+    ]
   )
 
   // --- HLS / <video> ---
@@ -771,15 +1089,25 @@ export function VirtualPanoramaPlayer({
     let renderer: THREE.WebGLRenderer | null = null
     let ro: ResizeObserver | null = null
     let onWheel: ((e: WheelEvent) => void) | null = null
+    let lutTexRef: THREE.DataTexture | null = null
 
     ;(async () => {
       try {
-        const [scene_, vbuf, ibuf] = await Promise.all([
+        const [scene_, vbuf, ibuf, tuning] = await Promise.all([
           fetch(`${meshBaseUrl}/scene.json`).then(
             (r) => r.json() as Promise<SceneJson>
           ),
           fetch(`${meshBaseUrl}/vertices.bin`).then((r) => r.arrayBuffer()),
           fetch(`${meshBaseUrl}/indices.bin`).then((r) => r.arrayBuffer()),
+          // optional per-scene render tuning (multi-cam colour match) —
+          // absent for most scenes, never load-blocking: 404/bad-JSON → null,
+          // and the timeout stops a hung CDN request from stalling every
+          // scene's mesh load (this sits in the same Promise.all)
+          fetch(`${meshBaseUrl}/tuning.json`, {
+            signal: AbortSignal.timeout(3000),
+          })
+            .then((r) => (r.ok ? (r.json() as Promise<MeshTuning>) : null))
+            .catch(() => null),
         ])
         if (disposed) return
         // Curved mode (the product path): Perform's exact de-warp — every mesh
@@ -868,12 +1196,19 @@ export function VirtualPanoramaPlayer({
         const geometries: THREE.BufferGeometry[] = []
         const materials: THREE.Material[] = [material]
         const meshes: THREE.Mesh[] = []
+        // Shared by all patched materials; written every frame in the loop.
+        const projUniforms: BlendUniforms = {
+          uBlend: { value: 0 },
+          uHalf: { value: new THREE.Vector2(1, 1) },
+          uKey: { value: 0 },
+        }
         if (curved && projs && projs.length >= 1) {
           // Exact reproduction of Perform's de-warp shader (see buildExactPanorama).
           const view = buildExactPanorama(
             vbuf,
             ibuf,
-            projs as unknown as SceneProjection[]
+            projs as unknown as SceneProjection[],
+            tuning
           )
           panoRef.current = view
           // pan/tilt limits from the panorama's real angular extents
@@ -883,8 +1218,23 @@ export function VirtualPanoramaPlayer({
             minTilt: view.tiltMin,
             maxTilt: view.tiltMax,
           }
-          // open at a flat broadcast-style zoom (a wide fov fisheyes the edges)
-          viewRef.current = clampView({ pan: 0, tilt: 0, fov: 46 })
+          // zoom-out floor = the window's tilt height (Spiideo semantics):
+          // Nazwa → 127, HCT → ~47. A wider cap collapses the pan clamp and
+          // drags a corner-pinned aim during zoom (the "rotation" percept).
+          curvedFovMaxRef.current = curvedFovMax(view.tiltMin, view.tiltMax)
+          // open at a flat broadcast-style zoom (a wide fov fisheyes the
+          // edges), aimed at the pitch band — the mesh ceiling now extends to
+          // the capture boundary (~+30°), so tilt 0 would open on the skyline.
+          // −20° suits tall down-looking windows (Nazwa/FP, whose vertical
+          // midpoints are ≈−26°); never open BELOW the window's midpoint —
+          // short elevated windows (HCT, mid ≈+6°) put the pitch band there,
+          // and −20° would open on the floor with the frame half black.
+          // NOTE pan/tilt are RADIANS (fov is degrees).
+          const openTilt = Math.max(
+            -20 * DEG,
+            (view.tiltMin + view.tiltMax) / 2
+          )
+          viewRef.current = clampView({ pan: 0, tilt: openTilt, fov: 46 })
           syncZoom()
           // Compose N projections: the LAST is the opaque base, the rest are
           // drawn on top with Spiideo's baked feather alpha across each overlap.
@@ -910,6 +1260,24 @@ export function VirtualPanoramaPlayer({
             m.renderOrder = gs.length - 1 - gi
             geometries.push(gs[gi])
             meshes.push(m)
+          }
+          // Fov-adaptive projection: NOT in inspect (the orbit camera needs the
+          // real projectionMatrix on these same meshes). The shader ignores the
+          // camera's projectionMatrix, so disable three's pinhole-frustum CPU
+          // culling — the blend frame can see geometry the pinhole frustum cuts.
+          if (!inspect && !flatProjection) {
+            patchBlendProjection(material, projUniforms)
+            patchBlendProjection(blend, projUniforms)
+            for (const m of meshes) m.frustumCulled = false
+          }
+          // Cross-camera tone LUT (tuning.colorLuts) on the OVERLAY material —
+          // chained after any blend patch. All overlays share one material, so
+          // the first valid overlay LUT applies (real LUTs only exist on
+          // 2-camera scenes, which have exactly one overlay).
+          const lutTex = buildLutTexture(tuning, gs.length)
+          if (lutTex) {
+            lutTexRef = lutTex
+            patchColorLut(blend, lutTex)
           }
         } else {
           const g = buildMeshGeometry(vbuf, ibuf, {
@@ -940,10 +1308,37 @@ export function VirtualPanoramaPlayer({
 
         onWheel = (e: WheelEvent) => {
           e.preventDefault()
-          viewRef.current = clampView({
-            ...viewRef.current,
-            fov: viewRef.current.fov / Math.exp(-e.deltaY * 0.0015),
+          const v = viewRef.current
+          const next = clampView({
+            ...v,
+            fov: v.fov / Math.exp(-e.deltaY * 0.0015),
           })
+          // Zoom about the CURSOR, not the frame centre (map-style): keep the
+          // world direction under the pointer fixed while the fov changes.
+          // Centre-anchored zoom slides off-centre content radially outward,
+          // which at the frame edges reads as the view "rotating".
+          // atan(n·tan(fov/2)) = the cursor ray's angular offset from the view
+          // axis; the aim absorbs the offset change. Signs follow the grab-
+          // drag convention above (+pan moves content right, +tilt moves it
+          // down); clampView still bounds the adjusted aim.
+          const rect = host.getBoundingClientRect()
+          if (next.fov !== v.fov && rect.width > 0 && rect.height > 0) {
+            const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1
+            const ny = ((e.clientY - rect.top) / rect.height) * 2 - 1 // +down
+            const aspect = rect.width / rect.height
+            const tanOld = Math.tan((v.fov / 2) * DEG)
+            const tanNew = Math.tan((next.fov / 2) * DEG)
+            const dPan =
+              Math.atan(nx * tanOld * aspect) - Math.atan(nx * tanNew * aspect)
+            const dTilt = Math.atan(ny * tanOld) - Math.atan(ny * tanNew)
+            viewRef.current = clampView({
+              pan: next.pan - dPan,
+              tilt: next.tilt - dTilt,
+              fov: next.fov,
+            })
+          } else {
+            viewRef.current = next
+          }
           syncZoom()
           dismissHint()
         }
@@ -1056,7 +1451,11 @@ export function VirtualPanoramaPlayer({
                   const varx = Math.max(0, sxx / sw - mx * mx),
                     vary = Math.max(0, syy / sw - my * my)
                   const spread = Math.sqrt(varx / (Wc * Wc) + vary / (Hc * Hc))
-                  const fovT = clamp(34 + spread * 70, 30, CURVED_FOV_MAX)
+                  const fovT = clamp(
+                    34 + spread * 70,
+                    30,
+                    Math.min(CURVED_FOV_FOLLOW_MAX, curvedFovMaxRef.current)
+                  )
                   followTarget.fov +=
                     (fovT - followTarget.fov) * (haveTarget ? 0.08 : 1)
                   haveTarget = true
@@ -1116,6 +1515,22 @@ export function VirtualPanoramaPlayer({
               dir.applyAxisAngle(rightNow, tilt)
               camera.up.copy(pv.up)
               camera.lookAt(dir)
+              // Fov-adaptive projection: refresh the blend uniforms from the
+              // live fov + canvas aspect (cheap; covers zoom AND resize).
+              const b = flatProjection
+                ? 0
+                : blendFactor(
+                    fov,
+                    blendFovLo,
+                    blendFovHi,
+                    blendMax,
+                    blendFovDownLo,
+                    blendFovDownHi
+                  )
+              const he = blendHalfExtents(fov, camera.aspect, b)
+              projUniforms.uBlend.value = b
+              projUniforms.uHalf.value.set(he.x, he.y)
+              projUniforms.uKey.value = flatProjection ? 0 : keystone
             } else {
               // Viewer at the projection center (origin); surface sits toward +Z.
               camera.position.set(0, 0, 0)
@@ -1144,6 +1559,7 @@ export function VirtualPanoramaPlayer({
             texture.dispose()
             for (const g of geometries) g.dispose()
             for (const m of materials) m.dispose()
+            lutTexRef?.dispose()
             renderer?.forceContextLoss()
             renderer?.dispose()
             if (renderer && renderer.domElement.parentNode === host)
@@ -1184,6 +1600,13 @@ export function VirtualPanoramaPlayer({
     seamShiftY,
     seamWarpA,
     seamWarpB,
+    flatProjection,
+    blendFovLo,
+    blendFovHi,
+    blendMax,
+    blendFovDownLo,
+    blendFovDownHi,
+    keystone,
   ])
 
   useEffect(() => {

@@ -11,6 +11,21 @@ import {
   viewToCamera,
   initialView,
   deriveViewLimits,
+  BLEND_FOV_LO,
+  BLEND_FOV_HI,
+  BLEND_FOV_DOWN_LO,
+  BLEND_FOV_DOWN_HI,
+  BLEND_MAX_DEFAULT,
+  blendFactor,
+  blendHalfExtents,
+  blendPanHalfAngleDeg,
+  overviewWiden,
+  OVERVIEW_PAN_HALF_DEG,
+  OVERVIEW_FOV_LO,
+  blendProject,
+  applyKeystone,
+  curvedFovMax,
+  CURVED_FOV_MAX_CEIL,
   type ViewLimits,
 } from '../projection'
 
@@ -131,5 +146,194 @@ describe('deriveViewLimits', () => {
     const { arcHeight, limits } = deriveViewLimits(140, 0, 100)
     expect(Number.isFinite(arcHeight)).toBe(true)
     expect(limits.maxFov).toBeGreaterThanOrEqual(limits.minFov)
+  })
+})
+
+describe('blendFactor (mid-range bump)', () => {
+  it('is 0 at/below the up-ramp start and bmax on the plateau', () => {
+    expect(blendFactor(BLEND_FOV_LO)).toBe(0)
+    expect(blendFactor(BLEND_FOV_LO - 20)).toBe(0)
+    expect(blendFactor(BLEND_FOV_HI)).toBe(BLEND_MAX_DEFAULT)
+    expect(blendFactor(BLEND_FOV_DOWN_LO)).toBe(BLEND_MAX_DEFAULT)
+    expect(blendFactor(70, BLEND_FOV_LO, BLEND_FOV_HI, 0.6)).toBe(0.6)
+  })
+  it('returns to PURE PINHOLE at/above the down-ramp end (whole-window zoom-out, Spiideo parity)', () => {
+    expect(blendFactor(BLEND_FOV_DOWN_HI)).toBe(0)
+    expect(blendFactor(127)).toBe(0)
+    expect(
+      blendFactor((BLEND_FOV_DOWN_LO + BLEND_FOV_DOWN_HI) / 2)
+    ).toBeCloseTo(BLEND_MAX_DEFAULT / 2)
+  })
+  it('is 0.5·bmax at the up-ramp midpoint, monotone up then monotone down', () => {
+    const mid = (BLEND_FOV_LO + BLEND_FOV_HI) / 2
+    expect(blendFactor(mid)).toBeCloseTo(BLEND_MAX_DEFAULT * 0.5)
+    let prev = -1
+    for (let f = BLEND_FOV_LO; f <= BLEND_FOV_HI; f += 1) {
+      const b = blendFactor(f)
+      expect(b).toBeGreaterThanOrEqual(prev)
+      prev = b
+    }
+    prev = BLEND_MAX_DEFAULT + 1
+    for (let f = BLEND_FOV_DOWN_LO; f <= BLEND_FOV_DOWN_HI; f += 1) {
+      const b = blendFactor(f)
+      expect(b).toBeLessThanOrEqual(prev)
+      prev = b
+    }
+  })
+  it('legacy monotonic behaviour with the down-ramp pushed to Infinity', () => {
+    expect(blendFactor(80, 42, 60, 1, Infinity, Infinity)).toBe(1)
+    expect(blendFactor(150, 42, 60, 1, Infinity, Infinity)).toBe(1)
+  })
+  it('degenerate ramps (hi <= lo) are steps', () => {
+    expect(blendFactor(45, 50, 50, 1, Infinity, Infinity)).toBe(0)
+    expect(blendFactor(55, 50, 50, 1, Infinity, Infinity)).toBe(1)
+    expect(blendFactor(101, 42, 60, 1, 100, 100)).toBe(0)
+    expect(blendFactor(99, 42, 60, 1, 100, 100)).toBe(1)
+  })
+  it('clamps bmax to [0, 1] — b > 1 would fold the projection past 45°', () => {
+    expect(blendFactor(70, BLEND_FOV_LO, BLEND_FOV_HI, 2)).toBe(1)
+    expect(blendFactor(70, BLEND_FOV_LO, BLEND_FOV_HI, -1)).toBe(0)
+  })
+})
+
+describe('blendProject', () => {
+  const rays = [
+    [0.3, 0.1, 1],
+    [-0.8, -0.25, 1.4],
+    [0.01, 0.4, 2],
+    [1.6, -0.3, 1], // theta ≈ 58° — past the small-angle regime
+  ] as const
+  it('b=0 is the pinhole map (x = dx/dz, y = dy/dz)', () => {
+    for (const [dx, dy, dz] of rays) {
+      const { x, y } = blendProject(dx, dy, dz, 0)
+      expect(x).toBeCloseTo(dx / dz, 12)
+      expect(y).toBeCloseTo(dy / dz, 12)
+    }
+  })
+  it('b=1 is the cylindrical map (x = theta, y = dy/hypot(dx,dz))', () => {
+    for (const [dx, dy, dz] of rays) {
+      const { x, y } = blendProject(dx, dy, dz, 1)
+      expect(x).toBeCloseTo(Math.atan2(dx, dz), 12)
+      expect(y).toBeCloseTo(dy / Math.hypot(dx, dz), 12)
+    }
+  })
+  it('x is strictly monotone in dx for every blend', () => {
+    for (const b of [0, 0.5, 1]) {
+      let prev = -Infinity
+      for (let dx = -1.2; dx <= 1.2; dx += 0.1) {
+        const { x } = blendProject(dx, 0.2, 1, b)
+        expect(x).toBeGreaterThan(prev)
+        prev = x
+      }
+    }
+  })
+})
+
+describe('blendHalfExtents', () => {
+  it('b=0 is the pinhole frame (ties to horizontalFov)', () => {
+    const { x, y } = blendHalfExtents(46, 16 / 9, 0)
+    const DEG = Math.PI / 180
+    expect(x).toBeCloseTo(Math.tan((horizontalFov(46, 16 / 9) / 2) * DEG), 12)
+    expect(y).toBeCloseTo(Math.tan((46 / 2) * DEG), 12)
+  })
+  it('edge ray at hh projects to xmax for EVERY blend (angular extent invariant — why clampView needs no change)', () => {
+    const DEG = Math.PI / 180
+    const aspect = 16 / 9
+    for (const vfov of [30, 46, 60]) {
+      const hh = Math.atan(Math.tan((vfov / 2) * DEG) * aspect)
+      for (const b of [0, 0.25, 0.5, 0.75, 1]) {
+        const { x } = blendHalfExtents(vfov, aspect, b)
+        const edge = blendProject(Math.sin(hh), 0, Math.cos(hh), b)
+        expect(edge.x).toBeCloseTo(x, 12)
+      }
+    }
+  })
+  it('vertical footprint under blend never exceeds the pinhole frame (clamp stays conservative)', () => {
+    for (const b of [0.25, 0.5, 1]) {
+      const pin = blendHalfExtents(60, 16 / 9, 0)
+      const bl = blendHalfExtents(60, 16 / 9, b)
+      expect(bl.y).toBeLessThanOrEqual(pin.y)
+    }
+  })
+})
+
+describe('overview widening', () => {
+  const DEG = Math.PI / 180
+  const aspect = 16 / 9
+  it('inactive below full cylindricality or below the fov ramp (extent-invariance law preserved)', () => {
+    expect(overviewWiden(92, 0.99)).toBe(0)
+    expect(overviewWiden(60, 1)).toBe(0)
+    expect(overviewWiden(OVERVIEW_FOV_LO, 1)).toBe(0)
+    // un-widened b=1 extents still follow the original x0 = hh law
+    const hh = Math.atan(Math.tan((60 / 2) * DEG) * aspect)
+    expect(blendHalfExtents(60, aspect, 1).x).toBeCloseTo(hh, 12)
+  })
+  it('reaches the full overview half-angle at the zoom-out cap', () => {
+    expect(blendPanHalfAngleDeg(92, aspect, 1)).toBeCloseTo(
+      OVERVIEW_PAN_HALF_DEG,
+      9
+    )
+    expect(blendHalfExtents(92, aspect, 1).x).toBeCloseTo(
+      OVERVIEW_PAN_HALF_DEG * DEG,
+      9
+    )
+  })
+  it('vertical extent returns to the nominal tan(vfov/2) at full widening', () => {
+    expect(blendHalfExtents(92, aspect, 1).y).toBeCloseTo(
+      Math.tan((92 / 2) * DEG),
+      9
+    )
+  })
+  it('is continuous at the ramp start', () => {
+    const a = blendHalfExtents(OVERVIEW_FOV_LO, aspect, 1)
+    const b = blendHalfExtents(OVERVIEW_FOV_LO + 1e-6, aspect, 1)
+    expect(b.x - a.x).toBeLessThan(1e-4)
+    expect(Math.abs(b.y - a.y)).toBeLessThan(1e-4)
+  })
+  it('clamp twin matches the render extents in the widened regime (angular units)', () => {
+    for (const fov of [75, 84, 92]) {
+      expect(blendPanHalfAngleDeg(fov, aspect, 1) * DEG).toBeCloseTo(
+        blendHalfExtents(fov, aspect, 1).x,
+        9
+      )
+    }
+  })
+})
+
+describe('curvedFovMax (scene-derived zoom-out cap)', () => {
+  const DEG = Math.PI / 180
+  it('equals the window tilt height for a short window (HCT: ~47° tall)', () => {
+    // HCT scene 315f936b: tilt −26.53°..+20.36°
+    expect(curvedFovMax(-0.4630174526886419, 0.3554184441970182)).toBeCloseTo(
+      46.9,
+      1
+    )
+  })
+  it('caps at the ceiling for the tallest window (Nazwa: −89.95..+37.07 ≈ 127°)', () => {
+    expect(curvedFovMax(-89.95 * DEG, 37.07 * DEG)).toBe(CURVED_FOV_MAX_CEIL)
+  })
+  it('floors at minFovDeg for degenerate or inverted windows', () => {
+    expect(curvedFovMax(-0.01, 0.01)).toBe(12)
+    expect(curvedFovMax(0.5, -0.5)).toBe(12)
+    expect(curvedFovMax(-0.01, 0.01, 30)).toBe(30)
+  })
+})
+
+describe('applyKeystone', () => {
+  it('k=0 is the identity', () => {
+    expect(applyKeystone(0.4, -0.7, 0)).toEqual({ x: 0.4, y: -0.7 })
+  })
+  it('k > 0 narrows the bottom and widens the top', () => {
+    expect(Math.abs(applyKeystone(0.5, -0.8, 0.2).x)).toBeLessThan(0.5)
+    expect(Math.abs(applyKeystone(0.5, 0.8, 0.2).x)).toBeGreaterThan(0.5)
+  })
+  it('preserves collinearity (it is a homography — straight lines stay straight)', () => {
+    // three collinear points on y = 0.3x − 0.2
+    const pts = [-0.9, 0.1, 0.8].map((x) =>
+      applyKeystone(x, 0.3 * x - 0.2, 0.25)
+    )
+    const [a, b, c] = pts
+    const cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+    expect(Math.abs(cross)).toBeLessThan(1e-12)
   })
 })

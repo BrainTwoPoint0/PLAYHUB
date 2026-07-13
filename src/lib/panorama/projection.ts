@@ -187,3 +187,189 @@ export function deriveViewLimits(
   }
   return { limits, arcRad, arcHeight }
 }
+
+/*
+ * Fov-adaptive pinhole↔cylindrical blend (the curved product path's view
+ * projection). A rectilinear (pinhole) wide view of the pitch stretches the
+ * edges ("rounded feel"); a cylindrical view fixes the stretch but bows
+ * straight horizontal lines through the centre. The blend is exactly pinhole
+ * when zoomed in and ramps toward cylindrical as the view widens, so each
+ * fov gets the projection that reads flattest.
+ *
+ * Forward map for a camera-frame ray (dx, dy, dz), blend b ∈ [0, 1]:
+ *   theta  = atan2(dx, dz)                  — azimuth off the view axis
+ *   tanphi = dy / hypot(dx, dz)             — elevation
+ *   x = (1−b)·tan(theta) + b·theta          — pinhole (b=0) ↔ cylindrical (b=1)
+ *   y = ((1−b)/cos(theta) + b) · tanphi
+ * The frame's horizontal ANGULAR extent is invariant in b (the edge ray at
+ * hh always maps to xmax), so angular pan clamps hold under any blend.
+ */
+
+/** Blend ramp (vertical fov, deg): a mid-range BUMP, not a monotonic ramp.
+ *  Pure pinhole below LO, bmax between HI and DOWN_LO, back to pure pinhole
+ *  at/above DOWN_HI. Eye-tuned by Karim (2026-07-13, on the refit straight
+ *  meshes): a mild blend (bmax 0.3) reads nicer through the normal viewing
+ *  range, but the whole-window zoom-out must stay pure pinhole — Spiideo's
+ *  live viewer is pinhole at every zoom (§0l) and the cylindrical term bows
+ *  straight horizontals exactly where the full-pitch view shows them longest.
+ *  Tuning knobs on /panorama-test: `blo`/`bhi`/`bmax`/`bdlo`/`bdhi`
+ *  (`flat=1` = off). */
+export const BLEND_FOV_LO = 42
+export const BLEND_FOV_HI = 60
+export const BLEND_FOV_DOWN_LO = 85
+export const BLEND_FOV_DOWN_HI = 105
+export const BLEND_MAX_DEFAULT = 0.3
+
+/**
+ * Blend factor b for a vertical fov:
+ * `bmax · smoothstep(lo → hi) · (1 − smoothstep(downLo → downHi))`.
+ * 0 = pinhole (exactly the stock render). Degenerate ramps (hi ≤ lo) fall
+ * back to a step at `lo`; same for the down-ramp at `downLo`.
+ */
+export function blendFactor(
+  vfovDeg: number,
+  lo = BLEND_FOV_LO,
+  hi = BLEND_FOV_HI,
+  bmax = BLEND_MAX_DEFAULT,
+  downLo = BLEND_FOV_DOWN_LO,
+  downHi = BLEND_FOV_DOWN_HI
+): number {
+  const smooth = (t: number) => t * t * (3 - 2 * t)
+  const up =
+    hi <= lo
+      ? vfovDeg >= lo
+        ? 1
+        : 0
+      : clampNum((vfovDeg - lo) / (hi - lo), 0, 1)
+  const down =
+    downHi <= downLo
+      ? vfovDeg >= downLo
+        ? 1
+        : 0
+      : clampNum((vfovDeg - downLo) / (downHi - downLo), 0, 1)
+  // b outside [0, 1] breaks the projection's monotonicity (the map folds
+  // past |theta| = 45° for b > 1), so the cap is clamped, not trusted.
+  return clampNum(bmax, 0, 1) * smooth(up) * (1 - smooth(down))
+}
+
+/**
+ * Overview widening (the Perform-style "whole pitch at full zoom-out"). At
+ * full cylindricality the frame's horizontal ANGULAR half-extent can exceed
+ * the pinhole-equivalent hh — a cylinder happily represents rays past ±90°
+ * off-axis, which no pinhole term can (tan folds). So the widening is gated
+ * on b ≥ 0.999 (pure cylindrical map only) and ramps with fov from
+ * OVERVIEW_FOV_LO to the zoom-out cap, reaching OVERVIEW_PAN_HALF_DEG. The
+ * vertical extent simultaneously returns to the nominal tan(vfov/2) — the
+ * un-widened blend's y = x/aspect quietly under-spans the fov at b=1.
+ */
+export const OVERVIEW_FOV_LO = 90
+export const OVERVIEW_FOV_HI = 92
+export const OVERVIEW_PAN_HALF_DEG = 95
+
+export function overviewWiden(vfovDeg: number, b: number): number {
+  if (b < 0.999) return 0
+  const t = clampNum(
+    (vfovDeg - OVERVIEW_FOV_LO) / (OVERVIEW_FOV_HI - OVERVIEW_FOV_LO),
+    0,
+    1
+  )
+  return t * t * (3 - 2 * t)
+}
+
+/**
+ * Horizontal angular half-extent (deg) of the rendered frame — the pan-clamp
+ * twin of {@link blendHalfExtents}. Below the overview ramp this is the
+ * blend-invariant pinhole hh (the original extent-invariance law); inside it,
+ * it widens toward OVERVIEW_PAN_HALF_DEG.
+ */
+export function blendPanHalfAngleDeg(
+  vfovDeg: number,
+  aspect: number,
+  b: number
+): number {
+  const hhDeg = horizontalFov(vfovDeg, aspect) / 2
+  const w = overviewWiden(vfovDeg, b)
+  return hhDeg + Math.max(0, OVERVIEW_PAN_HALF_DEG - hhDeg) * w
+}
+
+/**
+ * Half-extents of the projected frame in projection units for a vertical fov,
+ * viewport aspect and blend b. NDC = projected coord / half-extent. At b=0
+ * this is the pinhole frame (x = tan(hFov/2), y = tan(vFov/2)). Inside the
+ * overview ramp (see {@link overviewWiden}) x is angular (b=1) and widens
+ * toward OVERVIEW_PAN_HALF_DEG while y returns to tan(vfov/2).
+ */
+export function blendHalfExtents(
+  vfovDeg: number,
+  aspect: number,
+  b: number
+): { x: number; y: number } {
+  const hh = Math.atan(Math.tan((vfovDeg * DEG) / 2) * aspect)
+  const x0 = (1 - b) * Math.tan(hh) + b * hh
+  const y0 = x0 / aspect
+  const w = overviewWiden(vfovDeg, b)
+  if (w === 0) return { x: x0, y: y0 }
+  const x = x0 + Math.max(0, OVERVIEW_PAN_HALF_DEG * DEG - x0) * w
+  const y = y0 + (Math.tan((vfovDeg * DEG) / 2) - y0) * w
+  return { x, y }
+}
+
+/**
+ * Project a camera-frame ray (dz > 0 = forward) under blend b. JS twin of
+ * CYL_PROJECT_GLSL in VirtualPanoramaPlayer.tsx — keep the two in lockstep.
+ * (The GLSL carries the same map multiplied through by w = dz, so it stays
+ * continuous through dz = 0; on this function's dz > 0 domain they agree.)
+ */
+export function blendProject(
+  dx: number,
+  dy: number,
+  dz: number,
+  b: number
+): { x: number; y: number } {
+  const theta = Math.atan2(dx, dz)
+  const tanphi = dy / Math.hypot(dx, dz)
+  const x = (1 - b) * Math.tan(theta) + b * theta
+  const y = ((1 - b) / Math.cos(theta) + b) * tanphi
+  return { x, y }
+}
+
+/** Ceiling for the scene-derived zoom-out cap: the tallest real window
+ *  (Nazwa, tilt −89.95°..+37.07° ≈ 127°) — also the value the player
+ *  historically hardcoded for every scene. */
+export const CURVED_FOV_MAX_CEIL = 127
+
+/**
+ * Scene-derived zoom-out cap (deg). Spiideo ties the zoom-out floor to the
+ * WINDOW's tilt height, so a short window (HCT is ~47° tall) must not zoom
+ * out to a 127° pinhole: at fovs far beyond the window the frame is mostly
+ * black with extreme edge stretch (the wide-fov "bowl"), and clampView's
+ * pan bounds collapse toward the midpoint — a corner-pinned aim gets dragged
+ * through a huge diagonal pan+tilt sweep during zoom, which reads as the
+ * view "rotating" (apparent roll of frame content; a FIXED aim cannot rotate
+ * under pure fov change). Tilt extents in RADIANS (mesh window extents).
+ */
+export function curvedFovMax(
+  minTiltRad: number,
+  maxTiltRad: number,
+  minFovDeg = 12
+): number {
+  const spanDeg = (maxTiltRad - minTiltRad) / DEG
+  return clampNum(spanDeg, minFovDeg, CURVED_FOV_MAX_CEIL)
+}
+
+/**
+ * Keystone (vertical perspective) correction on NDC — a pure HOMOGRAPHY, so
+ * every straight line stays straight (unlike the cylindrical blend's bow).
+ * k > 0 narrows the bottom of the frame and widens the top, reducing the
+ * ground-plane trapezoid splay (the "hill" percept: near side too wide, far
+ * side too pinched). Cost: off-centre verticals lean slightly outward.
+ * GLSL twin: the uKey term in CYL_PROJECT_GLSL (w' = w − k·y_clip).
+ */
+export function applyKeystone(
+  x: number,
+  y: number,
+  k: number
+): { x: number; y: number } {
+  const d = 1 - k * y
+  return { x: x / d, y: y / d }
+}

@@ -5,6 +5,8 @@
  *   ?inspect=1  → orbit an external camera around the mesh (see its 3D shape)
  *   ?proj=both|0|1 → render both projection strips or just one (default 0)
  *   ?swap=0 ?flipv=1 ?flipy=1 → texture UV tuning
+ *   ?flat=1 → stock pinhole projection (disable the fov-adaptive blend, for A/B)
+ *   ?blo= ?bhi= ?bmax= → blend ramp overrides (vfov deg lo/hi, max blend 0..1)
  * Not shipped (404 in prod).
  */
 
@@ -29,9 +31,21 @@ export default function PanoramaTestPage() {
     dy: undefined as number | undefined,
     wa: undefined as number | undefined,
     wb: undefined as number | undefined,
-    mesh: '/vp-mesh',
+    flat: false,
+    blo: undefined as number | undefined,
+    bhi: undefined as number | undefined,
+    bmax: undefined as number | undefined,
+    bdlo: undefined as number | undefined,
+    bdhi: undefined as number | undefined,
+    ky: undefined as number | undefined,
+    // vp-mesh-kuwait (v4, Nazwa scene) + vp-raw-kuwait.mp4 (its RAW 4K fisheye
+    // VP) are the matching pair. Gotchas: the old /vp-mesh (July 2 format) no
+    // longer renders with current buildExactPanorama (alternating-triangle
+    // artifact), and /panorama-test.mp4 is a 1080p PRODUCED clip — meshing it
+    // double-warps (jagged frame edges).
+    mesh: '/vp-mesh-kuwait',
     auto: '',
-    src: '/vp-test.mp4',
+    src: '/vp-raw-kuwait.mp4',
   })
   useEffect(() => {
     const p = new URLSearchParams(window.location.search)
@@ -54,9 +68,16 @@ export default function PanoramaTestPage() {
       dy: num('dy'),
       wa: num('wa'),
       wb: num('wb'),
-      mesh: p.get('mesh') || '/vp-mesh',
+      flat: p.get('flat') === '1',
+      blo: num('blo'),
+      bhi: num('bhi'),
+      bmax: num('bmax'),
+      bdlo: num('bdlo'),
+      bdhi: num('bdhi'),
+      ky: num('ky'),
+      mesh: p.get('mesh') || '/vp-mesh-kuwait',
       auto: p.get('auto') || '',
-      src: p.get('src') || '/vp-test.mp4',
+      src: p.get('src') || '/vp-raw-kuwait.mp4',
     })
   }, [])
 
@@ -77,7 +98,7 @@ export default function PanoramaTestPage() {
       </p>
       <div className="max-w-5xl">
         <VirtualPanoramaPlayer
-          key={`${q.swap}-${q.flipv}-${q.flipy}-${q.debug}-${q.inspect}-${q.proj}-${q.ortho}-${q.dewarp}-${q.ov}-${q.scale}-${q.dy}-${q.wa}-${q.wb}-${q.mesh}-${q.src}-${q.auto}`}
+          key={`${q.swap}-${q.flipv}-${q.flipy}-${q.debug}-${q.inspect}-${q.proj}-${q.ortho}-${q.dewarp}-${q.ov}-${q.scale}-${q.dy}-${q.wa}-${q.wb}-${q.flat}-${q.blo}-${q.bhi}-${q.bmax}-${q.bdlo}-${q.bdhi}-${q.ky}-${q.mesh}-${q.src}-${q.auto}`}
           src={q.src}
           autoSrc={q.auto || undefined}
           meshBaseUrl={q.mesh}
@@ -94,6 +115,13 @@ export default function PanoramaTestPage() {
           seamShiftY={q.dy}
           seamWarpA={q.wa}
           seamWarpB={q.wb}
+          flatProjection={q.flat}
+          blendFovLo={q.blo}
+          blendFovHi={q.bhi}
+          blendMax={q.bmax}
+          blendFovDownLo={q.bdlo}
+          blendFovDownHi={q.bdhi}
+          keystone={q.ky}
           autoplay
         />
       </div>
