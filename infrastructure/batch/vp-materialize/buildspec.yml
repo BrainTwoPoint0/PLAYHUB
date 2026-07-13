@@ -1,0 +1,20 @@
+# CodeBuild spec: build the vp-materialize container image and push it to ECR.
+# Runs in a privileged CodeBuild container (has Docker) so we don't need Docker
+# locally. Triggered by build-image.sh (zips this dir → S3 → start-build).
+# Env (from the CodeBuild project): ECR_REPO_URL, AWS_REGION.
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "Logging in to ECR $ECR_REPO_URL"
+      - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REPO_URL"
+  build:
+    commands:
+      # Source zip root == infrastructure/batch/vp-materialize/, so the Dockerfile
+      # + entrypoint.mjs + package.json are in the build context (".").
+      - docker build --pull -t "$ECR_REPO_URL:latest" .
+  post_build:
+    commands:
+      - docker push "$ECR_REPO_URL:latest"
+      - echo "Pushed $ECR_REPO_URL:latest"
