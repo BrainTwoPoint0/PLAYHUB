@@ -46,7 +46,11 @@ const videoPath = arg('video')
 const clipId = arg('clip-id')
 const outPath = arg('out')
 const labelFilter = arg('labels')
-  ? new Set(arg('labels')!.split(',').map((s) => s.trim()))
+  ? new Set(
+      arg('labels')!
+        .split(',')
+        .map((s) => s.trim())
+    )
   : null
 const keyframesOnly = process.argv.includes('--keyframes-only')
 

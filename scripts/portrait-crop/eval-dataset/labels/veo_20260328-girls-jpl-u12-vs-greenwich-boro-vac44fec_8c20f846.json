@@ -1,41 +1,207 @@
 {
-  "clip_id": "veo_20260502_goal_01",
-  "match_id": "20260502-untitled-recording-2026-05-02_12-04-05-ve3415dd",
-  "source": "veo_academy",
+  "clip_id": "veo_20260328-girls-jpl-u12-vs-greenwich-boro-vac44fec_8c20f846",
+  "match_id": "veo_20260328-girls-jpl-u12-vs-greenwich-boro-vac44fec_8c20f846",
+  "source": "unknown",
   "provenance": {
-    "method": "human_label",
-    "cvat_export": "veo_20260502_goal_01.xml",
-    "stamped_at": "2026-06-29T13:36:21.598Z",
-    "note": "backfilled seed label"
+    "method": "human_override",
+    "cvat_export": "veo_20260328-girls-jpl-u12-vs-greenwich-boro-vac44fec_8c20f846.xml",
+    "stamped_at": "2026-07-08T20:45:09.592Z"
   },
-  "dense": true,
-  "label_fps": 29.97002997002997,
+  "dense": false,
+  "label_fps": 30,
   "source_fps": 29.97002997002997,
   "frames": [
+    {
+      "frame": 8,
+      "t": 0.267,
+      "ball": {
+        "x": 915,
+        "y": 503,
+        "visible": true
+      }
+    },
+    {
+      "frame": 9,
+      "t": 0.3,
+      "ball": {
+        "x": 919,
+        "y": 503,
+        "visible": true
+      }
+    },
+    {
+      "frame": 10,
+      "t": 0.334,
+      "ball": {
+        "x": 923,
+        "y": 503,
+        "visible": true
+      }
+    },
+    {
+      "frame": 11,
+      "t": 0.367,
+      "ball": {
+        "x": 927,
+        "y": 503,
+        "visible": true
+      }
+    },
+    {
+      "frame": 12,
+      "t": 0.4,
+      "ball": {
+        "x": 931,
+        "y": 503,
+        "visible": true
+      }
+    },
+    {
+      "frame": 13,
+      "t": 0.434,
+      "ball": {
+        "x": 935,
+        "y": 504,
+        "visible": true
+      }
+    },
+    {
+      "frame": 14,
+      "t": 0.467,
+      "ball": {
+        "x": 938,
+        "y": 506,
+        "visible": true
+      }
+    },
+    {
+      "frame": 15,
+      "t": 0.501,
+      "ball": {
+        "x": 942,
+        "y": 507,
+        "visible": true
+      }
+    },
+    {
+      "frame": 16,
+      "t": 0.534,
+      "ball": {
+        "x": 946,
+        "y": 508,
+        "visible": true
+      }
+    },
+    {
+      "frame": 17,
+      "t": 0.567,
+      "ball": {
+        "x": 950,
+        "y": 510,
+        "visible": true
+      }
+    },
+    {
+      "frame": 18,
+      "t": 0.601,
+      "ball": {
+        "x": 953,
+        "y": 509,
+        "visible": true
+      }
+    },
+    {
+      "frame": 19,
+      "t": 0.634,
+      "ball": {
+        "x": 957,
+        "y": 509,
+        "visible": true
+      }
+    },
+    {
+      "frame": 20,
+      "t": 0.667,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 21,
+      "t": 0.701,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 22,
+      "t": 0.734,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 23,
+      "t": 0.767,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 24,
+      "t": 0.801,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 25,
+      "t": 0.834,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 26,
+      "t": 0.868,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 27,
+      "t": 0.901,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 28,
+      "t": 0.934,
+      "ball": {
+        "visible": false
+      }
+    },
     {
       "frame": 29,
       "t": 0.968,
       "ball": {
-        "x": 934,
-        "y": 471,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 30,
       "t": 1.001,
       "ball": {
-        "x": 924,
-        "y": 470,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 31,
       "t": 1.034,
       "ball": {
-        "x": 920,
-        "y": 470,
+        "x": 797,
+        "y": 447,
         "visible": true
       }
     },
@@ -43,44 +209,36 @@
       "frame": 32,
       "t": 1.068,
       "ball": {
-        "x": 909,
-        "y": 470,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 33,
       "t": 1.101,
       "ball": {
-        "x": 899,
-        "y": 469,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 34,
       "t": 1.134,
       "ball": {
-        "x": 889,
-        "y": 468,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 35,
       "t": 1.168,
       "ball": {
-        "x": 879,
-        "y": 468,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 36,
       "t": 1.201,
       "ball": {
-        "x": 870,
-        "y": 468,
+        "x": 1015,
+        "y": 504,
         "visible": true
       }
     },
@@ -88,8 +246,8 @@
       "frame": 37,
       "t": 1.235,
       "ball": {
-        "x": 872,
-        "y": 467,
+        "x": 1016,
+        "y": 503,
         "visible": true
       }
     },
@@ -97,8 +255,8 @@
       "frame": 38,
       "t": 1.268,
       "ball": {
-        "x": 888,
-        "y": 465,
+        "x": 1020,
+        "y": 503,
         "visible": true
       }
     },
@@ -106,8 +264,8 @@
       "frame": 39,
       "t": 1.301,
       "ball": {
-        "x": 909,
-        "y": 464,
+        "x": 1021,
+        "y": 502,
         "visible": true
       }
     },
@@ -115,8 +273,8 @@
       "frame": 40,
       "t": 1.335,
       "ball": {
-        "x": 927,
-        "y": 464,
+        "x": 1024,
+        "y": 502,
         "visible": true
       }
     },
@@ -124,8 +282,8 @@
       "frame": 41,
       "t": 1.368,
       "ball": {
-        "x": 946,
-        "y": 465,
+        "x": 1027,
+        "y": 500,
         "visible": true
       }
     },
@@ -133,8 +291,8 @@
       "frame": 42,
       "t": 1.401,
       "ball": {
-        "x": 965,
-        "y": 465,
+        "x": 1029,
+        "y": 499,
         "visible": true
       }
     },
@@ -142,8 +300,8 @@
       "frame": 43,
       "t": 1.435,
       "ball": {
-        "x": 984,
-        "y": 467,
+        "x": 1032,
+        "y": 498,
         "visible": true
       }
     },
@@ -151,8 +309,8 @@
       "frame": 44,
       "t": 1.468,
       "ball": {
-        "x": 1002,
-        "y": 473,
+        "x": 1034,
+        "y": 497,
         "visible": true
       }
     },
@@ -160,8 +318,8 @@
       "frame": 45,
       "t": 1.502,
       "ball": {
-        "x": 1020,
-        "y": 478,
+        "x": 1037,
+        "y": 496,
         "visible": true
       }
     },
@@ -169,8 +327,8 @@
       "frame": 46,
       "t": 1.535,
       "ball": {
-        "x": 1037,
-        "y": 483,
+        "x": 1039,
+        "y": 495,
         "visible": true
       }
     },
@@ -178,8 +336,8 @@
       "frame": 47,
       "t": 1.568,
       "ball": {
-        "x": 1054,
-        "y": 490,
+        "x": 1042,
+        "y": 494,
         "visible": true
       }
     },
@@ -187,8 +345,8 @@
       "frame": 48,
       "t": 1.602,
       "ball": {
-        "x": 1069,
-        "y": 492,
+        "x": 1044,
+        "y": 494,
         "visible": true
       }
     },
@@ -196,8 +354,8 @@
       "frame": 49,
       "t": 1.635,
       "ball": {
-        "x": 1084,
-        "y": 491,
+        "x": 1046,
+        "y": 494,
         "visible": true
       }
     },
@@ -205,8 +363,8 @@
       "frame": 50,
       "t": 1.668,
       "ball": {
-        "x": 1097,
-        "y": 488,
+        "x": 1048,
+        "y": 492,
         "visible": true
       }
     },
@@ -214,8 +372,8 @@
       "frame": 51,
       "t": 1.702,
       "ball": {
-        "x": 1110,
-        "y": 486,
+        "x": 1051,
+        "y": 491,
         "visible": true
       }
     },
@@ -223,8 +381,8 @@
       "frame": 52,
       "t": 1.735,
       "ball": {
-        "x": 1122,
-        "y": 485,
+        "x": 1056,
+        "y": 490,
         "visible": true
       }
     },
@@ -232,26 +390,22 @@
       "frame": 53,
       "t": 1.768,
       "ball": {
-        "x": 1130,
-        "y": 485,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 54,
       "t": 1.802,
       "ball": {
-        "x": 1149,
-        "y": 491,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 55,
       "t": 1.835,
       "ball": {
-        "x": 1160,
-        "y": 491,
+        "x": 1059,
+        "y": 488,
         "visible": true
       }
     },
@@ -259,179 +413,141 @@
       "frame": 56,
       "t": 1.869,
       "ball": {
-        "x": 1176,
-        "y": 501,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 57,
       "t": 1.902,
       "ball": {
-        "x": 1187,
-        "y": 501,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 58,
       "t": 1.935,
       "ball": {
-        "x": 1198,
-        "y": 503,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 59,
       "t": 1.969,
       "ball": {
-        "x": 1205,
-        "y": 505,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 60,
       "t": 2.002,
       "ball": {
-        "x": 1210,
-        "y": 506,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 61,
       "t": 2.035,
       "ball": {
-        "x": 1226,
-        "y": 500,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 62,
       "t": 2.069,
       "ball": {
-        "x": 1230,
-        "y": 495,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 63,
       "t": 2.102,
       "ball": {
-        "x": 1237,
-        "y": 492,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 64,
       "t": 2.135,
       "ball": {
-        "x": 1243,
-        "y": 494,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 65,
       "t": 2.169,
       "ball": {
-        "x": 1252,
-        "y": 498,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 66,
       "t": 2.202,
       "ball": {
-        "x": 1260,
-        "y": 505,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 67,
       "t": 2.236,
       "ball": {
-        "x": 1268,
-        "y": 508,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 68,
       "t": 2.269,
       "ball": {
-        "x": 1276,
-        "y": 511,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 69,
       "t": 2.302,
       "ball": {
-        "x": 1284,
-        "y": 514,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 70,
       "t": 2.336,
       "ball": {
-        "x": 1292,
-        "y": 517,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 71,
       "t": 2.369,
       "ball": {
-        "x": 1300,
-        "y": 520,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 72,
       "t": 2.402,
       "ball": {
-        "x": 1308,
-        "y": 523,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 73,
       "t": 2.436,
       "ball": {
-        "x": 1317,
-        "y": 507,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 74,
       "t": 2.469,
       "ball": {
-        "x": 1325,
-        "y": 499,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 75,
       "t": 2.502,
       "ball": {
-        "x": 1332,
-        "y": 492,
+        "x": 1031,
+        "y": 430,
         "visible": true
       }
     },
@@ -439,8 +555,8 @@
       "frame": 76,
       "t": 2.536,
       "ball": {
-        "x": 1342,
-        "y": 496,
+        "x": 1019,
+        "y": 470,
         "visible": true
       }
     },
@@ -448,8 +564,8 @@
       "frame": 77,
       "t": 2.569,
       "ball": {
-        "x": 1350,
-        "y": 501,
+        "x": 1015,
+        "y": 471,
         "visible": true
       }
     },
@@ -457,8 +573,8 @@
       "frame": 78,
       "t": 2.603,
       "ball": {
-        "x": 1360,
-        "y": 506,
+        "x": 1007,
+        "y": 470,
         "visible": true
       }
     },
@@ -466,8 +582,8 @@
       "frame": 79,
       "t": 2.636,
       "ball": {
-        "x": 1370,
-        "y": 513,
+        "x": 1007,
+        "y": 471,
         "visible": true
       }
     },
@@ -475,8 +591,8 @@
       "frame": 80,
       "t": 2.669,
       "ball": {
-        "x": 1378,
-        "y": 519,
+        "x": 1006,
+        "y": 468,
         "visible": true
       }
     },
@@ -484,8 +600,8 @@
       "frame": 81,
       "t": 2.703,
       "ball": {
-        "x": 1387,
-        "y": 528,
+        "x": 1003,
+        "y": 469,
         "visible": true
       }
     },
@@ -493,8 +609,8 @@
       "frame": 82,
       "t": 2.736,
       "ball": {
-        "x": 1396,
-        "y": 531,
+        "x": 998,
+        "y": 466,
         "visible": true
       }
     },
@@ -502,8 +618,8 @@
       "frame": 83,
       "t": 2.769,
       "ball": {
-        "x": 1403,
-        "y": 527,
+        "x": 992,
+        "y": 476,
         "visible": true
       }
     },
@@ -511,8 +627,8 @@
       "frame": 84,
       "t": 2.803,
       "ball": {
-        "x": 1412,
-        "y": 522,
+        "x": 989,
+        "y": 477,
         "visible": true
       }
     },
@@ -520,8 +636,8 @@
       "frame": 85,
       "t": 2.836,
       "ball": {
-        "x": 1421,
-        "y": 518,
+        "x": 986,
+        "y": 478,
         "visible": true
       }
     },
@@ -529,8 +645,8 @@
       "frame": 86,
       "t": 2.87,
       "ball": {
-        "x": 1430,
-        "y": 515,
+        "x": 982,
+        "y": 479,
         "visible": true
       }
     },
@@ -538,62 +654,50 @@
       "frame": 87,
       "t": 2.903,
       "ball": {
-        "x": 1441,
-        "y": 512,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 88,
       "t": 2.936,
       "ball": {
-        "x": 1451,
-        "y": 511,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 89,
       "t": 2.97,
       "ball": {
-        "x": 1461,
-        "y": 513,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 90,
       "t": 3.003,
       "ball": {
-        "x": 1473,
-        "y": 514,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 91,
       "t": 3.036,
       "ball": {
-        "x": 1482,
-        "y": 514,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 92,
       "t": 3.07,
       "ball": {
-        "x": 1493,
-        "y": 520,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 93,
       "t": 3.103,
       "ball": {
-        "x": 1503,
-        "y": 528,
+        "x": 958,
+        "y": 490,
         "visible": true
       }
     },
@@ -601,8 +705,8 @@
       "frame": 94,
       "t": 3.136,
       "ball": {
-        "x": 1512,
-        "y": 531,
+        "x": 954,
+        "y": 491,
         "visible": true
       }
     },
@@ -610,8 +714,8 @@
       "frame": 95,
       "t": 3.17,
       "ball": {
-        "x": 1524,
-        "y": 542,
+        "x": 951,
+        "y": 492,
         "visible": true
       }
     },
@@ -619,8 +723,8 @@
       "frame": 96,
       "t": 3.203,
       "ball": {
-        "x": 1533,
-        "y": 548,
+        "x": 947,
+        "y": 493,
         "visible": true
       }
     },
@@ -628,8 +732,8 @@
       "frame": 97,
       "t": 3.237,
       "ball": {
-        "x": 1539,
-        "y": 553,
+        "x": 944,
+        "y": 494,
         "visible": true
       }
     },
@@ -637,8 +741,8 @@
       "frame": 98,
       "t": 3.27,
       "ball": {
-        "x": 1557,
-        "y": 546,
+        "x": 940,
+        "y": 495,
         "visible": true
       }
     },
@@ -646,8 +750,8 @@
       "frame": 99,
       "t": 3.303,
       "ball": {
-        "x": 1568,
-        "y": 540,
+        "x": 937,
+        "y": 497,
         "visible": true
       }
     },
@@ -655,8 +759,8 @@
       "frame": 100,
       "t": 3.337,
       "ball": {
-        "x": 1578,
-        "y": 538,
+        "x": 933,
+        "y": 498,
         "visible": true
       }
     },
@@ -664,8 +768,8 @@
       "frame": 101,
       "t": 3.37,
       "ball": {
-        "x": 1566,
-        "y": 533,
+        "x": 930,
+        "y": 500,
         "visible": true
       }
     },
@@ -673,8 +777,8 @@
       "frame": 102,
       "t": 3.403,
       "ball": {
-        "x": 1550,
-        "y": 529,
+        "x": 926,
+        "y": 501,
         "visible": true
       }
     },
@@ -682,8 +786,8 @@
       "frame": 103,
       "t": 3.437,
       "ball": {
-        "x": 1536,
-        "y": 528,
+        "x": 923,
+        "y": 502,
         "visible": true
       }
     },
@@ -691,8 +795,8 @@
       "frame": 104,
       "t": 3.47,
       "ball": {
-        "x": 1524,
-        "y": 530,
+        "x": 920,
+        "y": 503,
         "visible": true
       }
     },
@@ -700,35 +804,29 @@
       "frame": 105,
       "t": 3.504,
       "ball": {
-        "x": 1506,
-        "y": 529,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 106,
       "t": 3.537,
       "ball": {
-        "x": 1495,
-        "y": 530,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 107,
       "t": 3.57,
       "ball": {
-        "x": 1482,
-        "y": 535,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 108,
       "t": 3.604,
       "ball": {
-        "x": 1468,
-        "y": 538,
+        "x": 904,
+        "y": 506,
         "visible": true
       }
     },
@@ -736,71 +834,57 @@
       "frame": 109,
       "t": 3.637,
       "ball": {
-        "x": 1462,
-        "y": 537,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 110,
       "t": 3.67,
       "ball": {
-        "x": 1456,
-        "y": 530,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 111,
       "t": 3.704,
       "ball": {
-        "x": 1449,
-        "y": 527,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 112,
       "t": 3.737,
       "ball": {
-        "x": 1437,
-        "y": 528,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 113,
       "t": 3.77,
       "ball": {
-        "x": 1434,
-        "y": 527,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 114,
       "t": 3.804,
       "ball": {
-        "x": 1431,
-        "y": 527,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 115,
       "t": 3.837,
       "ball": {
-        "x": 1428,
-        "y": 529,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 116,
       "t": 3.871,
       "ball": {
-        "x": 1423,
-        "y": 532,
+        "x": 872,
+        "y": 516,
         "visible": true
       }
     },
@@ -808,8 +892,8 @@
       "frame": 117,
       "t": 3.904,
       "ball": {
-        "x": 1418,
-        "y": 532,
+        "x": 868,
+        "y": 518,
         "visible": true
       }
     },
@@ -817,35 +901,29 @@
       "frame": 118,
       "t": 3.937,
       "ball": {
-        "x": 1412,
-        "y": 530,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 119,
       "t": 3.971,
       "ball": {
-        "x": 1409,
-        "y": 528,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 120,
       "t": 4.004,
       "ball": {
-        "x": 1405,
-        "y": 527,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 121,
       "t": 4.037,
       "ball": {
-        "x": 1401,
-        "y": 526,
+        "x": 851,
+        "y": 521,
         "visible": true
       }
     },
@@ -853,8 +931,8 @@
       "frame": 122,
       "t": 4.071,
       "ball": {
-        "x": 1397,
-        "y": 526,
+        "x": 846,
+        "y": 522,
         "visible": true
       }
     },
@@ -862,8 +940,8 @@
       "frame": 123,
       "t": 4.104,
       "ball": {
-        "x": 1393,
-        "y": 525,
+        "x": 842,
+        "y": 524,
         "visible": true
       }
     },
@@ -871,8 +949,8 @@
       "frame": 124,
       "t": 4.137,
       "ball": {
-        "x": 1389,
-        "y": 524,
+        "x": 838,
+        "y": 527,
         "visible": true
       }
     },
@@ -880,8 +958,8 @@
       "frame": 125,
       "t": 4.171,
       "ball": {
-        "x": 1385,
-        "y": 523,
+        "x": 833,
+        "y": 529,
         "visible": true
       }
     },
@@ -889,8 +967,8 @@
       "frame": 126,
       "t": 4.204,
       "ball": {
-        "x": 1386,
-        "y": 532,
+        "x": 829,
+        "y": 534,
         "visible": true
       }
     },
@@ -898,8 +976,8 @@
       "frame": 127,
       "t": 4.238,
       "ball": {
-        "x": 1386,
-        "y": 532,
+        "x": 827,
+        "y": 533,
         "visible": true
       }
     },
@@ -907,8 +985,8 @@
       "frame": 128,
       "t": 4.271,
       "ball": {
-        "x": 1373,
-        "y": 520,
+        "x": 822,
+        "y": 531,
         "visible": true
       }
     },
@@ -916,8 +994,8 @@
       "frame": 129,
       "t": 4.304,
       "ball": {
-        "x": 1369,
-        "y": 519,
+        "x": 811,
+        "y": 534,
         "visible": true
       }
     },
@@ -925,8 +1003,8 @@
       "frame": 130,
       "t": 4.338,
       "ball": {
-        "x": 1378,
-        "y": 526,
+        "x": 805,
+        "y": 532,
         "visible": true
       }
     },
@@ -934,8 +1012,8 @@
       "frame": 131,
       "t": 4.371,
       "ball": {
-        "x": 1379,
-        "y": 526,
+        "x": 822,
+        "y": 529,
         "visible": true
       }
     },
@@ -943,8 +1021,8 @@
       "frame": 132,
       "t": 4.404,
       "ball": {
-        "x": 1378,
-        "y": 529,
+        "x": 836,
+        "y": 527,
         "visible": true
       }
     },
@@ -952,8 +1030,8 @@
       "frame": 133,
       "t": 4.438,
       "ball": {
-        "x": 1381,
-        "y": 529,
+        "x": 853,
+        "y": 525,
         "visible": true
       }
     },
@@ -961,8 +1039,8 @@
       "frame": 134,
       "t": 4.471,
       "ball": {
-        "x": 1386,
-        "y": 529,
+        "x": 872,
+        "y": 522,
         "visible": true
       }
     },
@@ -970,8 +1048,8 @@
       "frame": 135,
       "t": 4.505,
       "ball": {
-        "x": 1381,
-        "y": 527,
+        "x": 887,
+        "y": 523,
         "visible": true
       }
     },
@@ -979,8 +1057,8 @@
       "frame": 136,
       "t": 4.538,
       "ball": {
-        "x": 1379,
-        "y": 526,
+        "x": 893,
+        "y": 522,
         "visible": true
       }
     },
@@ -988,8 +1066,8 @@
       "frame": 137,
       "t": 4.571,
       "ball": {
-        "x": 1375,
-        "y": 526,
+        "x": 908,
+        "y": 521,
         "visible": true
       }
     },
@@ -997,8 +1075,8 @@
       "frame": 138,
       "t": 4.605,
       "ball": {
-        "x": 1376,
-        "y": 524,
+        "x": 920,
+        "y": 519,
         "visible": true
       }
     },
@@ -1006,8 +1084,8 @@
       "frame": 139,
       "t": 4.638,
       "ball": {
-        "x": 1376,
-        "y": 521,
+        "x": 929,
+        "y": 516,
         "visible": true
       }
     },
@@ -1015,8 +1093,8 @@
       "frame": 140,
       "t": 4.671,
       "ball": {
-        "x": 1373,
-        "y": 521,
+        "x": 938,
+        "y": 513,
         "visible": true
       }
     },
@@ -1024,8 +1102,8 @@
       "frame": 141,
       "t": 4.705,
       "ball": {
-        "x": 1378,
-        "y": 521,
+        "x": 946,
+        "y": 510,
         "visible": true
       }
     },
@@ -1033,8 +1111,8 @@
       "frame": 142,
       "t": 4.738,
       "ball": {
-        "x": 1379,
-        "y": 520,
+        "x": 955,
+        "y": 507,
         "visible": true
       }
     },
@@ -1042,8 +1120,8 @@
       "frame": 143,
       "t": 4.771,
       "ball": {
-        "x": 1378,
-        "y": 519,
+        "x": 964,
+        "y": 504,
         "visible": true
       }
     },
@@ -1051,8 +1129,8 @@
       "frame": 144,
       "t": 4.805,
       "ball": {
-        "x": 1379,
-        "y": 518,
+        "x": 973,
+        "y": 501,
         "visible": true
       }
     },
@@ -1060,8 +1138,8 @@
       "frame": 145,
       "t": 4.838,
       "ball": {
-        "x": 1380,
-        "y": 517,
+        "x": 982,
+        "y": 499,
         "visible": true
       }
     },
@@ -1069,8 +1147,8 @@
       "frame": 146,
       "t": 4.872,
       "ball": {
-        "x": 1381,
-        "y": 517,
+        "x": 989,
+        "y": 500,
         "visible": true
       }
     },
@@ -1078,8 +1156,8 @@
       "frame": 147,
       "t": 4.905,
       "ball": {
-        "x": 1382,
-        "y": 516,
+        "x": 997,
+        "y": 501,
         "visible": true
       }
     },
@@ -1087,8 +1165,8 @@
       "frame": 148,
       "t": 4.938,
       "ball": {
-        "x": 1384,
-        "y": 515,
+        "x": 1004,
+        "y": 501,
         "visible": true
       }
     },
@@ -1096,8 +1174,8 @@
       "frame": 149,
       "t": 4.972,
       "ball": {
-        "x": 1385,
-        "y": 515,
+        "x": 1012,
+        "y": 502,
         "visible": true
       }
     },
@@ -1105,8 +1183,8 @@
       "frame": 150,
       "t": 5.005,
       "ball": {
-        "x": 1387,
-        "y": 514,
+        "x": 1019,
+        "y": 503,
         "visible": true
       }
     },
@@ -1114,8 +1192,8 @@
       "frame": 151,
       "t": 5.038,
       "ball": {
-        "x": 1388,
-        "y": 513,
+        "x": 1024,
+        "y": 501,
         "visible": true
       }
     },
@@ -1123,8 +1201,8 @@
       "frame": 152,
       "t": 5.072,
       "ball": {
-        "x": 1390,
-        "y": 513,
+        "x": 1029,
+        "y": 498,
         "visible": true
       }
     },
@@ -1132,8 +1210,8 @@
       "frame": 153,
       "t": 5.105,
       "ball": {
-        "x": 1402,
-        "y": 513,
+        "x": 1034,
+        "y": 495,
         "visible": true
       }
     },
@@ -1141,8 +1219,8 @@
       "frame": 154,
       "t": 5.138,
       "ball": {
-        "x": 1402,
-        "y": 512,
+        "x": 1039,
+        "y": 494,
         "visible": true
       }
     },
@@ -1150,8 +1228,8 @@
       "frame": 155,
       "t": 5.172,
       "ball": {
-        "x": 1408,
-        "y": 512,
+        "x": 1043,
+        "y": 494,
         "visible": true
       }
     },
@@ -1159,8 +1237,8 @@
       "frame": 156,
       "t": 5.205,
       "ball": {
-        "x": 1417,
-        "y": 510,
+        "x": 1048,
+        "y": 491,
         "visible": true
       }
     },
@@ -1168,8 +1246,8 @@
       "frame": 157,
       "t": 5.239,
       "ball": {
-        "x": 1426,
-        "y": 510,
+        "x": 1052,
+        "y": 491,
         "visible": true
       }
     },
@@ -1177,17 +1255,15 @@
       "frame": 158,
       "t": 5.272,
       "ball": {
-        "x": 1432,
-        "y": 509,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 159,
       "t": 5.305,
       "ball": {
-        "x": 1439,
-        "y": 509,
+        "x": 1061,
+        "y": 493,
         "visible": true
       }
     },
@@ -1195,8 +1271,8 @@
       "frame": 160,
       "t": 5.339,
       "ball": {
-        "x": 1446,
-        "y": 508,
+        "x": 1066,
+        "y": 495,
         "visible": true
       }
     },
@@ -1204,8 +1280,8 @@
       "frame": 161,
       "t": 5.372,
       "ball": {
-        "x": 1453,
-        "y": 508,
+        "x": 1068,
+        "y": 495,
         "visible": true
       }
     },
@@ -1213,89 +1289,71 @@
       "frame": 162,
       "t": 5.405,
       "ball": {
-        "x": 1460,
-        "y": 507,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 163,
       "t": 5.439,
       "ball": {
-        "x": 1467,
-        "y": 506,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 164,
       "t": 5.472,
       "ball": {
-        "x": 1474,
-        "y": 506,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 165,
       "t": 5.506,
       "ball": {
-        "x": 1481,
-        "y": 505,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 166,
       "t": 5.539,
       "ball": {
-        "x": 1487,
-        "y": 506,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 167,
       "t": 5.572,
       "ball": {
-        "x": 1494,
-        "y": 505,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 168,
       "t": 5.606,
       "ball": {
-        "x": 1501,
-        "y": 505,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 169,
       "t": 5.639,
       "ball": {
-        "x": 1499,
-        "y": 503,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 170,
       "t": 5.672,
       "ball": {
-        "x": 1471,
-        "y": 493,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 171,
       "t": 5.706,
       "ball": {
-        "x": 1428,
-        "y": 488,
+        "x": 1110,
+        "y": 487,
         "visible": true
       }
     },
@@ -1303,17 +1361,15 @@
       "frame": 172,
       "t": 5.739,
       "ball": {
-        "x": 1419,
-        "y": 479,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 173,
       "t": 5.772,
       "ball": {
-        "x": 1391,
-        "y": 471,
+        "x": 1121,
+        "y": 483,
         "visible": true
       }
     },
@@ -1321,152 +1377,120 @@
       "frame": 174,
       "t": 5.806,
       "ball": {
-        "x": 1366,
-        "y": 468,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 175,
       "t": 5.839,
       "ball": {
-        "x": 1342,
-        "y": 463,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 176,
       "t": 5.873,
       "ball": {
-        "x": 1313,
-        "y": 455,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 177,
       "t": 5.906,
       "ball": {
-        "x": 1286,
-        "y": 454,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 178,
       "t": 5.939,
       "ball": {
-        "x": 1262,
-        "y": 451,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 179,
       "t": 5.973,
       "ball": {
-        "x": 1233,
-        "y": 451,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 180,
       "t": 6.006,
       "ball": {
-        "x": 1208,
-        "y": 451,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 181,
       "t": 6.039,
       "ball": {
-        "x": 1185,
-        "y": 452,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 182,
       "t": 6.073,
       "ball": {
-        "x": 1164,
-        "y": 452,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 183,
       "t": 6.106,
       "ball": {
-        "x": 1136,
-        "y": 453,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 184,
       "t": 6.139,
       "ball": {
-        "x": 1113,
-        "y": 455,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 185,
       "t": 6.173,
       "ball": {
-        "x": 1089,
-        "y": 458,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 186,
       "t": 6.206,
       "ball": {
-        "x": 1069,
-        "y": 460,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 187,
       "t": 6.24,
       "ball": {
-        "x": 1040,
-        "y": 466,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 188,
       "t": 6.273,
       "ball": {
-        "x": 1015,
-        "y": 472,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 189,
       "t": 6.306,
       "ball": {
-        "x": 991,
-        "y": 480,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 190,
       "t": 6.34,
       "ball": {
-        "x": 965,
-        "y": 487,
+        "x": 1034,
+        "y": 401,
         "visible": true
       }
     },
@@ -1474,8 +1498,8 @@
       "frame": 191,
       "t": 6.373,
       "ball": {
-        "x": 937,
-        "y": 497,
+        "x": 1020,
+        "y": 394,
         "visible": true
       }
     },
@@ -1483,8 +1507,8 @@
       "frame": 192,
       "t": 6.406,
       "ball": {
-        "x": 916,
-        "y": 503,
+        "x": 1007,
+        "y": 388,
         "visible": true
       }
     },
@@ -1492,8 +1516,8 @@
       "frame": 193,
       "t": 6.44,
       "ball": {
-        "x": 894,
-        "y": 516,
+        "x": 994,
+        "y": 382,
         "visible": true
       }
     },
@@ -1501,8 +1525,8 @@
       "frame": 194,
       "t": 6.473,
       "ball": {
-        "x": 872,
-        "y": 522,
+        "x": 980,
+        "y": 374,
         "visible": true
       }
     },
@@ -1510,8 +1534,8 @@
       "frame": 195,
       "t": 6.506,
       "ball": {
-        "x": 857,
-        "y": 517,
+        "x": 966,
+        "y": 373,
         "visible": true
       }
     },
@@ -1519,35 +1543,29 @@
       "frame": 196,
       "t": 6.54,
       "ball": {
-        "x": 844,
-        "y": 511,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 197,
       "t": 6.573,
       "ball": {
-        "x": 836,
-        "y": 502,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 198,
       "t": 6.607,
       "ball": {
-        "x": 826,
-        "y": 496,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 199,
       "t": 6.64,
       "ball": {
-        "x": 814,
-        "y": 492,
+        "x": 911,
+        "y": 356,
         "visible": true
       }
     },
@@ -1555,62 +1573,50 @@
       "frame": 200,
       "t": 6.673,
       "ball": {
-        "x": 810,
-        "y": 489,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 201,
       "t": 6.707,
       "ball": {
-        "x": 797,
-        "y": 486,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 202,
       "t": 6.74,
       "ball": {
-        "x": 791,
-        "y": 484,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 203,
       "t": 6.773,
       "ball": {
-        "x": 779,
-        "y": 483,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 204,
       "t": 6.807,
       "ball": {
-        "x": 772,
-        "y": 484,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 205,
       "t": 6.84,
       "ball": {
-        "x": 762,
-        "y": 484,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 206,
       "t": 6.874,
       "ball": {
-        "x": 752,
-        "y": 488,
+        "x": 826,
+        "y": 351,
         "visible": true
       }
     },
@@ -1618,62 +1624,50 @@
       "frame": 207,
       "t": 6.907,
       "ball": {
-        "x": 745,
-        "y": 493,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 208,
       "t": 6.94,
       "ball": {
-        "x": 737,
-        "y": 494,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 209,
       "t": 6.974,
       "ball": {
-        "x": 730,
-        "y": 497,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 210,
       "t": 7.007,
       "ball": {
-        "x": 732,
-        "y": 493,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 211,
       "t": 7.04,
       "ball": {
-        "x": 739,
-        "y": 490,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 212,
       "t": 7.074,
       "ball": {
-        "x": 745,
-        "y": 488,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 213,
       "t": 7.107,
       "ball": {
-        "x": 745,
-        "y": 482,
+        "x": 742,
+        "y": 366,
         "visible": true
       }
     },
@@ -1681,26 +1675,22 @@
       "frame": 214,
       "t": 7.14,
       "ball": {
-        "x": 748,
-        "y": 479,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 215,
       "t": 7.174,
       "ball": {
-        "x": 753,
-        "y": 477,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 216,
       "t": 7.207,
       "ball": {
-        "x": 758,
-        "y": 477,
+        "x": 700,
+        "y": 381,
         "visible": true
       }
     },
@@ -1708,26 +1698,22 @@
       "frame": 217,
       "t": 7.241,
       "ball": {
-        "x": 758,
-        "y": 478,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 218,
       "t": 7.274,
       "ball": {
-        "x": 761,
-        "y": 483,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 219,
       "t": 7.307,
       "ball": {
-        "x": 765,
-        "y": 479,
+        "x": 667,
+        "y": 394,
         "visible": true
       }
     },
@@ -1735,8 +1721,8 @@
       "frame": 220,
       "t": 7.341,
       "ball": {
-        "x": 767,
-        "y": 481,
+        "x": 657,
+        "y": 403,
         "visible": true
       }
     },
@@ -1744,8 +1730,8 @@
       "frame": 221,
       "t": 7.374,
       "ball": {
-        "x": 770,
-        "y": 489,
+        "x": 642,
+        "y": 412,
         "visible": true
       }
     },
@@ -1753,8 +1739,8 @@
       "frame": 222,
       "t": 7.407,
       "ball": {
-        "x": 773,
-        "y": 499,
+        "x": 632,
+        "y": 417,
         "visible": true
       }
     },
@@ -1762,26 +1748,22 @@
       "frame": 223,
       "t": 7.441,
       "ball": {
-        "x": 775,
-        "y": 506,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 224,
       "t": 7.474,
       "ball": {
-        "x": 777,
-        "y": 515,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 225,
       "t": 7.508,
       "ball": {
-        "x": 777,
-        "y": 526,
+        "x": 653,
+        "y": 400,
         "visible": true
       }
     },
@@ -1789,8 +1771,8 @@
       "frame": 226,
       "t": 7.541,
       "ball": {
-        "x": 777,
-        "y": 535,
+        "x": 662,
+        "y": 397,
         "visible": true
       }
     },
@@ -1798,8 +1780,8 @@
       "frame": 227,
       "t": 7.574,
       "ball": {
-        "x": 779,
-        "y": 548,
+        "x": 670,
+        "y": 389,
         "visible": true
       }
     },
@@ -1807,8 +1789,8 @@
       "frame": 228,
       "t": 7.608,
       "ball": {
-        "x": 780,
-        "y": 557,
+        "x": 682,
+        "y": 385,
         "visible": true
       }
     },
@@ -1816,17 +1798,15 @@
       "frame": 229,
       "t": 7.641,
       "ball": {
-        "x": 783,
-        "y": 550,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 230,
       "t": 7.674,
       "ball": {
-        "x": 785,
-        "y": 550,
+        "x": 698,
+        "y": 374,
         "visible": true
       }
     },
@@ -1834,17 +1814,15 @@
       "frame": 231,
       "t": 7.708,
       "ball": {
-        "x": 792,
-        "y": 545,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 232,
       "t": 7.741,
       "ball": {
-        "x": 797,
-        "y": 547,
+        "x": 723,
+        "y": 370,
         "visible": true
       }
     },
@@ -1852,17 +1830,15 @@
       "frame": 233,
       "t": 7.774,
       "ball": {
-        "x": 803,
-        "y": 535,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 234,
       "t": 7.808,
       "ball": {
-        "x": 805,
-        "y": 539,
+        "x": 742,
+        "y": 367,
         "visible": true
       }
     },
@@ -1870,8 +1846,8 @@
       "frame": 235,
       "t": 7.841,
       "ball": {
-        "x": 809,
-        "y": 539,
+        "x": 753,
+        "y": 362,
         "visible": true
       }
     },
@@ -1879,8 +1855,8 @@
       "frame": 236,
       "t": 7.875,
       "ball": {
-        "x": 814,
-        "y": 537,
+        "x": 764,
+        "y": 362,
         "visible": true
       }
     },
@@ -1888,17 +1864,15 @@
       "frame": 237,
       "t": 7.908,
       "ball": {
-        "x": 817,
-        "y": 542,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 238,
       "t": 7.941,
       "ball": {
-        "x": 819,
-        "y": 550,
+        "x": 782,
+        "y": 361,
         "visible": true
       }
     },
@@ -1906,17 +1880,15 @@
       "frame": 239,
       "t": 7.975,
       "ball": {
-        "x": 822,
-        "y": 553,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 240,
       "t": 8.008,
       "ball": {
-        "x": 825,
-        "y": 557,
+        "x": 805,
+        "y": 366,
         "visible": true
       }
     },
@@ -1924,26 +1896,22 @@
       "frame": 241,
       "t": 8.041,
       "ball": {
-        "x": 841,
-        "y": 563,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 242,
       "t": 8.075,
       "ball": {
-        "x": 869,
-        "y": 571,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 243,
       "t": 8.108,
       "ball": {
-        "x": 877,
-        "y": 571,
+        "x": 837,
+        "y": 372,
         "visible": true
       }
     },
@@ -1951,44 +1919,36 @@
       "frame": 244,
       "t": 8.141,
       "ball": {
-        "x": 904,
-        "y": 577,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 245,
       "t": 8.175,
       "ball": {
-        "x": 924,
-        "y": 579,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 246,
       "t": 8.208,
       "ball": {
-        "x": 942,
-        "y": 582,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 247,
       "t": 8.242,
       "ball": {
-        "x": 961,
-        "y": 580,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 248,
       "t": 8.275,
       "ball": {
-        "x": 975,
-        "y": 579,
+        "x": 886,
+        "y": 393,
         "visible": true
       }
     },
@@ -1996,8 +1956,8 @@
       "frame": 249,
       "t": 8.308,
       "ball": {
-        "x": 990,
-        "y": 579,
+        "x": 897,
+        "y": 400,
         "visible": true
       }
     },
@@ -2005,8 +1965,8 @@
       "frame": 250,
       "t": 8.342,
       "ball": {
-        "x": 1001,
-        "y": 580,
+        "x": 907,
+        "y": 408,
         "visible": true
       }
     },
@@ -2014,8 +1974,8 @@
       "frame": 251,
       "t": 8.375,
       "ball": {
-        "x": 1019,
-        "y": 587,
+        "x": 917,
+        "y": 415,
         "visible": true
       }
     },
@@ -2023,8 +1983,8 @@
       "frame": 252,
       "t": 8.408,
       "ball": {
-        "x": 1037,
-        "y": 583,
+        "x": 926,
+        "y": 423,
         "visible": true
       }
     },
@@ -2032,8 +1992,8 @@
       "frame": 253,
       "t": 8.442,
       "ball": {
-        "x": 1053,
-        "y": 585,
+        "x": 935,
+        "y": 433,
         "visible": true
       }
     },
@@ -2041,8 +2001,8 @@
       "frame": 254,
       "t": 8.475,
       "ball": {
-        "x": 1069,
-        "y": 587,
+        "x": 945,
+        "y": 443,
         "visible": true
       }
     },
@@ -2050,8 +2010,8 @@
       "frame": 255,
       "t": 8.508,
       "ball": {
-        "x": 1083,
-        "y": 589,
+        "x": 955,
+        "y": 453,
         "visible": true
       }
     },
@@ -2059,8 +2019,8 @@
       "frame": 256,
       "t": 8.542,
       "ball": {
-        "x": 1092,
-        "y": 590,
+        "x": 964,
+        "y": 464,
         "visible": true
       }
     },
@@ -2068,8 +2028,8 @@
       "frame": 257,
       "t": 8.575,
       "ball": {
-        "x": 1099,
-        "y": 591,
+        "x": 974,
+        "y": 476,
         "visible": true
       }
     },
@@ -2077,8 +2037,8 @@
       "frame": 258,
       "t": 8.609,
       "ball": {
-        "x": 1138,
-        "y": 593,
+        "x": 983,
+        "y": 489,
         "visible": true
       }
     },
@@ -2086,8 +2046,8 @@
       "frame": 259,
       "t": 8.642,
       "ball": {
-        "x": 1152,
-        "y": 594,
+        "x": 993,
+        "y": 502,
         "visible": true
       }
     },
@@ -2095,17 +2055,15 @@
       "frame": 260,
       "t": 8.675,
       "ball": {
-        "x": 1163,
-        "y": 595,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 261,
       "t": 8.709,
       "ball": {
-        "x": 1170,
-        "y": 596,
+        "x": 1000,
+        "y": 503,
         "visible": true
       }
     },
@@ -2113,17 +2071,15 @@
       "frame": 262,
       "t": 8.742,
       "ball": {
-        "x": 1182,
-        "y": 602,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 263,
       "t": 8.775,
       "ball": {
-        "x": 1192,
-        "y": 605,
+        "x": 1007,
+        "y": 487,
         "visible": true
       }
     },
@@ -2131,8 +2087,8 @@
       "frame": 264,
       "t": 8.809,
       "ball": {
-        "x": 1202,
-        "y": 604,
+        "x": 1006,
+        "y": 478,
         "visible": true
       }
     },
@@ -2140,8 +2096,8 @@
       "frame": 265,
       "t": 8.842,
       "ball": {
-        "x": 1215,
-        "y": 607,
+        "x": 1011,
+        "y": 476,
         "visible": true
       }
     },
@@ -2149,8 +2105,8 @@
       "frame": 266,
       "t": 8.876,
       "ball": {
-        "x": 1229,
-        "y": 614,
+        "x": 1012,
+        "y": 469,
         "visible": true
       }
     },
@@ -2158,8 +2114,8 @@
       "frame": 267,
       "t": 8.909,
       "ball": {
-        "x": 1241,
-        "y": 615,
+        "x": 1013,
+        "y": 461,
         "visible": true
       }
     },
@@ -2167,35 +2123,29 @@
       "frame": 268,
       "t": 8.942,
       "ball": {
-        "x": 1251,
-        "y": 613,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 269,
       "t": 8.976,
       "ball": {
-        "x": 1265,
-        "y": 616,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 270,
       "t": 9.009,
       "ball": {
-        "x": 1279,
-        "y": 623,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 271,
       "t": 9.042,
       "ball": {
-        "x": 1295,
-        "y": 621,
+        "x": 1020,
+        "y": 446,
         "visible": true
       }
     },
@@ -2203,17 +2153,15 @@
       "frame": 272,
       "t": 9.076,
       "ball": {
-        "x": 1308,
-        "y": 625,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 273,
       "t": 9.109,
       "ball": {
-        "x": 1292,
-        "y": 615,
+        "x": 1022,
+        "y": 440,
         "visible": true
       }
     },
@@ -2221,71 +2169,57 @@
       "frame": 274,
       "t": 9.142,
       "ball": {
-        "x": 1263,
-        "y": 594,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 275,
       "t": 9.176,
       "ball": {
-        "x": 1231,
-        "y": 574,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 276,
       "t": 9.209,
       "ball": {
-        "x": 1204,
-        "y": 559,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 277,
       "t": 9.243,
       "ball": {
-        "x": 1173,
-        "y": 538,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 278,
       "t": 9.276,
       "ball": {
-        "x": 1148,
-        "y": 524,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 279,
       "t": 9.309,
       "ball": {
-        "x": 1124,
-        "y": 511,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 280,
       "t": 9.343,
       "ball": {
-        "x": 1090,
-        "y": 494,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 281,
       "t": 9.376,
       "ball": {
-        "x": 1066,
-        "y": 483,
+        "x": 1041,
+        "y": 432,
         "visible": true
       }
     },
@@ -2293,17 +2227,15 @@
       "frame": 282,
       "t": 9.409,
       "ball": {
-        "x": 1040,
-        "y": 473,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 283,
       "t": 9.443,
       "ball": {
-        "x": 1010,
-        "y": 461,
+        "x": 1048,
+        "y": 404,
         "visible": true
       }
     },
@@ -2311,8 +2243,8 @@
       "frame": 284,
       "t": 9.476,
       "ball": {
-        "x": 995,
-        "y": 455,
+        "x": 1054,
+        "y": 395,
         "visible": true
       }
     },
@@ -2320,8 +2252,8 @@
       "frame": 285,
       "t": 9.51,
       "ball": {
-        "x": 964,
-        "y": 445,
+        "x": 1060,
+        "y": 385,
         "visible": true
       }
     },
@@ -2329,8 +2261,8 @@
       "frame": 286,
       "t": 9.543,
       "ball": {
-        "x": 939,
-        "y": 439,
+        "x": 1065,
+        "y": 375,
         "visible": true
       }
     },
@@ -2338,8 +2270,8 @@
       "frame": 287,
       "t": 9.576,
       "ball": {
-        "x": 915,
-        "y": 433,
+        "x": 1070,
+        "y": 368,
         "visible": true
       }
     },
@@ -2347,17 +2279,15 @@
       "frame": 288,
       "t": 9.61,
       "ball": {
-        "x": 892,
-        "y": 429,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 289,
       "t": 9.643,
       "ball": {
-        "x": 870,
-        "y": 428,
+        "x": 1081,
+        "y": 355,
         "visible": true
       }
     },
@@ -2365,8 +2295,8 @@
       "frame": 290,
       "t": 9.676,
       "ball": {
-        "x": 850,
-        "y": 426,
+        "x": 1085,
+        "y": 346,
         "visible": true
       }
     },
@@ -2374,8 +2304,8 @@
       "frame": 291,
       "t": 9.71,
       "ball": {
-        "x": 831,
-        "y": 425,
+        "x": 1093,
+        "y": 343,
         "visible": true
       }
     },
@@ -2383,8 +2313,8 @@
       "frame": 292,
       "t": 9.743,
       "ball": {
-        "x": 811,
-        "y": 426,
+        "x": 1095,
+        "y": 336,
         "visible": true
       }
     },
@@ -2392,8 +2322,8 @@
       "frame": 293,
       "t": 9.776,
       "ball": {
-        "x": 791,
-        "y": 428,
+        "x": 1099,
+        "y": 332,
         "visible": true
       }
     },
@@ -2401,8 +2331,8 @@
       "frame": 294,
       "t": 9.81,
       "ball": {
-        "x": 773,
-        "y": 428,
+        "x": 1100,
+        "y": 332,
         "visible": true
       }
     },
@@ -2410,161 +2340,127 @@
       "frame": 295,
       "t": 9.843,
       "ball": {
-        "x": 754,
-        "y": 433,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 296,
       "t": 9.877,
       "ball": {
-        "x": 736,
-        "y": 437,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 297,
       "t": 9.91,
       "ball": {
-        "x": 719,
-        "y": 443,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 298,
       "t": 9.943,
       "ball": {
-        "x": 703,
-        "y": 449,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 299,
       "t": 9.977,
       "ball": {
-        "x": 688,
-        "y": 453,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 300,
       "t": 10.01,
       "ball": {
-        "x": 671,
-        "y": 463,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 301,
       "t": 10.043,
       "ball": {
-        "x": 658,
-        "y": 471,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 302,
       "t": 10.077,
       "ball": {
-        "x": 645,
-        "y": 481,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 303,
       "t": 10.11,
       "ball": {
-        "x": 632,
-        "y": 492,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 304,
       "t": 10.143,
       "ball": {
-        "x": 621,
-        "y": 500,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 305,
       "t": 10.177,
       "ball": {
-        "x": 606,
-        "y": 513,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 306,
       "t": 10.21,
       "ball": {
-        "x": 595,
-        "y": 522,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 307,
       "t": 10.244,
       "ball": {
-        "x": 587,
-        "y": 528,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 308,
       "t": 10.277,
       "ball": {
-        "x": 582,
-        "y": 532,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 309,
       "t": 10.31,
       "ball": {
-        "x": 579,
-        "y": 535,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 310,
       "t": 10.344,
       "ball": {
-        "x": 577,
-        "y": 536,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 311,
       "t": 10.377,
       "ball": {
-        "x": 580,
-        "y": 512,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 312,
       "t": 10.41,
       "ball": {
-        "x": 577,
-        "y": 536,
+        "x": 1154,
+        "y": 376,
         "visible": true
       }
     },
@@ -2572,8 +2468,8 @@
       "frame": 313,
       "t": 10.444,
       "ball": {
-        "x": 578,
-        "y": 536,
+        "x": 1155,
+        "y": 385,
         "visible": true
       }
     },
@@ -2581,8 +2477,8 @@
       "frame": 314,
       "t": 10.477,
       "ball": {
-        "x": 579,
-        "y": 535,
+        "x": 1156,
+        "y": 394,
         "visible": true
       }
     },
@@ -2590,8 +2486,8 @@
       "frame": 315,
       "t": 10.511,
       "ball": {
-        "x": 581,
-        "y": 534,
+        "x": 1157,
+        "y": 403,
         "visible": true
       }
     },
@@ -2599,8 +2495,8 @@
       "frame": 316,
       "t": 10.544,
       "ball": {
-        "x": 582,
-        "y": 532,
+        "x": 1156,
+        "y": 417,
         "visible": true
       }
     },
@@ -2608,17 +2504,15 @@
       "frame": 317,
       "t": 10.577,
       "ball": {
-        "x": 584,
-        "y": 531,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 318,
       "t": 10.611,
       "ball": {
-        "x": 586,
-        "y": 529,
+        "x": 1158,
+        "y": 433,
         "visible": true
       }
     },
@@ -2626,8 +2520,8 @@
       "frame": 319,
       "t": 10.644,
       "ball": {
-        "x": 587,
-        "y": 528,
+        "x": 1158,
+        "y": 445,
         "visible": true
       }
     },
@@ -2635,8 +2529,8 @@
       "frame": 320,
       "t": 10.677,
       "ball": {
-        "x": 589,
-        "y": 527,
+        "x": 1158,
+        "y": 456,
         "visible": true
       }
     },
@@ -2644,8 +2538,8 @@
       "frame": 321,
       "t": 10.711,
       "ball": {
-        "x": 591,
-        "y": 525,
+        "x": 1158,
+        "y": 468,
         "visible": true
       }
     },
@@ -2653,8 +2547,8 @@
       "frame": 322,
       "t": 10.744,
       "ball": {
-        "x": 592,
-        "y": 524,
+        "x": 1158,
+        "y": 479,
         "visible": true
       }
     },
@@ -2662,8 +2556,8 @@
       "frame": 323,
       "t": 10.777,
       "ball": {
-        "x": 594,
-        "y": 523,
+        "x": 1158,
+        "y": 491,
         "visible": true
       }
     },
@@ -2671,8 +2565,8 @@
       "frame": 324,
       "t": 10.811,
       "ball": {
-        "x": 595,
-        "y": 522,
+        "x": 1157,
+        "y": 488,
         "visible": true
       }
     },
@@ -2680,8 +2574,8 @@
       "frame": 325,
       "t": 10.844,
       "ball": {
-        "x": 596,
-        "y": 521,
+        "x": 1154,
+        "y": 476,
         "visible": true
       }
     },
@@ -2689,8 +2583,8 @@
       "frame": 326,
       "t": 10.878,
       "ball": {
-        "x": 597,
-        "y": 520,
+        "x": 1152,
+        "y": 467,
         "visible": true
       }
     },
@@ -2698,8 +2592,8 @@
       "frame": 327,
       "t": 10.911,
       "ball": {
-        "x": 598,
-        "y": 519,
+        "x": 1151,
+        "y": 458,
         "visible": true
       }
     },
@@ -2707,8 +2601,8 @@
       "frame": 328,
       "t": 10.944,
       "ball": {
-        "x": 599,
-        "y": 519,
+        "x": 1149,
+        "y": 450,
         "visible": true
       }
     },
@@ -2716,8 +2610,8 @@
       "frame": 329,
       "t": 10.978,
       "ball": {
-        "x": 596,
-        "y": 503,
+        "x": 1147,
+        "y": 441,
         "visible": true
       }
     },
@@ -2725,8 +2619,8 @@
       "frame": 330,
       "t": 11.011,
       "ball": {
-        "x": 601,
-        "y": 511,
+        "x": 1145,
+        "y": 434,
         "visible": true
       }
     },
@@ -2734,26 +2628,22 @@
       "frame": 331,
       "t": 11.044,
       "ball": {
-        "x": 599,
-        "y": 518,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 332,
       "t": 11.078,
       "ball": {
-        "x": 596,
-        "y": 516,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 333,
       "t": 11.111,
       "ball": {
-        "x": 597,
-        "y": 512,
+        "x": 1137,
+        "y": 410,
         "visible": true
       }
     },
@@ -2761,35 +2651,29 @@
       "frame": 334,
       "t": 11.144,
       "ball": {
-        "x": 587,
-        "y": 510,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 335,
       "t": 11.178,
       "ball": {
-        "x": 586,
-        "y": 506,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 336,
       "t": 11.211,
       "ball": {
-        "x": 582,
-        "y": 504,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 337,
       "t": 11.245,
       "ball": {
-        "x": 588,
-        "y": 502,
+        "x": 1126,
+        "y": 398,
         "visible": true
       }
     },
@@ -2797,8 +2681,8 @@
       "frame": 338,
       "t": 11.278,
       "ball": {
-        "x": 580,
-        "y": 508,
+        "x": 1123,
+        "y": 397,
         "visible": true
       }
     },
@@ -2806,8 +2690,8 @@
       "frame": 339,
       "t": 11.311,
       "ball": {
-        "x": 577,
-        "y": 507,
+        "x": 1121,
+        "y": 394,
         "visible": true
       }
     },
@@ -2815,8 +2699,8 @@
       "frame": 340,
       "t": 11.345,
       "ball": {
-        "x": 579,
-        "y": 504,
+        "x": 1117,
+        "y": 392,
         "visible": true
       }
     },
@@ -2824,8 +2708,8 @@
       "frame": 341,
       "t": 11.378,
       "ball": {
-        "x": 573,
-        "y": 506,
+        "x": 1114,
+        "y": 391,
         "visible": true
       }
     },
@@ -2833,8 +2717,8 @@
       "frame": 342,
       "t": 11.411,
       "ball": {
-        "x": 578,
-        "y": 510,
+        "x": 1112,
+        "y": 390,
         "visible": true
       }
     },
@@ -2842,29 +2726,35 @@
       "frame": 343,
       "t": 11.445,
       "ball": {
-        "visible": false
+        "x": 1110,
+        "y": 390,
+        "visible": true
       }
     },
     {
       "frame": 344,
       "t": 11.478,
       "ball": {
-        "visible": false
+        "x": 1107,
+        "y": 390,
+        "visible": true
       }
     },
     {
       "frame": 345,
       "t": 11.511,
       "ball": {
-        "visible": false
+        "x": 1104,
+        "y": 392,
+        "visible": true
       }
     },
     {
       "frame": 346,
       "t": 11.545,
       "ball": {
-        "x": 617,
-        "y": 422,
+        "x": 1101,
+        "y": 393,
         "visible": true
       }
     },
@@ -2872,8 +2762,8 @@
       "frame": 347,
       "t": 11.578,
       "ball": {
-        "x": 632,
-        "y": 398,
+        "x": 1099,
+        "y": 395,
         "visible": true
       }
     },
@@ -2881,8 +2771,8 @@
       "frame": 348,
       "t": 11.612,
       "ball": {
-        "x": 646,
-        "y": 374,
+        "x": 1097,
+        "y": 398,
         "visible": true
       }
     },
@@ -2890,8 +2780,8 @@
       "frame": 349,
       "t": 11.645,
       "ball": {
-        "x": 661,
-        "y": 356,
+        "x": 1094,
+        "y": 402,
         "visible": true
       }
     },
@@ -2899,8 +2789,8 @@
       "frame": 350,
       "t": 11.678,
       "ball": {
-        "x": 675,
-        "y": 333,
+        "x": 1092,
+        "y": 405,
         "visible": true
       }
     },
@@ -2908,8 +2798,8 @@
       "frame": 351,
       "t": 11.712,
       "ball": {
-        "x": 685,
-        "y": 316,
+        "x": 1091,
+        "y": 409,
         "visible": true
       }
     },
@@ -2917,8 +2807,8 @@
       "frame": 352,
       "t": 11.745,
       "ball": {
-        "x": 699,
-        "y": 296,
+        "x": 1089,
+        "y": 414,
         "visible": true
       }
     },
@@ -2926,8 +2816,8 @@
       "frame": 353,
       "t": 11.778,
       "ball": {
-        "x": 712,
-        "y": 279,
+        "x": 1086,
+        "y": 419,
         "visible": true
       }
     },
@@ -2935,8 +2825,8 @@
       "frame": 354,
       "t": 11.812,
       "ball": {
-        "x": 724,
-        "y": 261,
+        "x": 1084,
+        "y": 424,
         "visible": true
       }
     },
@@ -2944,8 +2834,8 @@
       "frame": 355,
       "t": 11.845,
       "ball": {
-        "x": 737,
-        "y": 246,
+        "x": 1083,
+        "y": 429,
         "visible": true
       }
     },
@@ -2953,170 +2843,134 @@
       "frame": 356,
       "t": 11.879,
       "ball": {
-        "x": 746,
-        "y": 230,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 357,
       "t": 11.912,
       "ball": {
-        "x": 759,
-        "y": 219,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 358,
       "t": 11.945,
       "ball": {
-        "x": 772,
-        "y": 211,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 359,
       "t": 11.979,
       "ball": {
-        "x": 784,
-        "y": 196,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 360,
       "t": 12.012,
       "ball": {
-        "x": 794,
-        "y": 186,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 361,
       "t": 12.045,
       "ball": {
-        "x": 805,
-        "y": 176,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 362,
       "t": 12.079,
       "ball": {
-        "x": 818,
-        "y": 167,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 363,
       "t": 12.112,
       "ball": {
-        "x": 829,
-        "y": 163,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 364,
       "t": 12.145,
       "ball": {
-        "x": 839,
-        "y": 153,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 365,
       "t": 12.179,
       "ball": {
-        "x": 846,
-        "y": 146,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 366,
       "t": 12.212,
       "ball": {
-        "x": 856,
-        "y": 143,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 367,
       "t": 12.246,
       "ball": {
-        "x": 866,
-        "y": 138,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 368,
       "t": 12.279,
       "ball": {
-        "x": 882,
-        "y": 133,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 369,
       "t": 12.312,
       "ball": {
-        "x": 890,
-        "y": 133,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 370,
       "t": 12.346,
       "ball": {
-        "x": 899,
-        "y": 126,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 371,
       "t": 12.379,
       "ball": {
-        "x": 914,
-        "y": 129,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 372,
       "t": 12.412,
       "ball": {
-        "x": 923,
-        "y": 126,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 373,
       "t": 12.446,
       "ball": {
-        "x": 934,
-        "y": 132,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 374,
       "t": 12.479,
       "ball": {
-        "x": 944,
-        "y": 129,
+        "x": 1063,
+        "y": 429,
         "visible": true
       }
     },
@@ -3124,8 +2978,8 @@
       "frame": 375,
       "t": 12.513,
       "ball": {
-        "x": 952,
-        "y": 129,
+        "x": 1063,
+        "y": 428,
         "visible": true
       }
     },
@@ -3133,8 +2987,8 @@
       "frame": 376,
       "t": 12.546,
       "ball": {
-        "x": 964,
-        "y": 134,
+        "x": 1061,
+        "y": 429,
         "visible": true
       }
     },
@@ -3142,8 +2996,8 @@
       "frame": 377,
       "t": 12.579,
       "ball": {
-        "x": 977,
-        "y": 139,
+        "x": 1066,
+        "y": 426,
         "visible": true
       }
     },
@@ -3151,8 +3005,8 @@
       "frame": 378,
       "t": 12.613,
       "ball": {
-        "x": 984,
-        "y": 142,
+        "x": 1061,
+        "y": 430,
         "visible": true
       }
     },
@@ -3160,8 +3014,8 @@
       "frame": 379,
       "t": 12.646,
       "ball": {
-        "x": 992,
-        "y": 142,
+        "x": 1063,
+        "y": 431,
         "visible": true
       }
     },
@@ -3169,8 +3023,8 @@
       "frame": 380,
       "t": 12.679,
       "ball": {
-        "x": 997,
-        "y": 150,
+        "x": 1061,
+        "y": 433,
         "visible": true
       }
     },
@@ -3178,8 +3032,8 @@
       "frame": 381,
       "t": 12.713,
       "ball": {
-        "x": 1003,
-        "y": 154,
+        "x": 1064,
+        "y": 436,
         "visible": true
       }
     },
@@ -3187,8 +3041,8 @@
       "frame": 382,
       "t": 12.746,
       "ball": {
-        "x": 1007,
-        "y": 162,
+        "x": 1056,
+        "y": 439,
         "visible": true
       }
     },
@@ -3196,8 +3050,8 @@
       "frame": 383,
       "t": 12.779,
       "ball": {
-        "x": 1015,
-        "y": 166,
+        "x": 1064,
+        "y": 447,
         "visible": true
       }
     },
@@ -3205,8 +3059,8 @@
       "frame": 384,
       "t": 12.813,
       "ball": {
-        "x": 1018,
-        "y": 177,
+        "x": 1053,
+        "y": 443,
         "visible": true
       }
     },
@@ -3214,116 +3068,92 @@
       "frame": 385,
       "t": 12.846,
       "ball": {
-        "x": 1025,
-        "y": 183,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 386,
       "t": 12.88,
       "ball": {
-        "x": 1029,
-        "y": 194,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 387,
       "t": 12.913,
       "ball": {
-        "x": 1032,
-        "y": 200,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 388,
       "t": 12.946,
       "ball": {
-        "x": 1039,
-        "y": 210,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 389,
       "t": 12.98,
       "ball": {
-        "x": 1040,
-        "y": 219,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 390,
       "t": 13.013,
       "ball": {
-        "x": 1048,
-        "y": 233,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 391,
       "t": 13.046,
       "ball": {
-        "x": 1048,
-        "y": 239,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 392,
       "t": 13.08,
       "ball": {
-        "x": 1051,
-        "y": 254,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 393,
       "t": 13.113,
       "ball": {
-        "x": 1059,
-        "y": 266,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 394,
       "t": 13.146,
       "ball": {
-        "x": 1062,
-        "y": 281,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 395,
       "t": 13.18,
       "ball": {
-        "x": 1065,
-        "y": 296,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 396,
       "t": 13.213,
       "ball": {
-        "x": 1069,
-        "y": 306,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 397,
       "t": 13.247,
       "ball": {
-        "x": 1071,
-        "y": 319,
+        "x": 1086,
+        "y": 424,
         "visible": true
       }
     },
@@ -3331,8 +3161,8 @@
       "frame": 398,
       "t": 13.28,
       "ball": {
-        "x": 1078,
-        "y": 323,
+        "x": 1090,
+        "y": 418,
         "visible": true
       }
     },
@@ -3340,8 +3170,8 @@
       "frame": 399,
       "t": 13.313,
       "ball": {
-        "x": 1082,
-        "y": 321,
+        "x": 1093,
+        "y": 412,
         "visible": true
       }
     },
@@ -3349,8 +3179,8 @@
       "frame": 400,
       "t": 13.347,
       "ball": {
-        "x": 1089,
-        "y": 319,
+        "x": 1097,
+        "y": 406,
         "visible": true
       }
     },
@@ -3358,8 +3188,8 @@
       "frame": 401,
       "t": 13.38,
       "ball": {
-        "x": 1094,
-        "y": 316,
+        "x": 1099,
+        "y": 403,
         "visible": true
       }
     },
@@ -3368,7 +3198,7 @@
       "t": 13.413,
       "ball": {
         "x": 1101,
-        "y": 322,
+        "y": 399,
         "visible": true
       }
     },
@@ -3376,8 +3206,8 @@
       "frame": 403,
       "t": 13.447,
       "ball": {
-        "x": 1110,
-        "y": 319,
+        "x": 1103,
+        "y": 396,
         "visible": true
       }
     },
@@ -3385,8 +3215,8 @@
       "frame": 404,
       "t": 13.48,
       "ball": {
-        "x": 1116,
-        "y": 318,
+        "x": 1106,
+        "y": 392,
         "visible": true
       }
     },
@@ -3394,8 +3224,8 @@
       "frame": 405,
       "t": 13.514,
       "ball": {
-        "x": 1122,
-        "y": 321,
+        "x": 1108,
+        "y": 389,
         "visible": true
       }
     },
@@ -3403,8 +3233,8 @@
       "frame": 406,
       "t": 13.547,
       "ball": {
-        "x": 1131,
-        "y": 326,
+        "x": 1110,
+        "y": 386,
         "visible": true
       }
     },
@@ -3412,8 +3242,8 @@
       "frame": 407,
       "t": 13.58,
       "ball": {
-        "x": 1132,
-        "y": 329,
+        "x": 1112,
+        "y": 382,
         "visible": true
       }
     },
@@ -3421,8 +3251,8 @@
       "frame": 408,
       "t": 13.614,
       "ball": {
-        "x": 1139,
-        "y": 336,
+        "x": 1114,
+        "y": 379,
         "visible": true
       }
     },
@@ -3430,8 +3260,8 @@
       "frame": 409,
       "t": 13.647,
       "ball": {
-        "x": 1148,
-        "y": 341,
+        "x": 1115,
+        "y": 377,
         "visible": true
       }
     },
@@ -3439,8 +3269,8 @@
       "frame": 410,
       "t": 13.68,
       "ball": {
-        "x": 1154,
-        "y": 344,
+        "x": 1116,
+        "y": 376,
         "visible": true
       }
     },
@@ -3448,8 +3278,8 @@
       "frame": 411,
       "t": 13.714,
       "ball": {
-        "x": 1165,
-        "y": 350,
+        "x": 1117,
+        "y": 374,
         "visible": true
       }
     },
@@ -3457,8 +3287,8 @@
       "frame": 412,
       "t": 13.747,
       "ball": {
-        "x": 1170,
-        "y": 359,
+        "x": 1118,
+        "y": 374,
         "visible": true
       }
     },
@@ -3466,8 +3296,8 @@
       "frame": 413,
       "t": 13.78,
       "ball": {
-        "x": 1180,
-        "y": 368,
+        "x": 1118,
+        "y": 373,
         "visible": true
       }
     },
@@ -3475,8 +3305,8 @@
       "frame": 414,
       "t": 13.814,
       "ball": {
-        "x": 1187,
-        "y": 379,
+        "x": 1119,
+        "y": 372,
         "visible": true
       }
     },
@@ -3484,8 +3314,8 @@
       "frame": 415,
       "t": 13.847,
       "ball": {
-        "x": 1191,
-        "y": 385,
+        "x": 1119,
+        "y": 372,
         "visible": true
       }
     },
@@ -3493,8 +3323,8 @@
       "frame": 416,
       "t": 13.881,
       "ball": {
-        "x": 1198,
-        "y": 399,
+        "x": 1120,
+        "y": 371,
         "visible": true
       }
     },
@@ -3502,17 +3332,15 @@
       "frame": 417,
       "t": 13.914,
       "ball": {
-        "x": 1207,
-        "y": 412,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 418,
       "t": 13.947,
       "ball": {
-        "x": 1215,
-        "y": 421,
+        "x": 1120,
+        "y": 374,
         "visible": true
       }
     },
@@ -3520,45 +3348,35 @@
       "frame": 419,
       "t": 13.981,
       "ball": {
-        "x": 1225,
-        "y": 436,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 420,
       "t": 14.014,
       "ball": {
-        "x": 1231,
-        "y": 451,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 421,
       "t": 14.047,
       "ball": {
-        "x": 1238,
-        "y": 460,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 422,
       "t": 14.081,
       "ball": {
-        "x": 1235,
-        "y": 458,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 423,
       "t": 14.114,
       "ball": {
-        "x": 1230,
-        "y": 448,
-        "visible": true
+        "visible": false
       }
     },
     {
@@ -3572,224 +3390,176 @@
       "frame": 425,
       "t": 14.181,
       "ball": {
-        "x": 292,
-        "y": 629,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 426,
       "t": 14.214,
       "ball": {
-        "x": 289,
-        "y": 630,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 427,
       "t": 14.248,
       "ball": {
-        "x": 285,
-        "y": 631,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 428,
       "t": 14.281,
       "ball": {
-        "x": 281,
-        "y": 632,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 429,
       "t": 14.314,
       "ball": {
-        "x": 1195,
-        "y": 441,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 430,
       "t": 14.348,
       "ball": {
-        "x": 1188,
-        "y": 434,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 431,
       "t": 14.381,
       "ball": {
-        "x": 1185,
-        "y": 433,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 432,
       "t": 14.414,
       "ball": {
-        "x": 1186,
-        "y": 439,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 433,
       "t": 14.448,
       "ball": {
-        "x": 1176,
-        "y": 441,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 434,
       "t": 14.481,
       "ball": {
-        "x": 1170,
-        "y": 444,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 435,
       "t": 14.514,
       "ball": {
-        "x": 1159,
-        "y": 449,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 436,
       "t": 14.548,
       "ball": {
-        "x": 1158,
-        "y": 454,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 437,
       "t": 14.581,
       "ball": {
-        "x": 1147,
-        "y": 456,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 438,
       "t": 14.615,
       "ball": {
-        "x": 1141,
-        "y": 463,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 439,
       "t": 14.648,
       "ball": {
-        "x": 1137,
-        "y": 471,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 440,
       "t": 14.681,
       "ball": {
-        "x": 1130,
-        "y": 474,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 441,
       "t": 14.715,
       "ball": {
-        "x": 1129,
-        "y": 470,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 442,
       "t": 14.748,
       "ball": {
-        "x": 1130,
-        "y": 467,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 443,
       "t": 14.781,
       "ball": {
-        "x": 1125,
-        "y": 465,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 444,
       "t": 14.815,
       "ball": {
-        "x": 1118,
-        "y": 459,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 445,
       "t": 14.848,
       "ball": {
-        "x": 1102,
-        "y": 438,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 446,
       "t": 14.882,
       "ball": {
-        "x": 1084,
-        "y": 426,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 447,
       "t": 14.915,
       "ball": {
-        "x": 1067,
-        "y": 417,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 448,
       "t": 14.948,
       "ball": {
-        "x": 1057,
-        "y": 409,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 449,
       "t": 14.982,
       "ball": {
-        "x": 1032,
-        "y": 391,
+        "x": 1090,
+        "y": 399,
         "visible": true
       }
     },
@@ -3797,135 +3567,105 @@
       "frame": 450,
       "t": 15.015,
       "ball": {
-        "x": 1022,
-        "y": 381,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 451,
       "t": 15.048,
       "ball": {
-        "x": 1012,
-        "y": 373,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 452,
       "t": 15.082,
       "ball": {
-        "x": 996,
-        "y": 365,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 453,
       "t": 15.115,
       "ball": {
-        "x": 978,
-        "y": 357,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 454,
       "t": 15.148,
       "ball": {
-        "x": 968,
-        "y": 348,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 455,
       "t": 15.182,
       "ball": {
-        "x": 956,
-        "y": 348,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 456,
       "t": 15.215,
       "ball": {
-        "x": 943,
-        "y": 343,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 457,
       "t": 15.249,
       "ball": {
-        "x": 935,
-        "y": 340,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 458,
       "t": 15.282,
       "ball": {
-        "x": 930,
-        "y": 337,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 459,
       "t": 15.315,
       "ball": {
-        "x": 924,
-        "y": 335,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 460,
       "t": 15.349,
       "ball": {
-        "x": 918,
-        "y": 343,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 461,
       "t": 15.382,
       "ball": {
-        "x": 918,
-        "y": 349,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 462,
       "t": 15.415,
       "ball": {
-        "x": 913,
-        "y": 356,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 463,
       "t": 15.449,
       "ball": {
-        "x": 909,
-        "y": 369,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 464,
       "t": 15.482,
       "ball": {
-        "x": 910,
-        "y": 378,
-        "visible": true
+        "visible": false
       }
     },
     {
@@ -4233,9 +3973,7 @@
       "frame": 508,
       "t": 16.95,
       "ball": {
-        "x": 858,
-        "y": 453,
-        "visible": true
+        "visible": false
       }
     },
     {
@@ -4277,89 +4015,1513 @@
       "frame": 514,
       "t": 17.15,
       "ball": {
-        "x": 847,
-        "y": 452,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 515,
       "t": 17.184,
       "ball": {
-        "x": 849,
-        "y": 450,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 516,
       "t": 17.217,
       "ball": {
-        "x": 846,
-        "y": 451,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 517,
       "t": 17.251,
       "ball": {
-        "x": 844,
-        "y": 450,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 518,
       "t": 17.284,
       "ball": {
-        "x": 841,
-        "y": 456,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 519,
       "t": 17.317,
       "ball": {
-        "x": 841,
-        "y": 453,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 520,
       "t": 17.351,
       "ball": {
-        "x": 842,
-        "y": 453,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 521,
       "t": 17.384,
       "ball": {
-        "x": 832,
-        "y": 454,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 522,
       "t": 17.417,
       "ball": {
-        "x": 834,
-        "y": 454,
-        "visible": true
+        "visible": false
       }
     },
     {
       "frame": 523,
       "t": 17.451,
       "ball": {
-        "x": 836,
-        "y": 455,
+        "visible": false
+      }
+    },
+    {
+      "frame": 524,
+      "t": 17.484,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 525,
+      "t": 17.518,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 526,
+      "t": 17.551,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 527,
+      "t": 17.584,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 528,
+      "t": 17.618,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 529,
+      "t": 17.651,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 530,
+      "t": 17.684,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 531,
+      "t": 17.718,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 532,
+      "t": 17.751,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 533,
+      "t": 17.784,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 534,
+      "t": 17.818,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 535,
+      "t": 17.851,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 536,
+      "t": 17.885,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 537,
+      "t": 17.918,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 538,
+      "t": 17.951,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 539,
+      "t": 17.985,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 540,
+      "t": 18.018,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 541,
+      "t": 18.051,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 542,
+      "t": 18.085,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 543,
+      "t": 18.118,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 544,
+      "t": 18.151,
+      "ball": {
+        "x": 1132,
+        "y": 419,
+        "visible": true
+      }
+    },
+    {
+      "frame": 545,
+      "t": 18.185,
+      "ball": {
+        "x": 1130,
+        "y": 419,
+        "visible": true
+      }
+    },
+    {
+      "frame": 546,
+      "t": 18.218,
+      "ball": {
+        "x": 1128,
+        "y": 419,
+        "visible": true
+      }
+    },
+    {
+      "frame": 547,
+      "t": 18.252,
+      "ball": {
+        "x": 1127,
+        "y": 419,
+        "visible": true
+      }
+    },
+    {
+      "frame": 548,
+      "t": 18.285,
+      "ball": {
+        "x": 1125,
+        "y": 419,
+        "visible": true
+      }
+    },
+    {
+      "frame": 549,
+      "t": 18.318,
+      "ball": {
+        "x": 1123,
+        "y": 419,
+        "visible": true
+      }
+    },
+    {
+      "frame": 550,
+      "t": 18.352,
+      "ball": {
+        "x": 1120,
+        "y": 418,
+        "visible": true
+      }
+    },
+    {
+      "frame": 551,
+      "t": 18.385,
+      "ball": {
+        "x": 1116,
+        "y": 417,
+        "visible": true
+      }
+    },
+    {
+      "frame": 552,
+      "t": 18.418,
+      "ball": {
+        "x": 1113,
+        "y": 416,
+        "visible": true
+      }
+    },
+    {
+      "frame": 553,
+      "t": 18.452,
+      "ball": {
+        "x": 1109,
+        "y": 415,
+        "visible": true
+      }
+    },
+    {
+      "frame": 554,
+      "t": 18.485,
+      "ball": {
+        "x": 1106,
+        "y": 414,
+        "visible": true
+      }
+    },
+    {
+      "frame": 555,
+      "t": 18.518,
+      "ball": {
+        "x": 1102,
+        "y": 414,
+        "visible": true
+      }
+    },
+    {
+      "frame": 556,
+      "t": 18.552,
+      "ball": {
+        "x": 1099,
+        "y": 414,
+        "visible": true
+      }
+    },
+    {
+      "frame": 557,
+      "t": 18.585,
+      "ball": {
+        "x": 1094,
+        "y": 415,
+        "visible": true
+      }
+    },
+    {
+      "frame": 558,
+      "t": 18.619,
+      "ball": {
+        "x": 1088,
+        "y": 417,
+        "visible": true
+      }
+    },
+    {
+      "frame": 559,
+      "t": 18.652,
+      "ball": {
+        "x": 1083,
+        "y": 418,
+        "visible": true
+      }
+    },
+    {
+      "frame": 560,
+      "t": 18.685,
+      "ball": {
+        "x": 1079,
+        "y": 420,
+        "visible": true
+      }
+    },
+    {
+      "frame": 561,
+      "t": 18.719,
+      "ball": {
+        "x": 1075,
+        "y": 423,
+        "visible": true
+      }
+    },
+    {
+      "frame": 562,
+      "t": 18.752,
+      "ball": {
+        "x": 1072,
+        "y": 426,
+        "visible": true
+      }
+    },
+    {
+      "frame": 563,
+      "t": 18.785,
+      "ball": {
+        "x": 1068,
+        "y": 428,
+        "visible": true
+      }
+    },
+    {
+      "frame": 564,
+      "t": 18.819,
+      "ball": {
+        "x": 1065,
+        "y": 431,
+        "visible": true
+      }
+    },
+    {
+      "frame": 565,
+      "t": 18.852,
+      "ball": {
+        "x": 1061,
+        "y": 433,
+        "visible": true
+      }
+    },
+    {
+      "frame": 566,
+      "t": 18.886,
+      "ball": {
+        "x": 1058,
+        "y": 436,
+        "visible": true
+      }
+    },
+    {
+      "frame": 567,
+      "t": 18.919,
+      "ball": {
+        "x": 1054,
+        "y": 438,
+        "visible": true
+      }
+    },
+    {
+      "frame": 568,
+      "t": 18.952,
+      "ball": {
+        "x": 1051,
+        "y": 441,
+        "visible": true
+      }
+    },
+    {
+      "frame": 569,
+      "t": 18.986,
+      "ball": {
+        "x": 1047,
+        "y": 443,
+        "visible": true
+      }
+    },
+    {
+      "frame": 570,
+      "t": 19.019,
+      "ball": {
+        "x": 1044,
+        "y": 446,
+        "visible": true
+      }
+    },
+    {
+      "frame": 571,
+      "t": 19.052,
+      "ball": {
+        "x": 1043,
+        "y": 444,
+        "visible": true
+      }
+    },
+    {
+      "frame": 572,
+      "t": 19.086,
+      "ball": {
+        "x": 1041,
+        "y": 441,
+        "visible": true
+      }
+    },
+    {
+      "frame": 573,
+      "t": 19.119,
+      "ball": {
+        "x": 1040,
+        "y": 441,
+        "visible": true
+      }
+    },
+    {
+      "frame": 574,
+      "t": 19.152,
+      "ball": {
+        "x": 1037,
+        "y": 441,
+        "visible": true
+      }
+    },
+    {
+      "frame": 575,
+      "t": 19.186,
+      "ball": {
+        "x": 1035,
+        "y": 440,
+        "visible": true
+      }
+    },
+    {
+      "frame": 576,
+      "t": 19.219,
+      "ball": {
+        "x": 1033,
+        "y": 442,
+        "visible": true
+      }
+    },
+    {
+      "frame": 577,
+      "t": 19.253,
+      "ball": {
+        "x": 1032,
+        "y": 443,
+        "visible": true
+      }
+    },
+    {
+      "frame": 578,
+      "t": 19.286,
+      "ball": {
+        "x": 1030,
+        "y": 444,
+        "visible": true
+      }
+    },
+    {
+      "frame": 579,
+      "t": 19.319,
+      "ball": {
+        "x": 1028,
+        "y": 446,
+        "visible": true
+      }
+    },
+    {
+      "frame": 580,
+      "t": 19.353,
+      "ball": {
+        "x": 1025,
+        "y": 450,
+        "visible": true
+      }
+    },
+    {
+      "frame": 581,
+      "t": 19.386,
+      "ball": {
+        "x": 1023,
+        "y": 451,
+        "visible": true
+      }
+    },
+    {
+      "frame": 582,
+      "t": 19.419,
+      "ball": {
+        "x": 1021,
+        "y": 454,
+        "visible": true
+      }
+    },
+    {
+      "frame": 583,
+      "t": 19.453,
+      "ball": {
+        "x": 1019,
+        "y": 456,
+        "visible": true
+      }
+    },
+    {
+      "frame": 584,
+      "t": 19.486,
+      "ball": {
+        "x": 1017,
+        "y": 459,
+        "visible": true
+      }
+    },
+    {
+      "frame": 585,
+      "t": 19.52,
+      "ball": {
+        "x": 1016,
+        "y": 459,
+        "visible": true
+      }
+    },
+    {
+      "frame": 586,
+      "t": 19.553,
+      "ball": {
+        "x": 1015,
+        "y": 458,
+        "visible": true
+      }
+    },
+    {
+      "frame": 587,
+      "t": 19.586,
+      "ball": {
+        "x": 1014,
+        "y": 457,
+        "visible": true
+      }
+    },
+    {
+      "frame": 588,
+      "t": 19.62,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 589,
+      "t": 19.653,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 590,
+      "t": 19.686,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 591,
+      "t": 19.72,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 592,
+      "t": 19.753,
+      "ball": {
+        "visible": false
+      }
+    },
+    {
+      "frame": 593,
+      "t": 19.786,
+      "ball": {
+        "x": 1007,
+        "y": 457,
+        "visible": true
+      }
+    },
+    {
+      "frame": 594,
+      "t": 19.82,
+      "ball": {
+        "x": 1007,
+        "y": 458,
+        "visible": true
+      }
+    },
+    {
+      "frame": 595,
+      "t": 19.853,
+      "ball": {
+        "x": 1006,
+        "y": 458,
+        "visible": true
+      }
+    },
+    {
+      "frame": 596,
+      "t": 19.887,
+      "ball": {
+        "x": 1005,
+        "y": 462,
+        "visible": true
+      }
+    },
+    {
+      "frame": 597,
+      "t": 19.92,
+      "ball": {
+        "x": 1003,
+        "y": 465,
+        "visible": true
+      }
+    },
+    {
+      "frame": 598,
+      "t": 19.953,
+      "ball": {
+        "x": 1002,
+        "y": 469,
+        "visible": true
+      }
+    },
+    {
+      "frame": 599,
+      "t": 19.987,
+      "ball": {
+        "x": 1002,
+        "y": 470,
+        "visible": true
+      }
+    },
+    {
+      "frame": 600,
+      "t": 20.02,
+      "ball": {
+        "x": 1001,
+        "y": 469,
+        "visible": true
+      }
+    },
+    {
+      "frame": 601,
+      "t": 20.053,
+      "ball": {
+        "x": 999,
+        "y": 469,
+        "visible": true
+      }
+    },
+    {
+      "frame": 602,
+      "t": 20.087,
+      "ball": {
+        "x": 998,
+        "y": 469,
+        "visible": true
+      }
+    },
+    {
+      "frame": 603,
+      "t": 20.12,
+      "ball": {
+        "x": 997,
+        "y": 469,
+        "visible": true
+      }
+    },
+    {
+      "frame": 604,
+      "t": 20.153,
+      "ball": {
+        "x": 996,
+        "y": 468,
+        "visible": true
+      }
+    },
+    {
+      "frame": 605,
+      "t": 20.187,
+      "ball": {
+        "x": 995,
+        "y": 467,
+        "visible": true
+      }
+    },
+    {
+      "frame": 606,
+      "t": 20.22,
+      "ball": {
+        "x": 994,
+        "y": 468,
+        "visible": true
+      }
+    },
+    {
+      "frame": 607,
+      "t": 20.254,
+      "ball": {
+        "x": 994,
+        "y": 468,
+        "visible": true
+      }
+    },
+    {
+      "frame": 608,
+      "t": 20.287,
+      "ball": {
+        "x": 993,
+        "y": 472,
+        "visible": true
+      }
+    },
+    {
+      "frame": 609,
+      "t": 20.32,
+      "ball": {
+        "x": 992,
+        "y": 473,
+        "visible": true
+      }
+    },
+    {
+      "frame": 610,
+      "t": 20.354,
+      "ball": {
+        "x": 991,
+        "y": 473,
+        "visible": true
+      }
+    },
+    {
+      "frame": 611,
+      "t": 20.387,
+      "ball": {
+        "x": 990,
+        "y": 474,
+        "visible": true
+      }
+    },
+    {
+      "frame": 612,
+      "t": 20.42,
+      "ball": {
+        "x": 989,
+        "y": 475,
+        "visible": true
+      }
+    },
+    {
+      "frame": 613,
+      "t": 20.454,
+      "ball": {
+        "x": 988,
+        "y": 475,
+        "visible": true
+      }
+    },
+    {
+      "frame": 614,
+      "t": 20.487,
+      "ball": {
+        "x": 987,
+        "y": 476,
+        "visible": true
+      }
+    },
+    {
+      "frame": 615,
+      "t": 20.521,
+      "ball": {
+        "x": 987,
+        "y": 475,
+        "visible": true
+      }
+    },
+    {
+      "frame": 616,
+      "t": 20.554,
+      "ball": {
+        "x": 986,
+        "y": 476,
+        "visible": true
+      }
+    },
+    {
+      "frame": 617,
+      "t": 20.587,
+      "ball": {
+        "x": 986,
+        "y": 476,
+        "visible": true
+      }
+    },
+    {
+      "frame": 618,
+      "t": 20.621,
+      "ball": {
+        "x": 985,
+        "y": 478,
+        "visible": true
+      }
+    },
+    {
+      "frame": 619,
+      "t": 20.654,
+      "ball": {
+        "x": 984,
+        "y": 480,
+        "visible": true
+      }
+    },
+    {
+      "frame": 620,
+      "t": 20.687,
+      "ball": {
+        "x": 983,
+        "y": 482,
+        "visible": true
+      }
+    },
+    {
+      "frame": 621,
+      "t": 20.721,
+      "ball": {
+        "x": 982,
+        "y": 485,
+        "visible": true
+      }
+    },
+    {
+      "frame": 622,
+      "t": 20.754,
+      "ball": {
+        "x": 982,
+        "y": 487,
+        "visible": true
+      }
+    },
+    {
+      "frame": 623,
+      "t": 20.787,
+      "ball": {
+        "x": 982,
+        "y": 488,
+        "visible": true
+      }
+    },
+    {
+      "frame": 624,
+      "t": 20.821,
+      "ball": {
+        "x": 982,
+        "y": 488,
+        "visible": true
+      }
+    },
+    {
+      "frame": 625,
+      "t": 20.854,
+      "ball": {
+        "x": 981,
+        "y": 488,
+        "visible": true
+      }
+    },
+    {
+      "frame": 626,
+      "t": 20.888,
+      "ball": {
+        "x": 981,
+        "y": 489,
+        "visible": true
+      }
+    },
+    {
+      "frame": 627,
+      "t": 20.921,
+      "ball": {
+        "x": 981,
+        "y": 490,
+        "visible": true
+      }
+    },
+    {
+      "frame": 628,
+      "t": 20.954,
+      "ball": {
+        "x": 980,
+        "y": 491,
+        "visible": true
+      }
+    },
+    {
+      "frame": 629,
+      "t": 20.988,
+      "ball": {
+        "x": 980,
+        "y": 493,
+        "visible": true
+      }
+    },
+    {
+      "frame": 630,
+      "t": 21.021,
+      "ball": {
+        "x": 980,
+        "y": 494,
+        "visible": true
+      }
+    },
+    {
+      "frame": 631,
+      "t": 21.054,
+      "ball": {
+        "x": 980,
+        "y": 494,
+        "visible": true
+      }
+    },
+    {
+      "frame": 632,
+      "t": 21.088,
+      "ball": {
+        "x": 979,
+        "y": 494,
+        "visible": true
+      }
+    },
+    {
+      "frame": 633,
+      "t": 21.121,
+      "ball": {
+        "x": 979,
+        "y": 495,
+        "visible": true
+      }
+    },
+    {
+      "frame": 634,
+      "t": 21.154,
+      "ball": {
+        "x": 979,
+        "y": 498,
+        "visible": true
+      }
+    },
+    {
+      "frame": 635,
+      "t": 21.188,
+      "ball": {
+        "x": 979,
+        "y": 499,
+        "visible": true
+      }
+    },
+    {
+      "frame": 636,
+      "t": 21.221,
+      "ball": {
+        "x": 979,
+        "y": 500,
+        "visible": true
+      }
+    },
+    {
+      "frame": 637,
+      "t": 21.255,
+      "ball": {
+        "x": 979,
+        "y": 500,
+        "visible": true
+      }
+    },
+    {
+      "frame": 638,
+      "t": 21.288,
+      "ball": {
+        "x": 979,
+        "y": 501,
+        "visible": true
+      }
+    },
+    {
+      "frame": 639,
+      "t": 21.321,
+      "ball": {
+        "x": 979,
+        "y": 502,
+        "visible": true
+      }
+    },
+    {
+      "frame": 640,
+      "t": 21.355,
+      "ball": {
+        "x": 979,
+        "y": 503,
+        "visible": true
+      }
+    },
+    {
+      "frame": 641,
+      "t": 21.388,
+      "ball": {
+        "x": 978,
+        "y": 504,
+        "visible": true
+      }
+    },
+    {
+      "frame": 642,
+      "t": 21.421,
+      "ball": {
+        "x": 978,
+        "y": 505,
+        "visible": true
+      }
+    },
+    {
+      "frame": 643,
+      "t": 21.455,
+      "ball": {
+        "x": 980,
+        "y": 506,
+        "visible": true
+      }
+    },
+    {
+      "frame": 644,
+      "t": 21.488,
+      "ball": {
+        "x": 981,
+        "y": 507,
+        "visible": true
+      }
+    },
+    {
+      "frame": 645,
+      "t": 21.521,
+      "ball": {
+        "x": 981,
+        "y": 508,
+        "visible": true
+      }
+    },
+    {
+      "frame": 646,
+      "t": 21.555,
+      "ball": {
+        "x": 982,
+        "y": 509,
+        "visible": true
+      }
+    },
+    {
+      "frame": 647,
+      "t": 21.588,
+      "ball": {
+        "x": 982,
+        "y": 510,
+        "visible": true
+      }
+    },
+    {
+      "frame": 648,
+      "t": 21.622,
+      "ball": {
+        "x": 983,
+        "y": 511,
+        "visible": true
+      }
+    },
+    {
+      "frame": 649,
+      "t": 21.655,
+      "ball": {
+        "x": 984,
+        "y": 512,
+        "visible": true
+      }
+    },
+    {
+      "frame": 650,
+      "t": 21.688,
+      "ball": {
+        "x": 985,
+        "y": 513,
+        "visible": true
+      }
+    },
+    {
+      "frame": 651,
+      "t": 21.722,
+      "ball": {
+        "x": 986,
+        "y": 514,
+        "visible": true
+      }
+    },
+    {
+      "frame": 652,
+      "t": 21.755,
+      "ball": {
+        "x": 987,
+        "y": 515,
+        "visible": true
+      }
+    },
+    {
+      "frame": 653,
+      "t": 21.788,
+      "ball": {
+        "x": 989,
+        "y": 516,
+        "visible": true
+      }
+    },
+    {
+      "frame": 654,
+      "t": 21.822,
+      "ball": {
+        "x": 990,
+        "y": 517,
+        "visible": true
+      }
+    },
+    {
+      "frame": 655,
+      "t": 21.855,
+      "ball": {
+        "x": 990,
+        "y": 518,
+        "visible": true
+      }
+    },
+    {
+      "frame": 656,
+      "t": 21.889,
+      "ball": {
+        "x": 991,
+        "y": 520,
+        "visible": true
+      }
+    },
+    {
+      "frame": 657,
+      "t": 21.922,
+      "ball": {
+        "x": 992,
+        "y": 521,
+        "visible": true
+      }
+    },
+    {
+      "frame": 658,
+      "t": 21.955,
+      "ball": {
+        "x": 994,
+        "y": 522,
+        "visible": true
+      }
+    },
+    {
+      "frame": 659,
+      "t": 21.989,
+      "ball": {
+        "x": 994,
+        "y": 523,
+        "visible": true
+      }
+    },
+    {
+      "frame": 660,
+      "t": 22.022,
+      "ball": {
+        "x": 996,
+        "y": 524,
+        "visible": true
+      }
+    },
+    {
+      "frame": 661,
+      "t": 22.055,
+      "ball": {
+        "x": 997,
+        "y": 525,
+        "visible": true
+      }
+    },
+    {
+      "frame": 662,
+      "t": 22.089,
+      "ball": {
+        "x": 999,
+        "y": 527,
+        "visible": true
+      }
+    },
+    {
+      "frame": 663,
+      "t": 22.122,
+      "ball": {
+        "x": 1001,
+        "y": 528,
+        "visible": true
+      }
+    },
+    {
+      "frame": 664,
+      "t": 22.155,
+      "ball": {
+        "x": 1002,
+        "y": 529,
+        "visible": true
+      }
+    },
+    {
+      "frame": 665,
+      "t": 22.189,
+      "ball": {
+        "x": 1004,
+        "y": 530,
+        "visible": true
+      }
+    },
+    {
+      "frame": 666,
+      "t": 22.222,
+      "ball": {
+        "x": 1005,
+        "y": 532,
+        "visible": true
+      }
+    },
+    {
+      "frame": 667,
+      "t": 22.256,
+      "ball": {
+        "x": 1007,
+        "y": 534,
+        "visible": true
+      }
+    },
+    {
+      "frame": 668,
+      "t": 22.289,
+      "ball": {
+        "x": 1009,
+        "y": 534,
+        "visible": true
+      }
+    },
+    {
+      "frame": 669,
+      "t": 22.322,
+      "ball": {
+        "x": 1010,
+        "y": 535,
+        "visible": true
+      }
+    },
+    {
+      "frame": 670,
+      "t": 22.356,
+      "ball": {
+        "x": 1012,
+        "y": 538,
+        "visible": true
+      }
+    },
+    {
+      "frame": 671,
+      "t": 22.389,
+      "ball": {
+        "x": 1014,
+        "y": 539,
+        "visible": true
+      }
+    },
+    {
+      "frame": 672,
+      "t": 22.422,
+      "ball": {
+        "x": 1015,
+        "y": 540,
+        "visible": true
+      }
+    },
+    {
+      "frame": 673,
+      "t": 22.456,
+      "ball": {
+        "x": 1017,
+        "y": 542,
+        "visible": true
+      }
+    },
+    {
+      "frame": 674,
+      "t": 22.489,
+      "ball": {
+        "x": 1019,
+        "y": 543,
+        "visible": true
+      }
+    },
+    {
+      "frame": 675,
+      "t": 22.523,
+      "ball": {
+        "x": 1020,
+        "y": 544,
+        "visible": true
+      }
+    },
+    {
+      "frame": 676,
+      "t": 22.556,
+      "ball": {
+        "x": 1018,
+        "y": 544,
+        "visible": true
+      }
+    },
+    {
+      "frame": 677,
+      "t": 22.589,
+      "ball": {
+        "x": 1017,
+        "y": 545,
+        "visible": true
+      }
+    },
+    {
+      "frame": 678,
+      "t": 22.623,
+      "ball": {
+        "x": 1015,
+        "y": 545,
+        "visible": true
+      }
+    },
+    {
+      "frame": 679,
+      "t": 22.656,
+      "ball": {
+        "x": 1014,
+        "y": 546,
+        "visible": true
+      }
+    },
+    {
+      "frame": 680,
+      "t": 22.689,
+      "ball": {
+        "x": 1012,
+        "y": 546,
+        "visible": true
+      }
+    },
+    {
+      "frame": 681,
+      "t": 22.723,
+      "ball": {
+        "x": 1011,
+        "y": 547,
+        "visible": true
+      }
+    },
+    {
+      "frame": 682,
+      "t": 22.756,
+      "ball": {
+        "x": 1009,
+        "y": 547,
+        "visible": true
+      }
+    },
+    {
+      "frame": 683,
+      "t": 22.789,
+      "ball": {
+        "x": 1008,
+        "y": 548,
+        "visible": true
+      }
+    },
+    {
+      "frame": 684,
+      "t": 22.823,
+      "ball": {
+        "x": 1006,
+        "y": 548,
+        "visible": true
+      }
+    },
+    {
+      "frame": 685,
+      "t": 22.856,
+      "ball": {
+        "x": 1002,
+        "y": 548,
+        "visible": true
+      }
+    },
+    {
+      "frame": 686,
+      "t": 22.89,
+      "ball": {
+        "x": 1000,
+        "y": 548,
+        "visible": true
+      }
+    },
+    {
+      "frame": 687,
+      "t": 22.923,
+      "ball": {
+        "x": 996,
+        "y": 548,
+        "visible": true
+      }
+    },
+    {
+      "frame": 688,
+      "t": 22.956,
+      "ball": {
+        "x": 992,
+        "y": 548,
+        "visible": true
+      }
+    },
+    {
+      "frame": 689,
+      "t": 22.99,
+      "ball": {
+        "x": 988,
+        "y": 547,
         "visible": true
       }
     }

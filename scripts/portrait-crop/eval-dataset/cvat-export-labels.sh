@@ -34,7 +34,9 @@ for id in "${ids[@]}"; do
   [ -n "$src" ] || { echo "  no annotations.xml for $id"; continue; }
   cp "$src" "$HERE/cvat-exports/$id.xml"
   dense=""
-  jq -e --arg id "$id" '.clips[] | select(.id==$id and .hero==true)' "$HERE/manifest.json" >/dev/null 2>&1 && dense="--dense"
+  # Dense export for hero clips AND all eval clips (split=test|val) — a test set
+  # needs per-frame GT, not just keyframes, to measure recall over the trajectory.
+  jq -e --arg id "$id" '.clips[] | select(.id==$id and (.hero==true or .split=="test" or .split=="val"))' "$HERE/manifest.json" >/dev/null 2>&1 && dense="--dense"
   ( cd "$PC" && npx tsx eval-dataset/cvat-to-labels.ts \
       --cvat "$HERE/cvat-exports/$id.xml" --video "$HERE/clips/$id.mp4" \
       --clip-id "$id" --out "$HERE/labels/$id.json" $dense )

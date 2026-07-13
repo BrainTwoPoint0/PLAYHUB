@@ -8,16 +8,18 @@ Reuses the compute env / queue / ECR / job role from `batch-ball-detection.tf`;
 `batch-precompute.tf` adds the Supabase secret + execution role + the array job def.
 
 ## Cost
+
 ~4,920 clips × ~$0.014 (spot g5/g6 @25fps) ≈ **~$67 in credits, one-time** (cached
 forever). Scales to zero when idle. AWS Budget alert at $150 recommended.
 
 ## Pieces
-| File | What |
-|---|---|
-| `Dockerfile` | CUDA image; **now includes `supervision`** (was missing → image crashed) |
-| `entrypoint.py` | array-shard mode: reads S3 manifest shard → detect → idempotent upsert via Supabase REST |
-| `build_manifest.py` | queries goals-missing-cache → JSONL → S3 (the frozen work-list) |
-| `../../terraform/batch-precompute.tf` | secret, execution role, array job def |
+
+| File                                  | What                                                                                     |
+| ------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `Dockerfile`                          | CUDA image; **now includes `supervision`** (was missing → image crashed)                 |
+| `entrypoint.py`                       | array-shard mode: reads S3 manifest shard → detect → idempotent upsert via Supabase REST |
+| `build_manifest.py`                   | queries goals-missing-cache → JSONL → S3 (the frozen work-list)                          |
+| `../../terraform/batch-precompute.tf` | secret, execution role, array job def                                                    |
 
 ## Deploy + run (AWS_PROFILE=playhub, eu-west-2, account 274921264686)
 
@@ -64,10 +66,12 @@ AWS_PROFILE=playhub aws batch describe-jobs --jobs <parent-id> --query 'jobs[0].
 ```
 
 ## The 3 things most likely to bite (per the infra review)
+
 1. **GPU AMI/driver** — the CE must use the ECS GPU-optimized AMI or `cuda.is_available()` is False and YOLO grinds on CPU. `entrypoint.py` asserts CUDA and exits loud; the smoke test catches it.
 2. **Spot capacity** — two instance types (g5+g6) + `SPOT_CAPACITY_OPTIMIZED` + small 20-clip shards make reclamation cheap; if pools dry up jobs queue (don't fail).
 3. **ECR auth** — the execution role needs `AmazonECSTaskExecutionRolePolicy` (it does); a lifecycle-expired pinned digest fails the pull.
 
 ## Ongoing (new goals as Veo adds them)
+
 Same job def. A scheduled Lambda (EventBridge) queries new uncached goals and submits
 a small array job — or just re-run steps 3+5 periodically.

@@ -26,14 +26,14 @@ import { fileURLToPath } from 'node:url'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CLIPS = join(HERE, 'clips')
 
-const CONF_MIN = 0.15         // a candidate strong enough to be "a ball"
-const COMPETE_FRAC = 0.5      // a rival counts only if conf >= this * the top candidate's
-const FAR_PX = 300            // two strong candidates this far apart = disagreement
-const TELEPORT_PX = 350       // selected-track jump this large = a switch
-const UNDETECTED_FRAC = 0.3   // >30% of frames ball-lost → review
-const DISAGREE_FRAC = 0.08    // >8% of frames ambiguous → review
-const TELEPORTS_MAX = 3       // more track-switches than this → review
-const MIN_WINDOW = 3          // frames; ignore blips shorter than this
+const CONF_MIN = 0.15 // a candidate strong enough to be "a ball"
+const COMPETE_FRAC = 0.5 // a rival counts only if conf >= this * the top candidate's
+const FAR_PX = 300 // two strong candidates this far apart = disagreement
+const TELEPORT_PX = 350 // selected-track jump this large = a switch
+const UNDETECTED_FRAC = 0.3 // >30% of frames ball-lost → review
+const DISAGREE_FRAC = 0.08 // >8% of frames ambiguous → review
+const TELEPORTS_MAX = 3 // more track-switches than this → review
+const MIN_WINDOW = 3 // frames; ignore blips shorter than this
 
 function contiguousWindows(times, flags) {
   const w = []
@@ -45,7 +45,8 @@ function contiguousWindows(times, flags) {
       s = null
     }
   }
-  if (s !== null && flags.length - s >= MIN_WINDOW) w.push([times[s], times[flags.length - 1]])
+  if (s !== null && flags.length - s >= MIN_WINDOW)
+    w.push([times[s], times[flags.length - 1]])
   return w
 }
 
@@ -84,7 +85,10 @@ function score(clipId) {
     for (const c of cs) if ((c.conf ?? 0) > (best.conf ?? 0)) best = c
     const floor = COMPETE_FRAC * (best.conf ?? 0)
     return cs.some(
-      (c) => c !== best && (c.conf ?? 0) >= floor && Math.hypot(c.x - best.x, c.y - best.y) > FAR_PX
+      (c) =>
+        c !== best &&
+        (c.conf ?? 0) >= floor &&
+        Math.hypot(c.x - best.x, c.y - best.y) > FAR_PX
     )
   })
   const fracDisagree = disagree.filter(Boolean).length / n
@@ -100,8 +104,10 @@ function score(clipId) {
   }
 
   const reasons = []
-  if (fracLost > UNDETECTED_FRAC) reasons.push(`undetected ${Math.round(fracLost * 100)}%`)
-  if (fracDisagree > DISAGREE_FRAC) reasons.push(`disagreement ${Math.round(fracDisagree * 100)}%`)
+  if (fracLost > UNDETECTED_FRAC)
+    reasons.push(`undetected ${Math.round(fracLost * 100)}%`)
+  if (fracDisagree > DISAGREE_FRAC)
+    reasons.push(`disagreement ${Math.round(fracDisagree * 100)}%`)
   if (teleports > TELEPORTS_MAX) reasons.push(`${teleports} track-switches`)
 
   // Review windows: where the human should look (union of lost + disagreement spans).
@@ -156,6 +162,8 @@ if (asJson) {
         }`
       )
     else if (!r.cands)
-      console.log(`            all_candidates empty — disagreement not assessed; re-detect for a full read`)
+      console.log(
+        `            all_candidates empty — disagreement not assessed; re-detect for a full read`
+      )
   }
 }

@@ -485,7 +485,9 @@ function smoothPositions(
     const cx = Math.round(lastX - CROP_W / 2)
     return {
       time: p.time,
-      cropX: Number.isFinite(cx) ? Math.max(0, Math.min(CROP_MAX_X, cx)) : CENTER_CROP_X,
+      cropX: Number.isFinite(cx)
+        ? Math.max(0, Math.min(CROP_MAX_X, cx))
+        : CENTER_CROP_X,
       source: p.source,
     }
   })
@@ -930,7 +932,9 @@ async function processClip(
       0,
       Math.min(CROP_MAX_Y, Math.round(detection.actionBandY - CROP_H / 2))
     )
-    console.log(`  Zoom ${ZOOM}x → crop ${CROP_W}x${CROP_H} at y=${cropY} (action band ${Math.round(detection.actionBandY)})`)
+    console.log(
+      `  Zoom ${ZOOM}x → crop ${CROP_W}x${CROP_H} at y=${cropY} (action band ${Math.round(detection.actionBandY)})`
+    )
     runCrop(inputPath, outputPath, cropXPerFrame, fps, cropY)
 
     // 5. Debug preview

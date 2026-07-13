@@ -88,12 +88,17 @@ function probeFrameCount(p: string): number {
 function loadPositions(): Pos[] {
   if (rawPath) return JSON.parse(fs.readFileSync(rawPath, 'utf-8')).positions
   const script = path.resolve(__dirname, '..', 'detect_ball.py')
-  console.error(`Running detector on ${path.basename(videoPath!)} (may take minutes)…`)
-  const out = execSync(`python3 "${script}" "${videoPath}" --fps ${detectFps}`, {
-    encoding: 'utf-8',
-    maxBuffer: 50 * 1024 * 1024,
-    timeout: 15 * 60 * 1000,
-  })
+  console.error(
+    `Running detector on ${path.basename(videoPath!)} (may take minutes)…`
+  )
+  const out = execSync(
+    `python3 "${script}" "${videoPath}" --fps ${detectFps}`,
+    {
+      encoding: 'utf-8',
+      maxBuffer: 50 * 1024 * 1024,
+      timeout: 15 * 60 * 1000,
+    }
+  )
   return JSON.parse(out.trim().split('\n').pop()!).positions
 }
 

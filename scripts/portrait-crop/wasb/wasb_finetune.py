@@ -44,7 +44,14 @@ PC = str(Path(__file__).resolve().parent.parent)  # .../scripts/portrait-crop
 ED = f"{PC}/eval-dataset"
 
 HOLDOUT = "veo_20260506_hb_cupfinal_goal_01"
+# v3 (2026-07-08): the original 7 v2 clips + 17 human-verified corpus clips
+# (CVAT-labelled this campaign, ~9.2k visible-ball frames, 24 venues/dates/
+# lighting, 2024→2026). The diverse-corpus test of "does more labelled data
+# move recall past the v2 ~1% plateau". Task 86 (veo_20250201-fa5ca4fc…) is
+# DELIBERATELY held out of training as an honest witness — scored v2-vs-v3
+# offline post-train (Karim flagged it as mixed good/bad-by-period).
 TRAIN_CLIPS = [
+    # --- original v2 corpus ---
     "veo_20240918_goalkick_01",
     "veo_20250927_cfa_u9_freekick_01",
     "veo_20260502_goal_01",
@@ -52,6 +59,24 @@ TRAIN_CLIPS = [
     "veo_20260502_passage_01",
     "veo_20260502b_goal_01",
     "veo_20260505_sefa_u19_goal_01",
+    # --- v3 diverse corpus (17 verified clips; task 86 held out) ---
+    "veo_20250122-soccer-elite-fa-u19-vs-emc-afd80965_dd182e79",
+    "veo_20240925-match-27-sep-2024-4996873f_532cdab9",
+    "veo_20241026-boys-jpl-u13-vs-russellers-fc-4210dc19_40121690",
+    "veo_20250208-cfamezzie-u9-yellow-vs-hannakins-farm-u8s-07b3f179_868f9e4e",
+    "veo_20250222-south-london-kings-b0e9e038_bb4b53d5",
+    "veo_20250312-soccer-elite-fa-u19-vs-vs-kinetic-mapes-9a793f01_98428c28",
+    "veo_20250322-girls-jpl-u12-vs-afc-wimbledon-b08b7a1d_5c0f9a08",
+    "veo_20250614-match-cfa-u9-24434165_31191747",
+    "veo_20250719-boys-jpl-u13-2526-vs-vs-metrogas-284a6319_d5ebf462",
+    "veo_20251105-soccer-elite-fa-u19-vs-emc-tactics-wed-e417237a_09e219a9",
+    "veo_20260328-girls-jpl-u12-vs-greenwich-boro-vac44fec_8c20f846",
+    "veo_20260516-match-16-may-2026-vb948536_6e44dcdf",
+    "veo_20260517-elite-london-academy-u9-vs-the-a-academy-u9-v27c2e8a_ca03b278",
+    "veo_20260606-soccer-elite-fa-u12-vs-2627-u12s-erith-town-vb9fd673_7cb86410",
+    "veo_20260628-roehampton-elite-u8-vs-forza-skill-u8-va2aa67a_94c3c401",
+    "veo_london-youth-league-20260510-lfs-yellow-vs-champs-u8-v2061dad_a671dcc6",
+    "veo_london-youth-league-20260510-nsfc-silver-vs-national-harrow-blue-u7-v507aa60_6bf646e0",
 ]
 ALL_CLIPS = TRAIN_CLIPS + [HOLDOUT]
 
@@ -236,7 +261,7 @@ def _run_eval(weights, vis, tag, extra=()):
     return f"\n########## EVAL [{tag}] rc={out.returncode} ##########\n{tail}"
 
 
-@app.function(gpu=GPU, timeout=10800, volumes={"/vol": vol})
+@app.function(gpu=GPU, timeout=25200, volumes={"/vol": vol})
 def run(max_epochs: int = 30, inp_h: int = 0, inp_w: int = 0, batch: int = 8,
         sched: str = "10,20", vi_step: int = 5, skip_baseline: bool = False,
         vol_tag: str = "finetune-v1"):
@@ -350,6 +375,38 @@ def run(max_epochs: int = 30, inp_h: int = 0, inp_w: int = 0, batch: int = 8,
         report += f"\n!! final checkpoint missing or train failed (rc={tr.returncode}) — skipped finetuned eval"
 
     return {"text": report, "montage_b64": montage_b64}
+
+
+@app.function(gpu=GPU, timeout=5400, volumes={"/vol": vol})
+def eval_sweep(vol_tag: str = "finetune-v3-bigcorpus", epochs: str = "1,2,3,4,5,6,7",
+               inp_h: int = 720, inp_w: int = 1280):
+    """Re-evaluate persisted checkpoints on the frozen holdout — recovers the
+    true per-epoch trajectory when a detached run lost its return value."""
+    import os
+    import re
+    _build_dataset()  # builds HOLDOUT frames+annos (among ALL_CLIPS)
+    res_over = [f"model.inp_height={inp_h}", f"model.inp_width={inp_w}",
+                f"model.out_height={inp_h}", f"model.out_width={inp_w}"]
+    lines = []
+    for e in [x.strip() for x in epochs.split(",")]:
+        ckpt = f"/vol/{vol_tag}/{'best_model' if e=='best' else f'checkpoint_ep{e}'}.pth.tar"
+        if not os.path.exists(ckpt):
+            lines.append(f"ep{e}\tMISSING"); continue
+        rep = _run_eval(ckpt, vis=False, tag=f"ep{e}", extra=res_over)
+        rows = re.findall(r"\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*"
+                          r"\|\s*(\d+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|", rep)
+        if rows:
+            tp, tn, fp1, fp2, fp, fn, prec, rec, f1, acc = rows[-1]
+            lines.append(f"ep{e}\tTP={tp}\tFP={fp}\tFN={fn}\trecall={rec}\tprec={prec}\tF1={f1}")
+        else:
+            lines.append(f"ep{e}\t(parse-fail) tail:{rep[-240:]}")
+    return "\n".join(lines)
+
+
+@app.local_entrypoint()
+def sweep(vol_tag: str = "finetune-v3-bigcorpus", epochs: str = "1,2,3,4,5,6,7,best"):
+    print("=== v3 checkpoint eval sweep on frozen holdout (hb_cupfinal) ===")
+    print(eval_sweep.remote(vol_tag=vol_tag, epochs=epochs))
 
 
 @app.local_entrypoint()

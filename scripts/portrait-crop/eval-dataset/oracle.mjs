@@ -17,7 +17,8 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-const RAD = 60 // match radius in px — mirrors RECALL_MATCH_RADIUS in eval.ts
+const RAD = parseInt(process.env.ORACLE_RAD || '60', 10) // px — mirrors RECALL_MATCH_RADIUS in eval.ts
+const SUFFIX = process.env.RAW_SUFFIX || '_raw.json' // e.g. _mog2raw.json scores mined candidates
 const here = path.dirname(fileURLToPath(import.meta.url))
 const clipsDir = path.join(here, 'clips')
 const labelsDir = path.join(here, 'labels')
@@ -30,7 +31,9 @@ function oracle(rawPath, gtPath) {
   const ts = gt.frames.map((f) => f.t)
   const minT = Math.min(...ts) - step
   const maxT = Math.max(...ts) + step
-  const cin = (raw.all_candidates || []).filter((c) => c.time >= minT && c.time <= maxT)
+  const cin = (raw.all_candidates || []).filter(
+    (c) => c.time >= minT && c.time <= maxT
+  )
   const srcOf = (c) => c.source || 'yolo'
   const sources = [...new Set(cin.map(srcOf))].sort()
   const byK = new Map()
@@ -52,7 +55,10 @@ function oracle(rawPath, gtPath) {
     const srcHit = {}
     for (const dk of [k - 1, k, k + 1]) {
       for (const c of byK.get(dk) || []) {
-        if (near(c, f)) { anyHit = true; srcHit[srcOf(c)] = true }
+        if (near(c, f)) {
+          anyHit = true
+          srcHit[srcOf(c)] = true
+        }
       }
     }
     if (anyHit) hit.any++
@@ -70,17 +76,25 @@ function oracle(rawPath, gtPath) {
 const args = process.argv.slice(2)
 const clips = args.length
   ? args
-  : fs.readdirSync(labelsDir).filter((f) => f.endsWith('.json')).map((f) => f.replace('.json', ''))
+  : fs
+      .readdirSync(labelsDir)
+      .filter((f) => f.endsWith('.json'))
+      .map((f) => f.replace('.json', ''))
 
 console.log(`ORACLE recall (any candidate ≤${RAD}px of GT ball) — per source\n`)
 for (const id of clips) {
-  const rawPath = path.join(clipsDir, `${id}_raw.json`)
+  const rawPath = path.join(clipsDir, `${id}${SUFFIX}`)
   const gtPath = path.join(labelsDir, `${id}.json`)
   if (!fs.existsSync(rawPath) || !fs.existsSync(gtPath)) {
     console.log(`  ${id}: (missing _raw.json or labels)`)
     continue
   }
   const r = oracle(rawPath, gtPath)
-  const bs = Object.entries(r.bySource).map(([s, v]) => `${s}=${v}%`).join(' ') || '—'
-  console.log(`  ${id.padEnd(40)} oracle=${String(r.overall).padStart(3)}%  [${bs}]  (${r.n} GT)`)
+  const bs =
+    Object.entries(r.bySource)
+      .map(([s, v]) => `${s}=${v}%`)
+      .join(' ') || '—'
+  console.log(
+    `  ${id.padEnd(40)} oracle=${String(r.overall).padStart(3)}%  [${bs}]  (${r.n} GT)`
+  )
 }

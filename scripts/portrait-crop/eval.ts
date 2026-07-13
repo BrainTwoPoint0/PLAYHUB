@@ -29,6 +29,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { bootstrapMeanCI, bootstrapGroupedMeanCI } from './eval-stats'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -53,6 +54,9 @@ const POSITION_TOLERANCE = 80
 const RECALL_MATCH_RADIUS = 60
 // Target precision for recall reporting
 const RECALL_PRECISION_TARGET = 0.9
+// Tolerance sweep (px) — report recall@precision at each so we see the full
+// localisation curve (4px = tight, 60px = follow-camera-adequate), not one point.
+const RECALL_RADII = [4, 8, 16, 32, 60]
 
 // ── CLI ────────────────────────────────────────────────────────────
 const args = process.argv.slice(2)
@@ -60,6 +64,11 @@ const useModal = args.includes('--modal')
 const skipDetect = args.includes('--skip-detect')
 const datasetIdx = args.indexOf('--dataset')
 const datasetDir = datasetIdx >= 0 ? args[datasetIdx + 1] : 'eval-dataset'
+// --split test|val|train : restrict to clips whose manifest.json entry has that
+// `split` role. Enforces the val/test separation the eval rigor depends on
+// (never select checkpoints on the same clips you report the final number on).
+const splitIdx = args.indexOf('--split')
+const splitFilter = splitIdx >= 0 ? args[splitIdx + 1] : null
 const paramsIdx = args.indexOf('--params')
 const paramOverrides: Record<string, number> | undefined =
   paramsIdx >= 0 ? JSON.parse(args[paramsIdx + 1]) : undefined
@@ -113,7 +122,9 @@ interface ClipMetrics {
   max_accel_abs: number // px/s²
   ball_in_crop_pct: number | null // % (vs. GT ball pos, or vs. detected pos if no GT)
   ball_in_crop_source: 'gt' | 'detected' | 'none'
-  detection_recall_at_p90: number | null // 0-1 (only with dense GT)
+  detection_recall_at_p90: number | null // 0-1 (only with dense GT) — at RECALL_MATCH_RADIUS
+  detection_recall_by_radius: Record<string, number> | null // recall@p90 per RECALL_RADII px
+  detection_recall_headline: number | null // recall @ precision≥0.99 @ 16px — the report number
   legacy_keyframe_score: number | null // 0-1 (only with old-format GT)
   detect_seconds: number
 }
@@ -472,6 +483,32 @@ async function main() {
     process.exit(1)
   }
 
+  // --split: keep only clips tagged with the requested role in manifest.json.
+  if (splitFilter) {
+    const manifestPath = path.resolve(__dirname, datasetDir, 'manifest.json')
+    const roleById = new Map<string, string>()
+    if (fs.existsSync(manifestPath)) {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'))
+      for (const c of manifest.clips ?? []) {
+        const id = c.id ?? c.clip_id
+        if (id && c.split) roleById.set(id, c.split)
+      }
+    }
+    if (roleById.size === 0) {
+      console.error(
+        `--split ${splitFilter} requested but no clip has a "split" role in manifest.json — cannot enforce the val/test separation. Aborting.`
+      )
+      process.exit(1)
+    }
+    for (const id of [...candidates.keys()]) {
+      if (roleById.get(id) !== splitFilter) candidates.delete(id)
+    }
+    console.error(
+      `--split ${splitFilter}: ${candidates.size} clip(s) after filtering.`
+    )
+    if (candidates.size === 0) process.exit(1)
+  }
+
   console.error(`\n=== Portrait Crop Eval (${candidates.size} clips) ===\n`)
 
   const resultsDir = path.resolve(__dirname, datasetDir, 'results')
@@ -535,6 +572,26 @@ async function main() {
           RECALL_PRECISION_TARGET
         )
       : null
+    const recallByRadius = gt
+      ? Object.fromEntries(
+          RECALL_RADII.map((r) => [
+            String(r),
+            detectionRecallAtPrecision(
+              rawOutput.positions,
+              gt,
+              r,
+              RECALL_PRECISION_TARGET
+            ),
+          ])
+        )
+      : null
+    // Headline (per the eval-methodology review): recall @ precision≥0.99 @ 16px.
+    // 16px ≈ 2-3 ball diameters — the "close enough to seed the tracker" distance
+    // for a follow-camera; P≥0.99 because false jumps are fatal (a recall win at
+    // lower precision from confident wrong firings is a regression in disguise).
+    const recallHeadline = gt
+      ? detectionRecallAtPrecision(rawOutput.positions, gt, 16, 0.99)
+      : null
     const legacyScore = legacy ? legacyKeyframeMatch(simplified, legacy) : null
 
     const m: ClipMetrics = {
@@ -548,6 +605,8 @@ async function main() {
       ball_in_crop_pct: inCrop.source === 'none' ? null : inCrop.pct,
       ball_in_crop_source: inCrop.source,
       detection_recall_at_p90: recall,
+      detection_recall_by_radius: recallByRadius,
+      detection_recall_headline: recallHeadline,
       legacy_keyframe_score: legacyScore,
       detect_seconds: detectSec,
     }
@@ -573,6 +632,45 @@ async function main() {
       .map((m) => m[k] as unknown)
       .filter((x): x is number => typeof x === 'number' && !isNaN(x))
 
+  // Map clip → match_id (from manifest) so CIs bootstrap over MATCHES, not clips
+  // (same-match clips are correlated; clip-level CIs are falsely confident).
+  const matchOf = new Map<string, string>()
+  try {
+    const manifest = JSON.parse(
+      fs.readFileSync(
+        path.resolve(__dirname, datasetDir, 'manifest.json'),
+        'utf-8'
+      )
+    )
+    for (const c of manifest.clips ?? []) {
+      const id = c.id ?? c.clip_id
+      if (id) matchOf.set(id, c.match_id ?? id)
+    }
+  } catch {
+    /* no manifest — fall back to per-clip (each clip its own group) */
+  }
+  const grpItems = (pick: (m: ClipMetrics) => number | null | undefined) =>
+    perClip
+      .map((m) => ({ value: pick(m), group: matchOf.get(m.clip) ?? m.clip }))
+      .filter(
+        (it): it is { value: number; group: string } =>
+          typeof it.value === 'number' && !isNaN(it.value)
+      )
+
+  // Per-radius recall@p90 with match-block bootstrap CIs (diagnostic sweep).
+  const recallByRadius = Object.fromEntries(
+    RECALL_RADII.map((r) => [
+      String(r),
+      bootstrapGroupedMeanCI(
+        grpItems((m) => m.detection_recall_by_radius?.[String(r)])
+      ),
+    ])
+  )
+  // The HEADLINE number: recall @ precision≥0.99 @ 16px, match-block bootstrap.
+  const headline = bootstrapGroupedMeanCI(
+    grpItems((m) => m.detection_recall_headline)
+  )
+
   const summary = {
     clips: n,
     mean_detection_coverage: avg(collect('detection_coverage')),
@@ -582,6 +680,8 @@ async function main() {
     max_max_accel_abs: Math.max(0, ...collect('max_accel_abs')),
     mean_ball_in_crop_pct: avg(collect('ball_in_crop_pct')),
     mean_detection_recall_at_p90: avg(collect('detection_recall_at_p90')),
+    recall_headline_p99_16px: headline,
+    recall_by_radius: recallByRadius,
     mean_legacy_score: avg(collect('legacy_keyframe_score')),
     total_detect_seconds: perClip.reduce((s, m) => s + m.detect_seconds, 0),
   }
@@ -610,6 +710,29 @@ async function main() {
     console.error(
       `Detection recall@p0.9:  ${(summary.mean_detection_recall_at_p90 * 100).toFixed(1)}%  (target ≥92)`
     )
+  const pc = (x: number) => (x * 100).toFixed(1).padStart(5)
+  if (headline.n > 0) {
+    console.error(
+      `\n★ HEADLINE recall @P≥0.99 @16px:  ${pc(headline.mean)}%  ` +
+        `[${pc(headline.lo)}, ${pc(headline.hi)}]  ` +
+        `(${headline.n} clips / ${headline.groups} matches, block-bootstrap)`
+    )
+    if (headline.groups < 12)
+      console.error(
+        `  ⚠ ${headline.groups} matches = DIRECTIONAL only; ~12-15 needed for a trustworthy A/B.`
+      )
+  }
+  if (RECALL_RADII.some((r) => recallByRadius[String(r)].n > 0)) {
+    console.error(
+      `Recall@p0.9 sweep (mean [95% CI] by match, diagnostic — 4px ≈ annotation jitter):`
+    )
+    for (const r of RECALL_RADII) {
+      const c = recallByRadius[String(r)]
+      console.error(
+        `   ${String(r).padStart(3)}px:  ${pc(c.mean)}%  [${pc(c.lo)}, ${pc(c.hi)}]`
+      )
+    }
+  }
   if (summary.mean_legacy_score > 0)
     console.error(
       `Legacy keyframe match:  ${summary.mean_legacy_score.toFixed(3)}  (back-compat)`

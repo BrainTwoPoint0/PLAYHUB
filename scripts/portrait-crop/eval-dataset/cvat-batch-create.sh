@@ -11,6 +11,9 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 HOST="${CVAT_HOST:-http://localhost}"; PORT="${CVAT_PORT:-8080}"
 : "${CVAT_AUTH:?set CVAT_AUTH=user:pass}"
+# CLIPS_DIR overrides where the .mp4s live (XMLs always in cvat-imports/). For the
+# B-ball corpus: CLIPS_DIR=../mining/corpus ./cvat-batch-create.sh
+CLIPS_DIR="${CLIPS_DIR:-$HERE/clips}"
 
 cli() { cvat-cli --server-host "$HOST" --server-port "$PORT" --auth "$CVAT_AUTH" "$@" \
           2>&1 | grep -viE "WARNING: (Failed to connect|This fallback)"; }
@@ -18,7 +21,7 @@ cli() { cvat-cli --server-host "$HOST" --server-port "$PORT" --auth "$CVAT_AUTH"
 # Existing task NAMES (default `task ls` prints only IDs — must use --json).
 existing="$(cli task ls --json 2>/dev/null | jq -r '.[].name' 2>/dev/null || true)"
 created=0; skipped=0
-for mp4 in "$HERE"/clips/*.mp4; do
+for mp4 in "$CLIPS_DIR"/*.mp4; do
   id="$(basename "$mp4" .mp4)"
   xml="$HERE/cvat-imports/$id.xml"
   if [ ! -f "$xml" ]; then echo "skip $id (no pre-annotation)"; skipped=$((skipped+1)); continue; fi

@@ -543,8 +543,44 @@ def select_trajectory(per_frame_data: list) -> list:
     miss = sum(1 for c in chosen if c is None)
     for t in range(n):
         per_frame_data[t]["best_ball"] = chosen[t]
+    _attach_track_support(per_frame_data)
     print(f"  Trajectory DP: {n - miss}/{n} frames selected, {miss} miss", file=sys.stderr)
     return per_frame_data
+
+
+# Track-support scale: residual (px) at which trajectory-fit support decays to 1/e.
+# ~2× a real ball's inter-frame motion, so on-arc picks score high and an off-arc
+# distractor the DP was forced to pick in a gap scores low.
+SUPPORT_TAU = 60.0
+SUPPORT_MAX_SPAN = 1.0   # s — beyond this neighbour gap, linear interp is unreliable → fall back to conf
+
+
+def _attach_track_support(per_frame_data: list) -> None:
+    """Temporal Confidence Propagation. The DP already selected the globally most
+    consistent arc, but the emitted score was raw single-frame YOLO conf — which
+    can't separate a 5px ball from bright distractors, so precision-gating collapses
+    recall. Replace it with a TRACK-SUPPORT score = how well each selected pick fits
+    its own trajectory (residual vs the constant-velocity interpolation of its real
+    neighbours). On-arc ball → high; off-arc distractor picked in a gap → low. Raw
+    conf survives only as a weak tie-breaker. Written to best_ball['support']; the
+    precision-sensitive consumer (eval / follow ball-bias) ranks by this, not conf."""
+    reals = [(t, fd["best_ball"]) for t, fd in enumerate(per_frame_data) if fd.get("best_ball")]
+    times = [fd["time_sec"] for fd in per_frame_data]
+    for k, (t, b) in enumerate(reals):
+        support = None
+        if 0 < k < len(reals) - 1:
+            tp, bp = reals[k - 1]
+            tn, bn = reals[k + 1]
+            span = times[tn] - times[tp]
+            if 1e-3 < span <= SUPPORT_MAX_SPAN:
+                frac = (times[t] - times[tp]) / span
+                px = bp["x"] + (bn["x"] - bp["x"]) * frac
+                py = bp["y"] + (bn["y"] - bp["y"]) * frac
+                resid = math.hypot(b["x"] - px, b["y"] - py)
+                support = math.exp(-resid / SUPPORT_TAU)
+        if support is None:
+            support = float(b.get("conf", 0.3))   # endpoint/isolated: no trajectory context
+        b["support"] = round(0.8 * support + 0.2 * float(b.get("conf", 0.0)), 4)
 
 
 def _run_tracking(per_frame_data: list, kalman_r: float) -> tuple:
@@ -597,6 +633,7 @@ def _run_tracking(per_frame_data: list, kalman_r: float) -> tuple:
                     "w": round(best_ball["w"]),
                     "h": round(best_ball["h"]),
                     "conf": round(best_ball["conf"], 3),
+                    "support": round(best_ball.get("support", best_ball["conf"]), 4),
                     "source": "ball"
                 }
             else:
@@ -607,6 +644,7 @@ def _run_tracking(per_frame_data: list, kalman_r: float) -> tuple:
                     "w": round(best_ball["w"]),
                     "h": round(best_ball["h"]),
                     "conf": round(best_ball["conf"], 3),
+                    "support": round(best_ball.get("support", best_ball["conf"]), 4),
                     "source": "ball"
                 }
             positions.append(pos)
@@ -635,6 +673,7 @@ def _run_tracking(per_frame_data: list, kalman_r: float) -> tuple:
                     "w": round(best_ball["w"]),
                     "h": round(best_ball["h"]),
                     "conf": round(best_ball["conf"], 3),
+                    "support": round(best_ball.get("support", best_ball["conf"]), 4),
                     "source": "ball"
                 }
                 positions.append(pos)

@@ -1,9 +1,7 @@
 {
   "$schema": "./manifest.schema.json",
   "version": 2,
-  "frozen_holdout": [
-    "veo_20260506_hb_cupfinal_goal_01"
-  ],
+  "frozen_holdout": ["veo_20260506_hb_cupfinal_goal_01"],
   "clips": [
     {
       "id": "veo_20260502_goal_01",
@@ -46,7 +44,8 @@
         "notes": "Cup-final 2026-05-06, fresh post-fine-tune."
       },
       "notes": "veo_match=20260506-hollands-blair-u23-vs-ta-cup-final-v471daec, highlight_id=19da9261-05e3-44a5-9150-0603e5fc9445, start=3082, url=https://veo-content-ii.s3.eu-west-1.amazonaws.com/21a123ec-4aad-479a-8ba8-cb0a8976338a/highlight-v2/19da9261-05e3-44a5-9150-0603e5fc9445_1778117161.795974/video.mp4",
-      "match_id": "20260506-hollands-blair-u23-vs-ta-cup-final-v471daec"
+      "match_id": "20260506-hollands-blair-u23-vs-ta-cup-final-v471daec",
+      "split": "test"
     },
     {
       "id": "veo_20260505_sefa_u19_goal_01",
@@ -74,7 +73,8 @@
         "notes": "NCFE L3 practical 2026-05-01, fresh post-fine-tune."
       },
       "notes": "veo_match=20260501-ncfe-l3-2nd-year-practical-work-vf142fc8, highlight_id=14c25cc5-44b8-4dc2-8a5a-b784bd88ab8b, start=3271, url=https://veo-content-ii.s3.eu-west-1.amazonaws.com/a24232ab-9459-4d59-a470-1ff38b8ff36b/highlight-v2/14c25cc5-44b8-4dc2-8a5a-b784bd88ab8b_1777982954.843849/video.mp4",
-      "match_id": "20260501-ncfe-l3-2nd-year-practical-work-vf142fc8"
+      "match_id": "20260501-ncfe-l3-2nd-year-practical-work-vf142fc8",
+      "split": "val"
     },
     {
       "id": "veo_20260502_match_goal_01",
@@ -118,7 +118,8 @@
         "notes": "Shot-on-goal build-up from the 2026-05-02 secondary recording."
       },
       "notes": "veo_match=20260502-untitled-recording-2026-05-02_12-03-41-v40ff5bb, highlight_id=ac81d3f8-b04e-4a98-8244-51d5d51774f6, start=221, url=https://veo-content-ii.s3.eu-west-1.amazonaws.com/54a2e957-67ef-4320-a2d8-4b440ab9dbda/highlight-v2/ac81d3f8-b04e-4a98-8244-51d5d51774f6_1778195726.602911/video.mp4",
-      "match_id": "20260502-untitled-recording-2026-05-02_12-03-41-v40ff5bb"
+      "match_id": "20260502-untitled-recording-2026-05-02_12-03-41-v40ff5bb",
+      "split": "val"
     },
     {
       "id": "veo_20260505_hb_matchday1_passage_01",
@@ -133,7 +134,8 @@
         "notes": "Hollands Blair u23 matchday-1, 2026-05-05."
       },
       "notes": "veo_match=20260505-hollands-blair-u23-vs-matchday-1-vs-ta-v5b3f5dc, highlight_id=4efabfb1-c47b-41f2-b460-d995bb862adb, start=2039, url=https://veo-content-ii.s3.eu-west-1.amazonaws.com/31d89fc9-cda6-43e7-a4b6-88bc025f48e9/highlight-v2/4efabfb1-c47b-41f2-b460-d995bb862adb_1778114510.68403/video.mp4",
-      "match_id": "20260505-hollands-blair-u23-vs-matchday-1-vs-ta-v5b3f5dc"
+      "match_id": "20260505-hollands-blair-u23-vs-matchday-1-vs-ta-v5b3f5dc",
+      "split": "val"
     },
     {
       "id": "veo_20260506_hb_cupfinal_passage_01",
@@ -148,7 +150,8 @@
         "notes": "Cup-final 2026-05-06, distinct from the goal clip on the same match."
       },
       "notes": "veo_match=20260506-hollands-blair-u23-vs-ta-cup-final-v471daec, highlight_id=14294cce-9766-450d-a3b1-86ec0dd60de2, start=2632, url=https://veo-content-ii.s3.eu-west-1.amazonaws.com/21a123ec-4aad-479a-8ba8-cb0a8976338a/highlight-v2/14294cce-9766-450d-a3b1-86ec0dd60de2_1778117161.795974/video.mp4",
-      "match_id": "20260506-hollands-blair-u23-vs-ta-cup-final-v471daec"
+      "match_id": "20260506-hollands-blair-u23-vs-ta-cup-final-v471daec",
+      "split": "val"
     },
     {
       "id": "veo_20250920_cfa_u9_corner_01",
@@ -160,7 +163,7 @@
       "leak_audit": {
         "forzasys_soccer": "clean",
         "veo_finetuned": "unknown",
-        "notes": "CFA u9 from 2025-09-20 — predates the Veo fine-tune. KARIM: verify against Roboflow project 'veo-ball-detection v1' before labeling; swap if ID overlap. The only corner-tagged highlight currently in cache."
+        "notes": "CFA u9 from 2025-09-20 \u2014 predates the Veo fine-tune. KARIM: verify against Roboflow project 'veo-ball-detection v1' before labeling; swap if ID overlap. The only corner-tagged highlight currently in cache."
       },
       "notes": "veo_match=20250920-cfa-u9-vs-mezzie-youth-477d786a, highlight_id=05e9564a-ce71-47f1-a9bc-743e0f187504, start=2018, url=https://c.veocdn.com/283a6f1f-21ac-49ed-a4d2-d802ebc5e842/highlight-v2/05e9564a-ce71-47f1-a9bc-743e0f187504_1758535356.716584/video.mp4?v=sAPSUUT4",
       "match_id": "20250920-cfa-u9-vs-mezzie-youth-477d786a"
@@ -175,7 +178,7 @@
       "leak_audit": {
         "forzasys_soccer": "clean",
         "veo_finetuned": "unknown",
-        "notes": "CFA u9 2025-09-27 — verify against Roboflow before labeling."
+        "notes": "CFA u9 2025-09-27 \u2014 verify against Roboflow before labeling."
       },
       "notes": "veo_match=20250927-cfa-u9-yellow-vs-valley-green-ba185d64, highlight_id=72115aea-f816-46e2-bd3b-9cc87a4eeef8, start=541, url=https://c.veocdn.com/d085767a-e391-44f9-bf61-b8e14bff8717/highlight-v2/72115aea-f816-46e2-bd3b-9cc87a4eeef8_1759143983.223454/video.mp4?v=AiydCK1h",
       "match_id": "20250927-cfa-u9-yellow-vs-valley-green-ba185d64"
@@ -190,7 +193,7 @@
       "leak_audit": {
         "forzasys_soccer": "clean",
         "veo_finetuned": "unknown",
-        "notes": "Goal-kick from 2024-09-18 — old, verify against Roboflow before labeling. Stands in for the 'keeper long ball' edge case."
+        "notes": "Goal-kick from 2024-09-18 \u2014 old, verify against Roboflow before labeling. Stands in for the 'keeper long ball' edge case."
       },
       "notes": "veo_match=20240918-match-18-sep-2024-20de1d37, highlight_id=051aab26-93cf-41f1-9033-8b2a59386de2, start=1536, url=https://c.veocdn.com/99d16727-0566-4c19-b05a-61bd57c61a3f/highlight-v2/051aab26-93cf-41f1-9033-8b2a59386de2_1727793249.724764/video.mp4",
       "match_id": "20240918-match-18-sep-2024-20de1d37"
@@ -205,7 +208,7 @@
       "leak_audit": {
         "forzasys_soccer": "clean",
         "veo_finetuned": "clean",
-        "notes": "PLACEHOLDER — Karim picks during sprint: a goal where the ball crosses into the net NEAR A FRAME EDGE (last visible ball x < 300 or > 1620 of 1920). This is the case that separates Phase 1.2 post-goal-hold (hold on the goal at the edge) from 1.1 recenter (drift to center) — 002331 couldn't prove 1.2 because its goal sat near center."
+        "notes": "PLACEHOLDER \u2014 Karim picks during sprint: a goal where the ball crosses into the net NEAR A FRAME EDGE (last visible ball x < 300 or > 1620 of 1920). This is the case that separates Phase 1.2 post-goal-hold (hold on the goal at the edge) from 1.1 recenter (drift to center) \u2014 002331 couldn't prove 1.2 because its goal sat near center."
       },
       "notes": "Selection: scrub goal-tagged highlights for a goal whose mouth sits near the LEFT or RIGHT edge of the panorama. Skip rather than mislabel if none surface.",
       "match_id": "GOAL_EDGE_01"
@@ -220,7 +223,7 @@
       "leak_audit": {
         "forzasys_soccer": "clean",
         "veo_finetuned": "clean",
-        "notes": "PLACEHOLDER — second goal-at-edge clip, OPPOSITE side from GOAL_EDGE_01 if possible (one left-goal, one right-goal) to exercise both toward_left and toward_right branches of maybe_goal_hold_until."
+        "notes": "PLACEHOLDER \u2014 second goal-at-edge clip, OPPOSITE side from GOAL_EDGE_01 if possible (one left-goal, one right-goal) to exercise both toward_left and toward_right branches of maybe_goal_hold_until."
       },
       "notes": "See GOAL_EDGE_01 selection criterion. Opposite-edge example preferred.",
       "match_id": "GOAL_EDGE_02"
@@ -235,9 +238,9 @@
       "leak_audit": {
         "forzasys_soccer": "clean",
         "veo_finetuned": "clean",
-        "notes": "PLACEHOLDER — Karim picks a clip during sprint by visual review (lens flare, low-light, sunset, etc.). Veo metadata can't surface visual properties."
+        "notes": "PLACEHOLDER \u2014 Karim picks a clip during sprint by visual review (lens flare, low-light, sunset, etc.). Veo metadata can't surface visual properties."
       },
-      "notes": "Skip if no good candidate surfaces during the labeling sprint — drop to 14 clips rather than mislabel as cursed.",
+      "notes": "Skip if no good candidate surfaces during the labeling sprint \u2014 drop to 14 clips rather than mislabel as cursed.",
       "match_id": "CURSED_01_lens_flare"
     },
     {
@@ -250,10 +253,190 @@
       "leak_audit": {
         "forzasys_soccer": "clean",
         "veo_finetuned": "clean",
-        "notes": "PLACEHOLDER — Karim picks a clip with visible warm-up ball / multi-ball confusion during the labeling sprint."
+        "notes": "PLACEHOLDER \u2014 Karim picks a clip with visible warm-up ball / multi-ball confusion during the labeling sprint."
       },
       "notes": "Tests the tracker's ability to lock onto the right ball under ambiguity.",
       "match_id": "CURSED_02_two_ball"
+    },
+    {
+      "id": "veo_20220428-cfamezzie-u10-vs-fc-evolution-5fc4e3c4_67de8749",
+      "file": "veo_20220428-cfamezzie-u10-vs-fc-evolution-5fc4e3c4_67de8749.mp4",
+      "category": "goal",
+      "label_fps": 5,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "held_out_from_playhub_corpus",
+        "notes": "Diverse held-out val clip added 2026-07-10 to power up the eval (n=4->n<=16). Not in the vNEXT corpus finetune (0 match_id collision with train, verified). Production veo_finetuned training set predates and is unverified."
+      },
+      "notes": "veo_match=20220428-cfamezzie-u10-vs-fc-evolution-5fc4e3c4, event_id=67de8749-9a32-49b8-94ba-d8243aa4f32b, ts=460, url=https://c.veocdn.com/68feab6e-b158-4a7b-be58-57aa5301f210/highlight-v2/67de8749-9a32-49b8-94ba-d8243aa4f32b_1740254641.159219/video.mp4?v=a80vpyOQ",
+      "match_id": "20220428-cfamezzie-u10-vs-fc-evolution-5fc4e3c4",
+      "split": "val"
+    },
+    {
+      "id": "veo_20241102-boys-jpl-u16-vs-ebbsfleet-153037b1_4630e3e5",
+      "file": "veo_20241102-boys-jpl-u16-vs-ebbsfleet-153037b1_4630e3e5.mp4",
+      "category": "goal",
+      "label_fps": 5,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "held_out_from_playhub_corpus",
+        "notes": "Diverse held-out val clip added 2026-07-10 to power up the eval (n=4->n<=16). Not in the vNEXT corpus finetune (0 match_id collision with train, verified). Production veo_finetuned training set predates and is unverified."
+      },
+      "notes": "veo_match=20241102-boys-jpl-u16-vs-ebbsfleet-153037b1, event_id=4630e3e5-cd3d-4ce8-b6d1-a5fc3c187922, ts=776, url=https://c.veocdn.com/5cf9ada8-1efc-4dff-bcdd-306450bb8ed0/highlight-v2/4630e3e5-cd3d-4ce8-b6d1-a5fc3c187922_1730809240.145474/video.mp4?v=7IDt32Wy",
+      "match_id": "20241102-boys-jpl-u16-vs-ebbsfleet-153037b1",
+      "split": "val"
+    },
+    {
+      "id": "veo_20250501-soccer-elite-fa-u19-vs-handball-blue-timetable-bce5a130_00e9bc5b",
+      "file": "veo_20250501-soccer-elite-fa-u19-vs-handball-blue-timetable-bce5a130_00e9bc5b.mp4",
+      "category": "goal",
+      "label_fps": 5,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "held_out_from_playhub_corpus",
+        "notes": "Diverse held-out val clip added 2026-07-10 to power up the eval (n=4->n<=16). Not in the vNEXT corpus finetune (0 match_id collision with train, verified). Production veo_finetuned training set predates and is unverified."
+      },
+      "notes": "veo_match=20250501-soccer-elite-fa-u19-vs-handball-blue-timetable-bce5a130, event_id=00e9bc5b-5359-4729-a10a-bceb2af1e66b, ts=396, url=https://c.veocdn.com/0e2c6227-63d2-4824-98f1-a41eec3af277/highlight-v2/00e9bc5b-5359-4729-a10a-bceb2af1e66b_1746198797.790009/video.mp4",
+      "match_id": "20250501-soccer-elite-fa-u19-vs-handball-blue-timetable-bce5a130",
+      "split": "val"
+    },
+    {
+      "id": "veo_20260104-sefa-women-first-team-vs-afc-greenwich-borough-053ab183_df1b635c",
+      "file": "veo_20260104-sefa-women-first-team-vs-afc-greenwich-borough-053ab183_df1b635c.mp4",
+      "category": "goal",
+      "label_fps": 5,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "held_out_from_playhub_corpus",
+        "notes": "Diverse held-out val clip added 2026-07-10 to power up the eval (n=4->n<=16). Not in the vNEXT corpus finetune (0 match_id collision with train, verified). Production veo_finetuned training set predates and is unverified."
+      },
+      "notes": "veo_match=20260104-sefa-women-first-team-vs-afc-greenwich-borough-053ab183, event_id=df1b635c-e60f-4d42-b06d-88889a2d1a0a, ts=792, url=https://c.veocdn.com/d41a049c-44af-4e88-ae16-4938351b0339/highlight-v2/df1b635c-e60f-4d42-b06d-88889a2d1a0a_1767555363.666516/video.mp4",
+      "match_id": "20260104-sefa-women-first-team-vs-afc-greenwich-borough-053ab183",
+      "split": "val"
+    },
+    {
+      "id": "veo_20241012-u14s-vs-littlehampton-e5b0f0b8_1c722a61",
+      "file": "veo_20241012-u14s-vs-littlehampton-e5b0f0b8_1c722a61.mp4",
+      "category": "goal",
+      "label_fps": 5,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "held_out_from_playhub_corpus",
+        "notes": "Diverse held-out val clip added 2026-07-10 to power up the eval (n=4->n<=16). Not in the vNEXT corpus finetune (0 match_id collision with train, verified). Production veo_finetuned training set predates and is unverified."
+      },
+      "notes": "veo_match=20241012-u14s-vs-littlehampton-e5b0f0b8, event_id=1c722a61-0b48-4bf0-9674-024c61a7d52f, ts=2917, url=https://c.veocdn.com/ade077de-5dcb-4799-b866-f119a09eb22d/highlight-v2/1c722a61-0b48-4bf0-9674-024c61a7d52f_1728899918.233274/video.mp4?v=n5xut9-f",
+      "match_id": "20241012-u14s-vs-littlehampton-e5b0f0b8",
+      "split": "val"
+    },
+    {
+      "id": "veo_20260503-roehampton-u9-v57fd751_9d40dea4",
+      "file": "veo_20260503-roehampton-u9-v57fd751_9d40dea4.mp4",
+      "category": "goal",
+      "label_fps": 5,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "held_out_from_playhub_corpus",
+        "notes": "Diverse held-out val clip added 2026-07-10 to power up the eval (n=4->n<=16). Not in the vNEXT corpus finetune (0 match_id collision with train, verified). Production veo_finetuned training set predates and is unverified."
+      },
+      "notes": "veo_match=20260503-roehampton-u9-v57fd751, event_id=9d40dea4-8024-47c0-802a-a69f6dfeab2e, ts=448, url=https://veo-content-ii.s3.eu-west-1.amazonaws.com/b0abd74a-0e81-401f-917f-e68434873a7b/highlight-v2/9d40dea4-8024-47c0-802a-a69f6dfeab2e_1778395238.89346/video.mp4",
+      "match_id": "20260503-roehampton-u9-v57fd751",
+      "split": "val"
+    },
+    {
+      "id": "veo_20260517-elite-london-academy-u7-vs-roehampton-elite-u7-v7ed782b_64b76051",
+      "file": "veo_20260517-elite-london-academy-u7-vs-roehampton-elite-u7-v7ed782b_64b76051.mp4",
+      "category": "goal",
+      "label_fps": 5,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "held_out_from_playhub_corpus",
+        "notes": "Diverse held-out val clip added 2026-07-10 to power up the eval (n=4->n<=16). Not in the vNEXT corpus finetune (0 match_id collision with train, verified). Production veo_finetuned training set predates and is unverified."
+      },
+      "notes": "veo_match=20260517-elite-london-academy-u7-vs-roehampton-elite-u7-v7ed782b, event_id=64b76051-d711-49a6-b2b4-b7549cd169bc, ts=726, url=https://veo-content-ii.s3.eu-west-1.amazonaws.com/2dc475af-d4e5-4e04-a2d1-582bae61d1b7/highlight-v2/64b76051-d711-49a6-b2b4-b7549cd169bc_1779035659.631905/video.mp4",
+      "match_id": "20260517-elite-london-academy-u7-vs-roehampton-elite-u7-v7ed782b",
+      "split": "val"
+    },
+    {
+      "id": "veo_london-youth-league-20260517-forza-skillz-u8-vs-barnes-eagles-u8-vcc72fbf_9b49319e",
+      "file": "veo_london-youth-league-20260517-forza-skillz-u8-vs-barnes-eagles-u8-vcc72fbf_9b49319e.mp4",
+      "category": "goal",
+      "label_fps": 5,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "held_out_from_playhub_corpus",
+        "notes": "Diverse held-out val clip added 2026-07-10 to power up the eval (n=4->n<=16). Not in the vNEXT corpus finetune (0 match_id collision with train, verified). Production veo_finetuned training set predates and is unverified."
+      },
+      "notes": "veo_match=london-youth-league-20260517-forza-skillz-u8-vs-barnes-eagles-u8-vcc72fbf, event_id=9b49319e-ada0-42d9-ab17-14c4f39ad10c, ts=778, url=https://veo-content-ii.s3.eu-west-1.amazonaws.com/da2373d2-6085-4333-8a52-e6a729a7ee06/highlight-v2/173a2eeb-a089-44fb-8829-19fd7c4f7e04_1779040012.925529/video.mp4",
+      "match_id": "london-youth-league-20260517-forza-skillz-u8-vs-barnes-eagles-u8-vcc72fbf",
+      "split": "val"
+    },
+    {
+      "id": "veo_20241012-sefa-boys-jpl-u12-vs-prime-fdc-12f11b5f_eb13406e",
+      "file": "veo_20241012-sefa-boys-jpl-u12-vs-prime-fdc-12f11b5f_eb13406e.mp4",
+      "category": "goal",
+      "label_fps": 5,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "held_out_from_playhub_corpus",
+        "notes": "Diverse held-out val clip added 2026-07-10 to power up the eval (n=4->n<=16). Not in the vNEXT corpus finetune (0 match_id collision with train, verified). Production veo_finetuned training set predates and is unverified."
+      },
+      "notes": "veo_match=20241012-sefa-boys-jpl-u12-vs-prime-fdc-12f11b5f, event_id=eb13406e-8b25-4f8b-bb38-a9f848f67447, ts=2581, url=https://c.veocdn.com/36ecfe41-52b0-4681-a2d9-aee541552ba3/highlight-v2/eb13406e-8b25-4f8b-bb38-a9f848f67447_1728899284.23179/video.mp4",
+      "match_id": "20241012-sefa-boys-jpl-u12-vs-prime-fdc-12f11b5f",
+      "split": "val"
+    },
+    {
+      "id": "veo_20241023-hollands-blair-u23-vs-herne-bay-u23s-a33abe29_3cda81aa",
+      "file": "veo_20241023-hollands-blair-u23-vs-herne-bay-u23s-a33abe29_3cda81aa.mp4",
+      "category": "goal",
+      "label_fps": 5,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "held_out_from_playhub_corpus",
+        "notes": "Diverse held-out val clip added 2026-07-10 to power up the eval (n=4->n<=16). Not in the vNEXT corpus finetune (0 match_id collision with train, verified). Production veo_finetuned training set predates and is unverified."
+      },
+      "notes": "veo_match=20241023-hollands-blair-u23-vs-herne-bay-u23s-a33abe29, event_id=3cda81aa-8505-415c-b358-309b5ee699f1, ts=5469, url=https://c.veocdn.com/489419a7-b8be-409b-a535-1339d4b52c2a/highlight-v2/3cda81aa-8505-415c-b358-309b5ee699f1_1729721084.991246/video.mp4",
+      "match_id": "20241023-hollands-blair-u23-vs-herne-bay-u23s-a33abe29",
+      "split": "val"
+    },
+    {
+      "id": "veo_20241109-boys-jpl-u13-vs-greenwich-peninsula-536a05f1_2f666f4a",
+      "file": "veo_20241109-boys-jpl-u13-vs-greenwich-peninsula-536a05f1_2f666f4a.mp4",
+      "category": "goal",
+      "label_fps": 5,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "held_out_from_playhub_corpus",
+        "notes": "Diverse held-out val clip added 2026-07-10 to power up the eval (n=4->n<=16). Not in the vNEXT corpus finetune (0 match_id collision with train, verified). Production veo_finetuned training set predates and is unverified."
+      },
+      "notes": "veo_match=20241109-boys-jpl-u13-vs-greenwich-peninsula-536a05f1, event_id=2f666f4a-66b1-4657-97b1-697f0927615d, ts=1476, url=https://c.veocdn.com/600b2b19-1213-4bf7-947f-d740bee78931/highlight-v2/2f666f4a-66b1-4657-97b1-697f0927615d_1731325494.052994/video.mp4",
+      "match_id": "20241109-boys-jpl-u13-vs-greenwich-peninsula-536a05f1",
+      "split": "val"
+    },
+    {
+      "id": "veo_20250308-cfa-u11-vs-hannakins-55eef8f4_313dc148",
+      "file": "veo_20250308-cfa-u11-vs-hannakins-55eef8f4_313dc148.mp4",
+      "category": "goal",
+      "label_fps": 5,
+      "source": "veo_academy",
+      "leak_audit": {
+        "forzasys_soccer": "clean",
+        "veo_finetuned": "held_out_from_playhub_corpus",
+        "notes": "Diverse held-out val clip added 2026-07-10 to power up the eval (n=4->n<=16). Not in the vNEXT corpus finetune (0 match_id collision with train, verified). Production veo_finetuned training set predates and is unverified."
+      },
+      "notes": "veo_match=20250308-cfa-u11-vs-hannakins-55eef8f4, event_id=313dc148-4344-49f9-b160-675ea6fa8f9b, ts=669, url=https://c.veocdn.com/47cb1812-01a2-4428-a56a-fdc2086f31ea/highlight-v2/313dc148-4344-49f9-b160-675ea6fa8f9b_1741449904.225747/video.mp4?v=PoKghkAH",
+      "match_id": "20250308-cfa-u11-vs-hannakins-55eef8f4",
+      "split": "val"
     }
   ]
 }
