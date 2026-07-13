@@ -7,6 +7,7 @@ import {
   HeadObjectCommand,
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3'
+import { BatchClient, SubmitJobCommand } from '@aws-sdk/client-batch'
 import { Upload } from '@aws-sdk/lib-storage'
 import { Readable } from 'stream'
 import { createClient } from '@supabase/supabase-js'
@@ -15,6 +16,7 @@ import {
   sweepZombie,
   type ZombieCandidate,
 } from './zombies'
+import { sweepPanoramaCaptures } from './panorama-sweep'
 import { fetchAllRows } from './paginate'
 
 // Environment variables
@@ -32,6 +34,13 @@ const SPIIDEO_USER_ID = process.env.SPIIDEO_USER_ID!
 const RESEND_API_KEY = process.env.RESEND_API_KEY || ''
 const ALERT_EMAIL = process.env.ALERT_EMAIL || ''
 const APP_URL = process.env.APP_URL || 'https://playhub.playbacksports.ai'
+
+// Panorama capture sweep (preserve-first, 2026-07-07): Spiideo purges the raw
+// VP source ~30 days after a game, so published recordings missing their
+// panorama get a vp-materialize Batch job submitted here. Empty env disables
+// the sweep (fail-safe if terraform hasn't provided the names yet).
+const PANORAMA_JOB_QUEUE = process.env.PANORAMA_JOB_QUEUE || ''
+const PANORAMA_JOB_DEF = process.env.PANORAMA_JOB_DEF || ''
 
 // Simple HTML escaping for email templates
 function escapeHtml(s: string): string {
@@ -1245,9 +1254,49 @@ export const handler = async (): Promise<{
       )
     console.log(`${gamesToSync.length} games need syncing`)
 
+    // Panorama capture sweep — must never break the main sync. Runs on EVERY
+    // invocation (including no-work ticks, which are the steady-state
+    // majority): the sweep is the purge-window safety net, and a quiet day
+    // with no new games is exactly when backlogged recordings need it.
+    const runPanoramaSweep = async () => {
+      if (!PANORAMA_JOB_QUEUE || !PANORAMA_JOB_DEF) return
+      try {
+        const batch = new BatchClient({ region: S3_REGION })
+        const { submitted, candidates } = await sweepPanoramaCaptures(
+          supabase,
+          async (recordingId, gameId) => {
+            const out = await batch.send(
+              new SubmitJobCommand({
+                jobName: `vp-materialize-${recordingId}`,
+                jobQueue: PANORAMA_JOB_QUEUE,
+                jobDefinition: PANORAMA_JOB_DEF,
+                containerOverrides: {
+                  environment: [
+                    { name: 'RECORDING_ID', value: recordingId },
+                    { name: 'GAME_ID', value: gameId },
+                  ],
+                },
+              })
+            )
+            return out.jobId
+          }
+        )
+        if (candidates > 0)
+          console.log(
+            `Panorama sweep: ${submitted} submitted, ${candidates} claimable`
+          )
+      } catch (err) {
+        console.error(
+          'Panorama sweep failed (non-fatal):',
+          err instanceof Error ? err.message : err
+        )
+      }
+    }
+
     if (gamesToSync.length === 0) {
       // Still check for stale bookings even when nothing to sync
       await detectStaleBookings()
+      await runPanoramaSweep()
 
       // Emit zero-valued metrics so dashboards see a healthy heartbeat
       // (zero backlog, zero errors) rather than a gap. Zero-invocations
@@ -1316,6 +1365,8 @@ export const handler = async (): Promise<{
 
     // Detect stale bookings (runs every invocation, lightweight query)
     await detectStaleBookings()
+
+    await runPanoramaSweep()
 
     const summary = {
       transferred: results.filter((r) => r.status === 'transferred').length,

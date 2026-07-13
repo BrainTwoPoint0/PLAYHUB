@@ -99,6 +99,33 @@ resource "aws_iam_role_policy" "sync_lambda_s3" {
   })
 }
 
+# Panorama capture sweep (preserve-first, 2026-07-07): the sync Lambda submits
+# vp-materialize Batch jobs for published recordings still missing their raw
+# panorama — Spiideo purges the raw source ~30 days after a game.
+resource "aws_iam_role_policy" "sync_lambda_batch" {
+  name = "${var.project_name}-sync-lambda-batch"
+  role = aws_iam_role.sync_lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = ["batch:SubmitJob"]
+        Resource = [
+          aws_batch_job_queue.vp_materialize.arn,
+          # Submitting by NAME resolves the latest ACTIVE revision, and IAM
+          # evaluates the VERSIONED ARN — the :* wildcard covers current and
+          # future revisions (terraform bumps the revision on every job-def
+          # change). arn_prefix is the unversioned ARN (provider >= 5.x).
+          aws_batch_job_definition.vp_materialize.arn_prefix,
+          "${aws_batch_job_definition.vp_materialize.arn_prefix}:*",
+        ]
+      }
+    ]
+  })
+}
+
 # CloudWatch Log Group for Lambda
 resource "aws_cloudwatch_log_group" "sync_lambda" {
   name              = "/aws/lambda/${var.project_name}-sync-recordings"
@@ -148,6 +175,8 @@ resource "aws_lambda_function" "sync_recordings" {
       SUPABASE_SERVICE_KEY  = var.supabase_service_key
       RESEND_API_KEY        = var.resend_api_key
       ALERT_EMAIL           = var.alert_email
+      PANORAMA_JOB_QUEUE    = aws_batch_job_queue.vp_materialize.name
+      PANORAMA_JOB_DEF      = aws_batch_job_definition.vp_materialize.name
     }
   }
 
