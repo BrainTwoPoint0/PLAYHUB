@@ -21,8 +21,9 @@ Env: SRC (frame), OUT (json path), SELFTEST=1 (headless fit self-check, no GUI).
 """
 import os, json, numpy as np, cv2
 
-SRC = os.environ.get('SRC', 'PLAYHUB/scripts/vp-calibration/kuwait-fisheye.jpg')
-OUT = os.environ.get('OUT', 'PLAYHUB/scripts/vp-calibration/kuwait-disc.json')
+SITE = os.environ.get('SITE', 'kuwait')
+SRC = os.environ.get('SRC', f'PLAYHUB/scripts/vp-calibration/{SITE}-fisheye.jpg')
+OUT = os.environ.get('OUT', f'PLAYHUB/scripts/vp-calibration/{SITE}-disc.json')
 
 
 def fit_circle_taubin(pts):

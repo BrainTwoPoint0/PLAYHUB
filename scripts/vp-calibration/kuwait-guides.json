@@ -1,0 +1,129 @@
+{
+  "lines": [
+    {
+      "name": "far_touch",
+      "guide": [
+        [1075, 707],
+        [1100, 695],
+        [1200, 666],
+        [1300, 642],
+        [1400, 621],
+        [1500, 604],
+        [1600, 590],
+        [1700, 577],
+        [1750, 570],
+        [1800, 562],
+        [1850, 553],
+        [1920, 540],
+        [2100, 536],
+        [2328, 546],
+        [2500, 561],
+        [2620, 577],
+        [2700, 590]
+      ]
+    },
+    {
+      "name": "near_touch",
+      "guide": [
+        [420, 1432],
+        [620, 1560],
+        [820, 1668],
+        [1020, 1762],
+        [1220, 1838],
+        [1420, 1885],
+        [1620, 1908],
+        [1935, 1878],
+        [2240, 1822],
+        [2440, 1772],
+        [2740, 1665],
+        [3040, 1540],
+        [3340, 1390],
+        [3500, 1262]
+      ]
+    },
+    {
+      "name": "halfway",
+      "guide": [
+        [1923, 555],
+        [1928, 800],
+        [1932, 1100],
+        [1936, 1400],
+        [1938, 1650],
+        [1937, 1862]
+      ]
+    },
+    {
+      "name": "goal_line_left",
+      "guide": [
+        [1040, 675],
+        [995, 790],
+        [880, 920],
+        [750, 1050],
+        [665, 1165],
+        [540, 1300],
+        [420, 1445]
+      ]
+    },
+    {
+      "name": "goal_line_right",
+      "guide": [
+        [3230, 800],
+        [3320, 930],
+        [3400, 1060],
+        [3465, 1165],
+        [3500, 1250]
+      ]
+    },
+    {
+      "name": "rbox_front",
+      "guide": [
+        [2750, 690],
+        [2790, 800],
+        [2830, 910],
+        [2870, 1010]
+      ]
+    },
+    {
+      "name": "rbox_north",
+      "guide": [
+        [2750, 688],
+        [2850, 700],
+        [2950, 718]
+      ]
+    },
+    {
+      "name": "rbox_south",
+      "guide": [
+        [2870, 1015],
+        [3000, 985],
+        [3140, 940]
+      ]
+    },
+    {
+      "name": "lbox_front",
+      "guide": [
+        [1245, 798],
+        [1150, 905],
+        [1040, 1015],
+        [945, 1115]
+      ]
+    },
+    {
+      "name": "lbox_south",
+      "guide": [
+        [668, 1168],
+        [800, 1142],
+        [940, 1118]
+      ]
+    },
+    {
+      "name": "lbox_north",
+      "guide": [
+        [1005, 792],
+        [1120, 795],
+        [1250, 802]
+      ]
+    }
+  ],
+  "_note": "Corridor-snap guides for the kuwait (Nazwa scene 131777a6) fisheye plumb-line refit, 2026-07-13. Reproduce: SRC=kuwait-fisheye.jpg GUIDES=kuwait-guides.json OUT=kuwait-lines.json HALF=22 snap_lines.py (far_touch was snapped at HALF=12 \u2014 two parallel white ridges ~30px apart at the left end), then SOLVE=full MANUAL_LINES=kuwait-lines.json calibrate.py | 2026-07-13: goal_line_left/right guides trace the fence boundary (no goal-line paint exists on this caged pitch) \u2014 see kuwait-lines.json note; do not re-snap them as straight lines."
+}

@@ -12,8 +12,9 @@ Params via env so we can iterate fast:
 import os, cv2, numpy as np
 
 env = lambda k, d: float(os.environ.get(k, d))
-SRC = os.environ.get('SRC', 'PLAYHUB/scripts/vp-calibration/kuwait-fisheye.jpg')
-OUT = os.environ.get('OUT', '/tmp/kuwait-dewarped.png')
+SITE = os.environ.get('SITE', 'kuwait')
+SRC = os.environ.get('SRC', f'PLAYHUB/scripts/vp-calibration/{SITE}-fisheye.jpg')
+OUT = os.environ.get('OUT', f'/tmp/{SITE}-dewarped.png')
 
 img = cv2.imread(SRC)
 H, W = img.shape[:2]

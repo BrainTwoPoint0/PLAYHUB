@@ -1,0 +1,116 @@
+{
+  "comment": "HCT Dubai camera B (BOTTOM half of the stacked raw, 3840x1080, looks at RIGHT half of pitch). Same line strategy as camera A; straight track section is x<=2400 here (bend is image-right).",
+  "lines": [
+    {
+      "name": "halfway_B",
+      "half": 10,
+      "guide": [
+        [452, 500],
+        [440, 550],
+        [425, 600],
+        [410, 650],
+        [395, 700],
+        [380, 745]
+      ]
+    },
+    {
+      "name": "kerbB_1",
+      "half": 6,
+      "guide": [
+        [600, 705],
+        [1000, 704],
+        [1400, 702],
+        [1800, 703],
+        [2200, 702]
+      ]
+    },
+    {
+      "name": "laneB_1",
+      "half": 20,
+      "guide": [
+        [400, 893],
+        [800, 880],
+        [1200, 867],
+        [1500, 858]
+      ],
+      "comment": "restricted to x<=1500: bench rail sits exactly in the corridor at 1600-2600"
+    },
+    {
+      "name": "laneB_2",
+      "half": 20,
+      "guide": [
+        [800, 940],
+        [1600, 910],
+        [2400, 880]
+      ]
+    },
+    {
+      "name": "laneB_3",
+      "half": 20,
+      "guide": [
+        [800, 1010],
+        [1600, 970],
+        [2400, 935]
+      ]
+    },
+    {
+      "name": "poleB_mast",
+      "half": 12,
+      "guide": [
+        [1983, 250],
+        [1987, 350],
+        [1990, 450],
+        [1992, 530]
+      ]
+    },
+    {
+      "name": "poleB_1",
+      "half": 10,
+      "guide": [
+        [66, 310],
+        [68, 495]
+      ]
+    },
+    {
+      "name": "poleB_2",
+      "half": 10,
+      "guide": [
+        [272, 340],
+        [274, 500]
+      ]
+    },
+    {
+      "name": "poleB_3",
+      "half": 10,
+      "guide": [
+        [478, 340],
+        [480, 500]
+      ]
+    },
+    {
+      "name": "poleB_4",
+      "half": 10,
+      "guide": [
+        [917, 335],
+        [919, 505]
+      ]
+    },
+    {
+      "name": "poleB_5",
+      "half": 10,
+      "guide": [
+        [1142, 330],
+        [1144, 508]
+      ]
+    },
+    {
+      "name": "goalbarB",
+      "half": 8,
+      "guide": [
+        [2330, 555],
+        [2450, 547],
+        [2575, 540]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "cameras": [
+    {
+      "name": "top",
+      "lines": "hct-top-lines.json",
+      "W": 3840,
+      "H": 1080,
+      "tex_v0": 0.0,
+      "tex_v1": 0.5
+    },
+    {
+      "name": "bottom",
+      "lines": "hct-bottom-lines.json",
+      "W": 3840,
+      "H": 1080,
+      "tex_v0": 0.5,
+      "tex_v1": 1.0
+    }
+  ],
+  "families": {
+    "vertical": ["pole"],
+    "length": ["kerb", "lane"],
+    "width": ["halfway"]
+  },
+  "exclude": ["goalbar"],
+  "shared": [["halfway_A", "halfway_B"]]
+}

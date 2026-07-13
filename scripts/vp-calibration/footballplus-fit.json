@@ -1,0 +1,19 @@
+{
+  "F": 1113.6000000000001,
+  "CX": 1893.950441454098,
+  "CY": 1139.1858934768663,
+  "K1": -0.0034508533256732274,
+  "K2": -0.0008895689754098433,
+  "K3": -0.00030746802994486124,
+  "K4": -0.0001189569309656823,
+  "TILT": 33.776,
+  "n_lines": 14,
+  "disc_ok": false,
+  "solver": "full:k1..k4+cxy",
+  "train_straightness": 2.4879197852519854,
+  "YAW": 1.432,
+  "ROLL": -0.123,
+  "PAN_DEG": 122.98,
+  "TILT_HI": 32.53,
+  "window_note": "Scene window = Spiideo REAL Football Plus mesh ground truth (calibrations S3, fetched 2026-07-13): pan +/-122.98, ceiling +32.53, their floor -84.53. We keep floor -89.95 (below-camera freedom, same as kuwait). Their principal point reads out at exactly image centre (1920,1080); our solve (1894,1139) is 65px from it \u2014 same class as the kuwait refit vs their Nazwa mesh (51px)."
+}

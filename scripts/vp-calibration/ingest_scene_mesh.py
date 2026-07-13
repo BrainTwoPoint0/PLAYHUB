@@ -89,3 +89,43 @@ base = f'{SUPABASE_URL}/storage/v1/object/public/{BUCKET}/{GAME_ID}'
 print(f'\npublished {uploaded} mesh files for game {GAME_ID}')
 print(f'meshBaseUrl → {base}')
 print(f'verify: curl -sI {base}/scene.json  (expect 200)')
+
+# Register this game as the canonical mesh for its scene, so new captures on the
+# same camera auto-copy it (vp-materialize Batch job) and a backfill can fan it
+# out to sibling recordings (fanout_scene_mesh.mjs). SCENE_ID is required for
+# the registry — pass the recording's spiideo scene id.
+SCENE_ID = os.environ.get('SCENE_ID')
+if SCENE_ID:
+    # Guard: a wrong SCENE_ID/GAME_ID pairing would fan THIS mesh to every
+    # recording on that scene, corrupting de-warp camera-wide. Cross-check the
+    # game's cached scene (written by the Batch job at capture) before trusting it.
+    chk = urllib.request.Request(
+        f'{SUPABASE_URL}/rest/v1/playhub_match_recordings?spiideo_game_id=eq.{GAME_ID}&select=spiideo_scene_id',
+        headers={'apikey': SERVICE_KEY, 'Authorization': f'Bearer {SERVICE_KEY}'})
+    try:
+        rows = json.loads(urllib.request.urlopen(chk).read() or b'[]')
+    except Exception as e:
+        rows = []
+        print(f'warning: could not verify game→scene ({e}); proceeding on caller trust')
+    cached = next((r.get('spiideo_scene_id') for r in rows if r.get('spiideo_scene_id')), None)
+    if cached and cached != SCENE_ID:
+        sys.exit(f'REFUSING registry upsert — game {GAME_ID} is cached on scene {cached}, '
+                 f'not SCENE_ID={SCENE_ID}. Fix the pairing (a wrong one corrupts the whole camera).')
+    if not cached:
+        print(f'note: game {GAME_ID} has no cached scene to cross-check against SCENE_ID={SCENE_ID} '
+              f'(brand-new capture?) — proceeding on caller trust')
+    reg_url = f'{SUPABASE_URL}/rest/v1/playhub_panorama_scene_meshes?on_conflict=scene_id'
+    payload = json.dumps([{'scene_id': SCENE_ID, 'source_game_id': GAME_ID}]).encode()
+    r = urllib.request.Request(
+        reg_url, data=payload, method='POST',
+        headers={'apikey': SERVICE_KEY, 'Authorization': f'Bearer {SERVICE_KEY}',
+                 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal'})
+    try:
+        with urllib.request.urlopen(r) as resp:
+            print(f'registered scene {SCENE_ID} → game {GAME_ID} ({resp.status})')
+            print(f'fan out to siblings: node veo-automations/fanout_scene_mesh.mjs --scene {SCENE_ID}')
+    except urllib.error.HTTPError as e:
+        print(f'warning: scene registry upsert failed HTTP {e.code}: {e.read()[:200]}')
+else:
+    print('note: SCENE_ID not set — registry NOT updated (new captures on this '
+          'camera will not auto-inherit the mesh). Re-run with SCENE_ID=<sceneId>.')

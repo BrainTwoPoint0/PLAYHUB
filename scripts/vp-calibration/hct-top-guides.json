@@ -1,0 +1,131 @@
+{
+  "comment": "HCT Dubai camera A (TOP half of the stacked 3840x2160 raw, 3840x1080, looks at LEFT half of pitch). Median frame from game 4b4ecece. Sparse paint (portable goals, no boxes): halfway + track-straight lane lines + kerb + floodlight poles + goal crossbar. Lanes/kerb restricted to the track's straight section (x>=1000 here; the bend is image-left).",
+  "lines": [
+    {
+      "name": "halfway_A",
+      "half": 10,
+      "guide": [
+        [3218, 458],
+        [3205, 500],
+        [3185, 550],
+        [3165, 600],
+        [3140, 650],
+        [3115, 700],
+        [3092, 738]
+      ]
+    },
+    {
+      "name": "kerbA_1",
+      "half": 5,
+      "guide": [
+        [1000, 695],
+        [1600, 695],
+        [2200, 693],
+        [2800, 696],
+        [3400, 693]
+      ]
+    },
+    {
+      "name": "kerbA_2",
+      "half": 6,
+      "guide": [
+        [1000, 713],
+        [1400, 719],
+        [1800, 714],
+        [2200, 721],
+        [2600, 719],
+        [3000, 714],
+        [3400, 706]
+      ]
+    },
+    {
+      "name": "laneA_1",
+      "half": 20,
+      "guide": [
+        [2200, 810],
+        [2800, 798],
+        [3400, 790]
+      ],
+      "comment": "restricted to x>=2200: bench rail contaminates the corridor further left"
+    },
+    {
+      "name": "laneA_2",
+      "half": 20,
+      "guide": [
+        [1600, 887],
+        [2200, 862],
+        [2800, 845],
+        [3400, 833]
+      ]
+    },
+    {
+      "name": "laneA_3",
+      "half": 20,
+      "guide": [
+        [1600, 953],
+        [2200, 922],
+        [2800, 900],
+        [3400, 883]
+      ]
+    },
+    {
+      "name": "laneA_4",
+      "half": 20,
+      "guide": [
+        [2200, 990],
+        [2800, 962],
+        [3400, 940]
+      ]
+    },
+    {
+      "name": "poleA_mast",
+      "half": 12,
+      "guide": [
+        [1168, 150],
+        [1172, 290],
+        [1177, 430]
+      ]
+    },
+    {
+      "name": "poleA_1",
+      "half": 10,
+      "guide": [
+        [2226, 295],
+        [2228, 420]
+      ]
+    },
+    {
+      "name": "poleA_2",
+      "half": 10,
+      "guide": [
+        [2531, 300],
+        [2533, 420]
+      ]
+    },
+    {
+      "name": "poleA_3",
+      "half": 10,
+      "guide": [
+        [2763, 300],
+        [2765, 420]
+      ]
+    },
+    {
+      "name": "poleA_4",
+      "half": 10,
+      "guide": [
+        [3406, 150],
+        [3409, 420]
+      ]
+    },
+    {
+      "name": "goalbarA",
+      "half": 8,
+      "guide": [
+        [905, 521],
+        [1020, 517],
+        [1132, 512]
+      ]
+    }
+  ]
+}
