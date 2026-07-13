@@ -71,8 +71,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  if (!UUID_RE.test(id)) return noStore({ error: 'bad id', code: 'bad_request' }, 400)
-  if (!sameOriginOk(request)) return noStore({ error: 'forbidden', code: 'forbidden' }, 403)
+  if (!UUID_RE.test(id))
+    return noStore({ error: 'bad id', code: 'bad_request' }, 400)
+  if (!sameOriginOk(request))
+    return noStore({ error: 'forbidden', code: 'forbidden' }, 403)
 
   const token =
     request.nextUrl.searchParams.get('token') ||
@@ -90,7 +92,8 @@ export async function POST(
     .maybeSingle()
 
   // Mirror the watch page's 404 semantics exactly (don't reveal existence).
-  if (!rec || rec.status !== 'published') return noStore({ error: 'not found', code: 'not_found' }, 404)
+  if (!rec || rec.status !== 'published')
+    return noStore({ error: 'not found', code: 'not_found' }, 404)
 
   // Access-gate PARITY with page.tsx: published && (token match || grant).
   const tokenMatches = !!(
@@ -112,7 +115,10 @@ export async function POST(
       const url = await getPlaybackUrl(rec.panorama_s3_key, SIGNED_URL_TTL)
       return noStore({ status: 'ready', url })
     } catch (err) {
-      console.error('[panorama-source] sign failed:', err instanceof Error ? err.message : err)
+      console.error(
+        '[panorama-source] sign failed:',
+        err instanceof Error ? err.message : err
+      )
       return noStore({ error: 'sign failed', code: 'sign_error' }, 500)
     }
   }
@@ -220,7 +226,11 @@ export async function POST(
     // the client retries, then times out visibly) prevents the exact silent
     // forever-'pending' failure the PostgREST representation bug caused. Never
     // masquerade a broken claim as a legitimate lost race.
-    console.error('[panorama-source] claim failed:', claimErr.code, claimErr.message)
+    console.error(
+      '[panorama-source] claim failed:',
+      claimErr.code,
+      claimErr.message
+    )
     return noStore({ error: 'claim failed', code: 'claim_error' }, 500)
   }
   if (!claimedCount) {
@@ -254,7 +264,10 @@ export async function POST(
     )
     jobId = out.jobId
   } catch (err) {
-    console.error('[panorama-source] submit error:', err instanceof Error ? err.message : err)
+    console.error(
+      '[panorama-source] submit error:',
+      err instanceof Error ? err.message : err
+    )
   }
   if (!jobId) {
     // Roll the claim back to 'error' so it isn't stuck 'pending' for 10 min.
@@ -262,7 +275,10 @@ export async function POST(
       .from('playhub_match_recordings')
       .update({ panorama_capture_status: 'error' })
       .eq('id', id)
-    return noStore({ error: 'capture could not be started', code: 'submit_failed' }, 502)
+    return noStore(
+      { error: 'capture could not be started', code: 'submit_failed' },
+      502
+    )
   }
   return noStore({ status: 'pending' })
 }

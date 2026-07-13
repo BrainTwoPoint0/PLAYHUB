@@ -335,11 +335,7 @@ interface SyncableRow extends RecordingRow {
 }
 
 type SyncOutcome =
-  | 'published'
-  | 'status_updated'
-  | 'unchanged'
-  | 'failed'
-  | 'error'
+  'published' | 'status_updated' | 'unchanged' | 'failed' | 'error'
 
 async function getSyncableRecordings(): Promise<SyncableRow[]> {
   const { data, error } = await supabase

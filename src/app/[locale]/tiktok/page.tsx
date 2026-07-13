@@ -156,7 +156,8 @@ function TikTokDashboard() {
             TikTok
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Connect your account to publish highlights and track how they perform.
+            Connect your account to publish highlights and track how they
+            perform.
           </p>
         </div>
       </div>
@@ -240,7 +241,10 @@ function TikTokDashboard() {
                   <h2 className="mb-4 text-sm font-medium text-[var(--timberwolf)]">
                     Views — recent videos
                   </h2>
-                  <ChartContainer config={chartConfig} className="h-[220px] w-full">
+                  <ChartContainer
+                    config={chartConfig}
+                    className="h-[220px] w-full"
+                  >
                     <BarChart data={chartData}>
                       <CartesianGrid
                         vertical={false}
@@ -296,7 +300,9 @@ function ConnectCard({
         <Music2 className="h-6 w-6 text-[var(--timberwolf)]" />
       </div>
       <h2 className="text-lg font-semibold text-[var(--timberwolf)]">
-        {needsReconnect ? 'Reconnect your TikTok account' : 'Connect your TikTok account'}
+        {needsReconnect
+          ? 'Reconnect your TikTok account'
+          : 'Connect your TikTok account'}
       </h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
         {needsReconnect

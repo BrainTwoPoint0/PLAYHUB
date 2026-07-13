@@ -200,25 +200,23 @@ function videoLabel(t: Translator, video: VeoVideo): string {
  */
 function toRecordingEvents(events?: VeoEventsByType): RecordingEvent[] {
   if (!events?.goals?.length) return []
-  return events.goals.map(
-    (g): RecordingEvent => ({
-      id: g.id,
-      match_recording_id: null,
-      provider: 'veo',
-      provider_recording_id: null, // not threaded into the player
-      event_type: g.event_type as RecordingEvent['event_type'],
-      timestamp_seconds: g.timestamp_seconds,
-      team: g.team as RecordingEvent['team'],
-      label: null,
-      visibility: 'private',
-      source: 'ai_detected',
-      confidence_score: g.confidence_score,
-      created_by: null,
-      provider_event_id: null,
-      created_at: '',
-      updated_at: '',
-    })
-  )
+  return events.goals.map((g): RecordingEvent => ({
+    id: g.id,
+    match_recording_id: null,
+    provider: 'veo',
+    provider_recording_id: null, // not threaded into the player
+    event_type: g.event_type as RecordingEvent['event_type'],
+    timestamp_seconds: g.timestamp_seconds,
+    team: g.team as RecordingEvent['team'],
+    label: null,
+    visibility: 'private',
+    source: 'ai_detected',
+    confidence_score: g.confidence_score,
+    created_by: null,
+    provider_event_id: null,
+    created_at: '',
+    updated_at: '',
+  }))
 }
 
 function playableVideos(videos: VeoVideo[]): VeoVideo[] {

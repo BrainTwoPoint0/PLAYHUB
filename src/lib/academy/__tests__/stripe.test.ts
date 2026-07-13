@@ -628,9 +628,21 @@ describe('buildRegistrationTeamMap', () => {
 
   it('skips rows with no subscription id or no team', () => {
     const map = buildRegistrationTeamMap([
-      { stripe_subscription_id: null, registration_team: 'x', registration_subclub: null },
-      { stripe_subscription_id: 'sub_2', registration_team: null, registration_subclub: null },
-      { stripe_subscription_id: '  ', registration_team: 'y', registration_subclub: null },
+      {
+        stripe_subscription_id: null,
+        registration_team: 'x',
+        registration_subclub: null,
+      },
+      {
+        stripe_subscription_id: 'sub_2',
+        registration_team: null,
+        registration_subclub: null,
+      },
+      {
+        stripe_subscription_id: '  ',
+        registration_team: 'y',
+        registration_subclub: null,
+      },
     ])
     expect(map.size).toBe(0)
   })

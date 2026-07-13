@@ -36,12 +36,7 @@ const DEWARP_CAPS: PlayerCapabilities = {
 }
 
 type ExploreState =
-  | 'idle'
-  | 'loading'
-  | 'pending'
-  | 'unavailable'
-  | 'timeout'
-  | 'error'
+  'idle' | 'loading' | 'pending' | 'unavailable' | 'timeout' | 'error'
 
 interface WatchPlayerProps {
   // The flat production (Spiideo Play) — the MASTER clock/audio + default view.

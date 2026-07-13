@@ -78,12 +78,12 @@ describe('classifyRecordingSport', () => {
 
 describe('sportForBilling (non-throwing)', () => {
   it('classifies football / padel like the strict variant', () => {
-    expect(sportForBilling({ spiideo_game_id: 'g', clutch_video_id: null })).toBe(
-      'football'
-    )
-    expect(sportForBilling({ spiideo_game_id: null, clutch_video_id: 'v' })).toBe(
-      'padel'
-    )
+    expect(
+      sportForBilling({ spiideo_game_id: 'g', clutch_video_id: null })
+    ).toBe('football')
+    expect(
+      sportForBilling({ spiideo_game_id: null, clutch_video_id: 'v' })
+    ).toBe('padel')
   })
 
   it('returns null (no throw) for missing or ambiguous discriminators', () => {

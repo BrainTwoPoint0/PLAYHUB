@@ -39,10 +39,7 @@ export async function POST(request: Request) {
   }
   // Authorization: renders are stored under `${user.id}/…`. A caller may only
   // publish their own render — reject traversal and cross-user paths.
-  if (
-    storagePath.includes('..') ||
-    !storagePath.startsWith(`${user.id}/`)
-  ) {
+  if (storagePath.includes('..') || !storagePath.startsWith(`${user.id}/`)) {
     return NextResponse.json({ error: 'Forbidden path' }, { status: 403 })
   }
 

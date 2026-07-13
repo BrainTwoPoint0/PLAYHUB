@@ -92,8 +92,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   ) {
     return NextResponse.json(
       {
-        error:
-          'Both football_camera_count and padel_camera_count are required',
+        error: 'Both football_camera_count and padel_camera_count are required',
       },
       { status: 400 }
     )
@@ -131,7 +130,10 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     .maybeSingle()
 
   if (!org) {
-    return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
+    return NextResponse.json(
+      { error: 'Organization not found' },
+      { status: 404 }
+    )
   }
   if (org.type !== 'group') {
     return NextResponse.json(

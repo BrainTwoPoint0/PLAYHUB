@@ -19,7 +19,13 @@ const SUBCLUBS: SubclubRef[] = [
   {
     slug: 'taa',
     displayName: 'TAA',
-    aliases: ['The A Academy', 'The A academy', 'A Academy', 'A academy', 'TAA'],
+    aliases: [
+      'The A Academy',
+      'The A academy',
+      'A Academy',
+      'A academy',
+      'TAA',
+    ],
   },
   { slug: 'ela', displayName: 'ELA', aliases: ['ELA'] },
   { slug: 'lfs', displayName: 'LFS', aliases: ['LFS'] },
@@ -311,8 +317,14 @@ describe('parseRecording — rules layer', () => {
     )
     const ok = expectEligible(r.outcome)
     // Age comes from the folder; both youth sides share it.
-    expect(ok.parsed.home).toEqual({ subclubSlug: 'forzaskillz', ageGroup: 'u8' })
-    expect(ok.parsed.away).toEqual({ subclubSlug: 'barnes-eagles', ageGroup: 'u8' })
+    expect(ok.parsed.home).toEqual({
+      subclubSlug: 'forzaskillz',
+      ageGroup: 'u8',
+    })
+    expect(ok.parsed.away).toEqual({
+      subclubSlug: 'barnes-eagles',
+      ageGroup: 'u8',
+    })
     expect(ok.parsed.method).toBe('rules')
     expect(deps.anthropicCreate).not.toHaveBeenCalled()
   })

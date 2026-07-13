@@ -2143,8 +2143,7 @@ export default function VenueManagementPage() {
                         const gridCols = hasShare
                           ? 'md:grid-cols-4'
                           : 'md:grid-cols-2'
-                        const pctF =
-                          billingSummary.partnerSharePctFootball ?? 5
+                        const pctF = billingSummary.partnerSharePctFootball ?? 5
                         const pctP = billingSummary.partnerSharePctPadel ?? 5
                         const shareLabel =
                           !billingSummary.tiered || pctF === pctP

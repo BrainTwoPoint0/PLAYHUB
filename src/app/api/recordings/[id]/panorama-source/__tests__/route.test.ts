@@ -105,7 +105,9 @@ beforeEach(() => {
 
 describe('panorama-source — request validation', () => {
   it('400 on a non-UUID id', async () => {
-    const res = await POST(postReq(), { params: Promise.resolve({ id: 'nope' }) })
+    const res = await POST(postReq(), {
+      params: Promise.resolve({ id: 'nope' }),
+    })
     expect(res.status).toBe(400)
     expect((await res.json()).code).toBe('bad_request')
   })
@@ -115,7 +117,9 @@ describe('panorama-source — request validation', () => {
     expect(res.status).toBe(403)
   })
   it('always sets Cache-Control: no-store', async () => {
-    mockService.mockReturnValue(stubSupabase({ recording: rec({ panorama_s3_key: 'k' }) }))
+    mockService.mockReturnValue(
+      stubSupabase({ recording: rec({ panorama_s3_key: 'k' }) })
+    )
     mockAuth.mockResolvedValue({ user: { id: 'u' } })
     mockAccess.mockResolvedValue({ hasAccess: true })
     const res = await POST(postReq(), params)
@@ -125,7 +129,9 @@ describe('panorama-source — request validation', () => {
 
 describe('panorama-source — gate parity (mirrors the watch page)', () => {
   it('404 when unpublished', async () => {
-    mockService.mockReturnValue(stubSupabase({ recording: rec({ status: 'draft' }) }))
+    mockService.mockReturnValue(
+      stubSupabase({ recording: rec({ status: 'draft' }) })
+    )
     const res = await POST(postReq(), params)
     expect(res.status).toBe(404)
   })
@@ -135,16 +141,23 @@ describe('panorama-source — gate parity (mirrors the watch page)', () => {
     expect(res.status).toBe(404)
   })
   it('a matching share token passes the gate (serves fast-path)', async () => {
-    mockService.mockReturnValue(stubSupabase({ recording: rec({ panorama_s3_key: 'key' }) }))
+    mockService.mockReturnValue(
+      stubSupabase({ recording: rec({ panorama_s3_key: 'key' }) })
+    )
     const res = await POST(postReq({ token: 'sekret' }), params)
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ status: 'ready', url: 'https://signed.example/vp.mp4' })
+    expect(await res.json()).toEqual({
+      status: 'ready',
+      url: 'https://signed.example/vp.mp4',
+    })
   })
 })
 
 describe('panorama-source — capability split', () => {
   it('a token-only viewer can VIEW a ready panorama', async () => {
-    mockService.mockReturnValue(stubSupabase({ recording: rec({ panorama_s3_key: 'key' }) }))
+    mockService.mockReturnValue(
+      stubSupabase({ recording: rec({ panorama_s3_key: 'key' }) })
+    )
     const res = await POST(postReq({ token: 'sekret' }), params)
     expect((await res.json()).status).toBe('ready')
     expect(mockBatchSend).not.toHaveBeenCalled()
@@ -158,7 +171,9 @@ describe('panorama-source — capability split', () => {
   it('a grant-holder triggers a capture (claims → SubmitJob → pending)', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'u' } })
     mockAccess.mockResolvedValue({ hasAccess: true })
-    mockService.mockReturnValue(stubSupabase({ recording: rec(), claimed: { id: ID } }))
+    mockService.mockReturnValue(
+      stubSupabase({ recording: rec(), claimed: { id: ID } })
+    )
     const res = await POST(postReq(), params)
     expect((await res.json()).status).toBe('pending')
     expect(mockBatchSend).toHaveBeenCalledTimes(1)
@@ -197,7 +212,9 @@ describe('panorama-source — availability keys off the Spiideo game, not conten
     mockAuth.mockResolvedValue({ user: { id: 'u' } })
     mockAccess.mockResolvedValue({ hasAccess: true })
     mockMeshExists.mockResolvedValue(false)
-    mockService.mockReturnValue(stubSupabase({ recording: rec(), claimed: { id: ID } }))
+    mockService.mockReturnValue(
+      stubSupabase({ recording: rec(), claimed: { id: ID } })
+    )
     const res = await POST(postReq(), params)
     expect((await res.json()).status).toBe('unavailable')
     expect(mockBatchSend).not.toHaveBeenCalled()
@@ -210,7 +227,10 @@ describe('panorama-source — cost guards', () => {
     mockAccess.mockResolvedValue({ hasAccess: true })
     mockService.mockReturnValue(
       stubSupabase({
-        recording: rec({ panorama_capture_status: 'error', panorama_capture_attempts: 3 }),
+        recording: rec({
+          panorama_capture_status: 'error',
+          panorama_capture_attempts: 3,
+        }),
       })
     )
     const res = await POST(postReq(), params)
@@ -258,7 +278,9 @@ describe('panorama-source — cost guards', () => {
     mockAuth.mockResolvedValue({ user: { id: 'u' } })
     mockAccess.mockResolvedValue({ hasAccess: true })
     mockBatchSend.mockRejectedValue(new Error('batch down'))
-    mockService.mockReturnValue(stubSupabase({ recording: rec(), claimed: { id: ID } }))
+    mockService.mockReturnValue(
+      stubSupabase({ recording: rec(), claimed: { id: ID } })
+    )
     const res = await POST(postReq(), params)
     expect(res.status).toBe(502)
     expect((await res.json()).code).toBe('submit_failed')

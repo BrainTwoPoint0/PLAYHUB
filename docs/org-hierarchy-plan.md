@@ -89,10 +89,11 @@ CREATE INDEX idx_org_venue_access_venue ON organization_venue_access(venue_organ
 ```
 
 **Example data:**
+
 | organization_id | venue_organization_id | can_record | can_stream | default_graphic_package_id |
-|---|---|---|---|---|
-| DAFL | The Sevens | true | false | DAFL's graphics package |
-| DAFL | Jebel Ali | true | true | DAFL's graphics package |
+| --------------- | --------------------- | ---------- | ---------- | -------------------------- |
+| DAFL            | The Sevens            | true       | false      | DAFL's graphics package    |
+| DAFL            | Jebel Ali             | true       | true       | DAFL's graphics package    |
 
 **Rules:**
 

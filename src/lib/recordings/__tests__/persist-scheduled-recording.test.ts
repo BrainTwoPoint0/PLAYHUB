@@ -20,9 +20,10 @@ function makeChains() {
   const billingChain: any = {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
-    maybeSingle: vi
-      .fn()
-      .mockResolvedValue({ data: { default_billable_amount: 5, currency: 'KWD' }, error: null }),
+    maybeSingle: vi.fn().mockResolvedValue({
+      data: { default_billable_amount: 5, currency: 'KWD' },
+      error: null,
+    }),
   }
   const recordingsChain: any = {
     insert: recordingInsert.mockImplementation(() => ({

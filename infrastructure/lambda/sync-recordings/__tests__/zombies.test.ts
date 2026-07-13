@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { findZombieRecordings, sweepZombie, type SweepDeps } from '../zombies'
 
-function row(overrides: Partial<Parameters<typeof findZombieRecordings>[0][number]> = {}) {
+function row(
+  overrides: Partial<Parameters<typeof findZombieRecordings>[0][number]> = {}
+) {
   return {
     id: 'rec-1',
     spiideo_game_id: 'game-1',
@@ -48,7 +50,12 @@ describe('findZombieRecordings', () => {
   it('flags zombies regardless of status or synced state (deletion intent is proven by the tombstone)', () => {
     const zombies = findZombieRecordings(
       [
-        row({ id: 'rec-1', status: 'published', s3_key: 'recordings/a.mp4', s3_bucket: 'bkt' }),
+        row({
+          id: 'rec-1',
+          status: 'published',
+          s3_key: 'recordings/a.mp4',
+          s3_bucket: 'bkt',
+        }),
         row({ id: 'rec-2', status: 'processing', spiideo_game_id: 'game-2' }),
       ],
       new Set(['game-1', 'game-2'])

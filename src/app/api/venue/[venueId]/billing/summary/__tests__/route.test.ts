@@ -257,7 +257,11 @@ describe('GET /api/venue/[venueId]/billing/summary', () => {
   it('falls back to the default billable amount when unset', async () => {
     monthRecordingsChain.lte.mockResolvedValueOnce({
       data: [
-        makeRecording({ id: 'r1', billable_amount: null, collected_by: 'venue' }),
+        makeRecording({
+          id: 'r1',
+          billable_amount: null,
+          collected_by: 'venue',
+        }),
       ],
       error: null,
     })

@@ -36,21 +36,21 @@ function makeDeps(overrides: Partial<WebhookDeps> = {}): WebhookDeps {
     loadProfileByEmail: vi.fn(async () => null),
     loadClub: vi.fn(async () => baseClub),
     isAcademyProduct: vi.fn(async () => true),
-    insertActiveSub: vi.fn(
-      async (): Promise<InsertResult> => ({ kind: 'inserted', id: 'active-1' })
-    ),
-    insertPendingSub: vi.fn(
-      async (): Promise<InsertResult> => ({ kind: 'inserted', id: 'pending-1' })
-    ),
+    insertActiveSub: vi.fn(async (): Promise<InsertResult> => ({
+      kind: 'inserted',
+      id: 'active-1',
+    })),
+    insertPendingSub: vi.fn(async (): Promise<InsertResult> => ({
+      kind: 'inserted',
+      id: 'pending-1',
+    })),
     updateActiveStatus: vi.fn(async () => null),
     updatePendingStatus: vi.fn(async () => null),
-    provision: vi.fn(
-      async (subId): Promise<ProvisionOutcome> => ({
-        kind: 'success',
-        subId,
-        alreadyProvisioned: false,
-      })
-    ),
+    provision: vi.fn(async (subId): Promise<ProvisionOutcome> => ({
+      kind: 'success',
+      subId,
+      alreadyProvisioned: false,
+    })),
     sendClaimEmail: vi.fn(async () => undefined),
     ...overrides,
   }
@@ -256,9 +256,9 @@ describe('handleAcademyCheckoutCompleted', () => {
     it('returns duplicate when insert hits unique violation', async () => {
       const deps = makeDeps({
         loadProfileByEmail: vi.fn(async () => ({ user_id: 'user-uuid-1' })),
-        insertActiveSub: vi.fn(
-          async (): Promise<InsertResult> => ({ kind: 'duplicate' })
-        ),
+        insertActiveSub: vi.fn(async (): Promise<InsertResult> => ({
+          kind: 'duplicate',
+        })),
       })
       const result = await handleAcademyCheckoutCompleted(
         makeCheckoutSession(),
@@ -274,12 +274,10 @@ describe('handleAcademyCheckoutCompleted', () => {
     it('returns error when insert fails for non-unique reason', async () => {
       const deps = makeDeps({
         loadProfileByEmail: vi.fn(async () => ({ user_id: 'user-uuid-1' })),
-        insertActiveSub: vi.fn(
-          async (): Promise<InsertResult> => ({
-            kind: 'error',
-            message: 'FK violation',
-          })
-        ),
+        insertActiveSub: vi.fn(async (): Promise<InsertResult> => ({
+          kind: 'error',
+          message: 'FK violation',
+        })),
       })
       const result = await handleAcademyCheckoutCompleted(
         makeCheckoutSession(),
@@ -313,15 +311,13 @@ describe('handleAcademyCheckoutCompleted', () => {
     it('preserves the row when provision returns failure outcome', async () => {
       const deps = makeDeps({
         loadProfileByEmail: vi.fn(async () => ({ user_id: 'user-uuid-1' })),
-        provision: vi.fn(
-          async (subId): Promise<ProvisionOutcome> => ({
-            kind: 'failure',
-            subId,
-            error: 'email not confirmed yet',
-            retryable: true,
-            reason: 'email_not_confirmed',
-          })
-        ),
+        provision: vi.fn(async (subId): Promise<ProvisionOutcome> => ({
+          kind: 'failure',
+          subId,
+          error: 'email not confirmed yet',
+          retryable: true,
+          reason: 'email_not_confirmed',
+        })),
       })
       const result = await handleAcademyCheckoutCompleted(
         makeCheckoutSession(),
@@ -371,9 +367,9 @@ describe('handleAcademyCheckoutCompleted', () => {
 
     it('returns duplicate when pending insert hits unique violation', async () => {
       const deps = makeDeps({
-        insertPendingSub: vi.fn(
-          async (): Promise<InsertResult> => ({ kind: 'duplicate' })
-        ),
+        insertPendingSub: vi.fn(async (): Promise<InsertResult> => ({
+          kind: 'duplicate',
+        })),
       })
       const result = await handleAcademyCheckoutCompleted(
         makeCheckoutSession(),
@@ -388,12 +384,10 @@ describe('handleAcademyCheckoutCompleted', () => {
 
     it('returns error when pending insert fails for non-unique reason', async () => {
       const deps = makeDeps({
-        insertPendingSub: vi.fn(
-          async (): Promise<InsertResult> => ({
-            kind: 'error',
-            message: 'FK violation',
-          })
-        ),
+        insertPendingSub: vi.fn(async (): Promise<InsertResult> => ({
+          kind: 'error',
+          message: 'FK violation',
+        })),
       })
       const result = await handleAcademyCheckoutCompleted(
         makeCheckoutSession(),
@@ -413,12 +407,10 @@ describe('handleAcademyCheckoutCompleted', () => {
     it('persists subclub_slug to active row when metadata includes a valid subclub', async () => {
       const deps = makeDeps({
         loadProfileByEmail: vi.fn(async () => ({ user_id: 'user-uuid-1' })),
-        insertActiveSub: vi.fn(
-          async (): Promise<InsertResult> => ({
-            kind: 'inserted',
-            id: 'active-1',
-          })
-        ),
+        insertActiveSub: vi.fn(async (): Promise<InsertResult> => ({
+          kind: 'inserted',
+          id: 'active-1',
+        })),
       })
       const session = makeCheckoutSession({}, { subclub_slug: 'barnes-eagles' })
       const result = await handleAcademyCheckoutCompleted(session, deps)
@@ -435,12 +427,10 @@ describe('handleAcademyCheckoutCompleted', () => {
     it('persists subclub_slug to pending row when no profile exists yet', async () => {
       const deps = makeDeps({
         loadProfileByEmail: vi.fn(async () => null),
-        insertPendingSub: vi.fn(
-          async (): Promise<InsertResult> => ({
-            kind: 'inserted',
-            id: 'pending-1',
-          })
-        ),
+        insertPendingSub: vi.fn(async (): Promise<InsertResult> => ({
+          kind: 'inserted',
+          id: 'pending-1',
+        })),
       })
       const session = makeCheckoutSession({}, { subclub_slug: 'barnes-eagles' })
       const result = await handleAcademyCheckoutCompleted(session, deps)
@@ -458,12 +448,10 @@ describe('handleAcademyCheckoutCompleted', () => {
       // Existing-profile path
       const activeDeps = makeDeps({
         loadProfileByEmail: vi.fn(async () => ({ user_id: 'user-uuid-1' })),
-        insertActiveSub: vi.fn(
-          async (): Promise<InsertResult> => ({
-            kind: 'inserted',
-            id: 'active-1',
-          })
-        ),
+        insertActiveSub: vi.fn(async (): Promise<InsertResult> => ({
+          kind: 'inserted',
+          id: 'active-1',
+        })),
       })
       await handleAcademyCheckoutCompleted(makeCheckoutSession(), activeDeps)
       expect(activeDeps.insertActiveSub).toHaveBeenCalledWith(

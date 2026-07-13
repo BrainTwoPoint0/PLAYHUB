@@ -106,7 +106,8 @@ export async function persistScheduledRecording(
   // amount gets priced at an invented fallback figure by the billing
   // dashboards — refuse to mark it billable instead; configuring the
   // venue's billing config makes future recordings billable again.
-  const resolvedIsBillable = (isBillable ?? false) && resolvedBillableAmount !== null
+  const resolvedIsBillable =
+    (isBillable ?? false) && resolvedBillableAmount !== null
 
   const { data: recording, error: recordingError } = await serviceClient
     .from('playhub_match_recordings')

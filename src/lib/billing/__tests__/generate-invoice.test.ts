@@ -12,7 +12,9 @@ import { generateMonthlyInvoice } from '../generate-invoice'
 // (a table queried N times pulls its 1st..Nth result). Every terminal —
 // .single(), .maybeSingle(), and awaiting an array/insert/update chain —
 // consumes one result. Insert payloads are captured on `sb._inserts`.
-function makeSupabase(tables: Record<string, Array<{ data?: any; error?: any }>>) {
+function makeSupabase(
+  tables: Record<string, Array<{ data?: any; error?: any }>>
+) {
   const counters: Record<string, number> = {}
   const inserts: any[] = []
   const sb: any = {
@@ -27,7 +29,10 @@ function makeSupabase(tables: Record<string, Array<{ data?: any; error?: any }>>
         const arr = tables[table] || []
         const i = counters[table] ?? 0
         counters[table] = i + 1
-        const r = arr[Math.min(i, arr.length - 1)] ?? { data: null, error: null }
+        const r = arr[Math.min(i, arr.length - 1)] ?? {
+          data: null,
+          error: null,
+        }
         return { error: null, ...r }
       }
       const c: any = {}
@@ -45,7 +50,8 @@ function makeSupabase(tables: Record<string, Array<{ data?: any; error?: any }>>
       }
       c.single = () => Promise.resolve(nextResult())
       c.maybeSingle = () => Promise.resolve(nextResult())
-      c.then = (onF: any, onR: any) => Promise.resolve(nextResult()).then(onF, onR)
+      c.then = (onF: any, onR: any) =>
+        Promise.resolve(nextResult()).then(onF, onR)
       return c
     },
   }
@@ -123,8 +129,18 @@ describe('generateMonthlyInvoice', () => {
       playhub_match_recordings: [
         {
           data: [
-            { id: 'r1', title: 'M1', billable_amount: 10, collected_by: 'venue' },
-            { id: 'r2', title: 'M2', billable_amount: 20, collected_by: 'venue' },
+            {
+              id: 'r1',
+              title: 'M1',
+              billable_amount: 10,
+              collected_by: 'venue',
+            },
+            {
+              id: 'r2',
+              title: 'M2',
+              billable_amount: 20,
+              collected_by: 'venue',
+            },
           ],
         },
       ],
@@ -145,7 +161,9 @@ describe('generateMonthlyInvoice', () => {
     // gross 30, partner share 5% = 1.5, venue owes PLAYBACK the playback share = 28.5
     expect(stripe.invoiceItems.create).toHaveBeenCalledWith(
       expect.objectContaining({ amount: 28500, currency: 'kwd' }),
-      expect.objectContaining({ idempotencyKey: 'invoice:venue-1:2026:02:item' })
+      expect.objectContaining({
+        idempotencyKey: 'invoice:venue-1:2026:02:item',
+      })
     )
     expect(stripe.invoices.create).toHaveBeenCalledWith(
       expect.objectContaining({ customer: 'cus_123' }),

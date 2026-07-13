@@ -172,8 +172,10 @@ async function renderLiveInvoicePreview(
   const venueCollected = items.filter((r) => r.collected_by !== 'playhub')
   const playhubCollected = items.filter((r) => r.collected_by === 'playhub')
 
-  const sum = (recs: any[], pick: (s: { gross: number; partner: number }) => number) =>
-    recs.reduce((acc, r) => acc + pick(shareOf(r)), 0)
+  const sum = (
+    recs: any[],
+    pick: (s: { gross: number; partner: number }) => number
+  ) => recs.reduce((acc, r) => acc + pick(shareOf(r)), 0)
 
   const venueCollectedRevenue = sum(venueCollected, (s) => s.gross)
   const playhubCollectedRevenue = sum(playhubCollected, (s) => s.gross)

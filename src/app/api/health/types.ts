@@ -1,9 +1,5 @@
 export type HealthErrorCode =
-  | 'connection_failed'
-  | 'timeout'
-  | 'auth_failed'
-  | 'misconfigured'
-  | 'unknown'
+  'connection_failed' | 'timeout' | 'auth_failed' | 'misconfigured' | 'unknown'
 
 export interface ServiceStatus {
   name: string

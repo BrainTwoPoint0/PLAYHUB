@@ -18,7 +18,8 @@ export function findZombieRecordings<T extends ZombieCandidate>(
   tombstonedGameIds: Set<string>
 ): T[] {
   return recordings.filter(
-    (r) => r.spiideo_game_id !== null && tombstonedGameIds.has(r.spiideo_game_id)
+    (r) =>
+      r.spiideo_game_id !== null && tombstonedGameIds.has(r.spiideo_game_id)
   )
 }
 
