@@ -48,6 +48,8 @@ export function parseAimTrack(raw: unknown): AimTrack | null {
   const n = t.length
   if (n < 2 || pan.length !== n || tilt.length !== n || fov.length !== n)
     return null
+  // ~5.5h at 10Hz — anything bigger is not a real track (self-DoS guard).
+  if (n > 200_000) return null
   let prev = -Infinity
   for (let i = 0; i < n; i++) {
     if (
@@ -62,8 +64,8 @@ export function parseAimTrack(raw: unknown): AimTrack | null {
   }
   return {
     version: 1,
-    sampleFps: typeof o.sample_fps === 'number' ? o.sample_fps : 5,
-    coverage: typeof o.coverage === 'number' ? o.coverage : 1,
+    sampleFps: Number.isFinite(o.sample_fps) ? (o.sample_fps as number) : 5,
+    coverage: Number.isFinite(o.coverage) ? (o.coverage as number) : 1,
     t: t as number[],
     pan: pan as number[],
     tilt: tilt as number[],

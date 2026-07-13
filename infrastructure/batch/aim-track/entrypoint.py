@@ -30,8 +30,13 @@ import boto3
 from register import register
 from aim_convert import convert
 
-RECORDING_ID = os.environ['RECORDING_ID']
-GAME_ID = os.environ['GAME_ID']
+import uuid as _uuid
+
+# Format asserts make "a stray & in env rewrites the PATCH filter under
+# service role" structurally impossible (values are interpolated into
+# PostgREST query strings and storage paths).
+RECORDING_ID = str(_uuid.UUID(os.environ['RECORDING_ID']))
+GAME_ID = str(_uuid.UUID(os.environ['GAME_ID']))
 SUPABASE_URL = os.environ['SUPABASE_URL'].rstrip('/')
 SERVICE_KEY = os.environ['SUPABASE_SERVICE_ROLE_KEY']
 BUCKET = os.environ['S3_RECORDINGS_BUCKET']
@@ -180,10 +185,16 @@ if __name__ == '__main__':
     try:
         main()
     except Exception as err:  # noqa: BLE001 — terminal status then non-zero exit
-        # Truncated (boto/urllib error strings never carry auth headers; S3
-        # keys may appear — acceptable for an RLS-guarded column).
-        msg = str(err)[:300]
-        print(f'FATAL: {msg}', file=sys.stderr, flush=True)
+        # aim_track_error is readable on published rows (the public-SELECT RLS
+        # policy exposes every column), so only SELF-AUTHORED messages go to
+        # the DB: our RuntimeErrors verbatim (quality gates, missing keys),
+        # everything else as the exception class name. Full detail → logs.
+        if isinstance(err, RuntimeError):
+            msg = str(err)[:300]
+        else:
+            msg = f'{type(err).__name__} (see job logs)'
+        print(f'FATAL: {type(err).__name__}: {str(err)[:500]}',
+              file=sys.stderr, flush=True)
         try:
             set_status({'aim_track_status': 'error', 'aim_track_error': msg})
         except Exception as err2:  # noqa: BLE001
