@@ -2290,6 +2290,57 @@ export type Database = {
           },
         ]
       }
+      playhub_portrait_renders: {
+        Row: {
+          attempts: number
+          club_slug: string
+          created_at: string
+          error: string | null
+          id: string
+          provider_event_id: string
+          provider_recording_id: string
+          published_at: string | null
+          published_by: string | null
+          quality: Json | null
+          recording_event_id: string
+          status: string
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          club_slug: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          provider_event_id: string
+          provider_recording_id: string
+          published_at?: string | null
+          published_by?: string | null
+          quality?: Json | null
+          recording_event_id: string
+          status?: string
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          club_slug?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          provider_event_id?: string
+          provider_recording_id?: string
+          published_at?: string | null
+          published_by?: string | null
+          quality?: Json | null
+          recording_event_id?: string
+          status?: string
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       playhub_products: {
         Row: {
           access_duration_days: number | null
@@ -4225,6 +4276,16 @@ export type Database = {
         Row: {
           url: string | null
           veo_highlight_id: string | null
+        }
+        Relationships: []
+      }
+      playhub_portrait_render_candidates: {
+        Row: {
+          club_slug: string | null
+          goal_events: number | null
+          latest_event_at: string | null
+          match_slug: string | null
+          renders: number | null
         }
         Relationships: []
       }
