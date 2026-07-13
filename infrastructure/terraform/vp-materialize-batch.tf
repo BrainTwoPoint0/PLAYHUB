@@ -58,7 +58,7 @@ resource "aws_batch_compute_environment" "vp_materialize" {
 
   compute_resources {
     type               = "FARGATE"
-    max_vcpus          = 16 # ≥ in-flight cap (5) × 2 vCPU, with headroom
+    max_vcpus          = 16 # 5×2 vCPU (vp in-flight cap) + 2×2 (aim-track cap) = 14 ≤ 16 — caps guarantee no queueing
     subnets            = data.aws_subnets.default.ids
     security_group_ids = [aws_security_group.batch.id]
   }

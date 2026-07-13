@@ -177,3 +177,143 @@ export async function sweepPanoramaCaptures(
   }
   return { submitted, candidates: claimable.length }
 }
+
+// ── Aim-track sweep ──────────────────────────────────────────────────────────
+// Sibling sweep for the reg-SIFT auto-follow track: once a recording has BOTH
+// the produced Play mp4 (s3_key) and the preserved raw panorama
+// (panorama_s3_key), an aim-track Batch job can compute Spiideo's camera path
+// from our own S3 — no purge window applies (both inputs are ours forever).
+// Newest games first: they're the ones being watched.
+
+export const AIM_SWEEP_MAX_PER_RUN = 1 // jobs run 4-7h; trickle the backlog
+export const AIM_INFLIGHT_CAP = 2 // 2 vCPU each on the shared 16-vCPU CE
+// Stuck threshold is HOURS, not the panorama's 30 min: a queued Batch job has
+// no heartbeat, and reclaiming one here duplicates a 4-7h job. Aim tracks
+// have no purge deadline (both inputs are ours forever), so patience is free.
+// A genuinely dead job (heartbeat every 2 min while running) is still
+// reclaimed within one threshold.
+export const AIM_STUCK_MS = 3 * 3600_000
+
+export interface AimTrackCandidate {
+  id: string
+  spiideo_game_id: string | null
+  s3_key: string | null
+  panorama_s3_key: string | null
+  aim_track_status: string | null
+  aim_track_started_at: string | null
+  aim_track_attempts: number | null
+}
+
+/** Same claimability contract as isClaimable, over the aim_track_* columns. */
+export function isAimClaimable(row: AimTrackCandidate, nowMs: number): boolean {
+  if (!row.spiideo_game_id || !row.s3_key || !row.panorama_s3_key) return false
+  const status = row.aim_track_status
+  if (status === 'ready') return false
+  const startedAt = row.aim_track_started_at
+    ? Date.parse(row.aim_track_started_at)
+    : 0
+  if (status === null) return true
+  if (status === 'error')
+    return (
+      (row.aim_track_attempts ?? 0) < MAX_ATTEMPTS &&
+      nowMs - startedAt >= ERROR_COOLDOWN_MS
+    )
+  if (status === 'pending')
+    return (
+      (row.aim_track_attempts ?? 0) < MAX_ATTEMPTS &&
+      nowMs - startedAt >= AIM_STUCK_MS
+    )
+  return false
+}
+
+export async function sweepAimTracks(
+  supabase: SupabaseClient,
+  submitJob: SubmitPanoramaJob,
+  nowMs = Date.now()
+): Promise<{ submitted: number; candidates: number }> {
+  const { data, error } = await supabase
+    .from('playhub_match_recordings')
+    .select(
+      'id, spiideo_game_id, s3_key, panorama_s3_key, aim_track_status, aim_track_started_at, aim_track_attempts'
+    )
+    .eq('status', 'published')
+    .not('spiideo_game_id', 'is', null)
+    .not('s3_key', 'is', null)
+    .not('panorama_s3_key', 'is', null)
+    // NOT .neq('aim_track_status','ready') — SQL three-valued logic would drop
+    // the NULL (never-attempted) rows, which are the whole point.
+    .or(`aim_track_status.is.null,aim_track_status.neq.ready`)
+    .or(`aim_track_attempts.is.null,aim_track_attempts.lt.${MAX_ATTEMPTS}`)
+    .order('match_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false }) // deterministic among equal dates
+    .limit(25)
+  if (error) throw new Error(`aim sweep query: ${error.message}`)
+
+  const claimable = (data ?? []).filter((r) => isAimClaimable(r, nowMs))
+
+  const freshCutoff = new Date(nowMs - AIM_STUCK_MS).toISOString()
+  const { count: inFlight, error: inFlightErr } = await supabase
+    .from('playhub_match_recordings')
+    .select('id', { count: 'exact', head: true })
+    .eq('aim_track_status', 'pending')
+    .gte('aim_track_started_at', freshCutoff)
+  if (inFlightErr)
+    throw new Error(`aim sweep in-flight count: ${inFlightErr.message}`)
+  const budget = Math.max(
+    0,
+    Math.min(AIM_SWEEP_MAX_PER_RUN, AIM_INFLIGHT_CAP - (inFlight ?? 0))
+  )
+
+  let submitted = 0
+  let attempted = 0
+  for (const row of claimable) {
+    if (attempted >= budget) break
+    const stuckCutoff = new Date(nowMs - AIM_STUCK_MS).toISOString()
+    const errorCutoff = new Date(nowMs - ERROR_COOLDOWN_MS).toISOString()
+    const { count, error: claimErr } = await supabase
+      .from('playhub_match_recordings')
+      .update(
+        {
+          aim_track_status: 'pending',
+          aim_track_started_at: new Date(nowMs).toISOString(),
+          aim_track_error: null,
+          aim_track_attempts: (row.aim_track_attempts ?? 0) + 1,
+        },
+        { count: 'exact' }
+      )
+      .eq('id', row.id)
+      .or(
+        `aim_track_status.is.null,` +
+          `and(aim_track_status.eq.error,aim_track_attempts.lt.${MAX_ATTEMPTS},aim_track_started_at.lt.${errorCutoff}),` +
+          `and(aim_track_status.eq.pending,aim_track_attempts.lt.${MAX_ATTEMPTS},aim_track_started_at.lt.${stuckCutoff})`
+      )
+    if (claimErr) {
+      console.error(
+        `aim sweep: claim failed for ${row.id}: ${claimErr.message}`
+      )
+      continue
+    }
+    if (!count) continue
+
+    attempted++
+    try {
+      const jobId = await submitJob(row.id, String(row.spiideo_game_id))
+      if (!jobId) throw new Error('no jobId returned')
+      console.log(`aim sweep: submitted ${row.id} -> job ${jobId}`)
+      submitted++
+    } catch (err) {
+      console.error(
+        `aim sweep: submit failed for ${row.id}: ${err instanceof Error ? err.message : err}`
+      )
+      await supabase
+        .from('playhub_match_recordings')
+        .update({
+          aim_track_status: 'error',
+          aim_track_error: 'sweep submit failed',
+          aim_track_attempts: row.aim_track_attempts ?? 0,
+        })
+        .eq('id', row.id)
+    }
+  }
+  return { submitted, candidates: claimable.length }
+}

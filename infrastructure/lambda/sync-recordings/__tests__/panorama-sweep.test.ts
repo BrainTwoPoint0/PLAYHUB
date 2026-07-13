@@ -2,12 +2,18 @@ import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   isClaimable,
+  isAimClaimable,
   sweepPanoramaCaptures,
+  sweepAimTracks,
   CAPTURE_STUCK_MS,
   ERROR_COOLDOWN_MS,
   MAX_ATTEMPTS,
   SWEEP_MAX_PER_RUN,
+  AIM_SWEEP_MAX_PER_RUN,
+  AIM_INFLIGHT_CAP,
+  AIM_STUCK_MS,
   type PanoramaCandidate,
+  type AimTrackCandidate,
 } from '../panorama-sweep'
 
 const NOW = Date.parse('2026-07-07T12:00:00Z')
@@ -150,7 +156,16 @@ function stubSupabase(opts: {
 
   function makeBuilder(result: unknown, onResolve?: () => unknown) {
     const b: Record<string, unknown> = {}
-    for (const m of ['select', 'eq', 'not', 'is', 'or', 'gte', 'order', 'limit'])
+    for (const m of [
+      'select',
+      'eq',
+      'not',
+      'is',
+      'or',
+      'gte',
+      'order',
+      'limit',
+    ])
       b[m] = vi.fn(() => b)
     b.then = (res: (v: unknown) => unknown) =>
       Promise.resolve(onResolve ? onResolve() : result).then(res)
@@ -183,7 +198,10 @@ function stubSupabase(opts: {
 }
 
 describe('sweepPanoramaCaptures', () => {
-  const twoRows = [row({ id: 'rec-1' }), row({ id: 'rec-2', spiideo_game_id: 'game-2' })]
+  const twoRows = [
+    row({ id: 'rec-1' }),
+    row({ id: 'rec-2', spiideo_game_id: 'game-2' }),
+  ]
   const manyRows = Array.from({ length: 6 }, (_, i) =>
     row({ id: `rec-${i}`, spiideo_game_id: `game-${i}` })
   )
@@ -210,7 +228,14 @@ describe('sweepPanoramaCaptures', () => {
 
   it('rollback restores the pre-claim attempt count (plumbing failures must not burn capture budget)', async () => {
     const rows = [
-      row({ id: 'rec-1', panorama_capture_attempts: 1, panorama_capture_status: 'error', panorama_capture_started_at: new Date(NOW - ERROR_COOLDOWN_MS * 2).toISOString() }),
+      row({
+        id: 'rec-1',
+        panorama_capture_attempts: 1,
+        panorama_capture_status: 'error',
+        panorama_capture_started_at: new Date(
+          NOW - ERROR_COOLDOWN_MS * 2
+        ).toISOString(),
+      }),
     ]
     const { client, claims, rollbacks } = stubSupabase({ candidates: rows })
     const submit = vi.fn(async () => undefined) // "no jobId returned"
@@ -256,5 +281,129 @@ describe('sweepPanoramaCaptures', () => {
     expect(submit).toHaveBeenCalledTimes(1)
     expect(submit).toHaveBeenCalledWith('rec-idle', 'game-1')
     expect(out.candidates).toBe(1)
+  })
+})
+
+function aimRow(overrides: Partial<AimTrackCandidate> = {}): AimTrackCandidate {
+  return {
+    id: 'rec-1',
+    spiideo_game_id: 'game-1',
+    s3_key: 'recordings/2026-07-01/game-1/prod.mp4',
+    panorama_s3_key: 'panoramas/game-1/vp.mp4',
+    aim_track_status: null,
+    aim_track_started_at: null,
+    aim_track_attempts: 0,
+    ...overrides,
+  }
+}
+
+describe('isAimClaimable', () => {
+  it('claims a never-attempted row with both inputs present', () => {
+    expect(isAimClaimable(aimRow(), NOW)).toBe(true)
+  })
+
+  it('requires BOTH the produced mp4 and the preserved panorama', () => {
+    expect(isAimClaimable(aimRow({ s3_key: null }), NOW)).toBe(false)
+    expect(isAimClaimable(aimRow({ panorama_s3_key: null }), NOW)).toBe(false)
+    expect(isAimClaimable(aimRow({ spiideo_game_id: null }), NOW)).toBe(false)
+  })
+
+  it('never reclaims ready, fresh pending, or attempts-capped rows', () => {
+    expect(isAimClaimable(aimRow({ aim_track_status: 'ready' }), NOW)).toBe(
+      false
+    )
+    expect(
+      isAimClaimable(
+        aimRow({
+          aim_track_status: 'pending',
+          aim_track_started_at: new Date(NOW - 60_000).toISOString(),
+        }),
+        NOW
+      )
+    ).toBe(false)
+    expect(
+      isAimClaimable(
+        aimRow({
+          aim_track_status: 'error',
+          aim_track_attempts: MAX_ATTEMPTS,
+          aim_track_started_at: new Date(
+            NOW - ERROR_COOLDOWN_MS * 10
+          ).toISOString(),
+        }),
+        NOW
+      )
+    ).toBe(false)
+  })
+
+  it('reclaims a heartbeat-dead pending under the cap (aim threshold is HOURS)', () => {
+    // A 4-7h job merely queued/running is NOT stale at the panorama's 30 min…
+    expect(
+      isAimClaimable(
+        aimRow({
+          aim_track_status: 'pending',
+          aim_track_attempts: 1,
+          aim_track_started_at: new Date(
+            NOW - CAPTURE_STUCK_MS - 1000
+          ).toISOString(),
+        }),
+        NOW
+      )
+    ).toBe(false)
+    // …only after AIM_STUCK_MS of heartbeat silence.
+    expect(
+      isAimClaimable(
+        aimRow({
+          aim_track_status: 'pending',
+          aim_track_attempts: 1,
+          aim_track_started_at: new Date(
+            NOW - AIM_STUCK_MS - 1000
+          ).toISOString(),
+        }),
+        NOW
+      )
+    ).toBe(true)
+  })
+})
+
+describe('sweepAimTracks', () => {
+  const manyAimRows = Array.from({ length: 5 }, (_, i) =>
+    aimRow({ id: `rec-${i}`, spiideo_game_id: `game-${i}` })
+  )
+
+  it('submits at most AIM_SWEEP_MAX_PER_RUN per run', async () => {
+    const { client } = stubSupabase({
+      candidates: manyAimRows as unknown as PanoramaCandidate[],
+    })
+    const submit = vi.fn(async (id: string) => `job-${id}`)
+    const out = await sweepAimTracks(client, submit, NOW)
+    expect(submit).toHaveBeenCalledTimes(AIM_SWEEP_MAX_PER_RUN)
+    expect(out.submitted).toBe(AIM_SWEEP_MAX_PER_RUN)
+    expect(out.candidates).toBe(manyAimRows.length)
+  })
+
+  it('budget counts attempts: a failing submit rolls back once and stops', async () => {
+    const { client, rollbacks } = stubSupabase({
+      candidates: manyAimRows as unknown as PanoramaCandidate[],
+    })
+    const submit = vi.fn(async () => {
+      throw new Error('AccessDeniedException')
+    })
+    const out = await sweepAimTracks(client, submit, NOW)
+    expect(submit).toHaveBeenCalledTimes(AIM_SWEEP_MAX_PER_RUN)
+    expect(out.submitted).toBe(0)
+    expect(rollbacks).toHaveLength(AIM_SWEEP_MAX_PER_RUN)
+    expect(rollbacks[0].aim_track_status).toBe('error')
+    expect(rollbacks[0].aim_track_attempts).toBe(0)
+  })
+
+  it('respects the aim in-flight cap on the shared CE', async () => {
+    const { client } = stubSupabase({
+      candidates: manyAimRows as unknown as PanoramaCandidate[],
+      inFlight: AIM_INFLIGHT_CAP,
+    })
+    const submit = vi.fn(async (id: string) => `job-${id}`)
+    const out = await sweepAimTracks(client, submit, NOW)
+    expect(submit).not.toHaveBeenCalled()
+    expect(out.submitted).toBe(0)
   })
 })

@@ -1,0 +1,6 @@
+# Pinned exactly: this is a numerical pipeline — an OpenCV minor bump can shift
+# SIFT/RANSAC output between :latest image rebuilds, silently changing tracks.
+opencv-python-headless==4.10.0.84
+numpy==2.1.3
+scipy==1.14.1
+boto3==1.35.76

@@ -100,6 +100,12 @@ export function WatchPlayer({
   // the raw VP finishes materializing).
   const [wantDewarp, setWantDewarp] = useState(false)
   const dewarpApiRef = useRef<DewarpSurfaceApi | null>(null)
+  // Auto-follow availability + live state, reported by the de-warp surface so
+  // the shared bar's DewarpControls can render/reflect the toggle.
+  const [dewarpFollow, setDewarpFollow] = useState({
+    autoFollow: false,
+    hasAimTrack: false,
+  })
 
   const dewarpReady = Boolean(meshBaseUrl && panoramaSrc)
   const capturing = exploreState === 'loading' || exploreState === 'pending'
@@ -224,6 +230,13 @@ export function WatchPlayer({
             masterVideoRef={t.videoRef}
             hideChrome
             apiRef={dewarpApiRef}
+            onStateChange={({ autoFollow, hasAimTrack }) =>
+              setDewarpFollow((s) =>
+                s.autoFollow === autoFollow && s.hasAimTrack === hasAimTrack
+                  ? s
+                  : { autoFollow, hasAimTrack }
+              )
+            }
             className="h-full w-full"
           />
         </div>
@@ -282,7 +295,15 @@ export function WatchPlayer({
         videoEl={t.videoRef.current}
         capabilities={isDewarp ? DEWARP_CAPS : FLAT_CAPS}
         surfaceToggle={surfaceToggle}
-        extras={isDewarp ? <DewarpControls apiRef={dewarpApiRef} /> : null}
+        extras={
+          isDewarp ? (
+            <DewarpControls
+              apiRef={dewarpApiRef}
+              hasAimTrack={dewarpFollow.hasAimTrack}
+              autoFollow={dewarpFollow.autoFollow}
+            />
+          ) : null
+        }
       />
     </div>
   )

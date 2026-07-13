@@ -120,6 +120,9 @@ resource "aws_iam_role_policy" "sync_lambda_batch" {
           # change). arn_prefix is the unversioned ARN (provider >= 5.x).
           aws_batch_job_definition.vp_materialize.arn_prefix,
           "${aws_batch_job_definition.vp_materialize.arn_prefix}:*",
+          # Aim-track jobs run on the same queue with their own definition.
+          aws_batch_job_definition.aim_track.arn_prefix,
+          "${aws_batch_job_definition.aim_track.arn_prefix}:*",
         ]
       }
     ]
@@ -177,6 +180,7 @@ resource "aws_lambda_function" "sync_recordings" {
       ALERT_EMAIL           = var.alert_email
       PANORAMA_JOB_QUEUE    = aws_batch_job_queue.vp_materialize.name
       PANORAMA_JOB_DEF      = aws_batch_job_definition.vp_materialize.name
+      AIM_TRACK_JOB_DEF     = aws_batch_job_definition.aim_track.name
     }
   }
 

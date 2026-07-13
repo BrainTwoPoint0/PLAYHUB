@@ -16,7 +16,7 @@ import {
   sweepZombie,
   type ZombieCandidate,
 } from './zombies'
-import { sweepPanoramaCaptures } from './panorama-sweep'
+import { sweepPanoramaCaptures, sweepAimTracks } from './panorama-sweep'
 import { fetchAllRows } from './paginate'
 
 // Environment variables
@@ -41,6 +41,8 @@ const APP_URL = process.env.APP_URL || 'https://playhub.playbacksports.ai'
 // the sweep (fail-safe if terraform hasn't provided the names yet).
 const PANORAMA_JOB_QUEUE = process.env.PANORAMA_JOB_QUEUE || ''
 const PANORAMA_JOB_DEF = process.env.PANORAMA_JOB_DEF || ''
+// Aim-track jobs share the panorama queue; empty env disables the sweep.
+const AIM_TRACK_JOB_DEF = process.env.AIM_TRACK_JOB_DEF || ''
 
 // Simple HTML escaping for email templates
 function escapeHtml(s: string): string {
@@ -1290,6 +1292,39 @@ export const handler = async (): Promise<{
           'Panorama sweep failed (non-fatal):',
           err instanceof Error ? err.message : err
         )
+      }
+      if (AIM_TRACK_JOB_DEF) {
+        try {
+          const batch = new BatchClient({ region: S3_REGION })
+          const { submitted, candidates } = await sweepAimTracks(
+            supabase,
+            async (recordingId, gameId) => {
+              const out = await batch.send(
+                new SubmitJobCommand({
+                  jobName: `aim-track-${recordingId}`,
+                  jobQueue: PANORAMA_JOB_QUEUE,
+                  jobDefinition: AIM_TRACK_JOB_DEF,
+                  containerOverrides: {
+                    environment: [
+                      { name: 'RECORDING_ID', value: recordingId },
+                      { name: 'GAME_ID', value: gameId },
+                    ],
+                  },
+                })
+              )
+              return out.jobId
+            }
+          )
+          if (candidates > 0)
+            console.log(
+              `Aim sweep: ${submitted} submitted, ${candidates} claimable`
+            )
+        } catch (err) {
+          console.error(
+            'Aim sweep failed (non-fatal):',
+            err instanceof Error ? err.message : err
+          )
+        }
       }
     }
 

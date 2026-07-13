@@ -25,6 +25,11 @@ import { useTranslations } from 'next-intl'
 import Hls from 'hls.js'
 import { Button } from '@braintwopoint0/playback-commons/ui'
 import {
+  parseAimTrack,
+  sampleAimTrack,
+  type AimTrack,
+} from '@/lib/panorama/aim-track'
+import {
   Play,
   Pause,
   Maximize,
@@ -119,8 +124,12 @@ interface VirtualPanoramaPlayerProps {
   hideChrome?: boolean
   /** Imperative control handle for the pan/zoom/auto extras, so they can live in the shared control bar. Populated on mount. */
   apiRef?: React.MutableRefObject<DewarpSurfaceApi | null>
-  /** Reports pan-state changes (auto-follow toggled by button OR by a drag; zoom %) up to the shared bar's extras. */
-  onStateChange?: (s: { autoFollow: boolean; zoomPct: number }) => void
+  /** Reports pan-state changes (auto-follow toggled by button OR by a drag; zoom %; whether a reg-SIFT aim track loaded) up to the shared bar's extras. */
+  onStateChange?: (s: {
+    autoFollow: boolean
+    zoomPct: number
+    hasAimTrack: boolean
+  }) => void
   /**
    * Debug: disable the fov-adaptive pinhole↔cylindrical blend and render with
    * the stock pinhole projection (the pre-blend look). A/B via `?flat=1`.
@@ -931,6 +940,10 @@ export function VirtualPanoramaPlayer({
   // the detected action instead of the user. Only meaningful in curved mode.
   const [autoFollow, setAutoFollow] = useState(false)
   const autoFollowRef = useRef(false)
+  // Reg-SIFT aim track (Spiideo's own camera path, computed offline) — when
+  // present it replaces the motion-follow driver for Auto mode.
+  const aimTrackRef = useRef<AimTrack | null>(null)
+  const [hasAimTrack, setHasAimTrack] = useState(false)
   useEffect(() => {
     autoFollowRef.current = autoFollow
   }, [autoFollow])
@@ -1093,7 +1106,7 @@ export function VirtualPanoramaPlayer({
 
     ;(async () => {
       try {
-        const [scene_, vbuf, ibuf, tuning] = await Promise.all([
+        const [scene_, vbuf, ibuf, tuning, aimTrack] = await Promise.all([
           fetch(`${meshBaseUrl}/scene.json`).then(
             (r) => r.json() as Promise<SceneJson>
           ),
@@ -1108,8 +1121,19 @@ export function VirtualPanoramaPlayer({
           })
             .then((r) => (r.ok ? (r.json() as Promise<MeshTuning>) : null))
             .catch(() => null),
+          // optional reg-SIFT aim track (same optional-artifact contract, but
+          // a LARGER payload — ~1MB for a 2h match — so it gets a longer
+          // timeout than tuning.json; still null-degrading, never blocking)
+          fetch(`${meshBaseUrl}/aim-track.json`, {
+            signal: AbortSignal.timeout(10000),
+          })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((j) => parseAimTrack(j))
+            .catch(() => null),
         ])
         if (disposed) return
+        aimTrackRef.current = aimTrack
+        setHasAimTrack(aimTrack !== null)
         // Curved mode (the product path): Perform's exact de-warp — every mesh
         // vertex is a WORLD ray, viewed by a perspective camera at the origin;
         // pan/tilt rotate the viewer. Flat ortho remains for the single-
@@ -1476,11 +1500,31 @@ export function VirtualPanoramaPlayer({
             if (followFrame % 8 === 0) syncZoom()
           }
         }
+        const stepAim = (track: AimTrack) => {
+          // Deterministic Auto: sample Spiideo's recovered camera path at the
+          // MASTER clock (the produced video the control bar scrubs) — the
+          // slave raw-VP video may drift up to 1.5s. smoothDamp irons out
+          // seeks and the 5 Hz track quantization; clampView keeps the frame
+          // on the mesh exactly like every other driver.
+          const clock =
+            masterVideoRef?.current?.currentTime ?? video.currentTime
+          const aim = sampleAimTrack(track, clock)
+          const v = viewRef.current,
+            dt = 1 / 60
+          viewRef.current = clampView({
+            pan: smoothDamp(v.pan, aim.panDeg * DEG, velP, 0.25, dt),
+            tilt: smoothDamp(v.tilt, aim.tiltDeg * DEG, velT, 0.25, dt),
+            fov: smoothDamp(v.fov, aim.fovDeg, velF, 0.6, dt),
+          })
+          if (followFrame++ % 8 === 0) syncZoom()
+        }
         const loop = () => {
           raf = requestAnimationFrame(loop)
-          if (autoFollowRef.current && curved && !autoSrc)
-            stepFollow() // production feed handles Auto when autoSrc set
-          else {
+          if (autoFollowRef.current && curved && !autoSrc) {
+            const track = aimTrackRef.current
+            if (track) stepAim(track)
+            else stepFollow() // motion driver = fallback when no reg track
+          } else {
             prevLuma = null
             haveTarget = false
           }
@@ -1798,8 +1842,8 @@ export function VirtualPanoramaPlayer({
   // Report pan-state up so DewarpControls (rendered in the shared bar's extras)
   // reflect Auto-pressed + zoom%. Fires when Auto flips via button OR a drag.
   useEffect(() => {
-    onStateChange?.({ autoFollow, zoomPct })
-  }, [autoFollow, zoomPct, onStateChange])
+    onStateChange?.({ autoFollow, zoomPct, hasAimTrack })
+  }, [autoFollow, zoomPct, hasAimTrack, onStateChange])
 
   // Publish the imperative control handle for the extras (ref-as-latest-callback,
   // same pattern as toggleFullscreenRef — the closures below are already defined).
