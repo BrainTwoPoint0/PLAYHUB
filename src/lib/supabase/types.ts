@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: '12.2.3 (519615d)'
+  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -1650,54 +1655,104 @@ export type Database = {
           },
         ]
       }
+      playhub_group_tier_config: {
+        Row: {
+          created_at: string
+          football_camera_count: number
+          group_organization_id: string
+          id: string
+          padel_camera_count: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          football_camera_count?: number
+          group_organization_id: string
+          id?: string
+          padel_camera_count?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          football_camera_count?: number
+          group_organization_id?: string
+          id?: string
+          padel_camera_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'playhub_group_tier_config_group_organization_id_fkey'
+            columns: ['group_organization_id']
+            isOneToOne: true
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       playhub_invoice_line_items: {
         Row: {
-          ambassador_fee: number
+          ambassador_fee: number | null
           billable_amount: number
           collected_by: string
           created_at: string
           currency: string
           duration_seconds: number
           fixed_cost_eur_per_hour: number | null
-          fixed_cost_local: number
+          fixed_cost_local: number | null
           fx_rate: number | null
+          gross_amount: number | null
           id: string
           invoice_id: string
+          partner_share: number | null
+          partner_share_pct: number | null
+          playback_share: number | null
           recording_id: string | null
           recording_match_date: string | null
           recording_title: string | null
+          sport: string | null
         }
         Insert: {
-          ambassador_fee: number
+          ambassador_fee?: number | null
           billable_amount: number
           collected_by: string
           created_at?: string
           currency: string
           duration_seconds: number
           fixed_cost_eur_per_hour?: number | null
-          fixed_cost_local: number
+          fixed_cost_local?: number | null
           fx_rate?: number | null
+          gross_amount?: number | null
           id?: string
           invoice_id: string
+          partner_share?: number | null
+          partner_share_pct?: number | null
+          playback_share?: number | null
           recording_id?: string | null
           recording_match_date?: string | null
           recording_title?: string | null
+          sport?: string | null
         }
         Update: {
-          ambassador_fee?: number
+          ambassador_fee?: number | null
           billable_amount?: number
           collected_by?: string
           created_at?: string
           currency?: string
           duration_seconds?: number
           fixed_cost_eur_per_hour?: number | null
-          fixed_cost_local?: number
+          fixed_cost_local?: number | null
           fx_rate?: number | null
+          gross_amount?: number | null
           id?: string
           invoice_id?: string
+          partner_share?: number | null
+          partner_share_pct?: number | null
+          playback_share?: number | null
           recording_id?: string | null
           recording_match_date?: string | null
           recording_title?: string | null
+          sport?: string | null
         }
         Relationships: [
           {
@@ -1861,6 +1916,10 @@ export type Database = {
         Row: {
           access_method: string | null
           access_type: string | null
+          aim_track_attempts: number | null
+          aim_track_error: string | null
+          aim_track_started_at: string | null
+          aim_track_status: string | null
           away_team: string
           billable_amount: number | null
           billable_currency: string | null
@@ -1918,6 +1977,10 @@ export type Database = {
         Insert: {
           access_method?: string | null
           access_type?: string | null
+          aim_track_attempts?: number | null
+          aim_track_error?: string | null
+          aim_track_started_at?: string | null
+          aim_track_status?: string | null
           away_team: string
           billable_amount?: number | null
           billable_currency?: string | null
@@ -1975,6 +2038,10 @@ export type Database = {
         Update: {
           access_method?: string | null
           access_type?: string | null
+          aim_track_attempts?: number | null
+          aim_track_error?: string | null
+          aim_track_started_at?: string | null
+          aim_track_status?: string | null
           away_team?: string
           billable_amount?: number | null
           billable_currency?: string | null
