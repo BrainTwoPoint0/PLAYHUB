@@ -7,7 +7,11 @@ import {
   HeadObjectCommand,
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3'
-import { BatchClient, SubmitJobCommand } from '@aws-sdk/client-batch'
+import {
+  BatchClient,
+  SubmitJobCommand,
+  ListJobsCommand,
+} from '@aws-sdk/client-batch'
 import { Upload } from '@aws-sdk/lib-storage'
 import { Readable } from 'stream'
 import { createClient } from '@supabase/supabase-js'
@@ -16,7 +20,11 @@ import {
   sweepZombie,
   type ZombieCandidate,
 } from './zombies'
-import { sweepPanoramaCaptures, sweepAimTracks } from './panorama-sweep'
+import {
+  sweepPanoramaCaptures,
+  sweepAimTracks,
+  sweepPortraitRenders,
+} from './panorama-sweep'
 import { fetchAllRows } from './paginate'
 
 // Environment variables
@@ -43,6 +51,13 @@ const PANORAMA_JOB_QUEUE = process.env.PANORAMA_JOB_QUEUE || ''
 const PANORAMA_JOB_DEF = process.env.PANORAMA_JOB_DEF || ''
 // Aim-track jobs share the panorama queue; empty env disables the sweep.
 const AIM_TRACK_JOB_DEF = process.env.AIM_TRACK_JOB_DEF || ''
+// Portrait-render sweep: comma-separated club allowlist (empty = disabled)
+// + the job definition. Shares the panorama queue.
+const PORTRAIT_JOB_DEF = process.env.PORTRAIT_JOB_DEF || ''
+const PORTRAIT_CLUBS = (process.env.PORTRAIT_CLUBS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
 
 // Simple HTML escaping for email templates
 function escapeHtml(s: string): string {
@@ -1322,6 +1337,60 @@ export const handler = async (): Promise<{
         } catch (err) {
           console.error(
             'Aim sweep failed (non-fatal):',
+            err instanceof Error ? err.message : err
+          )
+        }
+      }
+      if (PORTRAIT_JOB_DEF && PORTRAIT_CLUBS.length > 0) {
+        try {
+          const batch = new BatchClient({ region: S3_REGION })
+          const { submitted, candidates } = await sweepPortraitRenders(
+            supabase,
+            PORTRAIT_CLUBS,
+            async (matchSlug, clubSlug) => {
+              // Duplicate guard: matches take ~20 min to render and the sweep
+              // ticks every 15 — skip if a job for this match is already
+              // queued/running (jobs are idempotent, this just saves Modal $).
+              const jobName = `portrait-render-${matchSlug}`.slice(0, 128)
+              const { jobSummaryList } = await batch.send(
+                new ListJobsCommand({
+                  jobQueue: PANORAMA_JOB_QUEUE,
+                  filters: [{ name: 'JOB_NAME', values: [jobName] }],
+                })
+              )
+              const active = (jobSummaryList ?? []).some((j) =>
+                [
+                  'SUBMITTED',
+                  'PENDING',
+                  'RUNNABLE',
+                  'STARTING',
+                  'RUNNING',
+                ].includes(j.status ?? '')
+              )
+              if (active) return undefined
+              const out = await batch.send(
+                new SubmitJobCommand({
+                  jobName,
+                  jobQueue: PANORAMA_JOB_QUEUE,
+                  jobDefinition: PORTRAIT_JOB_DEF,
+                  containerOverrides: {
+                    environment: [
+                      { name: 'MATCH_SLUG', value: matchSlug },
+                      { name: 'CLUB_SLUG', value: clubSlug },
+                    ],
+                  },
+                })
+              )
+              return out.jobId
+            }
+          )
+          if (candidates > 0)
+            console.log(
+              `Portrait sweep: ${submitted} submitted, ${candidates} candidate matches`
+            )
+        } catch (err) {
+          console.error(
+            'Portrait sweep failed (non-fatal):',
             err instanceof Error ? err.message : err
           )
         }

@@ -12,6 +12,8 @@ import {
   AIM_SWEEP_MAX_PER_RUN,
   AIM_INFLIGHT_CAP,
   AIM_STUCK_MS,
+  sweepPortraitRenders,
+  PORTRAIT_SWEEP_MAX_PER_RUN,
   type PanoramaCandidate,
   type AimTrackCandidate,
 } from '../panorama-sweep'
@@ -159,6 +161,7 @@ function stubSupabase(opts: {
     for (const m of [
       'select',
       'eq',
+      'in',
       'not',
       'is',
       'or',
@@ -404,6 +407,58 @@ describe('sweepAimTracks', () => {
     const submit = vi.fn(async (id: string) => `job-${id}`)
     const out = await sweepAimTracks(client, submit, NOW)
     expect(submit).not.toHaveBeenCalled()
+    expect(out.submitted).toBe(0)
+  })
+})
+
+describe('sweepPortraitRenders', () => {
+  const matches = [
+    { club_slug: 'cfa', match_slug: 'match-a', goal_events: 5, renders: 0 },
+    { club_slug: 'cfa', match_slug: 'match-b', goal_events: 3, renders: 1 },
+    { club_slug: 'cfa', match_slug: 'match-c', goal_events: 2, renders: 0 },
+  ]
+
+  it('does nothing when the club allowlist is empty (pilot off)', async () => {
+    const { client } = stubSupabase({
+      candidates: matches as unknown as PanoramaCandidate[],
+    })
+    const submit = vi.fn(async () => 'job-1')
+    const out = await sweepPortraitRenders(client, [], submit)
+    expect(submit).not.toHaveBeenCalled()
+    expect(out).toEqual({ submitted: 0, candidates: 0 })
+  })
+
+  it('submits at most PORTRAIT_SWEEP_MAX_PER_RUN matches per run', async () => {
+    const { client } = stubSupabase({
+      candidates: matches as unknown as PanoramaCandidate[],
+    })
+    const submit = vi.fn(async (slug: string) => `job-${slug}`)
+    const out = await sweepPortraitRenders(client, ['cfa'], submit)
+    expect(submit).toHaveBeenCalledTimes(PORTRAIT_SWEEP_MAX_PER_RUN)
+    expect(submit).toHaveBeenCalledWith('match-a', 'cfa')
+    expect(out.submitted).toBe(PORTRAIT_SWEEP_MAX_PER_RUN)
+    expect(out.candidates).toBe(matches.length)
+  })
+
+  it('a duplicate-guard skip (undefined jobId) consumes the budget without counting as submitted', async () => {
+    const { client } = stubSupabase({
+      candidates: matches as unknown as PanoramaCandidate[],
+    })
+    const submit = vi.fn(async () => undefined) // active job already running
+    const out = await sweepPortraitRenders(client, ['cfa'], submit)
+    expect(submit).toHaveBeenCalledTimes(PORTRAIT_SWEEP_MAX_PER_RUN)
+    expect(out.submitted).toBe(0)
+  })
+
+  it('a submit failure is non-fatal and bounded by the budget', async () => {
+    const { client } = stubSupabase({
+      candidates: matches as unknown as PanoramaCandidate[],
+    })
+    const submit = vi.fn(async () => {
+      throw new Error('AccessDeniedException')
+    })
+    const out = await sweepPortraitRenders(client, ['cfa'], submit)
+    expect(submit).toHaveBeenCalledTimes(PORTRAIT_SWEEP_MAX_PER_RUN)
     expect(out.submitted).toBe(0)
   })
 })

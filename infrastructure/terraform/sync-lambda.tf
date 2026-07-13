@@ -123,7 +123,17 @@ resource "aws_iam_role_policy" "sync_lambda_batch" {
           # Aim-track jobs run on the same queue with their own definition.
           aws_batch_job_definition.aim_track.arn_prefix,
           "${aws_batch_job_definition.aim_track.arn_prefix}:*",
+          # Portrait-render jobs too (CFA pilot sweep).
+          aws_batch_job_definition.portrait_render.arn_prefix,
+          "${aws_batch_job_definition.portrait_render.arn_prefix}:*",
         ]
+      },
+      {
+        # The portrait sweep's duplicate guard. ListJobs does not support
+        # resource-level permissions — "*" is the only valid resource.
+        Effect   = "Allow"
+        Action   = ["batch:ListJobs"]
+        Resource = "*"
       }
     ]
   })
@@ -181,6 +191,10 @@ resource "aws_lambda_function" "sync_recordings" {
       PANORAMA_JOB_QUEUE    = aws_batch_job_queue.vp_materialize.name
       PANORAMA_JOB_DEF      = aws_batch_job_definition.vp_materialize.name
       AIM_TRACK_JOB_DEF     = aws_batch_job_definition.aim_track.name
+      PORTRAIT_JOB_DEF      = aws_batch_job_definition.portrait_render.name
+      # Club allowlist for the portrait sweep; empty = disabled. Flip to "cfa"
+      # after the pilot E2E validates.
+      PORTRAIT_CLUBS        = var.portrait_clubs
     }
   }
 

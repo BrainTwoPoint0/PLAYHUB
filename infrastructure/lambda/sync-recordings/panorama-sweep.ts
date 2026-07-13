@@ -317,3 +317,62 @@ export async function sweepAimTracks(
   }
   return { submitted, candidates: claimable.length }
 }
+
+// ── Portrait-render sweep ────────────────────────────────────────────────────
+// Feed for the portrait-render Batch job (9:16 goal drafts, review-first):
+// club-allowlisted Veo matches with unrendered tagged goals, served by the
+// playhub_portrait_render_candidates view (service-role only). No CAS columns:
+// the job upserts per-event rows idempotently and skips published/rejected/
+// draft, so a duplicate submission wastes a little Modal compute at worst —
+// the caller guards active-duplicate jobs via a Batch ListJobs name check.
+
+export const PORTRAIT_SWEEP_MAX_PER_RUN = 1
+
+export interface PortraitCandidate {
+  club_slug: string
+  match_slug: string
+  goal_events: number
+  renders: number
+}
+
+export type SubmitPortraitJob = (
+  matchSlug: string,
+  clubSlug: string
+) => Promise<string | undefined> // Batch jobId; undefined = skipped (duplicate)
+
+export async function sweepPortraitRenders(
+  supabase: SupabaseClient,
+  allowedClubs: string[],
+  submitJob: SubmitPortraitJob
+): Promise<{ submitted: number; candidates: number }> {
+  if (allowedClubs.length === 0) return { submitted: 0, candidates: 0 }
+  const { data, error } = await supabase
+    .from('playhub_portrait_render_candidates')
+    .select('club_slug, match_slug, goal_events, renders')
+    .in('club_slug', allowedClubs)
+    .order('latest_event_at', { ascending: false }) // newest matches first
+    .limit(10)
+  if (error) throw new Error(`portrait sweep query: ${error.message}`)
+
+  const candidates = (data ?? []) as PortraitCandidate[]
+  let submitted = 0
+  let attempted = 0
+  for (const c of candidates) {
+    if (attempted >= PORTRAIT_SWEEP_MAX_PER_RUN) break
+    attempted++
+    try {
+      const jobId = await submitJob(c.match_slug, c.club_slug)
+      if (jobId) {
+        console.log(
+          `portrait sweep: submitted ${c.club_slug}/${c.match_slug} (${c.renders}/${c.goal_events} rendered) -> job ${jobId}`
+        )
+        submitted++
+      }
+    } catch (err) {
+      console.error(
+        `portrait sweep: submit failed for ${c.match_slug}: ${err instanceof Error ? err.message : err}`
+      )
+    }
+  }
+  return { submitted, candidates: candidates.length }
+}

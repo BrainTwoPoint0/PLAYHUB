@@ -1,0 +1,14 @@
+{
+  "name": "portrait-render",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild entrypoint.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/entrypoint.mjs --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
+    "typecheck": "tsc --noEmit entrypoint.ts --module esnext --moduleResolution bundler --target es2022 --strict --skipLibCheck"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "esbuild": "^0.25.12",
+    "typescript": "^5.0.0"
+  }
+}

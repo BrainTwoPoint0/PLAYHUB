@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useFormatter, useTranslations } from 'next-intl'
 import { VideoPlayer } from '@/components/video/VideoPlayer'
+import { PortraitRendersStrip } from '@/components/academy/PortraitRendersStrip'
 import type { RecordingEvent } from '@/lib/recordings/event-types'
 import { useParams } from 'next/navigation'
 import { useRouter } from '@/i18n/navigation'
@@ -609,6 +610,26 @@ function ExpandedRecording({
             </div>
           )
         })()}
+
+      {/* System-generated portrait goal drafts (renders nothing off-pilot) */}
+      <PortraitRendersStrip
+        clubSlug={clubSlug}
+        matchSlug={recording.slug}
+        editorSources={
+          new Map(
+            content.highlights
+              .filter((h) => h.id && h.videos?.[0]?.url)
+              .map((h) => [
+                h.id as string,
+                {
+                  id: h.id,
+                  videoUrl: h.videos?.[0]?.url,
+                  title: tagToString(h.tags?.[0]),
+                },
+              ])
+          )
+        }
+      />
 
       {/* Highlights */}
       {content.highlights.length > 0 ? (

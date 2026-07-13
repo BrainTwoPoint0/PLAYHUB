@@ -14,6 +14,7 @@ import {
   KEYFRAME_COLORS,
 } from '@/lib/editor/types'
 import { simplifyCropKeyframes } from '@/lib/editor/simplify'
+import { autoKeyframesFromDetection } from '@/lib/editor/auto-keyframes'
 import { removeKeyframeRange } from '@/lib/editor/keyframes'
 import {
   Upload,
@@ -441,12 +442,12 @@ export default function EditorPage() {
         modalInferenceMs: detection.modal_inference_ms ?? null,
         modalAppVersion: detection.modal_app_version ?? null,
       }
-      const cropKfs = detectionsToCropKeyframes({
+      // Shared with the headless portrait-render job — same input, same
+      // keyframes (auto-keyframes.ts is the single implementation).
+      const { keyframes: simplified } = autoKeyframesFromDetection({
         positions,
         scene_changes: sceneChangesData,
-        all_candidates: [],
       })
-      const simplified = simplifyCropKeyframes(cropKfs, sceneChangesData)
 
       setKeyframes(simplified)
       // Snapshot the pristine AI output — kept for feedback.keyframes_before
