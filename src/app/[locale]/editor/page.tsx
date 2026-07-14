@@ -48,6 +48,10 @@ import {
 /* ───────── constants ───────── */
 const CROP_RATIO = CROP_WIDTH / SOURCE_WIDTH
 const MAX_VIDEO_SIZE = 500 * 1024 * 1024 // 500MB
+// Messages that describe a preserved-work situation, not a failure — the
+// banner renders these in the neutral notice style instead of error red.
+const REDETECT_NOTICE = 'Live re-detection unavailable — keeping the saved crop'
+const NOTICE_MESSAGES = new Set([REDETECT_NOTICE])
 
 export default function EditorPage() {
   const searchParams = useSearchParams()
@@ -77,6 +81,7 @@ export default function EditorPage() {
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const isNotice = NOTICE_MESSAGES.has(errorMessage)
   const [isDragOver, setIsDragOver] = useState(false)
   const [posterUrl, setPosterUrl] = useState<string | null>(null)
   const prefersReducedMotion = useReducedMotion()
@@ -505,7 +510,7 @@ export default function EditorPage() {
         // non-fatal — say so instead of a scary generic failure.
         const hasCrop = keyframes.length > 0
         const msg = hasCrop
-          ? 'Live re-detection unavailable — keeping the saved crop'
+          ? REDETECT_NOTICE
           : err instanceof Error
             ? err.message
             : 'Processing failed — try importing keyframes manually'
@@ -1599,16 +1604,22 @@ export default function EditorPage() {
         )}
       </AnimatePresence>
 
-      {/* ── ERROR MESSAGE ── */}
+      {/* ── ERROR / NOTICE MESSAGE ── */}
       <AnimatePresence>
         {errorMessage && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="flex items-center justify-between px-3 py-2 text-xs text-red-400 overflow-hidden"
+            className={`flex items-center justify-between px-3 py-2 text-xs overflow-hidden ${
+              isNotice ? 'text-[var(--ash-grey)]' : 'text-red-400'
+            }`}
             style={{
-              background: 'rgba(239,68,68,0.08)',
+              // Informational notices (work preserved, nothing broken) must
+              // not wear the error red — amber-neutral instead.
+              background: isNotice
+                ? 'rgba(185,186,163,0.06)'
+                : 'rgba(239,68,68,0.08)',
               borderBottom:
                 '1px solid var(--editor-border, rgba(185,186,163,0.08))',
             }}
