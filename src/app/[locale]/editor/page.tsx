@@ -58,6 +58,9 @@ export default function EditorPage() {
   const [videoFilename, setVideoFilename] = useState('')
   const [isUrlSource, setIsUrlSource] = useState(false)
   const [duration, setDuration] = useState(0)
+  // False until the <video> reports metadata — gates the loading skeleton so
+  // the canvas keeps its full footprint while the (remote) source loads.
+  const [videoReady, setVideoReady] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [keyframes, setKeyframes] = useState<CropKeyframe[]>([])
@@ -411,13 +414,20 @@ export default function EditorPage() {
     }
   }, [videoUrl])
 
-  // Set duration from main video
+  // Set duration + readiness from main video. videoReady gates the loading
+  // skeleton: before metadata arrives the <video> has no intrinsic size, so
+  // without a reserved layout the canvas collapses to a tiny box.
   useEffect(() => {
     const video = videoRef.current
+    setVideoReady(false)
     if (!video) return
-    const onMeta = () => setDuration(video.duration)
+    const onMeta = () => {
+      setDuration(video.duration)
+      setVideoReady(true)
+    }
     if (video.readyState >= 1 && video.duration) {
       setDuration(video.duration)
+      setVideoReady(true)
     }
     video.addEventListener('loadedmetadata', onMeta)
     return () => video.removeEventListener('loadedmetadata', onMeta)
@@ -1818,6 +1828,10 @@ export default function EditorPage() {
                     style={{
                       maxHeight: '100%',
                       aspectRatio: '16/9',
+                      // Reserve the full canvas footprint BEFORE the video has
+                      // intrinsic dimensions — without this the box collapses
+                      // to a sliver while a remote source loads.
+                      width: 'min(100%, calc((100dvh - 220px) * 16 / 9))',
                     }}
                   >
                     <video
@@ -1830,6 +1844,27 @@ export default function EditorPage() {
                       muted
                       onClick={togglePlay}
                     />
+                    {/* Loading skeleton — full-size stand-in until metadata */}
+                    {!videoReady && (
+                      <div className="absolute inset-0 rounded-lg overflow-hidden bg-white/[0.02] border border-white/[0.04]">
+                        <div className="absolute inset-0 animate-pulse bg-white/[0.03]" />
+                        {/* Hint of the coming crop window */}
+                        <div
+                          className="absolute inset-y-3 rounded"
+                          style={{
+                            left: '35%',
+                            width: '30%',
+                            border: '1px dashed rgba(16,185,129,0.25)',
+                          }}
+                        />
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/40" />
+                          <span className="text-xs text-muted-foreground/50">
+                            Loading footage…
+                          </span>
+                        </div>
+                      </div>
+                    )}
                     {/* First-frame overlay — hides once user plays */}
                     {posterUrl && !isPlaying && currentTime < 0.1 && (
                       <img
@@ -1932,6 +1967,18 @@ export default function EditorPage() {
                         objectPosition: `${(effectiveCropX / (SOURCE_WIDTH - CROP_WIDTH)) * 100}% center`,
                       }}
                     />
+                  )}
+                  {/* Loading skeleton — same contract as the split view */}
+                  {!videoReady && (
+                    <div className="absolute inset-0 rounded-lg overflow-hidden bg-white/[0.02] border border-white/[0.04]">
+                      <div className="absolute inset-0 animate-pulse bg-white/[0.03]" />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/40" />
+                        <span className="text-xs text-muted-foreground/50">
+                          Loading footage…
+                        </span>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
