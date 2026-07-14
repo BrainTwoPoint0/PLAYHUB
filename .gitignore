@@ -97,3 +97,7 @@ scripts/portrait-crop/eval-dataset/clips/*.json
 # Fetched Spiideo calibration meshes — re-fetchable via fetch_spiideo_mesh.mjs;
 # canonical copies live in Supabase storage
 scripts/follow-re/spiideo-real-mesh-*/
+
+# Follow-re research resume doc — local working notes; quotes operational IDs
+# that trip Netlify's secrets scanner (2026-07-14 incident)
+scripts/follow-re/AIM_RESUME.md
