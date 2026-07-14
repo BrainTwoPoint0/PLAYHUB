@@ -489,8 +489,14 @@ export default function EditorPage() {
         if (!res.ok) throw new Error('Processing failed')
         applyDetection(await res.json())
       } catch (err) {
-        const msg =
-          err instanceof Error
+        // Live detection routinely exceeds the hosting platform's function
+        // time limit (Modal needs ~90s; cached detections exist precisely for
+        // this). When a crop is already loaded, a failed re-detect is
+        // non-fatal — say so instead of a scary generic failure.
+        const hasCrop = keyframes.length > 0
+        const msg = hasCrop
+          ? 'Live re-detection unavailable — keeping the saved crop'
+          : err instanceof Error
             ? err.message
             : 'Processing failed — try importing keyframes manually'
         setErrorMessage(msg)
@@ -499,7 +505,7 @@ export default function EditorPage() {
         setProcessing(false)
       }
     },
-    [applyDetection, searchParams]
+    [applyDetection, searchParams, keyframes.length]
   )
 
   /* ───────── file handlers ───────── */
