@@ -14,8 +14,14 @@ import {
   AIM_STUCK_MS,
   sweepPortraitRenders,
   PORTRAIT_SWEEP_MAX_PER_RUN,
+  isTrackletsClaimable,
+  sweepPlayerTracklets,
+  TRK_SWEEP_MAX_PER_RUN,
+  TRK_INFLIGHT_CAP,
+  TRK_STUCK_MS,
   type PanoramaCandidate,
   type AimTrackCandidate,
+  type TrackletsCandidate,
 } from '../panorama-sweep'
 
 const NOW = Date.parse('2026-07-07T12:00:00Z')
@@ -459,6 +465,283 @@ describe('sweepPortraitRenders', () => {
     })
     const out = await sweepPortraitRenders(client, ['cfa'], submit)
     expect(submit).toHaveBeenCalledTimes(PORTRAIT_SWEEP_MAX_PER_RUN)
+    expect(out.submitted).toBe(0)
+  })
+})
+
+// ── Player-tracklets sweep ───────────────────────────────────────────────────
+
+const MESH_SCENES = new Set(['scene-1', 'scene-2'])
+
+function trkRow(
+  overrides: Partial<TrackletsCandidate> = {}
+): TrackletsCandidate {
+  return {
+    id: 'rec-1',
+    spiideo_game_id: 'game-1',
+    spiideo_scene_id: 'scene-1',
+    tracklets_status: null,
+    tracklets_started_at: null,
+    tracklets_attempts: 0,
+    ...overrides,
+  }
+}
+
+/** Table-aware stub: the tracklets sweep reads the scene-mesh registry first,
+ *  then recordings — the shared stubSupabase is single-table. */
+function stubTrkSupabase(opts: {
+  scenes?: string[]
+  candidates: TrackletsCandidate[]
+  inFlight?: number
+  claimCounts?: number[]
+}) {
+  const claimCounts = [...(opts.claimCounts ?? [])]
+  const rollbacks: Array<Record<string, unknown>> = []
+  const claims: Array<Record<string, unknown>> = []
+
+  function makeBuilder(result: unknown, onResolve?: () => unknown) {
+    const b: Record<string, unknown> = {}
+    for (const m of [
+      'select',
+      'eq',
+      'in',
+      'not',
+      'is',
+      'or',
+      'gte',
+      'order',
+      'limit',
+    ])
+      b[m] = vi.fn(() => b)
+    b.then = (res: (v: unknown) => unknown) =>
+      Promise.resolve(onResolve ? onResolve() : result).then(res)
+    return b
+  }
+
+  const client = {
+    from: vi.fn((table: string) => {
+      if (table === 'playhub_panorama_scene_meshes') {
+        return {
+          select: vi.fn(() =>
+            makeBuilder({
+              data: (opts.scenes ?? Array.from(MESH_SCENES)).map((s) => ({
+                scene_id: s,
+              })),
+              error: null,
+            })
+          ),
+        }
+      }
+      return {
+        select: vi.fn((_cols: string, sopts?: { head?: boolean }) => {
+          if (sopts?.head)
+            return makeBuilder({ count: opts.inFlight ?? 0, error: null })
+          return makeBuilder({ data: opts.candidates, error: null })
+        }),
+        update: vi.fn(
+          (values: Record<string, unknown>, uopts?: { count?: string }) => {
+            if (uopts?.count === 'exact') {
+              claims.push(values)
+              return makeBuilder(null, () => ({
+                count: claimCounts.length ? claimCounts.shift() : 1,
+                error: null,
+              }))
+            }
+            rollbacks.push(values)
+            return makeBuilder({ error: null })
+          }
+        ),
+      }
+    }),
+  } as unknown as SupabaseClient
+  return { client, rollbacks, claims }
+}
+
+describe('isTrackletsClaimable', () => {
+  it('claims a never-attempted row on a mesh scene', () => {
+    expect(isTrackletsClaimable(trkRow(), MESH_SCENES, NOW)).toBe(true)
+  })
+
+  it('requires game id AND a mesh-bearing scene', () => {
+    expect(
+      isTrackletsClaimable(trkRow({ spiideo_game_id: null }), MESH_SCENES, NOW)
+    ).toBe(false)
+    expect(
+      isTrackletsClaimable(trkRow({ spiideo_scene_id: null }), MESH_SCENES, NOW)
+    ).toBe(false)
+    expect(
+      isTrackletsClaimable(
+        trkRow({ spiideo_scene_id: 'scene-without-mesh' }),
+        MESH_SCENES,
+        NOW
+      )
+    ).toBe(false)
+  })
+
+  it('never reclaims ready, fresh pending, or attempts-capped rows', () => {
+    expect(
+      isTrackletsClaimable(
+        trkRow({ tracklets_status: 'ready' }),
+        MESH_SCENES,
+        NOW
+      )
+    ).toBe(false)
+    expect(
+      isTrackletsClaimable(
+        trkRow({
+          tracklets_status: 'pending',
+          tracklets_started_at: new Date(NOW - 60_000).toISOString(),
+        }),
+        MESH_SCENES,
+        NOW
+      )
+    ).toBe(false)
+    expect(
+      isTrackletsClaimable(
+        trkRow({
+          tracklets_status: 'error',
+          tracklets_attempts: MAX_ATTEMPTS,
+          tracklets_started_at: new Date(
+            NOW - ERROR_COOLDOWN_MS * 10
+          ).toISOString(),
+        }),
+        MESH_SCENES,
+        NOW
+      )
+    ).toBe(false)
+  })
+
+  it('reclaims a heartbeat-dead pending only past TRK_STUCK_MS', () => {
+    expect(
+      isTrackletsClaimable(
+        trkRow({
+          tracklets_status: 'pending',
+          tracklets_attempts: 1,
+          tracklets_started_at: new Date(
+            NOW - TRK_STUCK_MS + 60_000
+          ).toISOString(),
+        }),
+        MESH_SCENES,
+        NOW
+      )
+    ).toBe(false)
+    expect(
+      isTrackletsClaimable(
+        trkRow({
+          tracklets_status: 'pending',
+          tracklets_attempts: 1,
+          tracklets_started_at: new Date(
+            NOW - TRK_STUCK_MS - 1000
+          ).toISOString(),
+        }),
+        MESH_SCENES,
+        NOW
+      )
+    ).toBe(true)
+  })
+})
+
+describe('sweepPlayerTracklets', () => {
+  const manyTrkRows = Array.from({ length: 5 }, (_, i) =>
+    trkRow({ id: `rec-${i}`, spiideo_game_id: `game-${i}` })
+  )
+
+  it('submits at most TRK_SWEEP_MAX_PER_RUN per run', async () => {
+    const { client } = stubTrkSupabase({ candidates: manyTrkRows })
+    const submit = vi.fn(async (id: string) => `job-${id}`)
+    const out = await sweepPlayerTracklets(client, submit, null, NOW)
+    expect(submit).toHaveBeenCalledTimes(TRK_SWEEP_MAX_PER_RUN)
+    expect(out.submitted).toBe(TRK_SWEEP_MAX_PER_RUN)
+    expect(out.candidates).toBe(manyTrkRows.length)
+  })
+
+  it('does nothing when the scene registry is empty', async () => {
+    const { client } = stubTrkSupabase({ scenes: [], candidates: manyTrkRows })
+    const submit = vi.fn(async (id: string) => `job-${id}`)
+    const out = await sweepPlayerTracklets(client, submit, null, NOW)
+    expect(submit).not.toHaveBeenCalled()
+    expect(out.candidates).toBe(0)
+  })
+
+  it('skips recordings whose scene has no mesh', async () => {
+    const { client } = stubTrkSupabase({
+      candidates: [trkRow({ spiideo_scene_id: 'scene-without-mesh' })],
+    })
+    const submit = vi.fn(async (id: string) => `job-${id}`)
+    const out = await sweepPlayerTracklets(client, submit, null, NOW)
+    expect(submit).not.toHaveBeenCalled()
+    expect(out.candidates).toBe(0)
+  })
+
+  it('budget counts attempts: a failing submit rolls back once and stops', async () => {
+    const { client, rollbacks } = stubTrkSupabase({ candidates: manyTrkRows })
+    const submit = vi.fn(async () => {
+      throw new Error('AccessDeniedException')
+    })
+    const out = await sweepPlayerTracklets(client, submit, null, NOW)
+    expect(submit).toHaveBeenCalledTimes(TRK_SWEEP_MAX_PER_RUN)
+    expect(out.submitted).toBe(0)
+    expect(rollbacks).toHaveLength(TRK_SWEEP_MAX_PER_RUN)
+    expect(rollbacks[0].tracklets_status).toBe('error')
+    expect(rollbacks[0].tracklets_attempts).toBe(0)
+  })
+
+  it('respects the tracklets in-flight cap on the shared CE', async () => {
+    const { client } = stubTrkSupabase({
+      candidates: manyTrkRows,
+      inFlight: TRK_INFLIGHT_CAP,
+    })
+    const submit = vi.fn(async (id: string) => `job-${id}`)
+    const out = await sweepPlayerTracklets(client, submit, null, NOW)
+    expect(submit).not.toHaveBeenCalled()
+    expect(out.submitted).toBe(0)
+  })
+
+  it('a lost claim race consumes neither budget nor a submit', async () => {
+    const { client, rollbacks } = stubTrkSupabase({
+      candidates: [
+        trkRow({ id: 'rec-1' }),
+        trkRow({ id: 'rec-2', spiideo_game_id: 'game-2' }),
+      ],
+      claimCounts: [0, 1],
+    })
+    const submit = vi.fn(async (id: string) => `job-${id}`)
+    const out = await sweepPlayerTracklets(client, submit, null, NOW)
+    expect(submit).toHaveBeenCalledTimes(1)
+    expect(submit).toHaveBeenCalledWith('rec-2', 'game-2')
+    expect(out.submitted).toBe(1)
+    expect(rollbacks).toHaveLength(0)
+  })
+
+  it('skips (without claiming) games whose per-game mesh is missing', async () => {
+    const { client, claims } = stubTrkSupabase({
+      candidates: [
+        trkRow({ id: 'rec-1', spiideo_game_id: 'no-mesh-game' }),
+        trkRow({ id: 'rec-2', spiideo_game_id: 'game-2' }),
+      ],
+    })
+    const submit = vi.fn(async (id: string) => `job-${id}`)
+    const hasGameMesh = vi.fn(async (gameId: string) => gameId === 'game-2')
+    const out = await sweepPlayerTracklets(client, submit, hasGameMesh, NOW)
+    expect(hasGameMesh).toHaveBeenCalledWith('no-mesh-game')
+    expect(submit).toHaveBeenCalledTimes(1)
+    expect(submit).toHaveBeenCalledWith('rec-2', 'game-2')
+    // rec-1 was never CAS-claimed — no attempt burned
+    expect(claims).toHaveLength(1)
+    expect(out.submitted).toBe(1)
+  })
+
+  it('a mesh-check failure skips the row unclaimed (retry next tick)', async () => {
+    const { client, claims } = stubTrkSupabase({
+      candidates: [trkRow({ id: 'rec-1' })],
+    })
+    const submit = vi.fn(async (id: string) => `job-${id}`)
+    const hasGameMesh = vi.fn(async () => {
+      throw new Error('storage 500')
+    })
+    const out = await sweepPlayerTracklets(client, submit, hasGameMesh, NOW)
+    expect(submit).not.toHaveBeenCalled()
+    expect(claims).toHaveLength(0)
     expect(out.submitted).toBe(0)
   })
 })

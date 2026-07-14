@@ -1,0 +1,17 @@
+# CodeBuild spec: build the player-tracklets container image and push to ECR.
+# Same pattern as aim-track: privileged CodeBuild container, source zip root
+# == infrastructure/batch/player-tracklets/. Env: ECR_REPO_URL, AWS_REGION.
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "Logging in to ECR $ECR_REPO_URL"
+      - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REPO_URL"
+  build:
+    commands:
+      - docker build --pull -t "$ECR_REPO_URL:latest" .
+  post_build:
+    commands:
+      - docker push "$ECR_REPO_URL:latest"
+      - echo "Pushed $ECR_REPO_URL:latest"

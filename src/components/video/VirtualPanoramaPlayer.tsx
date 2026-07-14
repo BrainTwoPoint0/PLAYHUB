@@ -30,6 +30,13 @@ import {
   type AimTrack,
 } from '@/lib/panorama/aim-track'
 import {
+  parseTracklets,
+  sampleObject,
+  objectsAt,
+  nearestObject,
+  type Tracklets,
+} from '@/lib/panorama/tracklets'
+import {
   Play,
   Pause,
   Maximize,
@@ -40,6 +47,7 @@ import {
   AlertTriangle,
   Move,
   Crosshair,
+  UserSearch,
 } from 'lucide-react'
 import { cn } from '@braintwopoint0/playback-commons/utils'
 import {
@@ -124,11 +132,13 @@ interface VirtualPanoramaPlayerProps {
   hideChrome?: boolean
   /** Imperative control handle for the pan/zoom/auto extras, so they can live in the shared control bar. Populated on mount. */
   apiRef?: React.MutableRefObject<DewarpSurfaceApi | null>
-  /** Reports pan-state changes (auto-follow toggled by button OR by a drag; zoom %; whether a reg-SIFT aim track loaded) up to the shared bar's extras. */
+  /** Reports pan-state changes (auto-follow toggled by button OR by a drag; zoom %; which optional artifacts loaded; spotlight armed) up to the shared bar's extras. */
   onStateChange?: (s: {
     autoFollow: boolean
     zoomPct: number
     hasAimTrack: boolean
+    hasTracklets: boolean
+    spotlight: boolean
   }) => void
   /**
    * Debug: disable the fov-adaptive pinhole↔cylindrical blend and render with
@@ -162,6 +172,7 @@ export interface DewarpSurfaceApi {
   zoomOut: () => void
   reset: () => void
   toggleAuto: () => void
+  toggleSpotlight: () => void
 }
 
 const FOV_MIN = 12
@@ -947,6 +958,46 @@ export function VirtualPanoramaPlayer({
   useEffect(() => {
     autoFollowRef.current = autoFollow
   }, [autoFollow])
+  // Player spotlight (per-player tracklets, computed offline): armed = the
+  // toggle is on and clicks select a player; the selection itself lives in a
+  // ref (updated every RAF frame — fragment hand-off must not re-render).
+  const trackletsRef = useRef<Tracklets | null>(null)
+  const [hasTracklets, setHasTracklets] = useState(false)
+  const [spotlight, setSpotlight] = useState(false)
+  const spotlightRef = useRef(false)
+  useEffect(() => {
+    spotlightRef.current = spotlight
+  }, [spotlight])
+  const spotSelRef = useRef<{
+    index: number
+    follow: boolean
+    lastPan: number // deg — last known position, drives re-association
+    lastTilt: number
+    lostSince: number | null // clock seconds when the fragment ran out
+    lastClock: number | null // detects seeks (a jump invalidates the selection)
+  } | null>(null)
+  // Status pill state machine: base kind is derived every frame in the
+  // overlay update ('hint' armed+unselected, 'nodata' armed in an untracked
+  // stretch, null otherwise); transient kinds override it briefly.
+  type SpotNotice = 'hint' | 'nodata' | 'following' | 'lost' | null
+  const [spotNotice, setSpotNotice] = useState<SpotNotice>(null)
+  const spotNoticeRef = useRef<SpotNotice>(null)
+  const spotNoticeOverride = useRef<{ kind: SpotNotice; until: number } | null>(
+    null
+  )
+  // Set inside the render effect (needs the live camera): screen NDC -> the
+  // dewarp pan/tilt (deg) under the pointer. Null until the scene is built.
+  const pickRef = useRef<
+    | ((
+        nx: number,
+        ny: number
+      ) => {
+        panDeg: number
+        tiltDeg: number
+      } | null)
+    | null
+  >(null)
+  const spotSvgRef = useRef<SVGSVGElement | null>(null)
 
   const dismissHint = useCallback(() => setShowHint(false), [])
   const syncZoom = useCallback(
@@ -1106,34 +1157,46 @@ export function VirtualPanoramaPlayer({
 
     ;(async () => {
       try {
-        const [scene_, vbuf, ibuf, tuning, aimTrack] = await Promise.all([
-          fetch(`${meshBaseUrl}/scene.json`).then(
-            (r) => r.json() as Promise<SceneJson>
-          ),
-          fetch(`${meshBaseUrl}/vertices.bin`).then((r) => r.arrayBuffer()),
-          fetch(`${meshBaseUrl}/indices.bin`).then((r) => r.arrayBuffer()),
-          // optional per-scene render tuning (multi-cam colour match) —
-          // absent for most scenes, never load-blocking: 404/bad-JSON → null,
-          // and the timeout stops a hung CDN request from stalling every
-          // scene's mesh load (this sits in the same Promise.all)
-          fetch(`${meshBaseUrl}/tuning.json`, {
-            signal: AbortSignal.timeout(3000),
-          })
-            .then((r) => (r.ok ? (r.json() as Promise<MeshTuning>) : null))
-            .catch(() => null),
-          // optional reg-SIFT aim track (same optional-artifact contract, but
-          // a LARGER payload — ~1MB for a 2h match — so it gets a longer
-          // timeout than tuning.json; still null-degrading, never blocking)
-          fetch(`${meshBaseUrl}/aim-track.json`, {
-            signal: AbortSignal.timeout(10000),
-          })
-            .then((r) => (r.ok ? r.json() : null))
-            .then((j) => parseAimTrack(j))
-            .catch(() => null),
-        ])
+        const [scene_, vbuf, ibuf, tuning, aimTrack, tracklets] =
+          await Promise.all([
+            fetch(`${meshBaseUrl}/scene.json`).then(
+              (r) => r.json() as Promise<SceneJson>
+            ),
+            fetch(`${meshBaseUrl}/vertices.bin`).then((r) => r.arrayBuffer()),
+            fetch(`${meshBaseUrl}/indices.bin`).then((r) => r.arrayBuffer()),
+            // optional per-scene render tuning (multi-cam colour match) —
+            // absent for most scenes, never load-blocking: 404/bad-JSON → null,
+            // and the timeout stops a hung CDN request from stalling every
+            // scene's mesh load (this sits in the same Promise.all)
+            fetch(`${meshBaseUrl}/tuning.json`, {
+              signal: AbortSignal.timeout(3000),
+            })
+              .then((r) => (r.ok ? (r.json() as Promise<MeshTuning>) : null))
+              .catch(() => null),
+            // optional reg-SIFT aim track (same optional-artifact contract, but
+            // a LARGER payload — ~1MB for a 2h match — so it gets a longer
+            // timeout than tuning.json; still null-degrading, never blocking)
+            fetch(`${meshBaseUrl}/aim-track.json`, {
+              signal: AbortSignal.timeout(10000),
+            })
+              .then((r) => (r.ok ? r.json() : null))
+              .then((j) => parseAimTrack(j))
+              .catch(() => null),
+            // optional per-player tracklets (spotlight) — the largest optional
+            // artifact (~2MB gzipped for a full match), hence the longest
+            // timeout; still null-degrading, never blocking
+            fetch(`${meshBaseUrl}/tracklets.json`, {
+              signal: AbortSignal.timeout(15000),
+            })
+              .then((r) => (r.ok ? r.json() : null))
+              .then((j) => parseTracklets(j))
+              .catch(() => null),
+          ])
         if (disposed) return
         aimTrackRef.current = aimTrack
         setHasAimTrack(aimTrack !== null)
+        trackletsRef.current = tracklets
+        setHasTracklets(tracklets !== null)
         // Curved mode (the product path): Perform's exact de-warp — every mesh
         // vertex is a WORLD ray, viewed by a perspective camera at the origin;
         // pan/tilt rotate the viewer. Flat ortho remains for the single-
@@ -1518,13 +1581,322 @@ export function VirtualPanoramaPlayer({
           })
           if (followFrame++ % 8 === 0) syncZoom()
         }
+        // --- player spotlight: click-to-select ring + trail + camera-follow ---
+        // All positions come from the offline tracklets artifact sampled at the
+        // MASTER clock. Objects are identity FRAGMENTS: when the followed one
+        // ends, re-associate to the nearest object at the last known position
+        // (the tracker almost always re-detects the same player in place);
+        // past the gate for a few seconds → the selection is honestly LOST.
+        const SPOT_FOLLOW_SMOOTH = 0.35
+        const SPOT_REASSOC_DEG = 2.5
+        const SPOT_LOST_SEC = 3
+        // Distinguishes a real seek from a suspended RAF (backgrounded tab).
+        let lastRafMs = performance.now()
+        const spotClock = () =>
+          masterVideoRef?.current?.currentTime ?? video.currentTime
+        const stepSpotlight = () => {
+          const track = trackletsRef.current
+          const sel = spotSelRef.current
+          if (!track || !sel) return
+          const clock = spotClock()
+          // A clock JUMP (seek/skip) invalidates the selection: re-associating
+          // at the OLD position after a scrub confidently rings whoever is
+          // standing there minutes later — worse than honestly letting go.
+          // Exception: a suspended RAF (backgrounded tab) reads as the same
+          // jump while playback was CONTINUOUS — resync and keep tracking.
+          if (sel.lastClock !== null && Math.abs(clock - sel.lastClock) > 2.5) {
+            const rafWasSuspended = performance.now() - lastRafMs > 2000
+            if (!rafWasSuspended) {
+              spotSelRef.current = null
+              return
+            }
+          }
+          sel.lastClock = clock
+          const s = sampleObject(track.objects[sel.index], clock)
+          if (s) {
+            sel.lastPan = s.panDeg
+            sel.lastTilt = s.tiltDeg
+            sel.lostSince = null
+          } else {
+            const cand = nearestObject(
+              track,
+              clock,
+              sel.lastPan,
+              sel.lastTilt,
+              SPOT_REASSOC_DEG,
+              sel.index
+            )
+            if (cand) {
+              sel.index = cand.index
+              sel.lastPan = cand.panDeg
+              sel.lastTilt = cand.tiltDeg
+              sel.lostSince = null
+            } else if (sel.lostSince === null) {
+              sel.lostSince = clock
+            } else if (Math.abs(clock - sel.lostSince) > SPOT_LOST_SEC) {
+              spotSelRef.current = null // gone for good — drop the ring
+              spotNoticeOverride.current = {
+                kind: 'lost',
+                until: Date.now() + 3000,
+              }
+              return
+            }
+          }
+          if (sel.follow && sel.lostSince === null) {
+            const v = viewRef.current,
+              dt = 1 / 60
+            viewRef.current = clampView({
+              pan: smoothDamp(
+                v.pan,
+                sel.lastPan * DEG,
+                velP,
+                SPOT_FOLLOW_SMOOTH,
+                dt
+              ),
+              tilt: smoothDamp(
+                v.tilt,
+                sel.lastTilt * DEG,
+                velT,
+                SPOT_FOLLOW_SMOOTH,
+                dt
+              ),
+              fov: v.fov, // zoom stays the user's — follow only aims
+            })
+            if (followFrame++ % 8 === 0) syncZoom()
+          }
+        }
+
+        // SVG overlay (dots on tracked players while armed; emerald ring +
+        // trail on the selection). DOM-positioned per frame via the SAME
+        // pinhole camera the panorama renders through — production runs with
+        // the projection blend OFF, so ndc = dir.project(camera) is exact.
+        const svgNS = 'http://www.w3.org/2000/svg'
+        const svg = spotSvgRef.current
+        const dotPool: SVGCircleElement[] = []
+        let ringEl: SVGEllipseElement | null = null
+        let ringCasingEl: SVGEllipseElement | null = null
+        let trailEl: SVGPolylineElement | null = null
+        if (svg && curved) {
+          while (svg.firstChild) svg.removeChild(svg.firstChild) // retry re-runs
+          trailEl = document.createElementNS(svgNS, 'polyline')
+          trailEl.setAttribute('fill', 'none')
+          trailEl.setAttribute('stroke', '#34d399')
+          trailEl.setAttribute('stroke-width', '2')
+          trailEl.setAttribute('stroke-linejoin', 'round')
+          trailEl.setAttribute('stroke-linecap', 'round')
+          trailEl.setAttribute('opacity', '0.5')
+          svg.appendChild(trailEl)
+          for (let i = 0; i < 40; i++) {
+            const c = document.createElementNS(svgNS, 'circle')
+            c.setAttribute('r', '4')
+            c.setAttribute('fill', 'rgba(255,255,255,0.8)')
+            c.setAttribute('stroke', 'rgba(10,16,13,0.6)')
+            c.setAttribute('stroke-width', '1.25')
+            c.style.display = 'none'
+            svg.appendChild(c)
+            dotPool.push(c)
+          }
+          // Casing under the ring (map-cartography keyline): the dark edge is
+          // what keeps an emerald mark legible on any grass tone.
+          ringCasingEl = document.createElementNS(svgNS, 'ellipse')
+          ringCasingEl.setAttribute('fill', 'none')
+          ringCasingEl.setAttribute('stroke', 'rgba(6,10,8,0.5)')
+          ringCasingEl.style.display = 'none'
+          svg.appendChild(ringCasingEl)
+          ringEl = document.createElementNS(svgNS, 'ellipse')
+          ringEl.setAttribute('fill', 'rgba(16,185,129,0.1)')
+          ringEl.setAttribute('stroke', '#34d399')
+          ringEl.style.display = 'none'
+          svg.appendChild(ringEl)
+        }
+        // The ring's rendered position is smoothed separately from the camera
+        // (raw 5 Hz tracklet samples inside a smooth-damped frame read as
+        // wobble); ~0.07s time constant, reset on selection change.
+        const ringSm = { pan: 0, tilt: 0, forIndex: -1 }
+        const camDir = new THREE.Vector3()
+        const objDir = new THREE.Vector3()
+        const objRight = new THREE.Vector3()
+        const projScratch = new THREE.Vector3()
+        const projectToPx = (
+          panDeg: number,
+          tiltDeg: number,
+          w: number,
+          h: number
+        ) => {
+          const pv = panoRef.current
+          if (!pv) return null
+          const p = panDeg * DEG,
+            tl = tiltDeg * DEG
+          objDir.copy(pv.forward).applyAxisAngle(pv.up, p)
+          objRight.copy(pv.right).applyAxisAngle(pv.up, p)
+          objDir.applyAxisAngle(objRight, tl)
+          if (objDir.dot(camDir) < 0.05) return null // behind the camera
+          const v = projScratch.copy(objDir).project(camera)
+          if (v.x < -1.15 || v.x > 1.15 || v.y < -1.15 || v.y > 1.15)
+            return null
+          return { x: ((v.x + 1) / 2) * w, y: (1 - (v.y + 1) / 2) * h }
+        }
+        const setNotice = (kind: SpotNotice) => {
+          if (spotNoticeRef.current !== kind) {
+            spotNoticeRef.current = kind
+            setSpotNotice(kind)
+          }
+        }
+        const updateSpotlightOverlay = () => {
+          if (!svg || !curved) return
+          const track = trackletsRef.current
+          const sel = spotSelRef.current
+          if (!track || (!spotlightRef.current && !sel)) {
+            svg.style.display = 'none'
+            setNotice(null)
+            return
+          }
+          svg.style.display = ''
+          const w = host.clientWidth || 1
+          const h = host.clientHeight || 1
+          svg.setAttribute('viewBox', `0 0 ${w} ${h}`)
+          camera.updateMatrixWorld()
+          camera.getWorldDirection(camDir)
+          const clock = spotClock()
+          const active = objectsAt(track, clock)
+          let di = 0
+          if (spotlightRef.current) {
+            for (const a of active) {
+              if (sel && a.index === sel.index) continue
+              if (di >= dotPool.length) break
+              const p = projectToPx(a.panDeg, a.tiltDeg, w, h)
+              if (!p) continue
+              const c = dotPool[di++]
+              c.setAttribute('cx', p.x.toFixed(1))
+              c.setAttribute('cy', p.y.toFixed(1))
+              // stand down once someone is selected — the ring is the story
+              c.style.opacity = sel ? '0.35' : '1'
+              c.style.display = ''
+            }
+          }
+          for (let i = di; i < dotPool.length; i++)
+            dotPool[i].style.display = 'none'
+          if (sel && ringEl && ringCasingEl && trailEl) {
+            const lost = sel.lostSince !== null
+            // Ring position is smoothed separately from the camera: raw 5 Hz
+            // samples inside a smooth-damped frame read as wobble.
+            if (ringSm.forIndex !== sel.index) {
+              ringSm.pan = sel.lastPan
+              ringSm.tilt = sel.lastTilt
+              ringSm.forIndex = sel.index
+            } else {
+              ringSm.pan += (sel.lastPan - ringSm.pan) * 0.35
+              ringSm.tilt += (sel.lastTilt - ringSm.tilt) * 0.35
+            }
+            const p = projectToPx(ringSm.pan, ringSm.tilt, w, h)
+            if (p) {
+              const rx = Math.max(14, (2.6 / viewRef.current.fov) * h)
+              const ry = Math.max(6, rx * 0.38)
+              const sw = Math.min(2.5, Math.max(1.75, rx * 0.12))
+              for (const el of [ringCasingEl, ringEl]) {
+                el.setAttribute('cx', p.x.toFixed(1))
+                el.setAttribute('cy', p.y.toFixed(1))
+                el.setAttribute('rx', rx.toFixed(1))
+                el.setAttribute('ry', ry.toFixed(1))
+                el.style.display = ''
+              }
+              ringCasingEl.setAttribute('stroke-width', (sw + 2).toFixed(2))
+              ringEl.setAttribute('stroke-width', sw.toFixed(2))
+              if (lost) {
+                // "searching": desaturated + dashed is a semantic state, not
+                // a fade — an opacity-only change reads as a glitch.
+                ringEl.setAttribute('stroke', '#b9baa3')
+                ringEl.setAttribute('stroke-dasharray', '5 4')
+                ringEl.setAttribute('fill', 'none')
+                ringEl.style.opacity = '0.8'
+              } else {
+                ringEl.setAttribute('stroke', '#34d399')
+                ringEl.setAttribute('stroke-dasharray', '')
+                ringEl.setAttribute('fill', 'rgba(16,185,129,0.1)')
+                ringEl.style.opacity = '1'
+              }
+              if (lost) {
+                trailEl.setAttribute('points', '')
+              } else {
+                const obj = track.objects[sel.index]
+                const pts: string[] = []
+                for (let i = 0; i < obj.t.length; i++) {
+                  if (obj.t[i] < clock - 2.5) continue
+                  if (obj.t[i] > clock) break
+                  const tp = projectToPx(obj.pan[i], obj.tilt[i], w, h)
+                  if (tp) pts.push(`${tp.x.toFixed(1)},${tp.y.toFixed(1)}`)
+                }
+                pts.push(`${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+                trailEl.setAttribute('points', pts.join(' '))
+              }
+            } else {
+              ringEl.style.display = 'none'
+              ringCasingEl.style.display = 'none'
+              trailEl.setAttribute('points', '')
+            }
+          } else if (ringEl && ringCasingEl && trailEl) {
+            ringEl.style.display = 'none'
+            ringCasingEl.style.display = 'none'
+            trailEl.setAttribute('points', '')
+            ringSm.forIndex = -1
+          }
+          // Status pill: transient overrides first, then the derived base.
+          const ov = spotNoticeOverride.current
+          if (ov && Date.now() < ov.until) {
+            setNotice(ov.kind)
+          } else {
+            if (ov) spotNoticeOverride.current = null
+            if (!spotlightRef.current) setNotice(null)
+            else if (active.length === 0)
+              setNotice('nodata') // untracked stretch — taps CAN'T work here
+            else if (!sel) setNotice('hint')
+            else setNotice(null)
+          }
+        }
+        // Screen NDC -> dewarp pan/tilt (deg) for click-to-select. Canonical
+        // basis inversion of the camera dir composition: pan = atan2(−x, z),
+        // tilt = −asin(y). Exact while the projection blend is off (the
+        // production default); debug blend params may skew edge picks.
+        pickRef.current = !curved
+          ? null
+          : (nx: number, ny: number) => {
+              camera.updateMatrixWorld()
+              const v = new THREE.Vector3(nx, ny, 0.5)
+                .unproject(camera)
+                .normalize()
+              return {
+                panDeg: Math.atan2(-v.x, v.z) / DEG,
+                tiltDeg: -Math.asin(clamp(v.y, -1, 1)) / DEG,
+              }
+            }
+
+        // Zero the smoothDamp velocity accumulators when the active camera
+        // driver changes — a minutes-old fov velocity from stepAim replaying
+        // into a fresh engagement produces a one-off transient.
+        let lastDriver = ''
         const loop = () => {
           raf = requestAnimationFrame(loop)
-          if (autoFollowRef.current && curved && !autoSrc) {
+          if (curved) stepSpotlight()
+          lastRafMs = performance.now()
+          const spotFollowing = Boolean(
+            spotSelRef.current?.follow && spotSelRef.current?.lostSince === null
+          )
+          const driver = spotFollowing
+            ? 'spot'
+            : autoFollowRef.current && curved && !autoSrc
+              ? 'auto'
+              : ''
+          if (driver !== lastDriver) {
+            velP.v = 0
+            velT.v = 0
+            velF.v = 0
+            lastDriver = driver
+          }
+          if (!spotFollowing && autoFollowRef.current && curved && !autoSrc) {
             const track = aimTrackRef.current
             if (track) stepAim(track)
             else stepFollow() // motion driver = fallback when no reg track
-          } else {
+          } else if (!spotFollowing) {
             prevLuma = null
             haveTarget = false
           }
@@ -1590,6 +1962,7 @@ export function VirtualPanoramaPlayer({
               camera.lookAt(target)
             }
           }
+          updateSpotlightOverlay()
           renderer!.render(scene, camera)
         }
         loop()
@@ -1598,6 +1971,11 @@ export function VirtualPanoramaPlayer({
         ;(host as HTMLDivElement & { __cleanup?: () => void }).__cleanup =
           () => {
             cancelAnimationFrame(raf)
+            pickRef.current = null
+            if (svg) {
+              svg.style.display = 'none'
+              while (svg.firstChild) svg.removeChild(svg.firstChild)
+            }
             ro?.disconnect()
             if (onWheel) host.removeEventListener('wheel', onWheel)
             texture.dispose()
@@ -1661,14 +2039,36 @@ export function VirtualPanoramaPlayer({
 
   // --- pointer grab-pan (radians from pixels via current fov) ---
   const dragRef = useRef<{ x: number; y: number } | null>(null)
+  // Distinguish a CLICK (spotlight select) from a drag: total movement under
+  // this many px between pointerdown and pointerup counts as a click.
+  const clickRef = useRef<{ x: number; y: number; moved: boolean } | null>(null)
   const onPointerDown = (e: React.PointerEvent) => {
     if (autoFollow) setAutoFollow(false) // taking manual control stops auto-follow
+    // NOTE: spotlight camera-follow is NOT disengaged here — only a real DRAG
+    // does that (in onPointerMove). A tap that misses a player must not
+    // silently stop the follow the user deliberately started.
     dragRef.current = { x: e.clientX, y: e.clientY }
+    clickRef.current = { x: e.clientX, y: e.clientY, moved: false }
     ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
     dismissHint()
   }
+  // Side effects stay OUTSIDE the state updaters (updaters must be pure —
+  // StrictMode double-invokes them and concurrent React may replay them).
   const toggleAutoFollow = () => {
-    setAutoFollow((a) => !a)
+    const next = !autoFollow
+    if (next) {
+      // one follow mode at a time — Auto takes over from Spotlight
+      spotSelRef.current = null
+      setSpotlight(false)
+    }
+    setAutoFollow(next)
+    dismissHint()
+  }
+  const toggleSpotlight = () => {
+    const next = !spotlight
+    if (next) setAutoFollow(false)
+    else spotSelRef.current = null // disarm clears the selection too
+    setSpotlight(next)
     dismissHint()
   }
   const onPointerMove = (e: React.PointerEvent) => {
@@ -1677,6 +2077,20 @@ export function VirtualPanoramaPlayer({
     if (!start || !host) return
     const dx = e.clientX - start.x
     const dy = e.clientY - start.y
+    const c = clickRef.current
+    // Touch fingers roll ~10px on a natural tap — a tight slop misclassifies
+    // taps as drags (and then a "drag" of a few px kills the follow).
+    const slop = e.pointerType === 'touch' ? 12 : 6
+    if (
+      c &&
+      !c.moved &&
+      Math.abs(e.clientX - c.x) + Math.abs(e.clientY - c.y) > slop
+    ) {
+      c.moved = true
+      // A real drag = taking manual control: disengage spotlight camera-
+      // follow (ring stays; tapping the player again re-follows).
+      if (spotSelRef.current) spotSelRef.current.follow = false
+    }
     dragRef.current = { x: e.clientX, y: e.clientY }
     const fovRad = viewRef.current.fov * DEG
     const perPxY = fovRad / host.clientHeight
@@ -1689,8 +2103,56 @@ export function VirtualPanoramaPlayer({
     })
   }
   const endDrag = (e: React.PointerEvent) => {
+    // A CANCELLED gesture (orientation change, system dialog) is not a click
+    // — running the select path would spotlight a random player.
+    const wasClick =
+      e.type !== 'pointercancel' && clickRef.current && !clickRef.current.moved
     dragRef.current = null
+    clickRef.current = null
     ;(e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
+    // Spotlight select: an armed, non-drag tap picks the nearest tracked
+    // player under the pointer (gate scales with zoom so a tap works at any
+    // fov). Empty taps keep the current selection.
+    if (!wasClick || !spotlightRef.current) return
+    const host = canvasHostRef.current
+    const track = trackletsRef.current
+    const pick = pickRef.current
+    const master = masterVideoRef?.current
+    if (!host || !track || !pick) return
+    const rect = host.getBoundingClientRect()
+    if (rect.width <= 0 || rect.height <= 0) return
+    const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1
+    const ny = -(((e.clientY - rect.top) / rect.height) * 2 - 1)
+    const at = pick(nx, ny)
+    if (!at) return
+    const clock = master?.currentTime ?? videoRef.current?.currentTime ?? 0
+    // Touch needs a ≥40px effective target; the pointer aims a whole player,
+    // not a 5px dot, and nearest-object semantics resolve crowding.
+    const coarse = e.pointerType === 'touch'
+    const gateDeg = Math.max(
+      coarse ? 2.2 : 1.5,
+      viewRef.current.fov * (coarse ? 0.09 : 0.06)
+    )
+    const hit = nearestObject(track, clock, at.panDeg, at.tiltDeg, gateDeg)
+    if (hit) {
+      spotSelRef.current = {
+        index: hit.index,
+        follow: true,
+        lastPan: hit.panDeg,
+        lastTilt: hit.tiltDeg,
+        lostSince: null,
+        lastClock: clock,
+      }
+      setAutoFollow(false)
+      spotNoticeOverride.current = {
+        kind: 'following',
+        until: Date.now() + 4000,
+      }
+    } else if (spotSelRef.current) {
+      // Confirmed empty tap with an existing selection: re-assert follow so a
+      // stray screen tap never silently stops tracking the chosen player.
+      spotSelRef.current.follow = true
+    }
   }
 
   const zoomBy = (f: number) => {
@@ -1732,6 +2194,49 @@ export function VirtualPanoramaPlayer({
       case '0':
       case 'Home':
         resetView()
+        break
+      case 'Enter': {
+        // Keyboard selection: when armed, spotlight the tracked player
+        // nearest to screen centre (arrows already aim the view).
+        const track = trackletsRef.current
+        const pick = pickRef.current
+        if (!spotlightRef.current || !track || !pick) {
+          handled = false
+          break
+        }
+        const at = pick(0, 0)
+        if (!at) break
+        const clock =
+          masterVideoRef?.current?.currentTime ??
+          videoRef.current?.currentTime ??
+          0
+        const hit = nearestObject(
+          track,
+          clock,
+          at.panDeg,
+          at.tiltDeg,
+          Math.max(2.5, viewRef.current.fov * 0.12)
+        )
+        if (hit) {
+          spotSelRef.current = {
+            index: hit.index,
+            follow: true,
+            lastPan: hit.panDeg,
+            lastTilt: hit.tiltDeg,
+            lostSince: null,
+            lastClock: clock,
+          }
+          setAutoFollow(false)
+          spotNoticeOverride.current = {
+            kind: 'following',
+            until: Date.now() + 4000,
+          }
+        }
+        break
+      }
+      case 'Escape':
+        if (spotSelRef.current) spotSelRef.current = null
+        else handled = false
         break
       default:
         handled = false
@@ -1842,8 +2347,14 @@ export function VirtualPanoramaPlayer({
   // Report pan-state up so DewarpControls (rendered in the shared bar's extras)
   // reflect Auto-pressed + zoom%. Fires when Auto flips via button OR a drag.
   useEffect(() => {
-    onStateChange?.({ autoFollow, zoomPct, hasAimTrack })
-  }, [autoFollow, zoomPct, hasAimTrack, onStateChange])
+    onStateChange?.({
+      autoFollow,
+      zoomPct,
+      hasAimTrack,
+      hasTracklets,
+      spotlight,
+    })
+  }, [autoFollow, zoomPct, hasAimTrack, hasTracklets, spotlight, onStateChange])
 
   // Publish the imperative control handle for the extras (ref-as-latest-callback,
   // same pattern as toggleFullscreenRef — the closures below are already defined).
@@ -1853,6 +2364,7 @@ export function VirtualPanoramaPlayer({
       zoomOut: () => zoomBy(1 / 1.25),
       reset: resetView,
       toggleAuto: toggleAutoFollow,
+      toggleSpotlight,
     }
   }
 
@@ -1883,6 +2395,56 @@ export function VirtualPanoramaPlayer({
           onPointerCancel={endDrag}
           onKeyDown={onKeyDown}
         />
+
+        {/* Spotlight overlay — dots/ring/trail drawn per RAF frame by the
+            render loop (imperative SVG children; no React churn). */}
+        <svg
+          ref={spotSvgRef}
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          style={{ display: 'none' }}
+        />
+
+        {spotNotice && canInteract && (
+          <div className="pointer-events-none absolute inset-x-0 top-4 flex justify-center">
+            <div
+              key={spotNotice}
+              className="flex items-center gap-2 rounded-full bg-black/60 px-4 py-2 text-sm text-[var(--timberwolf)] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2"
+            >
+              <UserSearch
+                className={cn(
+                  'h-4 w-4',
+                  spotNotice === 'nodata' || spotNotice === 'lost'
+                    ? 'text-[var(--ash-grey)]'
+                    : 'text-emerald-400'
+                )}
+              />{' '}
+              {t(
+                spotNotice === 'nodata'
+                  ? 'spotlightNoData'
+                  : spotNotice === 'following'
+                    ? 'spotlightFollowing'
+                    : spotNotice === 'lost'
+                      ? 'spotlightLost'
+                      : 'spotlightHint'
+              )}
+            </div>
+          </div>
+        )}
+        {/* Screen-reader announcements for pointer-driven state changes. */}
+        <span aria-live="polite" className="sr-only">
+          {spotNotice
+            ? t(
+                spotNotice === 'nodata'
+                  ? 'spotlightNoData'
+                  : spotNotice === 'following'
+                    ? 'spotlightFollowing'
+                    : spotNotice === 'lost'
+                      ? 'spotlightLost'
+                      : 'spotlightHint'
+              )
+            : ''}
+        </span>
 
         {autoSrc && (
           // Spiideo's pre-produced auto-follow feed, shown over the de-warp when
@@ -2010,6 +2572,28 @@ export function VirtualPanoramaPlayer({
                   >
                     <Crosshair className="h-4 w-4" />
                     <span className="text-xs font-medium">{t('auto')}</span>
+                  </Button>
+                )}
+                {curved && hasTracklets && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleSpotlight}
+                    aria-label={t('spotlightToggle')}
+                    aria-pressed={spotlight}
+                    title={
+                      spotlight ? t('spotlightOnTitle') : t('spotlightOffTitle')
+                    }
+                    className={cn(
+                      'h-9 gap-1.5 px-2 text-white hover:bg-white/20 md:h-8',
+                      spotlight &&
+                        'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+                    )}
+                  >
+                    <UserSearch className="h-4 w-4" />
+                    <span className="text-xs font-medium">
+                      {t('spotlight')}
+                    </span>
                   </Button>
                 )}
                 <Button

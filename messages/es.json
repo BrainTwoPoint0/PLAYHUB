@@ -993,7 +993,15 @@
     "resetView": "Restablecer vista",
     "autoFollowToggle": "Activar o desactivar el seguimiento automático",
     "autoFollowOnTitle": "Seguimiento automático activado — arrastra para tomar el control",
-    "autoFollowOffTitle": "Seguir la acción automáticamente"
+    "autoFollowOffTitle": "Seguir la acción automáticamente",
+    "spotlight": "Foco",
+    "spotlightToggle": "Foco en jugador",
+    "spotlightOnTitle": "Foco activado — toca un jugador para seguirlo; toca de nuevo para desactivar",
+    "spotlightOffTitle": "Enfocar a un jugador",
+    "spotlightHint": "Toca un jugador para enfocarlo y seguirlo",
+    "spotlightNoData": "El seguimiento de jugadores no está disponible en este punto del partido",
+    "spotlightFollowing": "Siguiendo — arrastra para mirar alrededor, toca otro jugador para cambiar",
+    "spotlightLost": "Jugador perdido — tócalo para enfocarlo de nuevo"
   },
   "auditHistory": {
     "title": "Historial de auditoría",

@@ -993,7 +993,15 @@
     "resetView": "Reset view",
     "autoFollowToggle": "Toggle auto-follow",
     "autoFollowOnTitle": "Auto-follow on — drag to take control",
-    "autoFollowOffTitle": "Auto-follow the action"
+    "autoFollowOffTitle": "Auto-follow the action",
+    "spotlight": "Spotlight",
+    "spotlightToggle": "Player spotlight",
+    "spotlightOnTitle": "Spotlight on — tap a player to follow them; tap again to turn off",
+    "spotlightOffTitle": "Spotlight a player",
+    "spotlightHint": "Tap a player to spotlight and follow them",
+    "spotlightNoData": "Player tracking isn’t available at this point of the match",
+    "spotlightFollowing": "Following — drag to look around, tap another player to switch",
+    "spotlightLost": "Lost the player — tap them to spotlight again"
   },
   "auditHistory": {
     "title": "Audit history",

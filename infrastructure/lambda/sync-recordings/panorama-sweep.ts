@@ -318,6 +318,172 @@ export async function sweepAimTracks(
   return { submitted, candidates: claimable.length }
 }
 
+// ── Player-tracklets sweep ───────────────────────────────────────────────────
+// Sibling sweep for the spotlight feature: fetch Spiideo's tracklets +
+// detections data streams, solve the per-game metric→ray homography, and
+// publish tracklets.json next to the mesh. Needs NO video (neither ours nor
+// Spiideo's) — only the mesh, so candidates are mesh-scene recordings.
+// Games recorded before a venue's tracklets rollout (Nazwa: pre 2026-06-09)
+// have no stream; the job errors clearly and the attempts cap settles them.
+
+export const TRK_SWEEP_MAX_PER_RUN = 1 // jobs run ~2 min; 1/tick drains fast
+export const TRK_INFLIGHT_CAP = 1 // 1 vCPU on the shared CE (16-vCPU budget)
+// Job runtime is minutes, but a QUEUED Batch job has no heartbeat — a job
+// stuck RUNNABLE >1h can be reclaimed while still queued (rare double-submit
+// accepted: both writes are idempotent x-upserts of the same artifact).
+export const TRK_STUCK_MS = 3600_000
+
+export interface TrackletsCandidate {
+  id: string
+  spiideo_game_id: string | null
+  spiideo_scene_id: string | null
+  tracklets_status: string | null
+  tracklets_started_at: string | null
+  tracklets_attempts: number | null
+}
+
+/** Same claimability contract as isAimClaimable, over the tracklets_* columns. */
+export function isTrackletsClaimable(
+  row: TrackletsCandidate,
+  meshSceneIds: Set<string>,
+  nowMs: number
+): boolean {
+  if (!row.spiideo_game_id || !row.spiideo_scene_id) return false
+  if (!meshSceneIds.has(row.spiideo_scene_id)) return false
+  const status = row.tracklets_status
+  if (status === 'ready') return false
+  const startedAt = row.tracklets_started_at
+    ? Date.parse(row.tracklets_started_at)
+    : 0
+  if (status === null) return true
+  if (status === 'error')
+    return (
+      (row.tracklets_attempts ?? 0) < MAX_ATTEMPTS &&
+      nowMs - startedAt >= ERROR_COOLDOWN_MS
+    )
+  if (status === 'pending')
+    return (
+      (row.tracklets_attempts ?? 0) < MAX_ATTEMPTS &&
+      nowMs - startedAt >= TRK_STUCK_MS
+    )
+  return false
+}
+
+export async function sweepPlayerTracklets(
+  supabase: SupabaseClient,
+  submitJob: SubmitPanoramaJob,
+  // The registry is SCENE-level but the job reads PER-GAME mesh files —
+  // a mesh-scene recording whose game folder was never materialized would
+  // claim, 404 in the job, and burn all 3 attempts at 1 claim/tick while
+  // sitting at the top of the newest-first window. One cheap HEAD per claim
+  // candidate prevents that. Null (tests/legacy callers) skips the check.
+  hasGameMesh: ((gameId: string) => Promise<boolean>) | null = null,
+  nowMs = Date.now()
+): Promise<{ submitted: number; candidates: number }> {
+  // Spotlight is only usable in the de-warp view, which needs a scene mesh —
+  // the registry is the source of truth for which scenes have one.
+  const { data: scenes, error: scenesErr } = await supabase
+    .from('playhub_panorama_scene_meshes')
+    .select('scene_id')
+  if (scenesErr)
+    throw new Error(`tracklets sweep scene registry: ${scenesErr.message}`)
+  const meshSceneIds = new Set((scenes ?? []).map((s) => String(s.scene_id)))
+  if (meshSceneIds.size === 0) return { submitted: 0, candidates: 0 }
+
+  const { data, error } = await supabase
+    .from('playhub_match_recordings')
+    .select(
+      'id, spiideo_game_id, spiideo_scene_id, tracklets_status, tracklets_started_at, tracklets_attempts'
+    )
+    .eq('status', 'published')
+    .not('spiideo_game_id', 'is', null)
+    .in('spiideo_scene_id', Array.from(meshSceneIds))
+    // NOT .neq(...,'ready') — three-valued logic drops NULL rows (the point).
+    .or(`tracklets_status.is.null,tracklets_status.neq.ready`)
+    .or(`tracklets_attempts.is.null,tracklets_attempts.lt.${MAX_ATTEMPTS}`)
+    .order('match_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
+    .limit(25)
+  if (error) throw new Error(`tracklets sweep query: ${error.message}`)
+
+  const claimable = (data ?? []).filter((r) =>
+    isTrackletsClaimable(r, meshSceneIds, nowMs)
+  )
+
+  const freshCutoff = new Date(nowMs - TRK_STUCK_MS).toISOString()
+  const { count: inFlight, error: inFlightErr } = await supabase
+    .from('playhub_match_recordings')
+    .select('id', { count: 'exact', head: true })
+    .eq('tracklets_status', 'pending')
+    .gte('tracklets_started_at', freshCutoff)
+  if (inFlightErr)
+    throw new Error(`tracklets sweep in-flight count: ${inFlightErr.message}`)
+  const budget = Math.max(
+    0,
+    Math.min(TRK_SWEEP_MAX_PER_RUN, TRK_INFLIGHT_CAP - (inFlight ?? 0))
+  )
+
+  let submitted = 0
+  let attempted = 0
+  for (const row of claimable) {
+    if (attempted >= budget) break
+    if (hasGameMesh) {
+      try {
+        if (!(await hasGameMesh(String(row.spiideo_game_id)))) continue
+      } catch {
+        continue // storage hiccup — try the row again next tick, unclaimed
+      }
+    }
+    const stuckCutoff = new Date(nowMs - TRK_STUCK_MS).toISOString()
+    const errorCutoff = new Date(nowMs - ERROR_COOLDOWN_MS).toISOString()
+    const { count, error: claimErr } = await supabase
+      .from('playhub_match_recordings')
+      .update(
+        {
+          tracklets_status: 'pending',
+          tracklets_started_at: new Date(nowMs).toISOString(),
+          tracklets_error: null,
+          tracklets_attempts: (row.tracklets_attempts ?? 0) + 1,
+        },
+        { count: 'exact' }
+      )
+      .eq('id', row.id)
+      .or(
+        `tracklets_status.is.null,` +
+          `and(tracklets_status.eq.error,tracklets_attempts.lt.${MAX_ATTEMPTS},tracklets_started_at.lt.${errorCutoff}),` +
+          `and(tracklets_status.eq.pending,tracklets_attempts.lt.${MAX_ATTEMPTS},tracklets_started_at.lt.${stuckCutoff})`
+      )
+    if (claimErr) {
+      console.error(
+        `tracklets sweep: claim failed for ${row.id}: ${claimErr.message}`
+      )
+      continue
+    }
+    if (!count) continue
+
+    attempted++
+    try {
+      const jobId = await submitJob(row.id, String(row.spiideo_game_id))
+      if (!jobId) throw new Error('no jobId returned')
+      console.log(`tracklets sweep: submitted ${row.id} -> job ${jobId}`)
+      submitted++
+    } catch (err) {
+      console.error(
+        `tracklets sweep: submit failed for ${row.id}: ${err instanceof Error ? err.message : err}`
+      )
+      await supabase
+        .from('playhub_match_recordings')
+        .update({
+          tracklets_status: 'error',
+          tracklets_error: 'sweep submit failed',
+          tracklets_attempts: row.tracklets_attempts ?? 0,
+        })
+        .eq('id', row.id)
+    }
+  }
+  return { submitted, candidates: claimable.length }
+}
+
 // ── Portrait-render sweep ────────────────────────────────────────────────────
 // Feed for the portrait-render Batch job (9:16 goal drafts, review-first):
 // club-allowlisted Veo matches with unrendered tagged goals, served by the

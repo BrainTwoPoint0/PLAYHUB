@@ -23,6 +23,7 @@ import {
 import {
   sweepPanoramaCaptures,
   sweepAimTracks,
+  sweepPlayerTracklets,
   sweepPortraitRenders,
 } from './panorama-sweep'
 import { fetchAllRows } from './paginate'
@@ -51,6 +52,8 @@ const PANORAMA_JOB_QUEUE = process.env.PANORAMA_JOB_QUEUE || ''
 const PANORAMA_JOB_DEF = process.env.PANORAMA_JOB_DEF || ''
 // Aim-track jobs share the panorama queue; empty env disables the sweep.
 const AIM_TRACK_JOB_DEF = process.env.AIM_TRACK_JOB_DEF || ''
+// Player-tracklets (spotlight) jobs share the panorama queue too.
+const TRACKLETS_JOB_DEF = process.env.TRACKLETS_JOB_DEF || ''
 // Portrait-render sweep: comma-separated club allowlist (empty = disabled)
 // + the job definition. Shares the panorama queue.
 const PORTRAIT_JOB_DEF = process.env.PORTRAIT_JOB_DEF || ''
@@ -1337,6 +1340,48 @@ export const handler = async (): Promise<{
         } catch (err) {
           console.error(
             'Aim sweep failed (non-fatal):',
+            err instanceof Error ? err.message : err
+          )
+        }
+      }
+      if (TRACKLETS_JOB_DEF) {
+        try {
+          const batch = new BatchClient({ region: S3_REGION })
+          const { submitted, candidates } = await sweepPlayerTracklets(
+            supabase,
+            async (recordingId, gameId) => {
+              const out = await batch.send(
+                new SubmitJobCommand({
+                  jobName: `player-tracklets-${recordingId}`,
+                  jobQueue: PANORAMA_JOB_QUEUE,
+                  jobDefinition: TRACKLETS_JOB_DEF,
+                  containerOverrides: {
+                    environment: [
+                      { name: 'RECORDING_ID', value: recordingId },
+                      { name: 'GAME_ID', value: gameId },
+                    ],
+                  },
+                })
+              )
+              return out.jobId
+            },
+            async (gameId) => {
+              // per-GAME mesh check (registry is scene-level; the job 404s
+              // without the game folder and would burn its attempts)
+              const res = await fetch(
+                `${SUPABASE_URL}/storage/v1/object/public/panorama-meshes/${gameId}/scene.json`,
+                { method: 'HEAD' }
+              )
+              return res.ok
+            }
+          )
+          if (candidates > 0)
+            console.log(
+              `Tracklets sweep: ${submitted} submitted, ${candidates} claimable`
+            )
+        } catch (err) {
+          console.error(
+            'Tracklets sweep failed (non-fatal):',
             err instanceof Error ? err.message : err
           )
         }

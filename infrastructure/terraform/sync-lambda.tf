@@ -191,6 +191,7 @@ resource "aws_lambda_function" "sync_recordings" {
       PANORAMA_JOB_QUEUE    = aws_batch_job_queue.vp_materialize.name
       PANORAMA_JOB_DEF      = aws_batch_job_definition.vp_materialize.name
       AIM_TRACK_JOB_DEF     = aws_batch_job_definition.aim_track.name
+      TRACKLETS_JOB_DEF     = aws_batch_job_definition.player_tracklets.name
       PORTRAIT_JOB_DEF      = aws_batch_job_definition.portrait_render.name
       # Club allowlist for the portrait sweep; empty = disabled. Flip to "cfa"
       # after the pilot E2E validates.

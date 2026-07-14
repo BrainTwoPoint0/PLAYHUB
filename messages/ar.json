@@ -655,7 +655,15 @@
     "resetView": "إعادة ضبط العرض",
     "autoFollowToggle": "تبديل التتبع التلقائي",
     "autoFollowOnTitle": "التتبع التلقائي مفعّل — اسحب للتحكم",
-    "autoFollowOffTitle": "تتبع تلقائي للّعب"
+    "autoFollowOffTitle": "تتبع تلقائي للّعب",
+    "spotlight": "تسليط الضوء",
+    "spotlightToggle": "تسليط الضوء على لاعب",
+    "spotlightOnTitle": "التسليط مفعّل — اضغط على لاعب لمتابعته؛ اضغط مجددًا للإيقاف",
+    "spotlightOffTitle": "سلّط الضوء على لاعب",
+    "spotlightHint": "اضغط على لاعب لتسليط الضوء عليه ومتابعته",
+    "spotlightNoData": "تتبع اللاعبين غير متاح في هذه اللحظة من المباراة",
+    "spotlightFollowing": "جارٍ المتابعة — اسحب للتجول، واضغط على لاعب آخر للتبديل",
+    "spotlightLost": "فُقد اللاعب — اضغط عليه لتسليط الضوء مجددًا"
   },
   "auth": {
     "common": {

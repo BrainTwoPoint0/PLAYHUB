@@ -105,6 +105,8 @@ export function WatchPlayer({
   const [dewarpFollow, setDewarpFollow] = useState({
     autoFollow: false,
     hasAimTrack: false,
+    hasTracklets: false,
+    spotlight: false,
   })
 
   const dewarpReady = Boolean(meshBaseUrl && panoramaSrc)
@@ -230,11 +232,19 @@ export function WatchPlayer({
             masterVideoRef={t.videoRef}
             hideChrome
             apiRef={dewarpApiRef}
-            onStateChange={({ autoFollow, hasAimTrack }) =>
+            onStateChange={({
+              autoFollow,
+              hasAimTrack,
+              hasTracklets,
+              spotlight,
+            }) =>
               setDewarpFollow((s) =>
-                s.autoFollow === autoFollow && s.hasAimTrack === hasAimTrack
+                s.autoFollow === autoFollow &&
+                s.hasAimTrack === hasAimTrack &&
+                s.hasTracklets === hasTracklets &&
+                s.spotlight === spotlight
                   ? s
-                  : { autoFollow, hasAimTrack }
+                  : { autoFollow, hasAimTrack, hasTracklets, spotlight }
               )
             }
             className="h-full w-full"
@@ -298,6 +308,8 @@ export function WatchPlayer({
         extras={
           isDewarp ? (
             <DewarpControls
+              hasTracklets={dewarpFollow.hasTracklets}
+              spotlight={dewarpFollow.spotlight}
               apiRef={dewarpApiRef}
               hasAimTrack={dewarpFollow.hasAimTrack}
               autoFollow={dewarpFollow.autoFollow}
