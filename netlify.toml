@@ -4,6 +4,9 @@
 
 [build.environment]
   NETLIFY_NEXT_SKEW_PROTECTION = "true"
+  # Pin the runtime remote builds use — unpinned Node was one suspect in the
+  # 2026-07-13 silent build failures.
+  NODE_VERSION = "22"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
