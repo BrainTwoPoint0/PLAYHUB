@@ -909,7 +909,7 @@ generate_mesh.py` — output schema matches scene.json field-for-field), NOT Spi
   data APIs + CloudFront still working). The sanctioned mesh source (per 2026-07-04 recon):
   **`projection-download` ORDER** on a Nazwa game → signed S3 URLs for THEIR
   vertices/indices/scene.json. `POST /v1/orders` is LIVE (400 validation, not 403) and requires
-  `paymentProvider` + `billingAccountId` + `userId` (= 63327323-7455-4c0f-b56f-c014dc5b4743, from
+  `paymentProvider` + `billingAccountId` + `userId` (= <SPIIDEO_PLAYBACK_ADMIN_USER_ID>, from
   JWT). billing-accounts API 403s for this user; NO pricing endpoint found → **order cost unknown,
   on an account paused for unpaid invoices** → escalated to Karim rather than fired. DB registry
   (`playhub_panorama_scene_meshes`): Nazwa scene 131777a6 mesh fanned out from game 2f847a02;

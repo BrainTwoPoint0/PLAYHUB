@@ -7,6 +7,9 @@
   # Pin the runtime remote builds use — unpinned Node was one suspect in the
   # 2026-07-13 silent build failures.
   NODE_VERSION = "22"
+  # Research docs under scripts/follow-re accumulate operational IDs that can
+  # collide with env-var values; they never reach the deploy bundle.
+  SECRETS_SCAN_OMIT_PATHS = "scripts/follow-re/*"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
