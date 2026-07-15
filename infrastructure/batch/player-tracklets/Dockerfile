@@ -1,7 +1,9 @@
 # Player-tracklets Batch job — Python, CPU-only, no video. Fetches Spiideo's
 # tracklets + detections data streams, solves the per-game metric->ray
 # homography, and publishes the per-player spotlight track.
-FROM python:3.12-slim
+# ECR Public mirror — Docker Hub anonymous pulls 429 from CodeBuild's
+# shared NAT IPs (hit 2026-07-15); AWS's mirror has no such limit.
+FROM public.ecr.aws/docker/library/python:3.12-slim
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates \

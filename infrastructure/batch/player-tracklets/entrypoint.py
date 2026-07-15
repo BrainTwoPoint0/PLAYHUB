@@ -208,11 +208,11 @@ def main():
         raise RuntimeError('tracklets stream has no items')
     print(f'fetched {len(trk_items)} tracklet items', flush=True)
 
-    objects = build_track.parse_items(trk_items, start_us)
-    if not objects:
-        raise RuntimeError('tracklets stream parsed to zero objects')
-    trk_window = (min(int(ts[0]) for ts, _ in objects.values()),
-                  max(int(ts[-1]) for ts, _ in objects.values()))
+    fragments = build_track.parse_items(trk_items, start_us)
+    if not fragments:
+        raise RuntimeError('tracklets stream parsed to zero fragments')
+    trk_window = (min(int(ts[0]) for ts, _ in fragments),
+                  max(int(ts[-1]) for ts, _ in fragments))
 
     det_frames: dict = {}
     for det_stream in streams['detections']:
@@ -223,7 +223,7 @@ def main():
                                          frames=det_frames)
     print(f'{len(det_frames)} detection frames sampled', flush=True)
     trk_frames: dict = {}
-    for ts, xy in objects.values():
+    for ts, xy in fragments:
         for t, p in zip(ts.tolist(), xy.tolist()):
             trk_frames.setdefault(t, []).append(p)
     trk_frames = {k: np.array(v, np.float64) for k, v in trk_frames.items()}
@@ -248,8 +248,10 @@ def main():
             f'quality gate: only {diag["matched_frames"]} matched frames')
 
     on_pitch = build_track.filter_on_pitch(
-        objects, diag['pitch_lo'], diag['pitch_hi'])
+        fragments, diag['pitch_lo'], diag['pitch_hi'])
     chains = build_track.stitch(on_pitch)
+    chains = build_track.filter_chains_on_pitch(
+        chains, diag['pitch_lo'], diag['pitch_hi'])
     conc = median_concurrency(chains)
     if conc < MIN_MEDIAN_CONCURRENT:
         raise RuntimeError(

@@ -973,8 +973,13 @@ export function VirtualPanoramaPlayer({
     follow: boolean
     lastPan: number // deg — last known position, drives re-association
     lastTilt: number
+    vPan: number // deg/s — EMA angular velocity (projects the gap search)
+    vTilt: number
     lostSince: number | null // clock seconds when the fragment ran out
     lastClock: number | null // detects seeks (a jump invalidates the selection)
+    hops: number // identity confidence decays per hand-off — hard cap 2
+    adoptedAt: number // clock when the current chain was adopted (min dwell)
+    fadeUntil: number // performance.now() ms — ring fades in after a >1° hop
   } | null>(null)
   // Status pill state machine: base kind is derived every frame in the
   // overlay update ('hint' armed+unselected, 'nodata' armed in an untracked
@@ -1582,18 +1587,21 @@ export function VirtualPanoramaPlayer({
           if (followFrame++ % 8 === 0) syncZoom()
         }
         // --- player spotlight: click-to-select ring + trail + camera-follow ---
-        // All positions come from the offline tracklets artifact sampled at the
-        // MASTER clock. Objects are identity FRAGMENTS: when the followed one
-        // ends, re-associate to the nearest object at the last known position
+        // Objects are identity FRAGMENTS: when the followed one ends,
+        // re-associate to the nearest object at the last known position
         // (the tracker almost always re-detects the same player in place);
         // past the gate for a few seconds → the selection is honestly LOST.
         const SPOT_FOLLOW_SMOOTH = 0.35
-        const SPOT_REASSOC_DEG = 2.5
+        const SPOT_REASSOC_DEG = 2.0
         const SPOT_LOST_SEC = 3
         // Distinguishes a real seek from a suspended RAF (backgrounded tab).
         let lastRafMs = performance.now()
-        const spotClock = () =>
-          masterVideoRef?.current?.currentTime ?? video.currentTime
+        // The SLAVE raw-VP video is what the user SEES (its frames feed the
+        // WebGL texture) and it may lag the master by up to 1.5s (the loose
+        // drift guard). The ring must sit on the VISIBLE player, so spotlight
+        // samples at the slave clock — unlike stepAim, whose whole-frame
+        // camera aim tolerates the lead and stays on the master transport.
+        const spotClock = () => video.currentTime
         const stepSpotlight = () => {
           const track = trackletsRef.current
           const sel = spotSelRef.current
@@ -1611,13 +1619,36 @@ export function VirtualPanoramaPlayer({
               return
             }
           }
+          const dtClock = sel.lastClock === null ? 0 : clock - sel.lastClock
           sel.lastClock = clock
           const s = sampleObject(track.objects[sel.index], clock)
           if (s) {
+            // Track angular velocity (EMA) while locked — it projects the
+            // search centre during hand-off gaps (a sprinter's true
+            // continuation exits a static cone in well under a second).
+            if (dtClock > 1e-3) {
+              const a = 0.3
+              sel.vPan =
+                sel.vPan * (1 - a) + ((s.panDeg - sel.lastPan) / dtClock) * a
+              sel.vTilt =
+                sel.vTilt * (1 - a) + ((s.tiltDeg - sel.lastTilt) / dtClock) * a
+            }
             sel.lastPan = s.panDeg
             sel.lastTilt = s.tiltDeg
             sel.lostSince = null
           } else {
+            if (sel.lostSince === null) sel.lostSince = clock
+            const gap = Math.abs(clock - sel.lostSince)
+            // Dead-reckon the ring through the gap with the terminal angular
+            // velocity for up to 1s (rendered dashed — visibly "coasting").
+            if (gap <= 1.0 && dtClock > 0) {
+              sel.lastPan += sel.vPan * dtClock
+              sel.lastTilt += sel.vTilt * dtClock
+            }
+            // ONE-SHOT re-association with ambiguity refusal: the server
+            // already bridged everything unambiguous, so what reaches the
+            // client is by construction harder — be stricter, and refuse
+            // rather than risk following a stranger.
             const cand = nearestObject(
               track,
               clock,
@@ -1627,13 +1658,62 @@ export function VirtualPanoramaPlayer({
               sel.index
             )
             if (cand) {
-              sel.index = cand.index
-              sel.lastPan = cand.panDeg
-              sel.lastTilt = cand.tiltDeg
-              sel.lostSince = null
-            } else if (sel.lostSince === null) {
-              sel.lostSince = clock
-            } else if (Math.abs(clock - sel.lostSince) > SPOT_LOST_SEC) {
+              const d1 = Math.hypot(
+                cand.panDeg - sel.lastPan,
+                cand.tiltDeg - sel.lastTilt
+              )
+              const rival = nearestObject(
+                track,
+                clock,
+                sel.lastPan,
+                sel.lastTilt,
+                SPOT_REASSOC_DEG * 2,
+                cand.index
+              )
+              const ambiguous =
+                rival &&
+                rival.index !== sel.index &&
+                Math.hypot(
+                  rival.panDeg - sel.lastPan,
+                  rival.tiltDeg - sel.lastTilt
+                ) < Math.max(2 * d1, d1 + 0.8)
+              // velocity consistency: the pickup must MOVE like the player
+              // we lost (a sprinter must not hand off to a stander)
+              const n1 = sampleObject(track.objects[cand.index], clock + 0.2)
+              const cv = n1
+                ? {
+                    p: (n1.panDeg - cand.panDeg) / 0.2,
+                    t: (n1.tiltDeg - cand.tiltDeg) / 0.2,
+                  }
+                : null
+              const velOk =
+                !cv || Math.hypot(cv.p - sel.vPan, cv.t - sel.vTilt) <= 5
+              const dwellOk = clock - sel.adoptedAt >= 2
+              if (!ambiguous && velOk && dwellOk && sel.hops < 2) {
+                sel.index = cand.index
+                sel.lastPan = cand.panDeg
+                sel.lastTilt = cand.tiltDeg
+                sel.lostSince = null
+                sel.hops += 1
+                sel.adoptedAt = clock
+                if (d1 > 1) sel.fadeUntil = performance.now() + 350 // hop = fade, not swoosh
+              } else if ((ambiguous || !velOk) && gap > SPOT_LOST_SEC) {
+                spotSelRef.current = null // unresolvable — honest loss
+                spotNoticeOverride.current = {
+                  kind: 'lost',
+                  until: Date.now() + 3000,
+                }
+                return
+              } else if (!dwellOk || sel.hops >= 2) {
+                // hop budget spent — end rather than daisy-chain identities
+                spotSelRef.current = null
+                spotNoticeOverride.current = {
+                  kind: 'lost',
+                  until: Date.now() + 3000,
+                }
+                return
+              }
+            } else if (gap > SPOT_LOST_SEC) {
               spotSelRef.current = null // gone for good — drop the ring
               spotNoticeOverride.current = {
                 kind: 'lost',
@@ -1803,8 +1883,8 @@ export function VirtualPanoramaPlayer({
               ringCasingEl.setAttribute('stroke-width', (sw + 2).toFixed(2))
               ringEl.setAttribute('stroke-width', sw.toFixed(2))
               if (lost) {
-                // "searching": desaturated + dashed is a semantic state, not
-                // a fade — an opacity-only change reads as a glitch.
+                // "coasting/searching": desaturated + dashed is a semantic
+                // state, not a fade — opacity-only reads as a glitch.
                 ringEl.setAttribute('stroke', '#b9baa3')
                 ringEl.setAttribute('stroke-dasharray', '5 4')
                 ringEl.setAttribute('fill', 'none')
@@ -1813,7 +1893,13 @@ export function VirtualPanoramaPlayer({
                 ringEl.setAttribute('stroke', '#34d399')
                 ringEl.setAttribute('stroke-dasharray', '')
                 ringEl.setAttribute('fill', 'rgba(16,185,129,0.1)')
-                ringEl.style.opacity = '1'
+                // After a >1° hand-off the ring FADES in at the new player —
+                // a lerped swoosh across the pitch would read as motion.
+                const fadeLeft = sel.fadeUntil - performance.now()
+                ringEl.style.opacity =
+                  fadeLeft > 0
+                    ? String(Math.max(0.15, 1 - fadeLeft / 350))
+                    : '1'
               }
               if (lost) {
                 trailEl.setAttribute('points', '')
@@ -2140,8 +2226,13 @@ export function VirtualPanoramaPlayer({
         follow: true,
         lastPan: hit.panDeg,
         lastTilt: hit.tiltDeg,
+        vPan: 0,
+        vTilt: 0,
         lostSince: null,
         lastClock: clock,
+        hops: 0,
+        adoptedAt: clock,
+        fadeUntil: 0,
       }
       setAutoFollow(false)
       spotNoticeOverride.current = {
@@ -2223,8 +2314,13 @@ export function VirtualPanoramaPlayer({
             follow: true,
             lastPan: hit.panDeg,
             lastTilt: hit.tiltDeg,
+            vPan: 0,
+            vTilt: 0,
             lostSince: null,
             lastClock: clock,
+            hops: 0,
+            adoptedAt: clock,
+            fadeUntil: 0,
           }
           setAutoFollow(false)
           spotNoticeOverride.current = {
