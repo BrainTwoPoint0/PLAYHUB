@@ -314,6 +314,15 @@ signal that is only ~70% per fragment still yields a near-perfect roster when
 pooled over 100 fragments. Geometry's ceiling is ~20-28 s at high purity;
 **jersey's ceiling is the whole match, and it gets there by not chaining.**
 
+> **CONFIRMED the same day, from outside.** Veo's `/api/mes/v2/player-tracking`
+> (found 2026-07-15; `veo-automations/VEO-API-REFERENCE.md`) is exactly this
+> architecture in production: every track row carries a jersey number, read on
+> **92.1% of player-frames**, with **0 of 225 tracks carrying conflicting
+> reads** — so a track break costs coverage, never identity. Their tracker is
+> also simply better than the substrate we are fighting here: **median track
+> 65.6 s vs our 16.2 s, p90 427 s**. The paragraph above was written from first
+> principles hours before that evidence existed; it is no longer a conjecture.
+
 ## 4.6 Open items (measured, not done)
 
 - **`AMBIGUITY_FLOOR_M = 0.5` is calibrated for gap→0** (~5σ) and is <1σ at
