@@ -15,9 +15,17 @@ Data model (re-verified on the pilot game with the CORRECT item cadence,
 - objectUUIDs ARE persistent across adjacent items (measured: 0.29m median
   seam jump over 0.24s, 0% >3m, n=3122). parse_items merges same-uuid across
   ADJACENT items under a continuity gate; a uuid reappearing after a missing
-  item or a >1s gap starts a new fragment (uuid reuse is not trusted across
-  absences). The position/velocity stitcher remains for genuine tracker
-  identity breaks.
+  item or a >1s gap starts a new fragment. The position/velocity stitcher
+  remains for genuine tracker identity breaks.
+- Spiideo NEVER re-links an identity across a real break (measured 2026-07-15,
+  uuid_reuse.py, 3 games): the longest intra-uuid gap anywhere is 1.6s and
+  there are ZERO re-appearances past 2s, so once a player is lost for more
+  than ~2s they come back as a brand-new uuid. Re-appearances within 1.6s are
+  genuine (100% physically reachable vs 28-74% for a same-instant null), but
+  they are rare (~1.4% of deaths). The tracker mints a fresh id roughly every
+  22s per player and never takes it back — that, not our gates, is why chains
+  are short, and no amount of stitching recovers an identity the upstream
+  never kept.
 - Positions are raw tracker output: per-fragment hygiene (teleport-split,
   Hampel, speed gate) then per-chain constant-velocity Kalman + RTS backward
   smoothing (offline → non-causal is allowed and optimal), resampled to a
@@ -51,6 +59,21 @@ HAMPEL_NSIGMA = 3.0
 STITCH_MAX_GAP_S = 1.5
 GATE_BASE_M = 0.8
 GATE_ACCEL = 4.0           # m/s² — d_gate = base + 0.5·a·gap²
+# Extended range (2026-07-15). Measured on 4 games / 3 venues: Spiideo mints a
+# fresh uuid every ~22s per player and NEVER re-links it (max intra-uuid gap
+# 1.6s), and 70-86% of chain deaths have their nearest plausible continuation
+# 1.5-5s out — i.e. the 1.5s ceiling, not the ambiguity gate, is what kills
+# chains (the gate fires on 0.0-0.2% of deaths).
+# The accel gate cannot be reused out here: it reaches 13m at 2.5s and 51m at
+# 5s, wider than the pitch. A player cannot sustain 4 m/s² for seconds — they
+# saturate — so past the accel ceiling the envelope goes LINEAR in gap.
+# Held-out check (ceiling_eval.py): a UNIQUE candidate inside this envelope is
+# the right player 98% of the time at 2s, ~95% at 3s — on injected breaks that
+# are ~2x less crowded than real ones, so read those as upper bounds. 2.5s is
+# the conservative pick; the ambiguity gate (dead code until now) does the
+# refusing out here, which is exactly what it was written for.
+STITCH_EXT_GAP_S = 2.5     # hard ceiling once the linear envelope takes over
+STITCH_EXT_SLOPE = 1.5     # m/s — deviation budget vs the CV prediction
 VEL_CONTINUITY = 4.0       # m/s — |v_end − v_start| ceiling
 AMBIGUITY_RATIO = 1.5
 AMBIGUITY_FLOOR_M = 0.5
@@ -229,64 +252,146 @@ def _endpoint_velocity(ts: np.ndarray, xy: np.ndarray, head: bool) -> np.ndarray
     return np.array([vx, vy])
 
 
-def stitch(fragments: list) -> list[tuple[np.ndarray, np.ndarray]]:
-    """Global edge matching: enumerate all gate-passing (i_end -> j_start)
-    bridges, sort by projected distance, accept greedily iff both endpoints
-    are unclaimed AND the margin against the next-best edge touching either
-    endpoint holds. Order-independent — a chain started earlier can no longer
-    steal another chain's true continuation (first-chain-wins bug)."""
+def stitch_gate_m(gap_s: float) -> float:
+    """Reach envelope at a given gap: how far the head may sit from the tail's
+    constant-velocity prediction. Acceleration-shaped while that is physical,
+    then linear once a player would have saturated their top speed.
+
+    The envelope DROPS at the handover (5.30m at 1.5s -> 3.05m just past it)
+    and is deliberately non-monotonic: the linear branch is an empirical
+    precision knob, not a continuation of the accel curve. Do NOT "fix" the
+    discontinuity by re-basing it at gate(1.5) — that would put the envelope at
+    6.8m at 2.5s and manufacture wrong-follows. The jump is conservative: it can
+    only lose bridges, never invent them. Held-out measurement is the authority
+    here (ceiling_eval.py), not the shape of the curve.
+
+    Past STITCH_EXT_GAP_S this returns -1.0, NOT inf: callers test
+    `d_fwd > gate`, so a negative gate rejects every pair (distances are >= 0,
+    and 0.0 > -1.0 holds), whereas inf would ACCEPT every pair — the exact
+    opposite of the intent."""
+    if gap_s <= STITCH_MAX_GAP_S:
+        return GATE_BASE_M + 0.5 * GATE_ACCEL * gap_s * gap_s
+    if gap_s <= STITCH_EXT_GAP_S:
+        return GATE_BASE_M + STITCH_EXT_SLOPE * gap_s
+    return -1.0
+
+
+def stitch_candidates(frags: list, max_gap_s: float | None = None) -> list:
+    """Every time-forward (i_end -> j_start) pair within max_gap_s, with the
+    raw terms the gates read: (i, j, gap_s, d_fwd, d_back, dv). UNGATED —
+    stitch_edges applies the gates, so the gate formulas live in exactly one
+    place and an offline diagnostic can attribute refusals without
+    reimplementing (and drifting from) them.
+
+    frags MUST already be sorted by first timestamp. max_gap_s is a parameter
+    so the diagnostic can ask what lies BEYOND the production ceiling; it
+    defaults to None and resolves at CALL time, because a default of
+    `STITCH_EXT_GAP_S` would freeze at import and silently ignore any later
+    change to the ceiling — the same symbol would then mean two different
+    things in this module."""
     import bisect
 
-    frags = sorted(fragments, key=lambda f: int(f[0][0]))
+    if max_gap_s is None:
+        max_gap_s = STITCH_EXT_GAP_S
     n = len(frags)
     starts = [int(f[0][0]) for f in frags]
     v_head = [_endpoint_velocity(ts, xy, head=True) for ts, xy in frags]
     v_tail = [_endpoint_velocity(ts, xy, head=False) for ts, xy in frags]
 
-    edges = []  # (proj_dist, i, j)
-    per_end: dict[int, list[float]] = {}
-    per_start: dict[int, list[float]] = {}
+    out = []
     for i in range(n):
         ts_end = int(frags[i][0][-1])
         pos_end = frags[i][1][-1]
         j0 = bisect.bisect_right(starts, ts_end)
-        j1 = bisect.bisect_right(starts, ts_end + int(STITCH_MAX_GAP_S * 1e6))
+        j1 = bisect.bisect_right(starts, ts_end + int(max_gap_s * 1e6))
         for j in range(j0, j1):
             gap = (starts[j] - ts_end) / 1e6
             if gap <= 0:
                 continue
-            gate = GATE_BASE_M + 0.5 * GATE_ACCEL * gap * gap
+            pos_start = frags[j][1][0]
             # forward projection of i's end
-            pred = pos_end + v_tail[i] * gap
-            d_fwd = float(np.linalg.norm(frags[j][1][0] - pred))
-            if d_fwd > gate:
-                continue
-            # velocity continuity: a sprinter must not bridge to a stander
-            if float(np.linalg.norm(v_tail[i] - v_head[j])) > VEL_CONTINUITY:
-                continue
+            d_fwd = float(np.linalg.norm(
+                pos_start - (pos_end + v_tail[i] * gap)))
             # reverse check: back-project j's start onto i's end
-            back = frags[j][1][0] - v_head[j] * gap
-            if float(np.linalg.norm(back - pos_end)) > gate:
-                continue
-            edges.append((d_fwd, i, j))
-            per_end.setdefault(i, []).append(d_fwd)
-            per_start.setdefault(j, []).append(d_fwd)
+            d_back = float(np.linalg.norm(
+                (pos_start - v_head[j] * gap) - pos_end))
+            # a sprinter must not bridge to a stander
+            dv = float(np.linalg.norm(v_tail[i] - v_head[j]))
+            out.append((i, j, gap, d_fwd, d_back, dv))
+    return out
 
-    edges.sort()
-    next_of = {}
-    prev_of = {}
+
+def stitch_edges(frags: list) -> list[tuple[float, int, int]]:
+    """Gate-passing bridges as (cost, i, j). The ONLY place the hard gates
+    live. Cost is the constant-velocity prediction residual — note this is
+    NOT a plain distance: the tail's velocity is already in it."""
+    out = []
+    # read the ceiling at CALL time, not via a frozen default argument
+    for i, j, gap, d_fwd, d_back, dv in stitch_candidates(frags,
+                                                          STITCH_EXT_GAP_S):
+        gate = stitch_gate_m(gap)
+        if d_fwd > gate or dv > VEL_CONTINUITY or d_back > gate:
+            continue
+        out.append((d_fwd, i, j))
+    return out
+
+
+def stitch_assign(n: int, edges: list) -> dict[int, int]:
+    """Gate-passing edges -> next_of {tail i: head j}.
+
+    Sort by cost and accept greedily iff both endpoints are unclaimed AND no
+    rival edge touching either endpoint is close enough to make the choice a
+    guess (no-follow beats wrong-follow). Order-independent — a chain started
+    earlier cannot steal another chain's true continuation.
+
+    A rival is any OTHER edge competing for i or j that is still claimable.
+    Two subtleties, both of which were bugs before 2026-07-15:
+
+    - Rivals must not be filtered to the strictly-worse (`x > d`). Refusing an
+      edge does not claim its endpoints, so the loop went on to reach the
+      runner-up — whose worse-only filter could not see the better edge just
+      rejected. Its rival list came up empty and it was accepted. The gate
+      therefore did not refuse ambiguous bridges at all: it DEMOTED the best
+      candidate and took the second-best, i.e. it reliably chose wrong exactly
+      where it had judged the choice unsafe. Measured at 3.6-5.4% of all
+      bridges on 3 games before the fix.
+    - An edge whose far endpoint is already claimed by a better bridge is not
+      an available alternative, so it cannot make anything ambiguous. Counting
+      it killed both endpoints over a rival that did not exist.
+
+    Edges are strictly time-forward (starts[j] > ts_end[i]), so next_of is
+    acyclic and the caller's chain walk terminates. A cycle here would be an
+    infinite loop inside a Fargate job — the acyclicity is load-bearing."""
+    per_end: dict[int, list[tuple[float, int]]] = {}
+    per_start: dict[int, list[tuple[float, int]]] = {}
     for d, i, j in edges:
+        per_end.setdefault(i, []).append((d, j))
+        per_start.setdefault(j, []).append((d, i))
+
+    next_of: dict[int, int] = {}
+    prev_of: dict[int, int] = {}
+    for d, i, j in sorted(edges):
         if i in next_of or j in prev_of:
             continue
-        # ambiguity: the next-best edge touching either endpoint must be
-        # clearly worse, else refuse the bridge (no-follow beats wrong-follow)
-        rivals = [x for x in per_end.get(i, []) if x > d] + \
-                 [x for x in per_start.get(j, []) if x > d]
+        rivals = [x for x, k in per_end.get(i, [])
+                  if k != j and k not in prev_of] + \
+                 [x for x, k in per_start.get(j, [])
+                  if k != i and k not in next_of]
         if rivals and min(rivals) < max(AMBIGUITY_RATIO * d,
                                         d + AMBIGUITY_FLOOR_M):
             continue
         next_of[i] = j
         prev_of[j] = i
+    return next_of
+
+
+def stitch(fragments: list) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Fragments -> chains, via gate-passing edges and a greedy assignment
+    that refuses ambiguous bridges. See stitch_candidates/edges/assign."""
+    frags = sorted(fragments, key=lambda f: int(f[0][0]))
+    n = len(frags)
+    next_of = stitch_assign(n, stitch_edges(frags))
+    prev_of = {j: i for i, j in next_of.items()}
 
     chains_idx = []
     for i in range(n):

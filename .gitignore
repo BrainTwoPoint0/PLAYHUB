@@ -101,3 +101,12 @@ scripts/follow-re/spiideo-real-mesh-*/
 # Follow-re research resume doc — local working notes; quotes operational IDs
 # that trip Netlify's secrets scanner (2026-07-14 incident)
 scripts/follow-re/AIM_RESUME.md
+
+# Player-identity research working data — re-fetchable via fetch_tracklets.py
+# (Spiideo items persist ~72d) or re-derivable from the raw panorama; the
+# scripts + README stay tracked
+scripts/player-identity/cache/
+scripts/player-identity/crops/
+scripts/player-identity/mesh/
+scripts/player-identity/prod-solve.json
+scripts/player-identity/*.png

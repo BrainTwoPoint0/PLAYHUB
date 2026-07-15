@@ -135,6 +135,157 @@ def test_wrong_cadence_would_shift_timeline():
     assert f16[0][0][0] - f10[0][0][0] == 6_000_000
 
 
+# ── stitching: gates + assignment ────────────────────────────────────────────
+
+def _line_frag(t0_s, dur_s, p0, v, dt=0.2):
+    """Constant-velocity fragment on the 5Hz grid."""
+    n = int(round(dur_s / dt)) + 1
+    ts = np.array([int(round((t0_s + k * dt) * 1e6)) for k in range(n)],
+                  np.int64)
+    xy = np.array([[p0[0] + v[0] * k * dt, p0[1] + v[1] * k * dt]
+                   for k in range(n)], np.float64)
+    return ts, xy
+
+
+def _cut(frag, t_cut_s, gap_s):
+    """Excise a gap -> (before, after). The break-injection primitive."""
+    ts, xy = frag
+    cut = ts[0] + int(t_cut_s * 1e6)
+    end = cut + int(gap_s * 1e6)
+    a, b = ts <= cut, ts >= end
+    return (ts[a], xy[a]), (ts[b], xy[b])
+
+
+def test_stitch_bridges_easy_single_gap():
+    # a lone player, one clean break: the bridge is unambiguous
+    a, b = _cut(_line_frag(0, 12, (0, 0), (2, 0)), 6.0, 0.6)
+    chains = build_track.stitch([a, b])
+    assert len(chains) == 1
+    assert (chains[0][0][-1] - chains[0][0][0]) / 1e6 == pytest.approx(12, abs=0.3)
+
+
+def test_stitch_refuses_beyond_gap_ceiling():
+    # 3.0s > STITCH_EXT_GAP_S: past the extended ceiling, nothing bridges
+    a, b = _cut(_line_frag(0, 16, (0, 0), (2, 0)), 6.0, 3.0)
+    assert len(build_track.stitch([a, b])) == 2
+
+
+def test_stitch_bridges_into_the_extended_range():
+    # 2.0s sits in the linear envelope: unreachable before 2026-07-15, and the
+    # 70-86% of real deaths that need 1.5-5s live here
+    a, b = _cut(_line_frag(0, 14, (0, 0), (2, 0)), 6.0, 2.0)
+    assert len(build_track.stitch([a, b])) == 1
+
+
+def test_gate_rejects_past_the_ceiling_even_at_zero_distance():
+    # regression: the beyond-ceiling gate must REJECT. Returning inf here (the
+    # intuitive "no limit") inverts the `d_fwd > gate` test and accepts every
+    # pair on the pitch — a perfect prediction (d_fwd == 0.0) must still fail.
+    # This assertion is the ONLY thing that catches that inversion: a pair past
+    # the ceiling is never enumerated, so the end-to-end test cannot see it.
+    assert build_track.stitch_gate_m(3.0) < 0.0
+    assert build_track.stitch_gate_m(float('nan')) < 0.0
+    assert build_track.stitch_gate_m(1.0) == pytest.approx(2.8)
+    assert build_track.stitch_gate_m(2.0) == pytest.approx(3.8)
+
+
+def test_gate_step_down_at_the_handover_is_deliberate():
+    # The envelope DROPS 5.30 -> 3.05 at 1.5s and is non-monotonic. The linear
+    # branch is an empirical precision knob, not a continuation of the accel
+    # curve. Pinned because the tempting "fix" — re-basing at gate(1.5) so it
+    # joins up — would put the envelope at 6.8m at 2.5s and manufacture
+    # wrong-follows. If this fails, someone smoothed the join: read
+    # ceiling_eval.py before touching it.
+    assert build_track.stitch_gate_m(1.5) == pytest.approx(5.3)
+    assert build_track.stitch_gate_m(1.5 + 1e-9) == pytest.approx(3.05)
+    assert build_track.stitch_gate_m(1.5) > build_track.stitch_gate_m(1.5 + 1e-9)
+    assert build_track.stitch_gate_m(2.5) == pytest.approx(4.55)
+
+
+def _two_head_race(sep_m):
+    """One tail, two heads at the SAME instant in the extended range, the
+    rival sep_m off the perfect prediction."""
+    tail = _line_frag(0, 6, (0, 0), (2, 0))          # ends (12,0) at t=6, v=(2,0)
+    h1 = _line_frag(8.0, 6, (16.0, 0.0), (2, 0))     # gap 2.0s, d_fwd = 0
+    h2 = _line_frag(8.0, 6, (16.0, sep_m), (2, 0))   # d_fwd = sep_m
+    frags = sorted([tail, h1, h2], key=lambda f: int(f[0][0]))
+    return build_track.stitch_assign(3, build_track.stitch_edges(frags))
+
+
+def test_stitch_extended_range_refuses_a_close_rival():
+    # out here the ambiguity gate finally earns its keep — it fires on 0.0-0.2%
+    # of real deaths today only because the 1.5s ceiling gets there first
+    assert _two_head_race(0.3) == {}
+
+
+def test_stitch_ambiguity_margin_is_half_a_metre_absolute():
+    # characterisation, not endorsement: max(1.5*d, d + AMBIGUITY_FLOOR_M) is
+    # the d+0.5 branch for any d < 1m, so "ambiguous" means "a rival within
+    # 0.5m". Two players a body-width apart (0.9m) do NOT trip it — at a 2.0s
+    # gap that is a thin margin, and it is a known open item: the floor was
+    # calibrated for sub-metre residuals at gap->0 (sigma(d_fwd) ~ 0.09m) and
+    # the extended range operates where residuals reach metres.
+    # Assert the exact winner, not just non-empty: `!= {}` would also pass for
+    # {0: 2}, i.e. a bridge to the WRONG head — a demotion test blind to
+    # demotions, which is the precise bug this file exists to pin.
+    assert _two_head_race(0.9) == {0: 1}
+
+
+def _stander_to_mover(head_speed):
+    """A stander, then a head leaving its exact predicted point at head_speed.
+    d_fwd == 0 by construction, and d_back == head_speed * gap, so at gap 0.2
+    (gate 0.88) the ONLY gate that can bite up to 4.4 m/s is VEL_CONTINUITY.
+    Isolating it needs this geometry: whenever d_fwd == 0, d_back == dv * gap,
+    so a coarser fixture trips the reverse check too and passes even with the
+    velocity gate deleted."""
+    tail = _line_frag(0, 5, (0, 0), (0, 0))
+    head = _line_frag(5.2, 5, (0, 0), (head_speed, 0))
+    return sorted([tail, head], key=lambda f: int(f[0][0]))
+
+
+def test_stitch_refuses_velocity_discontinuity():
+    # 4.2 > VEL_CONTINUITY (4.0) -> rejected, and d_back = 0.84 <= gate 0.88
+    # so nothing ELSE can be doing the rejecting
+    assert build_track.stitch_edges(_stander_to_mover(4.2)) == []
+
+
+def test_stitch_allows_velocity_just_inside_continuity():
+    # matched pair for the test above: 3.8 < 4.0 -> the edge survives. If this
+    # regresses the fixture has drifted and its twin proves nothing.
+    assert len(build_track.stitch_edges(_stander_to_mover(3.8))) == 1
+
+
+def test_stitch_ignores_a_rival_whose_head_is_already_claimed():
+    # i's rival edge to k must not veto i->j once k belongs to a strictly
+    # better bridge: a claimed head is not an available alternative, so it
+    # cannot make anything ambiguous. Before the fix this killed BOTH of i's
+    # endpoints over a rival that no longer existed.
+    i = _line_frag(0, 5, (0, 0), (0, 0))        # idx 0, ends (0, 0)
+    m = _line_frag(0, 5, (0, 0.65), (0, 0))     # idx 1, ends (0, 0.65)
+    j = _line_frag(5.4, 5, (0.30, 0), (0, 0))   # idx 2, d(i->j) = 0.30
+    k = _line_frag(5.4, 5, (0, 0.60), (0, 0))   # idx 3, d(m->k) = 0.05
+    frags = sorted([i, m, j, k], key=lambda f: int(f[0][0]))
+    next_of = build_track.stitch_assign(4, build_track.stitch_edges(frags))
+    # m->k wins k (0.05); i->j is then unambiguous because i->k (0.60) is dead
+    assert next_of == {0: 2, 1: 3}
+
+
+def test_stitch_chains_partition_fragments():
+    # every input sample lands in exactly one chain, each chain time-ordered
+    _, fragments, _ = _synthetic_world()
+    frags = []
+    for k, f in enumerate(fragments):
+        a, b = _cut(f, 10.0 + k * 0.5, 0.4)
+        frags += [a, b]
+    chains = build_track.stitch(frags)
+    for ts, xy in chains:
+        assert np.all(np.diff(ts) > 0)
+        assert len(ts) == len(xy)
+    total_in = sum(len(f[0]) for f in frags)
+    total_out = sum(len(ts) for ts, _ in chains)
+    assert total_out == total_in, (total_out, total_in)
+
+
 # ── synthetic geometry: seed + solve + gates ─────────────────────────────────
 
 def _synthetic_world(n_frames=240, n_players=12, rot_deg=90.0, seed=7):
