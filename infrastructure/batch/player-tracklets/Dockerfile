@@ -5,14 +5,17 @@
 # shared NAT IPs (hit 2026-07-15); AWS's mirror has no such limit.
 FROM public.ecr.aws/docker/library/python:3.12-slim
 
+# ffmpeg: extracts the 3 validation-PNG frames from the presigned raw
+# panorama via HTTP seek (no full download).
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates \
+  && apt-get install -y --no-install-recommends ca-certificates ffmpeg \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
-COPY spiideo.py mesh_rays.py solve_h.py build_track.py detections.py entrypoint.py ./
+COPY spiideo.py mesh_rays.py solve_h.py build_track.py detections.py \
+     validate_render.py entrypoint.py ./
 
 RUN useradd -r -u 10001 tracklets
 USER tracklets

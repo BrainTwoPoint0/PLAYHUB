@@ -56,7 +56,10 @@ resource "aws_batch_job_definition" "player_tracklets" {
 
     resourceRequirements = [
       { type = "VCPU", value = "1" }, # JSON fetch + a homography solve — light
-      { type = "MEMORY", value = "2048" }
+      # 4096: headroom for the ffmpeg 4K-panorama frame extraction in the
+      # validation render — a Fargate OOM is a SIGKILL that skips the SIGTERM
+      # status write and wastes a retry. No CE impact (the cap counts vCPUs).
+      { type = "MEMORY", value = "4096" }
     ]
     # Data streams are tens of MB of JSON; the Fargate default 20 GiB is ample.
 

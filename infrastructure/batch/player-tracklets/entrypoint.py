@@ -38,6 +38,7 @@ import spiideo
 import solve_h
 import build_track
 import detections
+import validate_render
 from mesh_rays import load_mesh_rays
 
 RECORDING_ID = str(_uuid.UUID(os.environ['RECORDING_ID']))
@@ -48,23 +49,36 @@ BUCKET = os.environ['S3_RECORDINGS_BUCKET']
 SPIIDEO_EMAIL = os.environ['SPIIDEO_PLAY_EMAIL']
 SPIIDEO_PASSWORD = os.environ['SPIIDEO_PLAY_PASSWORD']
 VP_S3_PREFIX = os.environ.get('VP_S3_PREFIX', 'panoramas')
-# How many detection items (10s windows) to sample across the match for the
-# H solve — the reference solve reached 0.0073 rayn from a 15-item window.
-DET_ITEM_TARGET = int(os.environ.get('DET_ITEM_TARGET', '40'))
 MESH_BUCKET = 'panorama-meshes'
 
+# Detection windows for the H solve: one DENSE CONTIGUOUS solve window (the
+# shape the reference chain was validated on) + two held-out eval windows at
+# 25%/75% of the tracklet span. With the correct tracklet time base +
+# interpolated pairing, a correct H matches ~0.6 of offered points on
+# held-out windows while a wrong one matches ~0.02 — rates and per-region
+# medians are finally discriminative (the first pilot's absolute-count gate
+# was un-gameable and let two bad ships through).
+SOLVE_WINDOW_S = 185.0
+EVAL_WINDOW_S = 65.0
+MIN_TRK_SPAN_S = 600.0
+
 # Quality gates — 'ready' is terminal (the sweep never reclaims it), so a
-# garbage artifact must never pass. The GLOBAL eval (Hungarian re-assignment
-# of every frame at a 0.03 gate with the final H) is the real arbiter — but
-# calibrated on ABSOLUTE matches, not rate: the ±80ms det↔trk pairing slop on
-# running players means even a correct H tightly matches only ~1% of offered
-# points (pilot: 89 matches, median 0.016), while a WRONG H matches zero
-# (identity-H control: 0). The tight-gate median_res is telemetry only.
+# garbage artifact must never pass.
+MIN_EVAL_RATE_SOLVE = 0.25
+MIN_EVAL_RATE_HELDOUT = 0.20
 MAX_EVAL_MEDIAN = 0.02
-MIN_EVAL_MATCHES_PER_1K_FRAMES = 50.0
-MIN_MATCHED_FRAMES = 100
+MIN_HALF_MATCHES = 50    # pooled, per half-pitch region
+MIN_QUAD_MATCHES = 25    # pooled, per quadrant
+MAX_REGION_MEDIAN = 0.025
+MAX_REGION_BIAS = 0.012  # signed median residual vector — a shear's tell
+MAX_LAG_S = 1.5          # time-base canary (item cadence drift)
+MIN_LAG_CORR = 0.10
+MIN_MATCHED_FRAMES = 300
 MIN_MEDIAN_CONCURRENT = 8
 MIN_SPAN_FRACTION = 0.6
+# a detection landing outside mesh coverage snaps to an arbitrary nearest
+# front vertex — reject queries further than this from any mesh UV sample
+MAX_UV_QUERY_DIST = 0.01
 
 s3 = boto3.client('s3')
 # Module-scope so the terminal error path can stop it before writing status.
@@ -102,7 +116,7 @@ def set_status(fields: dict, retries: int = 0):
 def fetch_row() -> dict:
     out = _sb('GET',
               f'/rest/v1/playhub_match_recordings?id=eq.{RECORDING_ID}'
-              f'&select=spiideo_game_id')
+              f'&select=spiideo_game_id,panorama_s3_key,s3_bucket')
     rows = json.loads(out)
     if not rows:
         raise RuntimeError('recording row not found')
@@ -129,8 +143,8 @@ def heartbeat_loop(stop: threading.Event):
             print(f'heartbeat failed (non-fatal): {err}', flush=True)
 
 
-def archive_provenance(items: list[tuple[int, bytes]], diag: dict,
-                       payload: dict):
+def archive_provenance(items: list[tuple[int, bytes]], solve_doc: dict,
+                       validation_png: bytes | None):
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode='w:gz') as tar:
         for idx, raw in items:
@@ -143,14 +157,12 @@ def archive_provenance(items: list[tuple[int, bytes]], diag: dict,
                   Body=buf.read(), ContentType='application/gzip')
     s3.put_object(Bucket=BUCKET,
                   Key=f'{VP_S3_PREFIX}/{GAME_ID}/tracklets-solve.json',
-                  Body=json.dumps({'H': diag['H'].tolist(),
-                                   'median_res': diag['median_res'],
-                                   'eval_median': diag['eval_median'],
-                                   'eval_rate': diag['eval_rate'],
-                                   'matched_frames': diag['matched_frames'],
-                                   'n_matches': diag['n_matches'],
-                                   'meta': payload['meta']}).encode(),
+                  Body=json.dumps(solve_doc).encode(),
                   ContentType='application/json')
+    if validation_png:
+        s3.put_object(Bucket=BUCKET,
+                      Key=f'{VP_S3_PREFIX}/{GAME_ID}/tracklets-validate.png',
+                      Body=validation_png, ContentType='image/png')
 
 
 def upload_track(payload: dict):
@@ -198,54 +210,134 @@ def main():
     uv_f, rays_f = uv[front], rays[front]
     rayn = rays_f[:, :2] / rays_f[:, 2:3]
     tree = cKDTree(uv_f)
+    rayn_tree = cKDTree(rayn)
 
     def uv_to_rayn(pts: np.ndarray) -> np.ndarray:
-        _, idx = tree.query(pts, k=3)
-        return rayn[idx].mean(axis=1)
+        d, idx = tree.query(pts, k=3)
+        out = rayn[idx].mean(axis=1)
+        # outside mesh coverage the nearest-vertex snap is arbitrary — mark
+        # NaN so the detection parser drops the point
+        out[d[:, 0] > MAX_UV_QUERY_DIST] = np.nan
+        return out
+
+    def rayn_to_uv(pts: np.ndarray) -> np.ndarray:
+        _, idx = rayn_tree.query(pts, k=3)
+        return uv_f[idx].mean(axis=1)
 
     trk_items = spiideo.fetch_items(GAME_ID, streams['tracklets']['id'])
     if not trk_items:
         raise RuntimeError('tracklets stream has no items')
-    print(f'fetched {len(trk_items)} tracklet items', flush=True)
+    cadence_us = build_track.estimate_cadence_us(streams['tracklets'],
+                                                 trk_items)
+    print(f'fetched {len(trk_items)} tracklet items, cadence '
+          f'{cadence_us / 1e6:.1f}s/item', flush=True)
 
-    fragments = build_track.parse_items(trk_items, start_us)
+    fragments = build_track.parse_items(trk_items, start_us, cadence_us)
     if not fragments:
         raise RuntimeError('tracklets stream parsed to zero fragments')
-    trk_window = (min(int(ts[0]) for ts, _ in fragments),
-                  max(int(ts[-1]) for ts, _ in fragments))
+    trk_lo = min(int(ts[0]) for ts, _ in fragments)
+    trk_hi = max(int(ts[-1]) for ts, _ in fragments)
+    trk_span_s = (trk_hi - trk_lo) / 1e6
+    if trk_span_s < MIN_TRK_SPAN_S:
+        raise RuntimeError(
+            f'tracklets span {trk_span_s:.0f}s < {MIN_TRK_SPAN_S:.0f}s — '
+            'too short to calibrate')
 
-    det_frames: dict = {}
+    # Windows by MOVING-sample density (a fixed 50% anchor is halftime on any
+    # two-half recording — pairs starve and a good game burns its attempts).
+    windows = solve_h.pick_windows(fragments, SOLVE_WINDOW_S, EVAL_WINDOW_S)
+    eval_names = [k for k in windows if k != 'solve']
+    if not eval_names:
+        raise RuntimeError(
+            'no independent eval window with player activity — cannot gate '
+            'the calibration')
+    det_windows: dict = {name: {} for name in windows}
     for det_stream in streams['detections']:
-        det_items = detections.sample_detection_items(
-            GAME_ID, det_stream['id'], DET_ITEM_TARGET, window_us=trk_window)
-        # shared dict: timestamp collisions across 2-cam streams concatenate
-        detections.parse_detection_items(det_items, uv_to_rayn,
-                                         frames=det_frames)
-    print(f'{len(det_frames)} detection frames sampled', flush=True)
-    trk_frames: dict = {}
-    for ts, xy in fragments:
-        for t, p in zip(ts.tolist(), xy.tolist()):
-            trk_frames.setdefault(t, []).append(p)
-    trk_frames = {k: np.array(v, np.float64) for k, v in trk_frames.items()}
+        for name, w in windows.items():
+            items = detections.fetch_window_items(GAME_ID, det_stream, w)
+            # shared dict: ts collisions across 2-cam streams concatenate;
+            # window clamp keeps solve frames out of the held-out windows
+            detections.parse_detection_items(items, uv_to_rayn,
+                                             frames=det_windows[name],
+                                             window_us=w)
+    print('windows: ' + ' '.join(
+        f'{k}@{(windows[k][0] - start_us) / 1e6:.0f}s'
+        f'={len(det_windows[k])}f' for k in windows), flush=True)
 
-    diag = solve_h.solve(det_frames, trk_frames)
-    print(f'H solved: inlier median {diag["median_res"]:.4f} rayn; global '
-          f'eval median {diag["eval_median"]:.4f} rate {diag["eval_rate"]:.2f} '
-          f'({diag["eval_matches"]} matches / {diag["matched_frames"]} frames)',
-          flush=True)
-    if diag['eval_median'] > MAX_EVAL_MEDIAN:
+    # Time-base canary: with the right cadence the det<->trk speed-profile
+    # correlation peaks at ~0 lag. A shifted/absent peak means the item
+    # cadence model no longer matches Spiideo's stream — fail loudly.
+    all_det: dict = {}
+    for frames in det_windows.values():
+        all_det.update(frames)
+    lag_s, lag_r = solve_h.lag_peak_s(all_det, fragments)
+    print(f'time-base check: lag {lag_s:+.1f}s (r={lag_r:.2f})', flush=True)
+    if np.isnan(lag_r):
         raise RuntimeError(
-            f'quality gate: H eval median {diag["eval_median"]:.4f} rayn > '
-            f'{MAX_EVAL_MEDIAN} (calibration unreliable)')
-    min_eval_matches = max(
-        30.0, MIN_EVAL_MATCHES_PER_1K_FRAMES * diag['matched_frames'] / 1000)
-    if diag['eval_matches'] < min_eval_matches:
+            'time-base gate: no overlapping det/trk speed profile '
+            '(detection stream too sparse for the canary)')
+    if abs(lag_s) > MAX_LAG_S or lag_r < MIN_LAG_CORR:
         raise RuntimeError(
-            f'quality gate: H eval matches {diag["eval_matches"]} < '
-            f'{min_eval_matches:.0f} (H matches too few detections)')
+            f'time-base gate: det/trk lag {lag_s:+.1f}s (r={lag_r:.2f}) — '
+            'item cadence model mismatch')
+
+    diag = solve_h.solve(det_windows['solve'], fragments)
+    ev = diag['eval']
+    print(f'H solved: inlier median {diag["median_res"]:.4f} rayn; solve-'
+          f'window eval rate {ev["rate"]:.2f} median {ev["median"]:.4f} '
+          f'({ev["matches"]}/{ev["offered"]} over {diag["matched_frames"]} '
+          'frames)', flush=True)
     if diag['matched_frames'] < MIN_MATCHED_FRAMES:
         raise RuntimeError(
-            f'quality gate: only {diag["matched_frames"]} matched frames')
+            f'quality gate: only {diag["matched_frames"]} paired frames')
+    evals = {'solve': ev}
+    lo, hi = diag['pitch_lo'], diag['pitch_hi']
+    for name in eval_names:
+        pairs = solve_h.time_paired_sets(det_windows[name], fragments, lo, hi)
+        evals[name] = solve_h.evaluate(diag['H'], pairs, lo, hi)
+        e = evals[name]
+        print(f'held-out {name}: rate {e["rate"]:.2f} median '
+              f'{e["median"]:.4f} ({e["matches"]}/{e["offered"]})', flush=True)
+    if ev['rate'] < MIN_EVAL_RATE_SOLVE or ev['median'] > MAX_EVAL_MEDIAN:
+        raise RuntimeError(
+            f'quality gate: solve-window eval rate {ev["rate"]:.2f} / median '
+            f'{ev["median"]:.4f} (need >={MIN_EVAL_RATE_SOLVE} / '
+            f'<={MAX_EVAL_MEDIAN})')
+    for name in eval_names:
+        e = evals[name]
+        if e['rate'] < MIN_EVAL_RATE_HELDOUT or e['median'] > MAX_EVAL_MEDIAN:
+            raise RuntimeError(
+                f'quality gate: held-out {name} rate {e["rate"]:.2f} / '
+                f'median {e["median"]:.4f} (need >={MIN_EVAL_RATE_HELDOUT} '
+                f'/ <={MAX_EVAL_MEDIAN})')
+    # Per-region gates on the pooled evals: halves must be populated with
+    # clean medians AND low SIGNED bias (a shear's coherent offset survives
+    # the gate's magnitude truncation); quadrants catch corner-localized
+    # errors that dilute into halves.
+    halves = ('left', 'right', 'far', 'near')
+    quads = ('far-left', 'far-right', 'near-left', 'near-right')
+    pooled: dict = {r: {'n': 0, 'medians': [], 'biases': []}
+                    for r in halves + quads}
+    for e in evals.values():
+        for r, st in e['regions'].items():
+            p = pooled[r]
+            p['n'] += st['n']
+            if st['n'] >= 10:
+                p['medians'].append(st['median'])
+                p['biases'].append(st['bias'])
+    problems = []
+    for r in halves + quads:
+        p = pooled[r]
+        floor = MIN_HALF_MATCHES if r in halves else MIN_QUAD_MATCHES
+        if p['n'] < floor:
+            problems.append(f'{r} starved (n={p["n"]})')
+            continue
+        if p['medians'] and max(p['medians']) > MAX_REGION_MEDIAN:
+            problems.append(f'{r} median {max(p["medians"]):.4f}')
+        if p['biases'] and max(p['biases']) > MAX_REGION_BIAS:
+            problems.append(f'{r} bias {max(p["biases"]):.4f}')
+    if problems:
+        raise RuntimeError('quality gate: per-region — ' + '; '.join(problems))
 
     on_pitch = build_track.filter_on_pitch(
         fragments, diag['pitch_lo'], diag['pitch_hi'])
@@ -260,15 +352,59 @@ def main():
 
     span_s = (max(int(c[0][-1]) for c in chains)
               - min(int(c[0][0]) for c in chains)) / 1e6
-    stream_span_s = len(trk_items) * spiideo.ITEM_SECONDS
+    # denominator from stream METADATA: a mid-stream item gap truncates the
+    # fetch, and len(items)*cadence would shrink in lockstep — the gate must
+    # measure against what Spiideo says the stream covers
+    stop = streams['tracklets'].get('stopTime')
+    stream_span_s = ((int(stop) - start_us) / 1e6 if stop is not None
+                     else len(trk_items) * cadence_us / 1e6)
     if span_s < MIN_SPAN_FRACTION * stream_span_s:
         raise RuntimeError(
             f'quality gate: tracked span {span_s:.0f}s < '
-            f'{MIN_SPAN_FRACTION:.0%} of stream span {stream_span_s}s')
+            f'{MIN_SPAN_FRACTION:.0%} of stream span {stream_span_s:.0f}s')
+
+    # Un-gameable visual check: dots-on-raw-frame PNG into private
+    # provenance. Required whenever the raw panorama is preserved — during
+    # the pilot a human signs off on it before a venue is enabled.
+    validation_png = None
+    if row.get('panorama_s3_key'):
+        # panorama_s3_key always lives in the job's own bucket (the row's
+        # s3_bucket column pairs with s3_key, the produced video)
+        url = s3.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': BUCKET, 'Key': row['panorama_s3_key']},
+            ExpiresIn=3600)
+        validation_png = validate_render.render_validation_png(
+            url, start_us, det_windows['solve'], fragments, diag['H'],
+            rayn_to_uv)
+        if validation_png is None:
+            raise RuntimeError(
+                'validation render failed (raw panorama present but no '
+                'frame could be extracted)')
+        print(f'validation PNG rendered ({len(validation_png) // 1024} KB)',
+              flush=True)
+    else:
+        print('no panorama_s3_key on row — skipping validation PNG',
+              flush=True)
 
     payload = build_track.build_payload(chains, diag['H'], start_us, diag)
     upload_track(payload)
-    archive_provenance(trk_items, diag, payload)
+    solve_doc = {
+        'H': diag['H'].tolist(),
+        'median_res': diag['median_res'],
+        'cadence_us': cadence_us,
+        'lag_s': lag_s,
+        'lag_r': lag_r,
+        'windows': {k: [(w[0] - start_us) / 1e6, (w[1] - start_us) / 1e6]
+                    for k, w in windows.items()},
+        'pitch_lo': diag['pitch_lo'],
+        'pitch_hi': diag['pitch_hi'],
+        'evals': evals,
+        'matched_frames': diag['matched_frames'],
+        'n_matches': diag['n_matches'],
+        'meta': payload['meta'],
+    }
+    archive_provenance(trk_items, solve_doc, validation_png)
 
     HEARTBEAT_STOP.set()
     set_status({'tracklets_status': 'ready', 'tracklets_error': None},
@@ -278,6 +414,7 @@ def main():
 
 
 def _on_sigterm(signum, frame):  # noqa: ARG001
+    HEARTBEAT_STOP.set()
     try:
         set_status({'tracklets_status': 'error',
                     'tracklets_error': 'terminated (Batch timeout/SIGTERM)'})
@@ -298,7 +435,8 @@ if __name__ == '__main__':
               file=sys.stderr, flush=True)
         HEARTBEAT_STOP.set()
         try:
-            set_status({'tracklets_status': 'error', 'tracklets_error': msg})
+            set_status({'tracklets_status': 'error', 'tracklets_error': msg},
+                       retries=3)
         except Exception as err2:  # noqa: BLE001
             print(f'could not write error status: {err2}', file=sys.stderr,
                   flush=True)

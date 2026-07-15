@@ -24,9 +24,9 @@ import urllib.request
 API = 'https://api.spiideo.com'
 CF = 'https://d35u71x3nb8v2y.cloudfront.net'
 
-# Item files are 10s windows; timeOffsets inside an item can run PAST the
-# window (adjacent items overlap) — consumers dedupe on absolute timestamp.
-ITEM_SECONDS = 10
+# Item cadence is PER-STREAM (every current tracklets stream measures 16s;
+# the b923 research assumed 10s — the 2026-07-15 time-base bug). Derive it
+# with build_track.estimate_cadence_us, never hardcode.
 # Stop enumerating after this many consecutive missing items. A single gap in
 # the middle of a match must not truncate the artifact to its first half.
 MAX_CONSECUTIVE_MISSES = 5

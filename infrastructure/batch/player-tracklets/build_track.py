@@ -2,18 +2,22 @@
 proximity (global edge matching), RTS-smooth per chain, and convert to the
 player's pan/tilt space.
 
-Data model (empirically verified on the pilot game, 2026-07-15):
-- Items are OVERLAPPING RE-COMPUTATIONS, not chunks of one stream: an item's
-  timeOffsets run past its 10s window, and the overlap region is a
-  re-estimated trajectory that DISAGREES with the previous item (~3m at the
-  same reconstructed timestamp). Merging same-uuid across items by union
-  interleaves the two estimates into a 5-13° sawtooth — the "twitching" bug.
-  Every item is trimmed to its own 10s window (the newest item that saw each
-  instant wins), EXCEPT when the successor item is missing / it is the final
-  item — then the tail is the only coverage and is kept.
-- objectUUIDs are PER-WINDOW, not persistent: same-uuid across the item seam
-  jumps 5.1m median (69% >3m). Identity across items comes from POSITION +
-  VELOCITY continuity (the stitcher), never from the uuid.
+Data model (re-verified on the pilot game with the CORRECT item cadence,
+2026-07-15 late):
+- Item cadence is PER-STREAM, not a constant: abs ts = startTime +
+  idx*cadence + timeOffset. Every current stream measures 16s/item
+  (longestItemLength), but the b923 research assumed 10s — that wrong cadence
+  compressed the reconstructed timeline ~40% and manufactured the earlier
+  "overlapping re-computations / per-window uuids" model: samples compared
+  "at the same timestamp" were really ~6s apart. estimate_cadence_us derives
+  the cadence from stream metadata + the last item's content span; the
+  entrypoint's det<->trk lag gate is the canary if Spiideo ever changes it.
+- objectUUIDs ARE persistent across adjacent items (measured: 0.29m median
+  seam jump over 0.24s, 0% >3m, n=3122). parse_items merges same-uuid across
+  ADJACENT items under a continuity gate; a uuid reappearing after a missing
+  item or a >1s gap starts a new fragment (uuid reuse is not trusted across
+  absences). The position/velocity stitcher remains for genuine tracker
+  identity breaks.
 - Positions are raw tracker output: per-fragment hygiene (teleport-split,
   Hampel, speed gate) then per-chain constant-velocity Kalman + RTS backward
   smoothing (offline → non-causal is allowed and optimal), resampled to a
@@ -30,7 +34,12 @@ import cv2
 from mesh_rays import rayn_pan_tilt_deg
 
 SAMPLE_DT = 0.2  # 5 Hz
-ITEM_WINDOW_US = 10_000_000
+DEFAULT_CADENCE_US = 16_000_000
+# uuid seam continuity: measured seam gaps are one 5Hz step (0.2-0.25s);
+# anything past 1s means the tracker lost the object — don't trust the uuid.
+SEAM_MAX_GAP_US = 1_000_000
+SEAM_BASE_M = 2.5
+SEAM_SPEED = 12.0          # m/s — same ceiling as TELEPORT_SPEED
 MIN_FRAGMENT_SAMPLES = 3   # ~0.6s — a uuid born late in a window is real
 MIN_CHAIN_SPAN_S = 2.5     # noise floor moves to the CHAIN level
 # Hygiene gates
@@ -55,37 +64,104 @@ MAX_TOTAL_POINTS = 700_000
 
 # ── Parsing + per-fragment hygiene ───────────────────────────────────────────
 
-def parse_items(items: list[tuple[int, bytes]], start_time_us: int) -> list:
-    """(index, raw json bytes) -> hygienic per-(item, uuid) FRAGMENTS
-    [(ts_us[], xy[]), ...]. Trimmed to the item's own window unless the
-    successor item is missing (then the tail is the only coverage)."""
-    present = {idx for idx, _ in items}
+def estimate_cadence_us(stream: dict, items: list[tuple[int, bytes]]) -> int:
+    """Per-stream item cadence from metadata + the last item's content span:
+    cadence = (stopTime - startTime - last_item_span) / last_item_idx.
+
+    Snapped to 500ms: cadences are engineered values (16s everywhere today),
+    and the coarse grid absorbs the estimator's known bias sources — an
+    empty/short LAST item (post-final-whistle recording) or a few trailing
+    missing items each shift the raw estimate by <= ~0.3s at real item
+    counts, which a 100ms grid would faithfully preserve as a 20s+ timeline
+    drift. The entrypoint's lag gate arbitrates anything the snap can't."""
+    fallback = int(stream.get('longestItemLength') or DEFAULT_CADENCE_US)
+    start = stream.get('startTime')
+    stop = stream.get('stopTime')
+    if not items or items[-1][0] < 1 or start is None or stop is None:
+        return fallback
+    last_idx, last_raw = items[-1]
+    last_span = 0
+    try:
+        data = json.loads(last_raw)
+        if isinstance(data, dict):
+            offs = [int(round(p['timeOffset'])) for pts in data.values()
+                    if isinstance(pts, list) for p in pts
+                    if isinstance(p, dict) and 'timeOffset' in p]
+            if offs:
+                last_span = max(offs)
+    except (ValueError, TypeError):
+        pass
+    raw = (int(stop) - int(start) - last_span) / last_idx
+    snapped = int(round(raw / 500_000) * 500_000)
+    if not 2_000_000 <= snapped <= 60_000_000:
+        return fallback
+    return snapped
+
+
+def parse_items(items: list[tuple[int, bytes]], start_time_us: int,
+                cadence_us: int = DEFAULT_CADENCE_US) -> list:
+    """(index, raw json bytes) -> hygienic per-uuid FRAGMENTS
+    [(ts_us[], xy[]), ...]. Same-uuid samples are merged across ADJACENT
+    items when the seam passes the continuity gate; a missing item, a >1s
+    seam gap, or a discontinuous jump starts a new fragment."""
     fragments = []
-    for idx, raw in items:
-        base = start_time_us + idx * ITEM_WINDOW_US
-        keep_tail = (idx + 1) not in present
+    # uuid -> (last_item_idx, last_ts, last_xy, seq {ts: (x, y)})
+    open_series: dict = {}
+
+    def close(uuid_key):
+        seq = open_series.pop(uuid_key)[3]
+        if len(seq) < MIN_FRAGMENT_SAMPLES:
+            return
+        ts = np.array(sorted(seq), np.int64)
+        xy = np.array([seq[t] for t in ts], np.float64)
+        for f_ts, f_xy in _hygiene(ts, xy):
+            fragments.append((f_ts, f_xy))
+
+    for idx, raw in sorted(items, key=lambda it: it[0]):
+        base = start_time_us + idx * cadence_us
         try:
             data = json.loads(raw)
         except ValueError:
             continue
-        for pts in data.values():
+        if not isinstance(data, dict):
+            continue  # shape drift — skip the item, don't crash the run
+        # close series whose uuid did not continue into this item
+        for u in [u for u, (li, _, _, _) in open_series.items() if li < idx - 1]:
+            close(u)
+        for uuid_key, pts in data.items():
             if not isinstance(pts, list):
                 continue
             seq = {}
             for p in pts:
                 try:
-                    off = int(round(p['timeOffset']))
-                    if off >= ITEM_WINDOW_US and not keep_tail:
-                        continue  # overlap tail = an older re-estimate
-                    seq[base + off] = (float(p['x']), float(p['y']))
+                    seq[base + int(round(p['timeOffset']))] = (
+                        float(p['x']), float(p['y']))
                 except (KeyError, TypeError, ValueError):
                     continue
-            if len(seq) < MIN_FRAGMENT_SAMPLES:
+            if not seq:
                 continue
-            ts = np.array(sorted(seq), np.int64)
-            xy = np.array([seq[t] for t in ts], np.float64)
-            for f_ts, f_xy in _hygiene(ts, xy):
-                fragments.append((f_ts, f_xy))
+            first_ts = min(seq)
+            prev = open_series.get(uuid_key)
+            if prev is not None:
+                li, last_ts, last_xy, _ = prev
+                gap_us = first_ts - last_ts
+                d = float(np.hypot(seq[first_ts][0] - last_xy[0],
+                                   seq[first_ts][1] - last_xy[1]))
+                gate = max(SEAM_BASE_M, SEAM_SPEED * max(gap_us, 0) / 1e6)
+                # gap <= 0 = same-instant boundary re-estimate: merge (the
+                # newer item's value wins via dict update), no distance test
+                if li != idx - 1 or gap_us > SEAM_MAX_GAP_US \
+                        or (gap_us > 0 and d > gate):
+                    close(uuid_key)
+                    prev = None
+            if prev is None:
+                open_series[uuid_key] = (idx, 0, (0.0, 0.0), {})
+            _, _, _, seq_all = open_series[uuid_key]
+            seq_all.update(seq)
+            last_ts = max(seq)
+            open_series[uuid_key] = (idx, last_ts, seq[last_ts], seq_all)
+    for u in list(open_series):
+        close(u)
     return fragments
 
 
@@ -379,6 +455,7 @@ def build_payload(chains: list, H: np.ndarray, start_time_us: int,
         'meta': {
             'hMedianRes': round(diag['median_res'], 5),
             'matchedFrames': diag['matched_frames'],
+            'evalRate': round(diag['eval']['rate'], 3) if diag.get('eval') else None,
             'nObjects': len(objects),
             'downsampled': step > 1,
         },
