@@ -1,0 +1,23 @@
+# CodeBuild spec: build the veo-capture container image and push it to ECR.
+# Runs in a privileged CodeBuild container (has Docker) so we don't need Docker
+# locally. Triggered by zipping this dir → S3 → start-build.
+# Env (from the CodeBuild project): ECR_REPO_URL, AWS_REGION.
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "Logging in to ECR $ECR_REPO_URL"
+      - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REPO_URL"
+  build:
+    commands:
+      # Source zip root == infrastructure/batch/veo-capture/, so the Dockerfile
+      # + entrypoint.mjs + package.json are in the build context (".").
+      # --pull matters here: the base is mcr.microsoft.com (not Docker Hub), so
+      # CodeBuild's NAT does not hit the anonymous-pull 429s that forced the other
+      # job images onto the ECR Public mirror.
+      - docker build --pull -t "$ECR_REPO_URL:latest" .
+  post_build:
+    commands:
+      - docker push "$ECR_REPO_URL:latest"
+      - echo "Pushed $ECR_REPO_URL:latest"

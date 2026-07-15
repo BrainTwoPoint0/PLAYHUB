@@ -24,6 +24,7 @@ import {
   sweepPanoramaCaptures,
   sweepAimTracks,
   sweepPlayerTracklets,
+  sweepVeoCaptures,
   sweepPortraitRenders,
 } from './panorama-sweep'
 import { fetchAllRows } from './paginate'
@@ -54,6 +55,9 @@ const PANORAMA_JOB_DEF = process.env.PANORAMA_JOB_DEF || ''
 const AIM_TRACK_JOB_DEF = process.env.AIM_TRACK_JOB_DEF || ''
 // Player-tracklets (spotlight) jobs share the panorama queue too.
 const TRACKLETS_JOB_DEF = process.env.TRACKLETS_JOB_DEF || ''
+// Veo capture (2026-07-15): preserves the native panorama + jersey labels
+// before Veo Glacier-archives them. Unset = the sweep is off.
+const VEO_CAPTURE_JOB_DEF = process.env.VEO_CAPTURE_JOB_DEF || ''
 // Portrait-render sweep: comma-separated club allowlist (empty = disabled)
 // + the job definition. Shares the panorama queue.
 const PORTRAIT_JOB_DEF = process.env.PORTRAIT_JOB_DEF || ''
@@ -1382,6 +1386,42 @@ export const handler = async (): Promise<{
         } catch (err) {
           console.error(
             'Tracklets sweep failed (non-fatal):',
+            err instanceof Error ? err.message : err
+          )
+        }
+      }
+      if (VEO_CAPTURE_JOB_DEF) {
+        try {
+          const batch = new BatchClient({ region: S3_REGION })
+          const { submitted, candidates } = await sweepVeoCaptures(
+            supabase,
+            async (captureId, matchSlug) => {
+              const out = await batch.send(
+                new SubmitJobCommand({
+                  // Batch job names allow [A-Za-z0-9_-] only; Veo slugs are
+                  // already in that set but are long, so key the name on the
+                  // capture uuid (which is also what the job writes back to).
+                  jobName: `veo-capture-${captureId}`,
+                  jobQueue: PANORAMA_JOB_QUEUE,
+                  jobDefinition: VEO_CAPTURE_JOB_DEF,
+                  containerOverrides: {
+                    environment: [
+                      { name: 'ROW_ID', value: captureId },
+                      { name: 'MATCH_SLUG', value: matchSlug },
+                    ],
+                  },
+                })
+              )
+              return out.jobId
+            }
+          )
+          if (candidates > 0)
+            console.log(
+              `Veo capture sweep: ${submitted} submitted, ${candidates} claimable`
+            )
+        } catch (err) {
+          console.error(
+            'Veo capture sweep failed (non-fatal):',
             err instanceof Error ? err.message : err
           )
         }

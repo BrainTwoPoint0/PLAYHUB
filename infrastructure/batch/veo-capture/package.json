@@ -1,0 +1,16 @@
+{
+  "name": "veo-capture-batch",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AWS Batch job: capture a Veo match's NATIVE panorama (.ts) + jersey-labelled player tracking into private S3, before Veo archives the panorama to Glacier. The corpus for our own jersey model.",
+  "scripts": {
+    "start": "node entrypoint.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/lib-storage": "^3.600.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "playwright-core": "1.58.2"
+  }
+}

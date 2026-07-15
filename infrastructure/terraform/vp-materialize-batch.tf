@@ -57,8 +57,23 @@ resource "aws_batch_compute_environment" "vp_materialize" {
   service_role             = aws_iam_role.batch_service.arn
 
   compute_resources {
-    type               = "FARGATE"
-    max_vcpus          = 16 # 5×2 vCPU (vp in-flight cap) + 2×2 (aim-track cap) = 14 ≤ 16 — caps guarantee no queueing
+    type = "FARGATE"
+    # Sized so every job class's in-flight cap can run WITHOUT queueing. Sum the
+    # caps whenever a class is added — the comment here was stale at "= 14 ≤ 16"
+    # while the CE was already at exactly 16/16, which would have silently queued
+    # the next class behind capture work.
+    #   vp-materialize 5 × 2 vCPU = 10  (GLOBAL_INFLIGHT_CAP)
+    #   aim-track      2 × 2      =  4
+    #   portrait       1 × 1      =  1   (see below)
+    #   player-tracklets 1 × 1    =  1   -> 16, i.e. FULL before veo-capture
+    #   veo-capture    2 × 1      =  2   -> 18
+    # 20, not 18: portrait has NO explicit in-flight cap — it holds at 1 only
+    # because the sweep breaks after one attempt and index.ts dedupes by slug.
+    # Raising PORTRAIT_SWEEP_MAX_PER_RUN would silently make it N-concurrent and
+    # overflow the CE. The slack is cheap (Fargate bills running vCPU, not the
+    # ceiling; the eu-west-2 On-Demand quota is 64) and this CE has now been found
+    # at exactly-full twice in one day. Overflow costs queueing, not failure.
+    max_vcpus          = 20
     subnets            = data.aws_subnets.default.ids
     security_group_ids = [aws_security_group.batch.id]
   }

@@ -542,3 +542,226 @@ export async function sweepPortraitRenders(
   }
   return { submitted, candidates: candidates.length }
 }
+
+// ── Veo capture sweep ────────────────────────────────────────────────────────
+// Preserve-first, the Veo edition (2026-07-15). Veo is the free LABELLER for our
+// own jersey model — production must never call their AI — but the corpus only
+// exists while the PIXELS do, and the pixels expire: the native .ts panorama is
+// `available` at <=40d and Glacier'd (`InvalidObjectState`) by ~150d. This is the
+// same trap that cost us 234/268 Spiideo panoramas before capture-on-publish, so
+// it gets the same answer.
+//
+// Candidates come from the playhub_veo_capture_candidates VIEW (cache LEFT JOIN
+// captures; PostgREST can't express the join). State lives on
+// playhub_veo_captures, deliberately NOT on the recordings cache — that table is
+// pruned when a match leaves Veo's listing (cache-writer.ts:306), which would
+// orphan a ~9.5GB S3 object with no record of its key.
+//
+// isClaimable MUST stay in lockstep with the view's settlement predicate. Drift
+// livelocks the sweep — the view keeps offering rows the sweep will never claim
+// and the budget burns re-reading them (portrait-render, 20260714000500).
+
+export const VEO_SWEEP_MAX_PER_RUN = 1
+// A ~9.5GB transfer each. The shared CE has no headroom for more (see
+// veo-capture-batch.tf), and there is no deadline pressure inside a ~120d window.
+export const VEO_INFLIGHT_CAP = 2
+// Looser than the job's 2-min heartbeat: a queued Batch job does not heartbeat,
+// and reclaiming a merely-queued one double-spends a multi-GB download.
+export const VEO_CAPTURE_STUCK_MS = 60 * 60_000
+
+export interface VeoCaptureCandidate {
+  veo_club_slug: string
+  match_slug: string
+  match_date: string | null
+  capture_id: string | null
+  capture_status: string | null
+  capture_attempts: number | null
+  capture_started_at: string | null
+}
+
+export function isVeoCaptureClaimable(
+  row: VeoCaptureCandidate,
+  nowMs: number
+): boolean {
+  if (!row.veo_club_slug || !row.match_slug) return false
+  const status = row.capture_status
+  if (status === 'ready') return false
+  if (!row.capture_id || status === null) return true // never attempted
+  const startedAt = row.capture_started_at ? Date.parse(row.capture_started_at) : 0
+  if (status === 'error')
+    return (
+      (row.capture_attempts ?? 0) < MAX_ATTEMPTS &&
+      nowMs - startedAt >= ERROR_COOLDOWN_MS
+    )
+  if (status === 'pending')
+    return (
+      (row.capture_attempts ?? 0) < MAX_ATTEMPTS &&
+      nowMs - startedAt >= VEO_CAPTURE_STUCK_MS
+    )
+  return false
+}
+
+export type SubmitVeoCaptureJob = (
+  captureId: string,
+  matchSlug: string
+) => Promise<string | undefined> // returns Batch jobId
+
+export async function sweepVeoCaptures(
+  supabase: SupabaseClient,
+  submitJob: SubmitVeoCaptureJob,
+  now: Date = new Date()
+): Promise<{ submitted: number; candidates: number }> {
+  const nowMs = now.getTime()
+
+  const { data, error } = await supabase
+    .from('playhub_veo_capture_candidates')
+    .select(
+      'veo_club_slug, match_slug, match_date, capture_id, capture_status, capture_attempts, capture_started_at'
+    )
+    .order('match_date', { ascending: false, nullsFirst: false })
+    .limit(25)
+  if (error) {
+    console.error(`veo capture sweep: candidate query failed: ${error.message}`)
+    return { submitted: 0, candidates: 0 }
+  }
+
+  const rows = (data ?? []) as VeoCaptureCandidate[]
+  const claimable = rows.filter((r) => isVeoCaptureClaimable(r, nowMs))
+  if (!claimable.length) {
+    // "the view offers rows the sweep will never claim" is the livelock
+    // signature, and reporting candidates:0 here made it INVISIBLE (index.ts
+    // only logs when candidates > 0). Say it out loud: with a 150-day
+    // irreversible deadline, silence is the expensive failure.
+    if (rows.length)
+      console.warn(
+        `veo capture sweep: ${rows.length} offered but NONE claimable — check the view/isClaimable lockstep`
+      )
+    return { submitted: 0, candidates: rows.length }
+  }
+
+  // In-flight = fresh pending rows only; a stale pending is a dead job, not a
+  // running one, and must not hold the cap hostage.
+  const { count: inFlight, error: cErr } = await supabase
+    .from('playhub_veo_captures')
+    .select('id', { count: 'exact', head: true })
+    .eq('capture_status', 'pending')
+    .gte(
+      'capture_started_at',
+      new Date(nowMs - VEO_CAPTURE_STUCK_MS).toISOString()
+    )
+  // Swallowing this would leave count null -> `inFlight ?? 0` -> a budget computed
+  // as if nothing were running -> the cap breached and two ~9.5GB transfers on a
+  // CE sized for exactly two. All three sibling sweeps throw here; so does this.
+  if (cErr) throw new Error(`in-flight count failed: ${cErr.message}`)
+  const budget = Math.min(
+    VEO_SWEEP_MAX_PER_RUN,
+    VEO_INFLIGHT_CAP - (inFlight ?? 0)
+  )
+  if (budget <= 0) return { submitted: 0, candidates: claimable.length }
+
+  let submitted = 0
+  let attempted = 0
+  const startedAt = now.toISOString()
+  const errorCutoff = new Date(nowMs - ERROR_COOLDOWN_MS).toISOString()
+  const stuckCutoff = new Date(nowMs - VEO_CAPTURE_STUCK_MS).toISOString()
+
+  for (const row of claimable) {
+    // Budget counts ATTEMPTS, not successes: a persistent submit failure (a
+    // missing IAM grant, say) must not claim-and-roll-back every candidate on
+    // every tick. That exact bug left the tracklets sweep inert for a day.
+    if (attempted >= budget) break
+
+    let captureId = row.capture_id
+    let priorAttempts = row.capture_attempts ?? 0
+
+    if (!captureId) {
+      // Never attempted: the unique (veo_club_slug, match_slug) IS the claim.
+      // A concurrent runner inserting first makes this a no-op and we skip.
+      const { data: ins, error: insErr } = await supabase
+        .from('playhub_veo_captures')
+        .insert({
+          veo_club_slug: row.veo_club_slug,
+          match_slug: row.match_slug,
+          match_date: row.match_date,
+          capture_status: 'pending',
+          capture_started_at: startedAt,
+          capture_attempts: 1,
+        })
+        .select('id')
+        .maybeSingle()
+      // 23505 = duplicate key = another runner claimed it first, which is fine.
+      // Anything else (RLS denial, schema drift, network) is a real fault and was
+      // being swallowed identically — silently, forever.
+      if (insErr && insErr.code !== '23505')
+        console.error(
+          `veo capture sweep: insert failed for ${row.match_slug}: ${insErr.message}`
+        )
+      if (insErr || !ins) continue
+      captureId = ins.id
+      priorAttempts = 0
+    } else {
+      // Retry: atomic CAS on the existing row. `.update(..., {count:'exact'})`
+      // with NO `.select()` — PostgREST 400s when a top-level or= filter meets
+      // return=representation.
+      const { count, error: claimErr } = await supabase
+        .from('playhub_veo_captures')
+        .update(
+          {
+            capture_status: 'pending',
+            capture_started_at: startedAt,
+            capture_error: null,
+            capture_attempts: priorAttempts + 1,
+          },
+          { count: 'exact' }
+        )
+        .eq('id', captureId)
+        .or(
+          // `capture_status.is.null` is NOT redundant: an operator reset leaves
+          // the row present with a NULL status, and without this branch the CAS
+          // silently matches nothing and the row is stuck forever. The view has
+          // the matching branch — the two MUST agree.
+          `capture_status.is.null,` +
+            `and(capture_status.eq.error,capture_attempts.lt.${MAX_ATTEMPTS},capture_started_at.lt.${errorCutoff}),` +
+            `and(capture_status.eq.pending,capture_attempts.lt.${MAX_ATTEMPTS},capture_started_at.lt.${stuckCutoff})`
+        )
+      if (claimErr) {
+        console.error(
+          `veo capture sweep: claim failed for ${row.match_slug}: ${claimErr.message}`
+        )
+        continue
+      }
+      if (!count) continue // lost the race
+    }
+
+    attempted++
+    try {
+      const jobId = await submitJob(captureId, row.match_slug)
+      if (!jobId) throw new Error('no jobId returned')
+      console.log(
+        `veo capture sweep: submitted ${row.match_slug} -> job ${jobId}`
+      )
+      submitted++
+    } catch (err) {
+      console.error(
+        `veo capture sweep: submit failed for ${row.match_slug}: ${err instanceof Error ? err.message : err}`
+      )
+      await supabase
+        .from('playhub_veo_captures')
+        .update({
+          capture_status: 'error',
+          capture_error: 'sweep submit failed',
+          // restore the pre-claim value: plumbing failures must not burn the
+          // 3-attempt budget inside the Glacier window
+          capture_attempts: priorAttempts,
+        })
+        .eq('id', captureId)
+        // CAS, not a blind write: SubmitJob can throw AFTER Batch accepted the
+        // job (a response timeout, a socket reset). Rolling the row back
+        // unconditionally would mark a RUNNING 9.5GB capture as re-claimable and
+        // start a second one. Only roll back the claim we ourselves just made.
+        .eq('capture_status', 'pending')
+        .eq('capture_started_at', startedAt)
+    }
+  }
+  return { submitted, candidates: claimable.length }
+}

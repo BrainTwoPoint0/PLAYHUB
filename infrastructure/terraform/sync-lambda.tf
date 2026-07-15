@@ -102,7 +102,9 @@ resource "aws_iam_role_policy" "sync_lambda_s3" {
 # Every Batch job class the sync Lambda's sweeps submit — panorama capture
 # (preserve-first, 2026-07-07: vp-materialize jobs for published recordings
 # still missing their raw panorama, since Spiideo purges the raw source ~30
-# days after a game), aim-track, portrait-render, player-tracklets.
+# days after a game), aim-track, portrait-render, player-tracklets, and
+# veo-capture (the same preserve-first race against Veo's ~150d Glacier archive
+# of the native panorama we need as a jersey-training corpus).
 #
 # The IAM grant below is derived from this map, so a new job class cannot ship
 # with a working sweep and a missing permission.
@@ -117,10 +119,11 @@ resource "aws_iam_role_policy" "sync_lambda_s3" {
 # human remember; this map makes forgetting impossible.
 locals {
   sweep_job_defs = {
-    panorama  = aws_batch_job_definition.vp_materialize
-    aim_track = aws_batch_job_definition.aim_track
-    portrait  = aws_batch_job_definition.portrait_render
-    tracklets = aws_batch_job_definition.player_tracklets
+    panorama    = aws_batch_job_definition.vp_materialize
+    aim_track   = aws_batch_job_definition.aim_track
+    portrait    = aws_batch_job_definition.portrait_render
+    tracklets   = aws_batch_job_definition.player_tracklets
+    veo_capture = aws_batch_job_definition.veo_capture
   }
 }
 
@@ -216,6 +219,7 @@ resource "aws_lambda_function" "sync_recordings" {
       AIM_TRACK_JOB_DEF     = aws_batch_job_definition.aim_track.name
       TRACKLETS_JOB_DEF     = aws_batch_job_definition.player_tracklets.name
       PORTRAIT_JOB_DEF      = aws_batch_job_definition.portrait_render.name
+      VEO_CAPTURE_JOB_DEF   = aws_batch_job_definition.veo_capture.name
       # Club allowlist for the portrait sweep; empty = disabled. Flip to "cfa"
       # after the pilot E2E validates.
       PORTRAIT_CLUBS = var.portrait_clubs
