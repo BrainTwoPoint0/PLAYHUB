@@ -99,9 +99,31 @@ resource "aws_iam_role_policy" "sync_lambda_s3" {
   })
 }
 
-# Panorama capture sweep (preserve-first, 2026-07-07): the sync Lambda submits
-# vp-materialize Batch jobs for published recordings still missing their raw
-# panorama — Spiideo purges the raw source ~30 days after a game.
+# Every Batch job class the sync Lambda's sweeps submit — panorama capture
+# (preserve-first, 2026-07-07: vp-materialize jobs for published recordings
+# still missing their raw panorama, since Spiideo purges the raw source ~30
+# days after a game), aim-track, portrait-render, player-tracklets.
+#
+# The IAM grant below is derived from this map, so a new job class cannot ship
+# with a working sweep and a missing permission.
+#
+# It could before, and did: player-tracklets shipped 2026-07-15 without its
+# grant, so sweepPlayerTracklets had NEVER submitted a single job. Every tick
+# logged "0 submitted, N claimable", wrote 'sweep submit failed' to the row,
+# and rolled the attempt counter back — so rows never settled, never ran, and
+# never alarmed (the sweeps are deliberately non-fatal, so Lambda Errors stays
+# 0). The pilot looked healthy only because a human submitted it by hand.
+# A comment saying "remember to add your job class here" is a request that a
+# human remember; this map makes forgetting impossible.
+locals {
+  sweep_job_defs = {
+    panorama  = aws_batch_job_definition.vp_materialize
+    aim_track = aws_batch_job_definition.aim_track
+    portrait  = aws_batch_job_definition.portrait_render
+    tracklets = aws_batch_job_definition.player_tracklets
+  }
+}
+
 resource "aws_iam_role_policy" "sync_lambda_batch" {
   name = "${var.project_name}-sync-lambda-batch"
   role = aws_iam_role.sync_lambda.id
@@ -112,21 +134,22 @@ resource "aws_iam_role_policy" "sync_lambda_batch" {
       {
         Effect = "Allow"
         Action = ["batch:SubmitJob"]
-        Resource = [
-          aws_batch_job_queue.vp_materialize.arn,
-          # Submitting by NAME resolves the latest ACTIVE revision, and IAM
-          # evaluates the VERSIONED ARN — the :* wildcard covers current and
-          # future revisions (terraform bumps the revision on every job-def
-          # change). arn_prefix is the unversioned ARN (provider >= 5.x).
-          aws_batch_job_definition.vp_materialize.arn_prefix,
-          "${aws_batch_job_definition.vp_materialize.arn_prefix}:*",
-          # Aim-track jobs run on the same queue with their own definition.
-          aws_batch_job_definition.aim_track.arn_prefix,
-          "${aws_batch_job_definition.aim_track.arn_prefix}:*",
-          # Portrait-render jobs too (CFA pilot sweep).
-          aws_batch_job_definition.portrait_render.arn_prefix,
-          "${aws_batch_job_definition.portrait_render.arn_prefix}:*",
-        ]
+        # All four classes share the vp-materialize queue; SubmitJob authorizes
+        # against BOTH the queue and the job definition, so a missing queue ARN
+        # denies identically to a missing job-def ARN.
+        Resource = concat(
+          [aws_batch_job_queue.vp_materialize.arn],
+          # The Lambda submits by NAME, so IAM authorizes against the
+          # UNVERSIONED ARN — that is `arn_prefix`, and it is the entry that
+          # actually grants access. (Confirmed by the live denial, which named
+          # `job-definition/playhub-player-tracklets` with no :revision.) The
+          # `:*` is belt-and-braces for a future caller that submits an
+          # explicit revision or a full ARN; terraform bumps the revision on
+          # every job-def change.
+          flatten([for d in local.sweep_job_defs : [
+            d.arn_prefix, "${d.arn_prefix}:*",
+          ]]),
+        )
       },
       {
         # The portrait sweep's duplicate guard. ListJobs does not support
@@ -195,7 +218,7 @@ resource "aws_lambda_function" "sync_recordings" {
       PORTRAIT_JOB_DEF      = aws_batch_job_definition.portrait_render.name
       # Club allowlist for the portrait sweep; empty = disabled. Flip to "cfa"
       # after the pilot E2E validates.
-      PORTRAIT_CLUBS        = var.portrait_clubs
+      PORTRAIT_CLUBS = var.portrait_clubs
     }
   }
 
