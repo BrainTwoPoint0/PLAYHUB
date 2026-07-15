@@ -143,9 +143,31 @@ resource "aws_iam_role_policy" "batch_job_s3" {
         Effect = "Allow"
         Action = [
           "s3:GetObject",
-          "s3:PutObject"
+          "s3:PutObject",
+          # Multipart aborts: veo-capture streams multi-GB objects, and a killed
+          # job must be able to abandon its upload rather than leak parts.
+          "s3:AbortMultipartUpload"
         ]
         Resource = "arn:aws:s3:::${var.s3_bucket}/*"
+      },
+      {
+        # The URL-SIGNING KEY IS IN THIS BUCKET. cloudfront.tf:138 already scopes
+        # the CDN's bucket policy away from "/*" for exactly this reason — but the
+        # JOB role above is "/*", so that reasoning was never applied here.
+        #
+        # It became reachable on 2026-07-15: veo-capture is the only job class in
+        # the fleet that runs a BROWSER (chromium, --no-sandbox) against a
+        # third-party origin. A renderer compromise inherits this task role, and
+        # with GetObject on "/*" it could read keys/cloudfront-private-key.pem and
+        # mint valid signed URLs for every club's footage — bypassing
+        # checkRecordingAccess entirely, leaving only a CDN access-log line. Worse,
+        # PutObject on "/*" could overwrite the key.
+        #
+        # An explicit Deny beats re-scoping the Allow: it cannot be undone by a
+        # future widening of the Allow, and Deny always wins in IAM evaluation.
+        Effect   = "Deny"
+        Action   = "s3:*"
+        Resource = "arn:aws:s3:::${var.s3_bucket}/keys/*"
       }
     ]
   })

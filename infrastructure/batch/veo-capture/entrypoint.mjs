@@ -89,14 +89,31 @@ async function setStatus(patch, retries = 3) {
 
 async function main() {
   if (!ROW_ID || !MATCH_SLUG) throw new Error('ROW_ID + MATCH_SLUG required')
+  // MATCH_SLUG is third-party data (Veo's API -> veo-sync -> our cache, unvalidated)
+  // and is interpolated into BOTH a URL path and an S3 key. It cannot escape either
+  // today — the URL authority is terminated before it, and S3 keys are opaque byte
+  // strings that never normalise '..' — but both defences are incidental. Assert it.
+  if (!/^[A-Za-z0-9._-]+$/.test(MATCH_SLUG))
+    throw new Error('MATCH_SLUG failed validation')
   if (!S3_BUCKET) throw new Error('S3_RECORDINGS_BUCKET required')
 
   // --disable-dev-shm-usage: Fargate pins /dev/shm to 64MB and does NOT support
   // linuxParameters.sharedMemorySize, so chromium must not try to use it. Without
   // this the login flakes under load.
+  // env: an EXPLICIT allowlist. Playwright passes process.env through by default,
+  // which would hand chromium SUPABASE_SERVICE_ROLE_KEY and VEO_PASSWORD —
+  // readable from /proc/self/environ by anything in that process. The browser
+  // runs THIRD-PARTY JavaScript unsandboxed, so a renderer compromise would read
+  // a key that bypasses RLS across the whole shared Supabase project (PLAYBACK and
+  // PLAYHUB, every profile, every minor). The browser needs none of it: the login
+  // credentials are typed in via page.fill, not read from its environment.
+  //
+  // --disable-dev-shm-usage: Fargate pins /dev/shm to 64MB and does not support
+  // linuxParameters.sharedMemorySize, so chromium must not try to use it.
   const browser = await chromium.launch({
     headless: true,
     args: ['--disable-dev-shm-usage', '--no-sandbox'],
+    env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '/tmp' },
   })
   let bearer = ''
   let api // page-context fetch, so cookies/CSRF ride along exactly as the app does
@@ -159,9 +176,19 @@ async function main() {
       console.log(`veo-capture: ${MATCH_SLUG} has no .ts yet; attempt not burned`)
       return
     }
-    if (ts.availability && ts.availability !== 'available')
-      // Glacier. Nothing to do but record it — this match aged out before we got here.
-      throw new Error(`panorama already ${ts.availability} — too late to capture`)
+    if (ts.availability && ts.availability !== 'available') {
+      // Glacier — IRREVERSIBLE, so settle in ONE attempt instead of burning three
+      // (~45 min of head-of-line budget at 15-min ticks x 5-min cooldown). That
+      // matters now the queue is earliest-deadline-first: the most-likely-archived
+      // rows sit at the HEAD, and retrying them starves the ones still savable.
+      await setStatus({
+        capture_status: 'error',
+        capture_error: `panorama already ${ts.availability} — too late to capture`,
+        capture_attempts: 3,
+      })
+      console.log(`veo-capture: ${MATCH_SLUG} already ${ts.availability}; settled`)
+      return
+    }
 
     // The match uuid is the first path segment of every CDN url.
     const uuid = new URL(ts.url).pathname.split('/').filter(Boolean)[0]
@@ -231,6 +258,12 @@ async function main() {
       frames,
     })
     await putJson('match-events.json', events.j ?? null)
+    // Record the pointer AS SOON AS the object exists, not at 'ready'. These are
+    // minors' tracking data: anything uploaded but unreferenced is invisible to a
+    // club-offboarding or erasure routine driven by this table. (Observed: a reset
+    // row left tracking.json + match-events.json in S3 with tracking_s3_key NULL.)
+    // Deletion should be prefix-driven anyway, but the DB must not under-report.
+    await setStatus({ tracking_s3_key: `${base}/tracking.json` })
 
     // Cheap provenance, and Phase 2 may want them: the lens calibration and the
     // per-frame follow-cam direction. Both are public CDN objects.

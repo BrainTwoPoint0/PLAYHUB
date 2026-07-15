@@ -618,7 +618,18 @@ export async function sweepVeoCaptures(
     .select(
       'veo_club_slug, match_slug, match_date, capture_id, capture_status, capture_attempts, capture_started_at'
     )
-    .order('match_date', { ascending: false, nullsFirst: false })
+    // OLDEST FIRST — the opposite of every sibling sweep, deliberately.
+    //
+    // Those sweeps chase fresh content for product UX, so newest-first is right.
+    // This one is a DEADLINE queue: the panorama is Glacier'd at ~150d and the
+    // loss is irreversible. Newest-first captures the matches with the MOST slack
+    // and reaches the ones nearest expiry LAST — and LIMIT 25 makes it structural,
+    // not probabilistic: ranks 26+ are invisible until the 25 above them settle.
+    // Measured at ship time: 354 candidates, ~78 captures/day, 4 rows within 2
+    // days of expiry sitting at rank ~351 — the sweep would have reached them on
+    // day ~4.5 and lost all four. Earliest-deadline-first is the only correct
+    // order here.
+    .order('match_date', { ascending: true, nullsFirst: false })
     .limit(25)
   if (error) {
     console.error(`veo capture sweep: candidate query failed: ${error.message}`)
