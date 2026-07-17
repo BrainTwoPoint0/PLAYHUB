@@ -62,6 +62,7 @@ import {
   blendHalfExtents,
   blendPanHalfAngleDeg,
   curvedFovMax,
+  intersectPanWindow,
   CURVED_FOV_MAX_CEIL,
 } from '@/lib/panorama/projection'
 
@@ -168,6 +169,13 @@ interface VirtualPanoramaPlayerProps {
    * (reduces ground-trapezoid splay). Sensible range ~0–0.3. Default 0.
    */
   keystone?: number
+  /**
+   * Half-pitch watch framing: pan sub-window (RADIANS, panorama frame)
+   * derived at watch time from the scene's active calibration midline. Only
+   * narrows the mesh-derived pan limits (intersectPanWindow) — degenerate or
+   * disjoint windows are ignored. The opening view centres in the window.
+   */
+  panWindow?: { minRad: number; maxRad: number }
 }
 
 /** Imperative surface controls, surfaced so DewarpControls can drive them from the shared bar. */
@@ -919,6 +927,7 @@ export function VirtualPanoramaPlayer({
   blendFovDownLo = BLEND_FOV_DOWN_LO,
   blendFovDownHi = BLEND_FOV_DOWN_HI,
   keystone = 0,
+  panWindow,
 }: VirtualPanoramaPlayerProps) {
   const t = useTranslations('player')
   const containerRef = useRef<HTMLDivElement>(null)
@@ -1005,13 +1014,7 @@ export function VirtualPanoramaPlayer({
   // overlay update ('hint' armed+unselected, 'nodata' armed in an untracked
   // stretch, null otherwise); transient kinds override it briefly.
   type SpotNotice =
-    | 'hint'
-    | 'nodata'
-    | 'following'
-    | 'locked'
-    | 'searching'
-    | 'lost'
-    | null
+    'hint' | 'nodata' | 'following' | 'locked' | 'searching' | 'lost' | null
   const [spotNotice, setSpotNotice] = useState<SpotNotice>(null)
   const spotNoticeRef = useRef<SpotNotice>(null)
   const spotNoticeOverride = useRef<{ kind: SpotNotice; until: number } | null>(
@@ -1330,10 +1333,16 @@ export function VirtualPanoramaPlayer({
             tuning
           )
           panoRef.current = view
-          // pan/tilt limits from the panorama's real angular extents
+          // pan/tilt limits from the panorama's real angular extents; the
+          // optional half-pitch focus window may only NARROW the pan range
+          const focusPan = intersectPanWindow(
+            view.panMin,
+            view.panMax,
+            panWindow
+          )
           limitsRef.current = {
-            minPan: view.panMin,
-            maxPan: view.panMax,
+            minPan: focusPan.minPan,
+            maxPan: focusPan.maxPan,
             minTilt: view.tiltMin,
             maxTilt: view.tiltMax,
           }
@@ -1353,7 +1362,11 @@ export function VirtualPanoramaPlayer({
             -20 * DEG,
             (view.tiltMin + view.tiltMax) / 2
           )
-          viewRef.current = clampView({ pan: 0, tilt: openTilt, fov: 46 })
+          // half-pitch focus opens centred in its window, not on the mesh mid
+          const openPan = panWindow
+            ? (focusPan.minPan + focusPan.maxPan) / 2
+            : 0
+          viewRef.current = clampView({ pan: openPan, tilt: openTilt, fov: 46 })
           syncZoom()
           // Compose N projections: the LAST is the opaque base, the rest are
           // drawn on top with Spiideo's baked feather alpha across each overlap.
@@ -1777,7 +1790,12 @@ export function VirtualPanoramaPlayer({
               // don't spend an identity-hop on it, so a player re-fragmenting in
               // place stays followed. The ambiguity + velocity gates still guard.
               const coLocated = d1 < SPOT_COLOCATED_DEG
-              if (!ambiguous && velOk && (dwellOk || coLocated) && sel.hops < 2) {
+              if (
+                !ambiguous &&
+                velOk &&
+                (dwellOk || coLocated) &&
+                sel.hops < 2
+              ) {
                 sel.index = cand.index
                 sel.lastPan = cand.panDeg
                 sel.lastTilt = cand.tiltDeg
@@ -1839,8 +1857,20 @@ export function VirtualPanoramaPlayer({
               })
               sel.frameFov = f.targetFov
               viewRef.current = clampView({
-                pan: smoothDamp(v.pan, f.aimPanDeg * DEG, velP, SPOT_FOLLOW_SMOOTH, dt),
-                tilt: smoothDamp(v.tilt, f.aimTiltDeg * DEG, velT, SPOT_FOLLOW_SMOOTH, dt),
+                pan: smoothDamp(
+                  v.pan,
+                  f.aimPanDeg * DEG,
+                  velP,
+                  SPOT_FOLLOW_SMOOTH,
+                  dt
+                ),
+                tilt: smoothDamp(
+                  v.tilt,
+                  f.aimTiltDeg * DEG,
+                  velT,
+                  SPOT_FOLLOW_SMOOTH,
+                  dt
+                ),
                 fov: smoothDamp(v.fov, f.targetFov, velF, SPOT_FOV_SMOOTH, dt),
               })
             } else {
@@ -1854,8 +1884,20 @@ export function VirtualPanoramaPlayer({
                 if (Math.abs(fov - sel.relaxFov) < 0.5) sel.relaxFov = 0
               }
               viewRef.current = clampView({
-                pan: smoothDamp(v.pan, sel.lastPan * DEG, velP, SPOT_FOLLOW_SMOOTH, dt),
-                tilt: smoothDamp(v.tilt, sel.lastTilt * DEG, velT, SPOT_FOLLOW_SMOOTH, dt),
+                pan: smoothDamp(
+                  v.pan,
+                  sel.lastPan * DEG,
+                  velP,
+                  SPOT_FOLLOW_SMOOTH,
+                  dt
+                ),
+                tilt: smoothDamp(
+                  v.tilt,
+                  sel.lastTilt * DEG,
+                  velT,
+                  SPOT_FOLLOW_SMOOTH,
+                  dt
+                ),
                 fov,
               })
             }
@@ -1867,8 +1909,20 @@ export function VirtualPanoramaPlayer({
             const v = viewRef.current,
               dt = 1 / 60
             viewRef.current = clampView({
-              pan: smoothDamp(v.pan, sel.lastPan * DEG, velP, SPOT_FOLLOW_SMOOTH, dt),
-              tilt: smoothDamp(v.tilt, sel.lastTilt * DEG, velT, SPOT_FOLLOW_SMOOTH, dt),
+              pan: smoothDamp(
+                v.pan,
+                sel.lastPan * DEG,
+                velP,
+                SPOT_FOLLOW_SMOOTH,
+                dt
+              ),
+              tilt: smoothDamp(
+                v.tilt,
+                sel.lastTilt * DEG,
+                velT,
+                SPOT_FOLLOW_SMOOTH,
+                dt
+              ),
               fov: smoothDamp(
                 v.fov,
                 searchFov(curvedFovMaxRef.current),
@@ -1971,6 +2025,21 @@ export function VirtualPanoramaPlayer({
             setSpotNotice(kind)
           }
         }
+        // Apparent-size factor from ground-plane geometry: a player at tilt θ
+        // below the horizon stands at ground distance ∝ 1/tan(−θ), so their
+        // apparent size ∝ tan(−θ). Normalized at −9° (mid-field for these
+        // mounts) and clamped so extremes stay legible: far players get
+        // smaller marks, near players bigger — same factor drives dot radius,
+        // ring size, badge size, and the pixel-space dedup radius (a fixed
+        // 12px merged two DISTINCT far players while under-merging near
+        // duplicates).
+        const REF_TILT_TAN = Math.tan(9 * DEG)
+        const tiltScale = (tiltDeg: number) =>
+          clamp(
+            Math.tan(Math.max(0.6, -tiltDeg) * DEG) / REF_TILT_TAN,
+            0.45,
+            2.2
+          )
         const updateSpotlightOverlay = () => {
           if (!svg || !curved) return
           const track = trackletsRef.current
@@ -2019,19 +2088,23 @@ export function VirtualPanoramaPlayer({
                 ? Math.max(0, track.rosterN - (sel ? 1 : 0))
                 : dotPool.length
             const maxDots = Math.min(dotPool.length, dotCap)
+            // Zoom factor shared with the ring: marks shrink as you zoom out.
+            const zoomK = clamp((26 / viewRef.current.fov) * (h / 800), 0.5, 2)
             for (const a of active) {
               if (sel && a.index === sel.index) continue
               if (di >= maxDots) break
               const p = projectToPx(a.panDeg, a.tiltDeg, w, h)
               if (!p) continue
+              const ts = tiltScale(a.tiltDeg)
+              const mergePx = SPOT_DOT_MERGE_PX * ts * zoomK
               if (
                 ringPx &&
-                Math.hypot(p.x - ringPx.x, p.y - ringPx.y) < SPOT_DOT_MERGE_PX
+                Math.hypot(p.x - ringPx.x, p.y - ringPx.y) < mergePx
               )
                 continue
               if (
                 placed.some(
-                  (q) => Math.hypot(p.x - q.x, p.y - q.y) < SPOT_DOT_MERGE_PX
+                  (q) => Math.hypot(p.x - q.x, p.y - q.y) < mergePx
                 )
               )
                 continue
@@ -2039,6 +2112,7 @@ export function VirtualPanoramaPlayer({
               const c = dotPool[di]
               c.setAttribute('cx', p.x.toFixed(1))
               c.setAttribute('cy', p.y.toFixed(1))
+              c.setAttribute('r', clamp(4 * ts * zoomK, 2, 9).toFixed(1))
               // stand down once someone is selected — the ring is the story
               c.style.opacity = sel ? '0.35' : '1'
               c.style.display = ''
@@ -2047,9 +2121,11 @@ export function VirtualPanoramaPlayer({
               const jersey = track.objects[a.index]?.jersey
               const b = badgePool[di]
               if (jersey) {
+                const fs = clamp(11 * ts * zoomK, 9, 18)
                 b.textContent = jersey
+                b.setAttribute('font-size', fs.toFixed(1))
                 b.setAttribute('x', p.x.toFixed(1))
-                b.setAttribute('y', (p.y - 9).toFixed(1))
+                b.setAttribute('y', (p.y - fs * 0.82).toFixed(1))
                 b.style.opacity = sel ? '0.35' : '1'
                 b.style.display = ''
               } else {
@@ -2076,8 +2152,14 @@ export function VirtualPanoramaPlayer({
             }
             const p = projectToPx(ringSm.pan, ringSm.tilt, w, h)
             if (p) {
-              const rx = Math.max(14, (2.6 / viewRef.current.fov) * h)
-              const ry = Math.max(6, rx * 0.38)
+              // Distance-scaled (tiltScale): a far player gets a smaller
+              // ring, a near player a bigger one — zoom scaling alone kept
+              // the ring one size across the pitch depth.
+              const rx = Math.max(
+                8,
+                (2.6 / viewRef.current.fov) * h * tiltScale(ringSm.tilt)
+              )
+              const ry = Math.max(4, rx * 0.38)
               const sw = Math.min(2.5, Math.max(1.75, rx * 0.12))
               for (const el of [ringCasingEl, ringEl]) {
                 el.setAttribute('cx', p.x.toFixed(1))
@@ -2177,9 +2259,7 @@ export function VirtualPanoramaPlayer({
           // stepSpotlight (lost↔found) are handled by the frameFov<=0 re-seed.
           {
             const sel0 = spotSelRef.current
-            const following0 = Boolean(
-              sel0?.follow && sel0?.lostSince === null
-            )
+            const following0 = Boolean(sel0?.follow && sel0?.lostSince === null)
             const driver = following0
               ? sel0?.lock
                 ? 'spot-lock'
@@ -2197,8 +2277,7 @@ export function VirtualPanoramaPlayer({
           if (curved) stepSpotlight()
           lastRafMs = performance.now()
           const spotFollowing = Boolean(
-            spotSelRef.current?.follow &&
-              spotSelRef.current?.lostSince === null
+            spotSelRef.current?.follow && spotSelRef.current?.lostSince === null
           )
           if (!spotFollowing && autoFollowRef.current && curved && !autoSrc) {
             const track = aimTrackRef.current
@@ -2394,7 +2473,10 @@ export function VirtualPanoramaPlayer({
       // Lock off: ease the frame back out to a wide follow (aim-follow stays);
       // caption it so the zoom-out isn't a silent, unexplained change.
       sel.relaxFov = searchFov(curvedFovMaxRef.current)
-      spotNoticeOverride.current = { kind: 'following', until: Date.now() + 2500 }
+      spotNoticeOverride.current = {
+        kind: 'following',
+        until: Date.now() + 2500,
+      }
     }
     setSpotLock(next)
     spotLockRef.current = next
@@ -2811,8 +2893,8 @@ export function VirtualPanoramaPlayer({
                 className={cn(
                   'h-4 w-4',
                   spotNotice === 'nodata' ||
-                  spotNotice === 'lost' ||
-                  spotNotice === 'searching'
+                    spotNotice === 'lost' ||
+                    spotNotice === 'searching'
                     ? 'text-[var(--ash-grey)]'
                     : 'text-emerald-400'
                 )}
