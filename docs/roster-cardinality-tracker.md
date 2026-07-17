@@ -86,12 +86,16 @@ Commit `7a53850` on `feat/tier1b-player-lock-camera`.
 - **(b)** re-association **adopts a co-located (<0.5°) pickup** immediately without spending an
   identity-hop (a tracker re-index in place = the same player).
 
-### Tier 2a — publish N + cap the count (cheap; ship next)
-- In the batch job `main` (`entrypoint.py`), compute **N** per §4 beside `median_concurrency`, and
-  publish `meta.rosterN` (+ `meta.concurrencyP95`, `meta.officialsIncluded`) in
-  `build_track.build_payload`. `tracklets.ts` reads it.
-- Client: the Tier-1c dot loop additionally **stops after N placed dots** (surplus = duplicates /
-  phantoms by construction). Delivers the owner's literal ask with no change to the follow logic.
+### Tier 2a — publish N + cap the count (SHIPPED, commit `1b3f3fd`)
+- `build_track.estimate_roster_n(chains)` = the **p95 of the de-duplicated (~1.7 m) concurrent
+  on-pitch body count** over the tracked span (`ROSTER_*` consts); published as `meta.rosterN` +
+  `meta.officialsIncluded` in `build_payload`. `tracklets.ts` parses the optional `rosterN` (absent →
+  no cap; backward-compat with pre-Tier-2a artifacts).
+- Client: the dot overlay **stops after `rosterN` placed dots** (the followed ring is one of N, so its
+  budget is N−1). Delivers the owner's literal ask with no change to the follow logic.
+- **Pending to make it live:** the tracklets Batch job must be **redeployed (CodeBuild→ECR) and the
+  artifacts re-run** to populate `meta.rosterN`; until then the cap is inert. Do NOT `terraform apply`
+  bare in this workspace (drift replaces the ball-detection CE — see the veo-capture decision).
 
 ### Tier 2b — offline N-slot global assignment (the real layer)
 Replace the ~2000-fragment artifact with **N slot-tracks**. After `stitch`/`filter_chains_on_pitch`,
