@@ -396,7 +396,7 @@ const SEAM_SHIFT_Y_DEFAULT = -0.0273
 const SEAM_WARP_A_DEFAULT = -0.04
 const SEAM_WARP_B_DEFAULT = 0.17
 
-interface SceneProjection {
+export interface SceneProjection {
   n_vertices: number
   n_indices: number
   camera: { position: number[]; rotation: number[] }
@@ -531,7 +531,7 @@ function patchBlendProjection(
   mat.customProgramCacheKey = () => 'cyl-blend-v2'
 }
 
-interface PanoramaView {
+export interface PanoramaView {
   geometries: THREE.BufferGeometry[] // one per projection (≥1)
   forward: THREE.Vector3
   right: THREE.Vector3
@@ -644,7 +644,7 @@ function patchColorLut(mat: THREE.MeshBasicMaterial, lut: THREE.DataTexture) {
   mat.customProgramCacheKey = () => `${prevKey()}|lut-v1`
 }
 
-function buildExactPanorama(
+export function buildExactPanorama(
   vbuf: ArrayBuffer,
   ibuf: ArrayBuffer,
   sceneProjs: SceneProjection[],
@@ -1888,6 +1888,7 @@ export function VirtualPanoramaPlayer({
         const svgNS = 'http://www.w3.org/2000/svg'
         const svg = spotSvgRef.current
         const dotPool: SVGCircleElement[] = []
+        const badgePool: SVGTextElement[] = []
         let ringEl: SVGEllipseElement | null = null
         let ringCasingEl: SVGEllipseElement | null = null
         let trailEl: SVGPolylineElement | null = null
@@ -1910,6 +1911,19 @@ export function VirtualPanoramaPlayer({
             c.style.display = 'none'
             svg.appendChild(c)
             dotPool.push(c)
+            // Jersey badge above the dot (Tier 3) — dark keyline casing keeps
+            // the number legible on any grass tone, same treatment as the ring.
+            const b = document.createElementNS(svgNS, 'text')
+            b.setAttribute('text-anchor', 'middle')
+            b.setAttribute('font-size', '11')
+            b.setAttribute('font-weight', '600')
+            b.setAttribute('fill', 'rgba(255,255,255,0.92)')
+            b.setAttribute('stroke', 'rgba(6,10,8,0.65)')
+            b.setAttribute('stroke-width', '2.5')
+            b.setAttribute('paint-order', 'stroke')
+            b.style.display = 'none'
+            svg.appendChild(b)
+            badgePool.push(b)
           }
           // Casing under the ring (map-cartography keyline): the dark edge is
           // what keeps an emerald mark legible on any grass tone.
@@ -2022,16 +2036,32 @@ export function VirtualPanoramaPlayer({
               )
                 continue
               placed.push(p)
-              const c = dotPool[di++]
+              const c = dotPool[di]
               c.setAttribute('cx', p.x.toFixed(1))
               c.setAttribute('cy', p.y.toFixed(1))
               // stand down once someone is selected — the ring is the story
               c.style.opacity = sel ? '0.35' : '1'
               c.style.display = ''
+              // Jersey badge (Tier 3): only strictly-identified fragments
+              // carry a number; everyone else stays an unlabelled dot.
+              const jersey = track.objects[a.index]?.jersey
+              const b = badgePool[di]
+              if (jersey) {
+                b.textContent = jersey
+                b.setAttribute('x', p.x.toFixed(1))
+                b.setAttribute('y', (p.y - 9).toFixed(1))
+                b.style.opacity = sel ? '0.35' : '1'
+                b.style.display = ''
+              } else {
+                b.style.display = 'none'
+              }
+              di++
             }
           }
-          for (let i = di; i < dotPool.length; i++)
+          for (let i = di; i < dotPool.length; i++) {
             dotPool[i].style.display = 'none'
+            badgePool[i].style.display = 'none'
+          }
           if (sel && ringEl && ringCasingEl && trailEl) {
             const lost = sel.lostSince !== null
             // Ring position is smoothed separately from the camera: raw 5 Hz

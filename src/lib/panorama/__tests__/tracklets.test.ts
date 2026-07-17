@@ -184,3 +184,35 @@ describe('nearestObject', () => {
     expect(hit).toBeNull() // only o0 is nearby, and it is excluded
   })
 })
+
+describe('jersey field (Tier 3)', () => {
+  it('parses a valid 1-2 digit jersey onto the object', () => {
+    const track = parseTracklets({
+      ...VALID,
+      objects: [{ ...OBJ_A, jersey: '10' }, OBJ_B],
+    })
+    expect(track!.objects[0].jersey).toBe('10')
+    expect(track!.objects[1].jersey).toBeUndefined()
+  })
+
+  it('drops malformed jersey values but keeps the object', () => {
+    const bad = ['', '123', '4a', 7, null, {}, ' 8']
+    for (const jersey of bad) {
+      const track = parseTracklets({
+        ...VALID,
+        objects: [{ ...OBJ_A, jersey }, OBJ_B],
+      })
+      expect(track).not.toBeNull()
+      expect(track!.objects[0].jersey).toBeUndefined()
+      expect(track!.objects[0].t).toEqual(OBJ_A.t)
+    }
+  })
+
+  it('single-digit jersey parses', () => {
+    const track = parseTracklets({
+      ...VALID,
+      objects: [{ ...OBJ_A, jersey: '7' }],
+    })
+    expect(track!.objects[0].jersey).toBe('7')
+  })
+})

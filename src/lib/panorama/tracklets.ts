@@ -14,6 +14,10 @@ export interface TrackletObject {
   t: number[]
   pan: number[]
   tilt: number[]
+  /** Jersey number (Tier 3): present only on fragments whose identity was
+   *  strictly established (≥2 agreeing legible reads on a kit-consistent
+   *  chain). Absent = honest-unlabelled — never inferred client-side. */
+  jersey?: string
 }
 
 export interface Tracklets {
@@ -76,11 +80,18 @@ export function parseTracklets(raw: unknown): Tracklets | null {
       if ((t[i] as number) <= prev) continue entries // strictly ascending
       prev = t[i] as number
     }
+    // Optional jersey label — a 1-2 digit string or nothing. Malformed
+    // values drop the FIELD, not the object (same degrade contract).
+    const jersey =
+      typeof e.jersey === 'string' && /^\d{1,2}$/.test(e.jersey)
+        ? e.jersey
+        : undefined
     objects.push({
       id,
       t: t as number[],
       pan: pan as number[],
       tilt: tilt as number[],
+      ...(jersey !== undefined ? { jersey } : {}),
     })
   }
   if (objects.length === 0) return null
