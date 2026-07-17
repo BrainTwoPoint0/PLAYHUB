@@ -36,9 +36,15 @@ export interface TrackletSample {
 }
 
 // ~700k points ceiling mirrors the job's cap; anything bigger is not a real
-// artifact (self-DoS guard on a CDN-served optional fetch).
+// artifact (self-DoS guard on a CDN-served optional fetch). POINTS is the
+// real payload/memory guard; the object cap only bounds bookkeeping.
+// Stadium-bowl venues (HCT: whole-bowl tracking, ~9s median fragments over a
+// 2.5h stream) legitimately publish ~25k fragments at 2.5Hz — a 5k object
+// cap silently killed Spotlight there. Objects are >=3 points each, so the
+// points cap already implies <= ~266k objects; 40k is a sanity bound, not
+// the size gate.
 const MAX_TOTAL_POINTS = 800_000
-const MAX_OBJECTS = 5_000
+const MAX_OBJECTS = 40_000
 
 /**
  * Validate a fetched tracklets.json. CDN-served and optional, so malformed
