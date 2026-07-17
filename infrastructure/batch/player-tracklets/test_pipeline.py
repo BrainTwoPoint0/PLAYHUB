@@ -449,3 +449,42 @@ def test_fetch_window_items_dense_contiguous():
 def test_fetch_window_items_missing_metadata():
     assert detections.fetch_window_items(
         'g', {'id': 's'}, (0, int(100e6)), fetch=lambda i: None) == []
+
+
+# ── roster cardinality N estimate (Tier 2a) ───────────────────────────────────
+
+def _roster_chain(t0_s, t1_s, x, y, n=24):
+    ts = np.linspace(t0_s, t1_s, n) * 1e6
+    xy = np.column_stack([np.full(n, float(x)), np.full(n, float(y))])
+    return (ts, xy)
+
+
+def test_estimate_roster_n_counts_distinct_players():
+    # 10 players, each a full-span chain at a spot well past the cluster radius.
+    chains = [_roster_chain(0, 60, 5 * i, 0) for i in range(10)]
+    assert build_track.estimate_roster_n(chains) == 10
+
+
+def test_estimate_roster_n_dedups_two_fragments_on_one_body():
+    # A duplicate fragment 0.5 m from player 0 must NOT inflate the count.
+    chains = [_roster_chain(0, 60, 5 * i, 0) for i in range(10)]
+    chains.append(_roster_chain(0, 60, 0.5, 0))
+    assert build_track.estimate_roster_n(chains) == 10
+
+
+def test_estimate_roster_n_is_high_percentile_not_median():
+    # 10 players all match + 2 subs present ~15% of the time (well separated).
+    # The median would miss the subs; p95 sees the full field.
+    chains = [_roster_chain(0, 100, 5 * i, 0) for i in range(10)]
+    chains.append(_roster_chain(0, 15, 100, 0))
+    chains.append(_roster_chain(0, 15, 110, 0))
+    assert build_track.estimate_roster_n(chains) == 12
+
+
+def test_estimate_roster_n_empty_and_degenerate():
+    assert build_track.estimate_roster_n([]) == 0
+    # single-instant span (t1<=t0) still counts deduped bodies
+    ts = np.array([1000, 1000], dtype=float)
+    a = (ts, np.array([[0.0, 0.0], [0.0, 0.0]]))
+    b = (ts, np.array([[20.0, 0.0], [20.0, 0.0]]))
+    assert build_track.estimate_roster_n([a, b]) == 2

@@ -1997,9 +1997,17 @@ export function VirtualPanoramaPlayer({
             const ringPx = sel
               ? projectToPx(sel.lastPan, sel.lastTilt, w, h)
               : null
+            // Roster cap (Tier 2a): never show more trackers than players. The
+            // followed player's ring is one of the N, so its dot budget is N-1.
+            // Absent rosterN (pre-Tier-2a artifacts) → no cap.
+            const dotCap =
+              track.rosterN != null
+                ? Math.max(0, track.rosterN - (sel ? 1 : 0))
+                : dotPool.length
+            const maxDots = Math.min(dotPool.length, dotCap)
             for (const a of active) {
               if (sel && a.index === sel.index) continue
-              if (di >= dotPool.length) break
+              if (di >= maxDots) break
               const p = projectToPx(a.panDeg, a.tiltDeg, w, h)
               if (!p) continue
               if (

@@ -21,6 +21,9 @@ export interface Tracklets {
   sampleFps: number
   t0OffsetSec: number
   objects: TrackletObject[]
+  /** Roster cap (Tier 2a, meta.rosterN): players on the pitch. The overlay
+   *  shows at most this many trackers. Absent on pre-Tier-2a artifacts → no cap. */
+  rosterN?: number
 }
 
 export interface TrackletSample {
@@ -82,11 +85,22 @@ export function parseTracklets(raw: unknown): Tracklets | null {
   }
   if (objects.length === 0) return null
 
+  // Optional roster cap (meta.rosterN) — a positive integer or nothing.
+  const meta =
+    o.meta && typeof o.meta === 'object'
+      ? (o.meta as Record<string, unknown>)
+      : undefined
+  const rosterN =
+    meta && Number.isInteger(meta.rosterN) && (meta.rosterN as number) > 0
+      ? (meta.rosterN as number)
+      : undefined
+
   return {
     version: 1,
     sampleFps: Number.isFinite(o.sampleFps) ? (o.sampleFps as number) : 5,
     t0OffsetSec: Number.isFinite(o.t0OffsetSec) ? (o.t0OffsetSec as number) : 0,
     objects,
+    rosterN,
   }
 }
 

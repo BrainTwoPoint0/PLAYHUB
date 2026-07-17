@@ -39,6 +39,21 @@ describe('parseTracklets', () => {
     expect(track!.sampleFps).toBe(5)
   })
 
+  it('parses a positive-integer meta.rosterN, ignores absent/invalid (Tier 2a)', () => {
+    expect(parseTracklets(VALID)!.rosterN).toBeUndefined() // no meta → no cap
+    expect(parseTracklets({ ...VALID, meta: { rosterN: 12 } })!.rosterN).toBe(12)
+    // non-integer / non-positive / non-object meta all degrade to no cap
+    expect(
+      parseTracklets({ ...VALID, meta: { rosterN: 11.5 } })!.rosterN
+    ).toBeUndefined()
+    expect(
+      parseTracklets({ ...VALID, meta: { rosterN: 0 } })!.rosterN
+    ).toBeUndefined()
+    expect(
+      parseTracklets({ ...VALID, meta: 'nope' })!.rosterN
+    ).toBeUndefined()
+  })
+
   it('rejects null, wrong version, and non-objects', () => {
     expect(parseTracklets(null)).toBeNull()
     expect(parseTracklets('nope')).toBeNull()

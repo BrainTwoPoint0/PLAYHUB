@@ -84,6 +84,18 @@ KF_SIGMA_A = 3.0           # m/s² — process noise (follows sprints, kills jit
 # Artifact size budget — beyond this, halve the sample rate (client lerps).
 MAX_TOTAL_POINTS = 700_000
 
+# Roster cardinality (Tier 2a): estimate N = players on the pitch, so the client
+# can cap the visible trackers at N ("never more trackers than players"). N is
+# the PCT percentile of the DE-DUPLICATED concurrent on-pitch count over the
+# match — NOT one frame (kickoff clusters occlude → undercount) and NOT the
+# median (fragments leave several players mid-gap each instant). De-dup at
+# CLUSTER_M so two fragments on one body count once. Refs are on-pitch and are
+# NOT removed, so N includes on-field officials (loose by 1-3 is fine — a cap
+# that loose still kills the gross duplicates/phantoms).
+ROSTER_CLUSTER_M = 1.7
+ROSTER_PCT = 95
+ROSTER_SAMPLES = 240
+
 
 # ── Parsing + per-fragment hygiene ───────────────────────────────────────────
 
@@ -445,6 +457,51 @@ def filter_chains_on_pitch(chains: list, lo, hi) -> list:
     return out
 
 
+# ── Roster cardinality (Tier 2a) ─────────────────────────────────────────────
+
+def _cluster_count(pts: list, r: float) -> int:
+    """Greedy single-pass cluster count: a point within r (metres) of an
+    already-seen cluster centre joins it, so two fragments on one body count
+    once. Order-dependent, but adequate as an input to a percentile taken over
+    many instants."""
+    r2 = r * r
+    centres: list = []
+    for x, y in pts:
+        if not any((x - cx) ** 2 + (y - cy) ** 2 < r2 for cx, cy in centres):
+            centres.append((x, y))
+    return len(centres)
+
+
+def estimate_roster_n(chains: list, cluster_m: float = ROSTER_CLUSTER_M,
+                      pct: float = ROSTER_PCT,
+                      n_samples: int = ROSTER_SAMPLES) -> int:
+    """N = the number of players on the pitch, for the client's tracker cap.
+
+    Sample `n_samples` instants over the tracked span; at each, take every
+    active (already on-pitch) chain's interpolated position, de-duplicate at
+    `cluster_m`, and count bodies. N = the `pct` percentile of those counts —
+    high enough to catch the instants where nearly everyone is in a live
+    fragment (robust to kickoff clustering and to players briefly mid-gap),
+    while the de-dup removes the two-fragments-on-one-player inflation. `chains`
+    are already on-pitch, so this needs no bounds. Includes on-field officials."""
+    if not chains:
+        return 0
+    t0 = min(int(c[0][0]) for c in chains)
+    t1 = max(int(c[0][-1]) for c in chains)
+    if t1 <= t0:
+        pts = [(float(xy[0, 0]), float(xy[0, 1])) for _, xy in chains]
+        return _cluster_count(pts, cluster_m)
+    counts = []
+    for s in np.linspace(t0, t1, n_samples):
+        pts = []
+        for ts, xy in chains:
+            if ts[0] <= s <= ts[-1]:
+                pts.append((float(np.interp(s, ts, xy[:, 0])),
+                            float(np.interp(s, ts, xy[:, 1]))))
+        counts.append(_cluster_count(pts, cluster_m))
+    return int(round(float(np.percentile(counts, pct))))
+
+
 # ── Kalman + RTS smoothing ───────────────────────────────────────────────────
 
 def _kf_rts(ts: np.ndarray, xy: np.ndarray):
@@ -562,6 +619,10 @@ def build_payload(chains: list, H: np.ndarray, start_time_us: int,
             'matchedFrames': diag['matched_frames'],
             'evalRate': round(diag['eval']['rate'], 3) if diag.get('eval') else None,
             'nObjects': len(objects),
+            # Roster cap (Tier 2a): the client shows at most this many trackers.
+            # Estimated from ALL on-pitch chains (not just the renderable ones).
+            'rosterN': estimate_roster_n(chains),
+            'officialsIncluded': True,
             'downsampled': step > 1,
         },
     }
