@@ -985,6 +985,7 @@ export function VirtualPanoramaPlayer({
     vPan: number // deg/s — EMA angular velocity (projects the gap search)
     vTilt: number
     lostSince: number | null // clock seconds when the fragment ran out
+    coastDeg: number // deg of aim coast spent this loss (capped, then freeze)
     lastClock: number | null // detects seeks (a jump invalidates the selection)
     hops: number // identity confidence decays per hand-off — hard cap 2
     adoptedAt: number // clock when the current chain was adopted (min dwell)
@@ -1639,6 +1640,20 @@ export function VirtualPanoramaPlayer({
         const SPOT_FOV_SEARCH_SMOOTH = 1.1
         const SPOT_REASSOC_DEG = 2.0
         const SPOT_LOST_SEC = 3
+        // Post-loss coast: decay the terminal velocity and CAP total coast
+        // displacement at the re-assoc radius, so a lost aim eases to a stop
+        // near where the player vanished instead of walking to the frame edge
+        // chasing nobody (then the widen reveals that spot for a re-tap).
+        const SPOT_COAST_SEC = 0.6
+        const SPOT_COAST_DECAY = 0.9 // per 1/60s frame
+        const SPOT_COAST_MAX_DEG = SPOT_REASSOC_DEG
+        // A pickup within this angular distance is the SAME player re-indexed in
+        // place (a fresh fragment id, not an identity jump) — adopt it without
+        // spending a hop, so a player re-fragmenting in place stays followed.
+        const SPOT_COLOCATED_DEG = 0.5
+        // Overlay dots closer than this on screen are the same body (or the
+        // ring's own player) — merged, killing the "two trackers on one player".
+        const SPOT_DOT_MERGE_PX = 12
         // Distinguishes a real seek from a suspended RAF (backgrounded tab).
         let lastRafMs = performance.now()
         // The SLAVE raw-VP video is what the user SEES (its frames feed the
@@ -1685,14 +1700,32 @@ export function VirtualPanoramaPlayer({
             // easing from the widened "searching" fov back to the frame.
             if (sel.lostSince !== null) sel.frameFov = 0
             sel.lostSince = null
+            sel.coastDeg = 0
           } else {
-            if (sel.lostSince === null) sel.lostSince = clock
+            if (sel.lostSince === null) {
+              sel.lostSince = clock
+              sel.coastDeg = 0 // fresh coast budget for this loss episode
+            }
             const gap = Math.abs(clock - sel.lostSince)
-            // Dead-reckon the ring through the gap with the terminal angular
-            // velocity for up to 1s (rendered dashed — visibly "coasting").
-            if (gap <= 1.0 && dtClock > 0) {
-              sel.lastPan += sel.vPan * dtClock
-              sel.lastTilt += sel.vTilt * dtClock
+            // Coast the ring a SHORT, DECAYING distance through the gap — do NOT
+            // project the terminal velocity at full strength (that walks the aim
+            // to the frame edge, tracking nobody). Total coast displacement is
+            // capped at the re-assoc radius; past that we would be inventing
+            // motion, so freeze and let the widen reveal the spot for a re-tap.
+            if (gap <= SPOT_COAST_SEC && dtClock > 0) {
+              const decay = Math.pow(SPOT_COAST_DECAY, dtClock * 60)
+              sel.vPan *= decay
+              sel.vTilt *= decay
+              const stepPan = sel.vPan * dtClock
+              const stepTilt = sel.vTilt * dtClock
+              const mag = Math.hypot(stepPan, stepTilt)
+              const left = SPOT_COAST_MAX_DEG - sel.coastDeg
+              if (mag > 0 && left > 0) {
+                const k = Math.min(1, left / mag)
+                sel.lastPan += stepPan * k
+                sel.lastTilt += stepTilt * k
+                sel.coastDeg += mag * k
+              }
             }
             // ONE-SHOT re-association with ambiguity refusal: the server
             // already bridged everything unambiguous, so what reaches the
@@ -1738,13 +1771,20 @@ export function VirtualPanoramaPlayer({
               const velOk =
                 !cv || Math.hypot(cv.p - sel.vPan, cv.t - sel.vTilt) <= 5
               const dwellOk = clock - sel.adoptedAt >= 2
-              if (!ambiguous && velOk && dwellOk && sel.hops < 2) {
+              // A pickup at essentially the SAME spot is the tracker re-indexing
+              // the same player in place (a fresh fragment id), not an identity
+              // jump — adopt it immediately (exempt from the dwell timer) and
+              // don't spend an identity-hop on it, so a player re-fragmenting in
+              // place stays followed. The ambiguity + velocity gates still guard.
+              const coLocated = d1 < SPOT_COLOCATED_DEG
+              if (!ambiguous && velOk && (dwellOk || coLocated) && sel.hops < 2) {
                 sel.index = cand.index
                 sel.lastPan = cand.panDeg
                 sel.lastTilt = cand.tiltDeg
                 sel.lostSince = null
+                sel.coastDeg = 0
                 sel.frameFov = 0 // recovered via re-assoc → re-seed the zoom damp
-                sel.hops += 1
+                if (!coLocated) sel.hops += 1 // a re-index in place is not a hop
                 sel.adoptedAt = clock
                 if (d1 > 1) sel.fadeUntil = performance.now() + 350 // hop = fade, not swoosh
               } else if ((ambiguous || !velOk) && gap > SPOT_LOST_SEC) {
@@ -1949,11 +1989,31 @@ export function VirtualPanoramaPlayer({
           const active = objectsAt(track, clock)
           let di = 0
           if (spotlightRef.current) {
+            // De-duplicate on screen: skip a dot within SPOT_DOT_MERGE_PX of an
+            // already-placed dot or of the followed player's ring. Two tracker
+            // fragments on one body (or ring + a stray dot on the same player)
+            // read as a bug; pixel-space is what the eye actually sees.
+            const placed: { x: number; y: number }[] = []
+            const ringPx = sel
+              ? projectToPx(sel.lastPan, sel.lastTilt, w, h)
+              : null
             for (const a of active) {
               if (sel && a.index === sel.index) continue
               if (di >= dotPool.length) break
               const p = projectToPx(a.panDeg, a.tiltDeg, w, h)
               if (!p) continue
+              if (
+                ringPx &&
+                Math.hypot(p.x - ringPx.x, p.y - ringPx.y) < SPOT_DOT_MERGE_PX
+              )
+                continue
+              if (
+                placed.some(
+                  (q) => Math.hypot(p.x - q.x, p.y - q.y) < SPOT_DOT_MERGE_PX
+                )
+              )
+                continue
+              placed.push(p)
               const c = dotPool[di++]
               c.setAttribute('cx', p.x.toFixed(1))
               c.setAttribute('cy', p.y.toFixed(1))
@@ -2387,6 +2447,7 @@ export function VirtualPanoramaPlayer({
         vPan: 0,
         vTilt: 0,
         lostSince: null,
+        coastDeg: 0,
         lastClock: clock,
         hops: 0,
         adoptedAt: clock,
@@ -2499,6 +2560,7 @@ export function VirtualPanoramaPlayer({
             vPan: 0,
             vTilt: 0,
             lostSince: null,
+            coastDeg: 0,
             lastClock: clock,
             hops: 0,
             adoptedAt: clock,
