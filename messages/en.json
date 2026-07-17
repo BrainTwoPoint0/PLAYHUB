@@ -1001,7 +1001,14 @@
     "spotlightHint": "Tap a player to spotlight and follow them",
     "spotlightNoData": "Player tracking isn’t available at this point of the match",
     "spotlightFollowing": "Following — drag to look around, tap another player to switch",
-    "spotlightLost": "Lost the player — tap them to spotlight again"
+    "spotlightLost": "Lost the player — tap them to spotlight again",
+    "spotlightSearching": "Finding them…",
+    "spotlightLocked": "Zoomed in and following — tap Lock to zoom back out",
+    "lock": "Lock",
+    "lockToggle": "Lock camera on player",
+    "lockOnTitle": "Camera locked on the player — tap to unlock (zoom back out)",
+    "lockOffTitle": "Lock the camera on this player and zoom in",
+    "lockDisabledTitle": "Tap a player first to lock the camera on them"
   },
   "auditHistory": {
     "title": "Audit history",

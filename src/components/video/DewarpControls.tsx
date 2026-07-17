@@ -3,7 +3,7 @@
 import type { RefObject } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@braintwopoint0/playback-commons/ui'
-import { Minus, Plus, Frame, LocateFixed, UserSearch } from 'lucide-react'
+import { Minus, Plus, Frame, LocateFixed, UserSearch, Focus } from 'lucide-react'
 import { cn } from '@braintwopoint0/playback-commons/utils'
 import type { DewarpSurfaceApi } from './VirtualPanoramaPlayer'
 
@@ -25,6 +25,10 @@ interface DewarpControlsProps {
   hasTracklets?: boolean
   /** Live spotlight-armed state (reported by the surface). */
   spotlight?: boolean
+  /** A player is currently selected — show the zoom-Lock toggle. */
+  hasSelection?: boolean
+  /** Live zoom-lock state (reported by the surface). */
+  lock?: boolean
 }
 
 export function DewarpControls({
@@ -33,6 +37,8 @@ export function DewarpControls({
   autoFollow = false,
   hasTracklets = false,
   spotlight = false,
+  hasSelection = false,
+  lock = false,
 }: DewarpControlsProps) {
   const t = useTranslations('player')
   return (
@@ -76,6 +82,34 @@ export function DewarpControls({
           <UserSearch className="h-4 w-4" />
           <span className="hidden text-xs font-medium md:inline">
             {t('spotlight')}
+          </span>
+        </Button>
+      )}
+      {/* Reserved once Spotlight is armed (disabled until a player is selected)
+          so it never pops in or shifts the zoom/reset cluster mid-session. */}
+      {hasTracklets && spotlight && (
+        <Button
+          onClick={() => apiRef.current?.toggleLock()}
+          size="sm"
+          variant="ghost"
+          disabled={!hasSelection}
+          aria-label={t('lockToggle')}
+          aria-pressed={lock}
+          title={
+            !hasSelection
+              ? t('lockDisabledTitle')
+              : lock
+                ? t('lockOnTitle')
+                : t('lockOffTitle')
+          }
+          className={cn(
+            'text-white hover:bg-white/20 h-9 gap-1.5 px-2 md:h-8 disabled:opacity-40',
+            lock && 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+          )}
+        >
+          <Focus className="h-4 w-4" />
+          <span className="hidden text-xs font-medium md:inline">
+            {t('lock')}
           </span>
         </Button>
       )}

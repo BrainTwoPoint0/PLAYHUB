@@ -1001,7 +1001,14 @@
     "spotlightHint": "Toca un jugador para enfocarlo y seguirlo",
     "spotlightNoData": "El seguimiento de jugadores no está disponible en este punto del partido",
     "spotlightFollowing": "Siguiendo — arrastra para mirar alrededor, toca otro jugador para cambiar",
-    "spotlightLost": "Jugador perdido — tócalo para enfocarlo de nuevo"
+    "spotlightLost": "Jugador perdido — tócalo para enfocarlo de nuevo",
+    "spotlightSearching": "Buscándolo…",
+    "spotlightLocked": "Ampliado y siguiendo — toca Fijar para alejar",
+    "lock": "Fijar",
+    "lockToggle": "Fijar la cámara en el jugador",
+    "lockOnTitle": "Cámara fija en el jugador — toca para liberar (alejar)",
+    "lockOffTitle": "Fija la cámara en este jugador y amplía",
+    "lockDisabledTitle": "Toca primero a un jugador para fijar la cámara en él"
   },
   "auditHistory": {
     "title": "Historial de auditoría",

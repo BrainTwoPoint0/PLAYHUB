@@ -107,6 +107,8 @@ export function WatchPlayer({
     hasAimTrack: false,
     hasTracklets: false,
     spotlight: false,
+    hasSelection: false,
+    lock: false,
   })
 
   const dewarpReady = Boolean(meshBaseUrl && panoramaSrc)
@@ -237,14 +239,25 @@ export function WatchPlayer({
               hasAimTrack,
               hasTracklets,
               spotlight,
+              hasSelection,
+              lock,
             }) =>
               setDewarpFollow((s) =>
                 s.autoFollow === autoFollow &&
                 s.hasAimTrack === hasAimTrack &&
                 s.hasTracklets === hasTracklets &&
-                s.spotlight === spotlight
+                s.spotlight === spotlight &&
+                s.hasSelection === hasSelection &&
+                s.lock === lock
                   ? s
-                  : { autoFollow, hasAimTrack, hasTracklets, spotlight }
+                  : {
+                      autoFollow,
+                      hasAimTrack,
+                      hasTracklets,
+                      spotlight,
+                      hasSelection,
+                      lock,
+                    }
               )
             }
             className="h-full w-full"
@@ -310,6 +323,8 @@ export function WatchPlayer({
             <DewarpControls
               hasTracklets={dewarpFollow.hasTracklets}
               spotlight={dewarpFollow.spotlight}
+              hasSelection={dewarpFollow.hasSelection}
+              lock={dewarpFollow.lock}
               apiRef={dewarpApiRef}
               hasAimTrack={dewarpFollow.hasAimTrack}
               autoFollow={dewarpFollow.autoFollow}

@@ -36,6 +36,7 @@ import {
   nearestObject,
   type Tracklets,
 } from '@/lib/panorama/tracklets'
+import { computeFraming, searchFov } from '@/lib/panorama/framing'
 import {
   Play,
   Pause,
@@ -48,6 +49,7 @@ import {
   Move,
   Crosshair,
   UserSearch,
+  Focus,
 } from 'lucide-react'
 import { cn } from '@braintwopoint0/playback-commons/utils'
 import {
@@ -139,6 +141,8 @@ interface VirtualPanoramaPlayerProps {
     hasAimTrack: boolean
     hasTracklets: boolean
     spotlight: boolean
+    hasSelection: boolean
+    lock: boolean
   }) => void
   /**
    * Debug: disable the fov-adaptive pinhole↔cylindrical blend and render with
@@ -173,6 +177,7 @@ export interface DewarpSurfaceApi {
   reset: () => void
   toggleAuto: () => void
   toggleSpotlight: () => void
+  toggleLock: () => void
 }
 
 const FOV_MIN = 12
@@ -971,6 +976,10 @@ export function VirtualPanoramaPlayer({
   const spotSelRef = useRef<{
     index: number
     follow: boolean
+    lock: boolean // camera zoom-LOCK on the player (Tier 1b) — off = ring+aim only
+    frameFov: number // committed fov goal (deg) for the lock; 0 = seed (reset damp)
+    relaxFov: number // >0 = ease the (unlocked) fov back to this wide value once,
+    // then clear — the "zoom back out" transient after an explicit Lock-off
     lastPan: number // deg — last known position, drives re-association
     lastTilt: number
     vPan: number // deg/s — EMA angular velocity (projects the gap search)
@@ -981,10 +990,27 @@ export function VirtualPanoramaPlayer({
     adoptedAt: number // clock when the current chain was adopted (min dwell)
     fadeUntil: number // performance.now() ms — ring fades in after a >1° hop
   } | null>(null)
+  // React mirrors of the (ref-held) selection, so the Lock affordance can render
+  // its pressed state + gate on "a player is selected" without per-frame churn.
+  // Updated (deduped) from the RAF overlay pass, like spotNotice.
+  const [hasSelection, setHasSelection] = useState(false)
+  const hasSelectionRef = useRef(false)
+  const [spotLock, setSpotLock] = useState(false)
+  const spotLockRef = useRef(false)
+  // Double-tap accelerator: a second select within this window locks the camera.
+  const lastSelectTapRef = useRef(0)
+  const DOUBLE_TAP_MS = 350
   // Status pill state machine: base kind is derived every frame in the
   // overlay update ('hint' armed+unselected, 'nodata' armed in an untracked
   // stretch, null otherwise); transient kinds override it briefly.
-  type SpotNotice = 'hint' | 'nodata' | 'following' | 'lost' | null
+  type SpotNotice =
+    | 'hint'
+    | 'nodata'
+    | 'following'
+    | 'locked'
+    | 'searching'
+    | 'lost'
+    | null
   const [spotNotice, setSpotNotice] = useState<SpotNotice>(null)
   const spotNoticeRef = useRef<SpotNotice>(null)
   const spotNoticeOverride = useRef<{ kind: SpotNotice; until: number } | null>(
@@ -1431,6 +1457,20 @@ export function VirtualPanoramaPlayer({
           } else {
             viewRef.current = next
           }
+          // Manual zoom while locked = the user takes zoom control: release the
+          // zoom-lock but KEEP the aim-follow (re-engage via Lock/double-tap).
+          // A silent drop is confusing, so caption it when it was actually on.
+          const sw = spotSelRef.current
+          if (sw?.follow) {
+            const wasLocked = sw.lock
+            sw.lock = false
+            sw.relaxFov = 0
+            if (wasLocked)
+              spotNoticeOverride.current = {
+                kind: 'following',
+                until: Date.now() + 2500,
+              }
+          }
           syncZoom()
           dismissHint()
         }
@@ -1592,6 +1632,11 @@ export function VirtualPanoramaPlayer({
         // (the tracker almost always re-detects the same player in place);
         // past the gate for a few seconds → the selection is honestly LOST.
         const SPOT_FOLLOW_SMOOTH = 0.35
+        // Zoom is driven SLOWER than the aim (cinematic; avoids visible zoom
+        // jitter) — see prior-art in framing.ts. The lost/searching widen eases
+        // slower still, so a brief occlusion doesn't yank the frame wide.
+        const SPOT_FOV_SMOOTH = 0.9
+        const SPOT_FOV_SEARCH_SMOOTH = 1.1
         const SPOT_REASSOC_DEG = 2.0
         const SPOT_LOST_SEC = 3
         // Distinguishes a real seek from a suspended RAF (backgrounded tab).
@@ -1635,6 +1680,10 @@ export function VirtualPanoramaPlayer({
             }
             sel.lastPan = s.panDeg
             sel.lastTilt = s.tiltDeg
+            // Recovering from a coast: re-seed the fov goal so the locked drive
+            // restarts the zoom damp cleanly (fires the frameFov<=0 velF reset),
+            // easing from the widened "searching" fov back to the frame.
+            if (sel.lostSince !== null) sel.frameFov = 0
             sel.lostSince = null
           } else {
             if (sel.lostSince === null) sel.lostSince = clock
@@ -1694,6 +1743,7 @@ export function VirtualPanoramaPlayer({
                 sel.lastPan = cand.panDeg
                 sel.lastTilt = cand.tiltDeg
                 sel.lostSince = null
+                sel.frameFov = 0 // recovered via re-assoc → re-seed the zoom damp
                 sel.hops += 1
                 sel.adoptedAt = clock
                 if (d1 > 1) sel.fadeUntil = performance.now() + 350 // hop = fade, not swoosh
@@ -1725,22 +1775,67 @@ export function VirtualPanoramaPlayer({
           if (sel.follow && sel.lostSince === null) {
             const v = viewRef.current,
               dt = 1 / 60
+            if (sel.lock) {
+              // LOCKED: drive fov to frame the player (context framing + a
+              // distortion cap + speed widen) and lead the aim in the motion
+              // direction. framing.ts clamps targetFov to the scene range, so
+              // clampView is a no-op on fov (a clamped goal would stall the
+              // damper). Seed frameFov (<=0) resets velF for a clean zoom start.
+              const l = limitsRef.current
+              if (sel.frameFov <= 0) velF.v = 0
+              const f = computeFraming({
+                panDeg: sel.lastPan,
+                tiltDeg: sel.lastTilt,
+                vPanDeg: sel.vPan,
+                vTiltDeg: sel.vTilt,
+                limitsDeg: {
+                  minPan: l.minPan / DEG,
+                  maxPan: l.maxPan / DEG,
+                  minTilt: l.minTilt / DEG,
+                  maxTilt: l.maxTilt / DEG,
+                },
+                sceneFovMax: curvedFovMaxRef.current,
+                prevGoalFov: sel.frameFov,
+              })
+              sel.frameFov = f.targetFov
+              viewRef.current = clampView({
+                pan: smoothDamp(v.pan, f.aimPanDeg * DEG, velP, SPOT_FOLLOW_SMOOTH, dt),
+                tilt: smoothDamp(v.tilt, f.aimTiltDeg * DEG, velT, SPOT_FOLLOW_SMOOTH, dt),
+                fov: smoothDamp(v.fov, f.targetFov, velF, SPOT_FOV_SMOOTH, dt),
+              })
+            } else {
+              // UNLOCKED (default tap): aim only, zoom stays the user's —
+              // byte-identical to the pre-Tier-1b behavior — EXCEPT the brief
+              // "zoom back out" ease after an explicit Lock-off (relaxFov > 0),
+              // which self-clears once it arrives.
+              let fov = v.fov
+              if (sel.relaxFov > 0) {
+                fov = smoothDamp(v.fov, sel.relaxFov, velF, SPOT_FOV_SMOOTH, dt)
+                if (Math.abs(fov - sel.relaxFov) < 0.5) sel.relaxFov = 0
+              }
+              viewRef.current = clampView({
+                pan: smoothDamp(v.pan, sel.lastPan * DEG, velP, SPOT_FOLLOW_SMOOTH, dt),
+                tilt: smoothDamp(v.tilt, sel.lastTilt * DEG, velT, SPOT_FOLLOW_SMOOTH, dt),
+                fov,
+              })
+            }
+            if (followFrame++ % 8 === 0) syncZoom()
+          } else if (sel.follow && sel.lostSince !== null && sel.lock) {
+            // LOCKED + coasting/lost: ease the frame WIDER toward the searching
+            // fov so the user can re-find and re-tap, while the aim gently
+            // tracks the dead-reckoned position. (Unlocked-lost holds, as before.)
+            const v = viewRef.current,
+              dt = 1 / 60
             viewRef.current = clampView({
-              pan: smoothDamp(
-                v.pan,
-                sel.lastPan * DEG,
-                velP,
-                SPOT_FOLLOW_SMOOTH,
+              pan: smoothDamp(v.pan, sel.lastPan * DEG, velP, SPOT_FOLLOW_SMOOTH, dt),
+              tilt: smoothDamp(v.tilt, sel.lastTilt * DEG, velT, SPOT_FOLLOW_SMOOTH, dt),
+              fov: smoothDamp(
+                v.fov,
+                searchFov(curvedFovMaxRef.current),
+                velF,
+                SPOT_FOV_SEARCH_SMOOTH,
                 dt
               ),
-              tilt: smoothDamp(
-                v.tilt,
-                sel.lastTilt * DEG,
-                velT,
-                SPOT_FOLLOW_SMOOTH,
-                dt
-              ),
-              fov: v.fov, // zoom stays the user's — follow only aims
             })
             if (followFrame++ % 8 === 0) syncZoom()
           }
@@ -1826,6 +1921,19 @@ export function VirtualPanoramaPlayer({
           if (!svg || !curved) return
           const track = trackletsRef.current
           const sel = spotSelRef.current
+          // Mirror selection presence + lock to React (deduped) so the Lock
+          // affordance gates on "a player is selected" and shows its pressed
+          // state. Done before the early return so a disarm/drop clears it too.
+          const hs = sel !== null
+          if (hasSelectionRef.current !== hs) {
+            hasSelectionRef.current = hs
+            setHasSelection(hs)
+          }
+          const lk = sel?.lock === true
+          if (spotLockRef.current !== lk) {
+            spotLockRef.current = lk
+            setSpotLock(lk)
+          }
           if (!track || (!spotlightRef.current && !sel)) {
             svg.style.display = 'none'
             setNotice(null)
@@ -1932,7 +2040,9 @@ export function VirtualPanoramaPlayer({
             setNotice(ov.kind)
           } else {
             if (ov) spotNoticeOverride.current = null
-            if (!spotlightRef.current) setNotice(null)
+            if (sel && sel.lostSince !== null)
+              setNotice('searching') // coasting — caption the widening frame
+            else if (!spotlightRef.current) setNotice(null)
             else if (active.length === 0)
               setNotice('nodata') // untracked stretch — taps CAN'T work here
             else if (!sel) setNotice('hint')
@@ -1962,22 +2072,36 @@ export function VirtualPanoramaPlayer({
         let lastDriver = ''
         const loop = () => {
           raf = requestAnimationFrame(loop)
+          // Driver-key velocity reset runs BEFORE stepSpotlight so engaging or
+          // releasing the zoom-lock pre-empts a stale-velF kick this frame
+          // (rather than cleaning it one frame late). 'spot-lock' vs 'spot'
+          // makes the lock toggle a driver change. Transitions that flip INSIDE
+          // stepSpotlight (lost↔found) are handled by the frameFov<=0 re-seed.
+          {
+            const sel0 = spotSelRef.current
+            const following0 = Boolean(
+              sel0?.follow && sel0?.lostSince === null
+            )
+            const driver = following0
+              ? sel0?.lock
+                ? 'spot-lock'
+                : 'spot'
+              : autoFollowRef.current && curved && !autoSrc
+                ? 'auto'
+                : ''
+            if (driver !== lastDriver) {
+              velP.v = 0
+              velT.v = 0
+              velF.v = 0
+              lastDriver = driver
+            }
+          }
           if (curved) stepSpotlight()
           lastRafMs = performance.now()
           const spotFollowing = Boolean(
-            spotSelRef.current?.follow && spotSelRef.current?.lostSince === null
+            spotSelRef.current?.follow &&
+              spotSelRef.current?.lostSince === null
           )
-          const driver = spotFollowing
-            ? 'spot'
-            : autoFollowRef.current && curved && !autoSrc
-              ? 'auto'
-              : ''
-          if (driver !== lastDriver) {
-            velP.v = 0
-            velT.v = 0
-            velF.v = 0
-            lastDriver = driver
-          }
           if (!spotFollowing && autoFollowRef.current && curved && !autoSrc) {
             const track = aimTrackRef.current
             if (track) stepAim(track)
@@ -2157,6 +2281,27 @@ export function VirtualPanoramaPlayer({
     setSpotlight(next)
     dismissHint()
   }
+  // Zoom-LOCK toggle (Tier 1b) — only meaningful with a live selection.
+  const toggleLock = () => {
+    const sel = spotSelRef.current
+    if (!sel) return
+    const next = !sel.lock
+    sel.lock = next
+    sel.frameFov = 0 // reset the fov goal so the zoom damp seeds cleanly
+    if (next) {
+      sel.relaxFov = 0
+      setAutoFollow(false)
+      spotNoticeOverride.current = { kind: 'locked', until: Date.now() + 3000 }
+    } else {
+      // Lock off: ease the frame back out to a wide follow (aim-follow stays);
+      // caption it so the zoom-out isn't a silent, unexplained change.
+      sel.relaxFov = searchFov(curvedFovMaxRef.current)
+      spotNoticeOverride.current = { kind: 'following', until: Date.now() + 2500 }
+    }
+    setSpotLock(next)
+    spotLockRef.current = next
+    dismissHint()
+  }
   const onPointerMove = (e: React.PointerEvent) => {
     const start = dragRef.current
     const host = canvasHostRef.current
@@ -2174,8 +2319,13 @@ export function VirtualPanoramaPlayer({
     ) {
       c.moved = true
       // A real drag = taking manual control: disengage spotlight camera-
-      // follow (ring stays; tapping the player again re-follows).
-      if (spotSelRef.current) spotSelRef.current.follow = false
+      // follow AND the zoom-lock (ring stays; tapping the player again
+      // re-follows, and Lock/double-tap re-engages the zoom).
+      if (spotSelRef.current) {
+        spotSelRef.current.follow = false
+        spotSelRef.current.lock = false
+        spotSelRef.current.relaxFov = 0 // user has aim control; cancel any relax
+      }
     }
     dragRef.current = { x: e.clientX, y: e.clientY }
     const fovRad = viewRef.current.fov * DEG
@@ -2221,9 +2371,17 @@ export function VirtualPanoramaPlayer({
     )
     const hit = nearestObject(track, clock, at.panDeg, at.tiltDeg, gateDeg)
     if (hit) {
+      // Double-tap accelerator: a second select within DOUBLE_TAP_MS engages the
+      // zoom-lock immediately (single tap = ring + aim only, today's behavior).
+      const now = Date.now()
+      const dbl = now - lastSelectTapRef.current < DOUBLE_TAP_MS
+      lastSelectTapRef.current = now
       spotSelRef.current = {
         index: hit.index,
         follow: true,
+        lock: dbl,
+        frameFov: 0,
+        relaxFov: 0,
         lastPan: hit.panDeg,
         lastTilt: hit.tiltDeg,
         vPan: 0,
@@ -2236,13 +2394,15 @@ export function VirtualPanoramaPlayer({
       }
       setAutoFollow(false)
       spotNoticeOverride.current = {
-        kind: 'following',
+        kind: dbl ? 'locked' : 'following',
         until: Date.now() + 4000,
       }
     } else if (spotSelRef.current) {
       // Confirmed empty tap with an existing selection: re-assert follow so a
       // stray screen tap never silently stops tracking the chosen player.
+      // Clear any pending unlock-relax so a re-follow isn't a surprise zoom-out.
       spotSelRef.current.follow = true
+      spotSelRef.current.relaxFov = 0
     }
   }
 
@@ -2251,9 +2411,28 @@ export function VirtualPanoramaPlayer({
       ...viewRef.current,
       fov: viewRef.current.fov / f,
     })
+    // Manual zoom releases the zoom-lock (keeps aim-follow), like the wheel.
+    const sw = spotSelRef.current
+    if (sw?.follow) {
+      const wasLocked = sw.lock
+      sw.lock = false
+      sw.relaxFov = 0
+      if (wasLocked)
+        spotNoticeOverride.current = {
+          kind: 'following',
+          until: Date.now() + 2500,
+        }
+    }
     syncZoom()
   }
   const resetView = () => {
+    // The "back to wide" home: drop follow + lock (ring stays; tap to re-follow)
+    // so the reset isn't instantly fought by the follow driver.
+    if (spotSelRef.current) {
+      spotSelRef.current.follow = false
+      spotSelRef.current.lock = false
+      spotSelRef.current.relaxFov = 0
+    }
     viewRef.current = clampView({ pan: 0, tilt: 0, fov: 70 })
     syncZoom()
   }
@@ -2312,6 +2491,9 @@ export function VirtualPanoramaPlayer({
           spotSelRef.current = {
             index: hit.index,
             follow: true,
+            lock: false,
+            frameFov: 0,
+            relaxFov: 0,
             lastPan: hit.panDeg,
             lastTilt: hit.tiltDeg,
             vPan: 0,
@@ -2330,6 +2512,12 @@ export function VirtualPanoramaPlayer({
         }
         break
       }
+      case 'l':
+      case 'L':
+        // Keyboard parity for the Lock toggle (only with a live selection).
+        if (spotSelRef.current) toggleLock()
+        else handled = false
+        break
       case 'Escape':
         if (spotSelRef.current) spotSelRef.current = null
         else handled = false
@@ -2449,8 +2637,19 @@ export function VirtualPanoramaPlayer({
       hasAimTrack,
       hasTracklets,
       spotlight,
+      hasSelection,
+      lock: spotLock,
     })
-  }, [autoFollow, zoomPct, hasAimTrack, hasTracklets, spotlight, onStateChange])
+  }, [
+    autoFollow,
+    zoomPct,
+    hasAimTrack,
+    hasTracklets,
+    spotlight,
+    hasSelection,
+    spotLock,
+    onStateChange,
+  ])
 
   // Publish the imperative control handle for the extras (ref-as-latest-callback,
   // same pattern as toggleFullscreenRef — the closures below are already defined).
@@ -2461,6 +2660,7 @@ export function VirtualPanoramaPlayer({
       reset: resetView,
       toggleAuto: toggleAutoFollow,
       toggleSpotlight,
+      toggleLock,
     }
   }
 
@@ -2510,7 +2710,9 @@ export function VirtualPanoramaPlayer({
               <UserSearch
                 className={cn(
                   'h-4 w-4',
-                  spotNotice === 'nodata' || spotNotice === 'lost'
+                  spotNotice === 'nodata' ||
+                  spotNotice === 'lost' ||
+                  spotNotice === 'searching'
                     ? 'text-[var(--ash-grey)]'
                     : 'text-emerald-400'
                 )}
@@ -2520,9 +2722,13 @@ export function VirtualPanoramaPlayer({
                   ? 'spotlightNoData'
                   : spotNotice === 'following'
                     ? 'spotlightFollowing'
-                    : spotNotice === 'lost'
-                      ? 'spotlightLost'
-                      : 'spotlightHint'
+                    : spotNotice === 'locked'
+                      ? 'spotlightLocked'
+                      : spotNotice === 'searching'
+                        ? 'spotlightSearching'
+                        : spotNotice === 'lost'
+                          ? 'spotlightLost'
+                          : 'spotlightHint'
               )}
             </div>
           </div>
@@ -2535,9 +2741,13 @@ export function VirtualPanoramaPlayer({
                   ? 'spotlightNoData'
                   : spotNotice === 'following'
                     ? 'spotlightFollowing'
-                    : spotNotice === 'lost'
-                      ? 'spotlightLost'
-                      : 'spotlightHint'
+                    : spotNotice === 'locked'
+                      ? 'spotlightLocked'
+                      : spotNotice === 'searching'
+                        ? 'spotlightSearching'
+                        : spotNotice === 'lost'
+                          ? 'spotlightLost'
+                          : 'spotlightHint'
               )
             : ''}
         </span>
@@ -2690,6 +2900,34 @@ export function VirtualPanoramaPlayer({
                     <span className="text-xs font-medium">
                       {t('spotlight')}
                     </span>
+                  </Button>
+                )}
+                {/* Reserved once Spotlight is armed (disabled until a player is
+                    selected) so it never pops in mid-session or shifts the
+                    zoom/reset cluster under the user's thumb. */}
+                {curved && hasTracklets && spotlight && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleLock}
+                    disabled={!hasSelection}
+                    aria-label={t('lockToggle')}
+                    aria-pressed={spotLock}
+                    title={
+                      !hasSelection
+                        ? t('lockDisabledTitle')
+                        : spotLock
+                          ? t('lockOnTitle')
+                          : t('lockOffTitle')
+                    }
+                    className={cn(
+                      'h-9 gap-1.5 px-2 text-white hover:bg-white/20 md:h-8 disabled:opacity-40',
+                      spotLock &&
+                        'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+                    )}
+                  >
+                    <Focus className="h-4 w-4" />
+                    <span className="text-xs font-medium">{t('lock')}</span>
                   </Button>
                 )}
                 <Button
