@@ -5,6 +5,7 @@ import {
   HeadObjectCommand,
   CopyObjectCommand,
   DeleteObjectCommand,
+  ListObjectsV2Command,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { Upload } from '@aws-sdk/lib-storage'
@@ -235,6 +236,57 @@ export async function getDownloadUrl(
   })
 
   return getSignedUrl(s3Client, command, { expiresIn: expiresInSeconds })
+}
+
+/**
+ * Generate a plain S3 presigned GET URL. Unlike getPlaybackUrl this never
+ * routes through CloudFront — use it for prefixes the CDN's bucket policy
+ * does not cover (e.g. calibration-stills/*).
+ */
+export async function getSignedObjectUrl(
+  s3Key: string,
+  expiresInSeconds: number = 60 * 60
+): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: s3Key,
+  })
+
+  return getSignedUrl(s3Client, command, { expiresIn: expiresInSeconds })
+}
+
+/**
+ * List ALL objects under a prefix (paginated — S3 lists in lexicographic key
+ * order, so a single page would silently drop keys once a prefix exceeds
+ * 1000 objects, and "newest by LastModified" picked from one page would be
+ * wrong with no signal).
+ */
+export async function listObjects(
+  prefix: string
+): Promise<{ key: string; size: number; lastModified: Date | null }[]> {
+  const out: { key: string; size: number; lastModified: Date | null }[] = []
+  let continuationToken: string | undefined
+  do {
+    const response = await s3Client.send(
+      new ListObjectsV2Command({
+        Bucket: S3_BUCKET,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      })
+    )
+    for (const obj of response.Contents ?? []) {
+      if (!obj.Key) continue
+      out.push({
+        key: obj.Key,
+        size: obj.Size ?? 0,
+        lastModified: obj.LastModified ?? null,
+      })
+    }
+    continuationToken = response.IsTruncated
+      ? response.NextContinuationToken
+      : undefined
+  } while (continuationToken)
+  return out
 }
 
 // ============================================================================

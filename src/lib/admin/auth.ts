@@ -566,8 +566,51 @@ export async function upsertSceneMapping(data: {
 }): Promise<{ success: boolean; error?: string }> {
   const supabase = createServiceClient() as any
 
+  // A scene leaving its venue (unassign, or reassign to a DIFFERENT org) must
+  // supersede the scene's active pitch calibration: the calibration snapshots
+  // venue_organization_id, so leaving it active would keep it readable by the
+  // old org's members while still resolving as the scene's current geometry.
+  const supersedeActiveCalibration = async () => {
+    const { error } = await supabase
+      .from('playhub_pitch_calibrations')
+      .update({ status: 'superseded', superseded_at: new Date().toISOString() })
+      .eq('scene_id', data.scene_id)
+      .eq('status', 'active')
+    if (error) {
+      console.error('Failed to supersede pitch calibration:', error)
+    }
+    return !error
+  }
+
+  // Calibration stills are median frames rendered from the OLD org's footage
+  // (calibration-stills/{scene_id}/ is keyed by scene alone) — a scene that
+  // leaves its org must not let the next org list + presign them. Best-effort:
+  // the supersede above is the access-critical part; a failed delete only
+  // preserves today's status quo and is logged loudly.
+  const deleteCalibrationStills = async () => {
+    try {
+      const { listObjects, deleteFile } = await import('@/lib/s3/client')
+      const stills = await listObjects(`calibration-stills/${data.scene_id}/`)
+      await Promise.all(stills.map((o) => deleteFile(o.key)))
+      if (stills.length) {
+        console.log(
+          `Deleted ${stills.length} calibration still(s) for reassigned scene ${data.scene_id}`
+        )
+      }
+    } catch (err) {
+      console.error(
+        `FAILED to delete calibration stills for scene ${data.scene_id} — old-org imagery remains listable by the new org:`,
+        err
+      )
+    }
+  }
+
   if (!data.organization_id) {
-    // Unassign: delete the mapping
+    // Unassign: supersede the calibration first, then delete the mapping
+    if (!(await supersedeActiveCalibration())) {
+      return { success: false, error: 'Failed to unassign scene' }
+    }
+    await deleteCalibrationStills()
     const { error } = await supabase
       .from('playhub_scene_venue_mapping')
       .delete()
@@ -578,6 +621,19 @@ export async function upsertSceneMapping(data: {
       return { success: false, error: 'Failed to unassign scene' }
     }
     return { success: true }
+  }
+
+  // Reassign to a different org: the old venue's calibration no longer applies
+  const { data: existing } = await supabase
+    .from('playhub_scene_venue_mapping')
+    .select('organization_id')
+    .eq('scene_id', data.scene_id)
+    .maybeSingle()
+  if (existing && existing.organization_id !== data.organization_id) {
+    if (!(await supersedeActiveCalibration())) {
+      return { success: false, error: 'Failed to reassign scene' }
+    }
+    await deleteCalibrationStills()
   }
 
   // Assign or reassign

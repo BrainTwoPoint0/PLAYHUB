@@ -1950,6 +1950,7 @@ export type Database = {
           panorama_capture_started_at: string | null
           panorama_capture_status: string | null
           panorama_s3_key: string | null
+          pitch_focus: string
           pitch_name: string | null
           preview_url: string | null
           price_amount: number | null
@@ -1968,6 +1969,10 @@ export type Database = {
           sync_attempts: number | null
           thumbnail_url: string | null
           title: string
+          tracklets_attempts: number | null
+          tracklets_error: string | null
+          tracklets_started_at: string | null
+          tracklets_status: string | null
           transferred_at: string | null
           updated_at: string | null
           venue: string | null
@@ -2011,6 +2016,7 @@ export type Database = {
           panorama_capture_started_at?: string | null
           panorama_capture_status?: string | null
           panorama_s3_key?: string | null
+          pitch_focus?: string
           pitch_name?: string | null
           preview_url?: string | null
           price_amount?: number | null
@@ -2029,6 +2035,10 @@ export type Database = {
           sync_attempts?: number | null
           thumbnail_url?: string | null
           title: string
+          tracklets_attempts?: number | null
+          tracklets_error?: string | null
+          tracklets_started_at?: string | null
+          tracklets_status?: string | null
           transferred_at?: string | null
           updated_at?: string | null
           venue?: string | null
@@ -2072,6 +2082,7 @@ export type Database = {
           panorama_capture_started_at?: string | null
           panorama_capture_status?: string | null
           panorama_s3_key?: string | null
+          pitch_focus?: string
           pitch_name?: string | null
           preview_url?: string | null
           price_amount?: number | null
@@ -2090,6 +2101,10 @@ export type Database = {
           sync_attempts?: number | null
           thumbnail_url?: string | null
           title?: string
+          tracklets_attempts?: number | null
+          tracklets_error?: string | null
+          tracklets_started_at?: string | null
+          tracklets_status?: string | null
           transferred_at?: string | null
           updated_at?: string | null
           venue?: string | null
@@ -2284,6 +2299,100 @@ export type Database = {
           {
             foreignKeyName: 'playhub_pending_admin_invites_organization_id_fkey'
             columns: ['organization_id']
+            isOneToOne: false
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      playhub_pitch_calibrations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          field_polygon_rayn: Json | null
+          frame_height: number
+          frame_s3_key: string
+          frame_width: number
+          homography: Json | null
+          id: string
+          marks: Json
+          mesh_source_game_id: string | null
+          pitch_length_m: number
+          pitch_width_m: number
+          provider: string
+          reprojection_error_px: number | null
+          scene_id: string
+          solver_version: number | null
+          source: string
+          status: string
+          superseded_at: string | null
+          superseded_by: string | null
+          venue_organization_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          field_polygon_rayn?: Json | null
+          frame_height?: number
+          frame_s3_key: string
+          frame_width?: number
+          homography?: Json | null
+          id?: string
+          marks: Json
+          mesh_source_game_id?: string | null
+          pitch_length_m: number
+          pitch_width_m: number
+          provider: string
+          reprojection_error_px?: number | null
+          scene_id: string
+          solver_version?: number | null
+          source?: string
+          status?: string
+          superseded_at?: string | null
+          superseded_by?: string | null
+          venue_organization_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          field_polygon_rayn?: Json | null
+          frame_height?: number
+          frame_s3_key?: string
+          frame_width?: number
+          homography?: Json | null
+          id?: string
+          marks?: Json
+          mesh_source_game_id?: string | null
+          pitch_length_m?: number
+          pitch_width_m?: number
+          provider?: string
+          reprojection_error_px?: number | null
+          scene_id?: string
+          solver_version?: number | null
+          source?: string
+          status?: string
+          superseded_at?: string | null
+          superseded_by?: string | null
+          venue_organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'playhub_pitch_calibrations_scene_id_fkey'
+            columns: ['scene_id']
+            isOneToOne: false
+            referencedRelation: 'playhub_scene_venue_mapping'
+            referencedColumns: ['scene_id']
+          },
+          {
+            foreignKeyName: 'playhub_pitch_calibrations_superseded_by_fkey'
+            columns: ['superseded_by']
+            isOneToOne: false
+            referencedRelation: 'playhub_pitch_calibrations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'playhub_pitch_calibrations_venue_organization_id_fkey'
+            columns: ['venue_organization_id']
             isOneToOne: false
             referencedRelation: 'organizations'
             referencedColumns: ['id']
@@ -3033,6 +3142,51 @@ export type Database = {
           csrf_token?: string
           expires_at?: string
           id?: string
+        }
+        Relationships: []
+      }
+      playhub_veo_captures: {
+        Row: {
+          capture_attempts: number
+          capture_error: string | null
+          capture_started_at: string | null
+          capture_status: string | null
+          created_at: string
+          id: string
+          match_date: string | null
+          match_slug: string
+          panorama_bytes: number | null
+          panorama_s3_key: string | null
+          tracking_s3_key: string | null
+          veo_club_slug: string
+        }
+        Insert: {
+          capture_attempts?: number
+          capture_error?: string | null
+          capture_started_at?: string | null
+          capture_status?: string | null
+          created_at?: string
+          id?: string
+          match_date?: string | null
+          match_slug: string
+          panorama_bytes?: number | null
+          panorama_s3_key?: string | null
+          tracking_s3_key?: string | null
+          veo_club_slug: string
+        }
+        Update: {
+          capture_attempts?: number
+          capture_error?: string | null
+          capture_started_at?: string | null
+          capture_status?: string | null
+          created_at?: string
+          id?: string
+          match_date?: string | null
+          match_slug?: string
+          panorama_bytes?: number | null
+          panorama_s3_key?: string | null
+          tracking_s3_key?: string | null
+          veo_club_slug?: string
         }
         Relationships: []
       }
@@ -4289,6 +4443,19 @@ export type Database = {
         }
         Relationships: []
       }
+      playhub_veo_capture_candidates: {
+        Row: {
+          capture_attempts: number | null
+          capture_id: string | null
+          capture_started_at: string | null
+          capture_status: string | null
+          match_date: string | null
+          match_slug: string | null
+          title: string | null
+          veo_club_slug: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       _handle_new_user_version: { Args: never; Returns: string }
@@ -4302,6 +4469,55 @@ export type Database = {
           org_id: string
         }
         Returns: boolean
+      }
+      playhub_activate_pitch_calibration: {
+        Args: {
+          p_created_by: string
+          p_field_polygon_rayn: Json
+          p_frame_height: number
+          p_frame_s3_key: string
+          p_frame_width: number
+          p_homography: Json
+          p_marks: Json
+          p_mesh_source_game_id: string
+          p_pitch_length_m: number
+          p_pitch_width_m: number
+          p_provider: string
+          p_reprojection_error_px: number
+          p_scene_id: string
+          p_solver_version: number
+          p_source: string
+          p_venue_organization_id: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          field_polygon_rayn: Json | null
+          frame_height: number
+          frame_s3_key: string
+          frame_width: number
+          homography: Json | null
+          id: string
+          marks: Json
+          mesh_source_game_id: string | null
+          pitch_length_m: number
+          pitch_width_m: number
+          provider: string
+          reprojection_error_px: number | null
+          scene_id: string
+          solver_version: number | null
+          source: string
+          status: string
+          superseded_at: string | null
+          superseded_by: string | null
+          venue_organization_id: string
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'playhub_pitch_calibrations'
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       playscanner_search_slots_json: {
         Args: {

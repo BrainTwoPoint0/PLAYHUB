@@ -21,6 +21,13 @@ function supabaseUrl(): string {
  * Public base URL for a game's de-warp mesh. The VirtualPanoramaPlayer appends
  * `/scene.json`, `/vertices.bin`, `/indices.bin` (and optional `/tuning.json`).
  * Returns null when there's no game to key on.
+ *
+ * TRUST INVARIANT: `gameId` is interpolated into the path un-encoded, which is
+ * safe ONLY because it is always a DB/service-role-written id (spiideo_game_id
+ * / source_game_id), never caller input. The host is fixed and the id is
+ * appended to the PATH, so a malformed value can at worst 404 on the same
+ * trusted Supabase host — no external SSRF. If a code path ever lets a user set
+ * the id feeding this, encode it and re-audit the server-side fetchers.
  */
 export function meshBaseUrl(gameId: string | null | undefined): string | null {
   if (!gameId) return null
