@@ -50,14 +50,14 @@ zero-added-noise question closed itself). Synth marginals passed the
 hard gate on both matches (frag median 14.4/14.8s, mean life 23.5/24.1s,
 crowded-death 0.562/0.533, gap mass 0.607).
 
-| match | variant | chains | HOTA | AssA | DetA | IDF1 | MOTA |
-|---|---|---|---|---|---|---|---|
-| HB-u23 | no-stitch | 1625 | 0.255 | 0.073 | 0.882 | 0.135 | 0.868 |
-| HB-u23 | legacy-1.5s | 1228 | 0.268 | 0.082 | 0.876 | 0.143 | 0.866 |
-| HB-u23 | shipped-2.5s | 1020 | 0.291 | 0.097 | 0.877 | 0.164 | 0.870 |
-| SEFA-W | no-stitch | 4961 | 0.196 | 0.044 | 0.880 | 0.088 | 0.867 |
-| SEFA-W | legacy-1.5s | 3781 | 0.208 | 0.050 | 0.874 | 0.098 | 0.865 |
-| SEFA-W | shipped-2.5s | 3152 | 0.223 | 0.057 | 0.875 | 0.109 | 0.868 |
+| match  | variant      | chains | HOTA  | AssA  | DetA  | IDF1  | MOTA  |
+| ------ | ------------ | ------ | ----- | ----- | ----- | ----- | ----- |
+| HB-u23 | no-stitch    | 1625   | 0.255 | 0.073 | 0.882 | 0.135 | 0.868 |
+| HB-u23 | legacy-1.5s  | 1228   | 0.268 | 0.082 | 0.876 | 0.143 | 0.866 |
+| HB-u23 | shipped-2.5s | 1020   | 0.291 | 0.097 | 0.877 | 0.164 | 0.870 |
+| SEFA-W | no-stitch    | 4961   | 0.196 | 0.044 | 0.880 | 0.088 | 0.867 |
+| SEFA-W | legacy-1.5s  | 3781   | 0.208 | 0.050 | 0.874 | 0.098 | 0.865 |
+| SEFA-W | shipped-2.5s | 3152   | 0.223 | 0.057 | 0.875 | 0.109 | 0.868 |
 
 Per-T P(right)/P(wrong)/P(lost), shipped-2.5s (both matches agree ±0.02):
 T=5s 0.88/0.00/0.12 · T=15s 0.67/0.01/0.32 · T=30s 0.46/0.01/0.53 ·

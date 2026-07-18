@@ -775,7 +775,11 @@ describe('isJerseyClaimable', () => {
 
   it('requires game id, allowlisted scene, ready tracklets, and a panorama', () => {
     expect(
-      isJerseyClaimable(jerseyRow({ spiideo_game_id: null }), JERSEY_VENUES, NOW)
+      isJerseyClaimable(
+        jerseyRow({ spiideo_game_id: null }),
+        JERSEY_VENUES,
+        NOW
+      )
     ).toBe(false)
     expect(
       isJerseyClaimable(
@@ -802,7 +806,11 @@ describe('isJerseyClaimable', () => {
 
   it('never reclaims ready, fresh pending, or attempts-capped rows', () => {
     expect(
-      isJerseyClaimable(jerseyRow({ jersey_status: 'ready' }), JERSEY_VENUES, NOW)
+      isJerseyClaimable(
+        jerseyRow({ jersey_status: 'ready' }),
+        JERSEY_VENUES,
+        NOW
+      )
     ).toBe(false)
     expect(
       isJerseyClaimable(
@@ -835,7 +843,9 @@ describe('isJerseyClaimable', () => {
         jerseyRow({
           jersey_status: 'error',
           jersey_attempts: 1,
-          jersey_started_at: new Date(NOW - ERROR_COOLDOWN_MS + 5000).toISOString(),
+          jersey_started_at: new Date(
+            NOW - ERROR_COOLDOWN_MS + 5000
+          ).toISOString(),
         }),
         JERSEY_VENUES,
         NOW
@@ -846,7 +856,9 @@ describe('isJerseyClaimable', () => {
         jerseyRow({
           jersey_status: 'error',
           jersey_attempts: 1,
-          jersey_started_at: new Date(NOW - ERROR_COOLDOWN_MS - 5000).toISOString(),
+          jersey_started_at: new Date(
+            NOW - ERROR_COOLDOWN_MS - 5000
+          ).toISOString(),
         }),
         JERSEY_VENUES,
         NOW
@@ -860,7 +872,9 @@ describe('isJerseyClaimable', () => {
         jerseyRow({
           jersey_status: 'pending',
           jersey_attempts: 1,
-          jersey_started_at: new Date(NOW - JERSEY_STUCK_MS + 60_000).toISOString(),
+          jersey_started_at: new Date(
+            NOW - JERSEY_STUCK_MS + 60_000
+          ).toISOString(),
         }),
         JERSEY_VENUES,
         NOW
@@ -871,7 +885,9 @@ describe('isJerseyClaimable', () => {
         jerseyRow({
           jersey_status: 'pending',
           jersey_attempts: 1,
-          jersey_started_at: new Date(NOW - JERSEY_STUCK_MS - 1000).toISOString(),
+          jersey_started_at: new Date(
+            NOW - JERSEY_STUCK_MS - 1000
+          ).toISOString(),
         }),
         JERSEY_VENUES,
         NOW

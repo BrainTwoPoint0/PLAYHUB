@@ -293,7 +293,14 @@ describe('slot field (Tier 3 / B3)', () => {
       objects: [
         { ...OBJ_A, slot: 'g1' }, // ends 10.6
         { ...OBJ_B, slot: 'g1' }, // ends 11.4
-        { id: 'o9', t: [3, 4], pan: [0, 0], tilt: [0, 0], jersey: '7', slot: 'b7' },
+        {
+          id: 'o9',
+          t: [3, 4],
+          pan: [0, 0],
+          tilt: [0, 0],
+          jersey: '7',
+          slot: 'b7',
+        },
       ],
     })!
     expect(track.slotEnd['g1']).toBe(track.objects[1].t.at(-1))
@@ -308,7 +315,14 @@ describe('slotMate', () => {
     objects: [
       { ...OBJ_A, jersey: '10', slot: 'a10' },
       { ...OBJ_B, jersey: '10', slot: 'a10' },
-      { id: 'o9', t: [10, 11], pan: [50, 50], tilt: [0, 0], jersey: '7', slot: 'b7' },
+      {
+        id: 'o9',
+        t: [10, 11],
+        pan: [50, 50],
+        tilt: [0, 0],
+        jersey: '7',
+        slot: 'b7',
+      },
     ],
   }
 

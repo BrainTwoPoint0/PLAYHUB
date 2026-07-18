@@ -2255,8 +2255,7 @@ export function VirtualPanoramaPlayer({
                 sel &&
                 sel.slot !== null &&
                 a.slot === sel.slot &&
-                Math.hypot(a.panDeg - sel.lastPan, a.tiltDeg - sel.lastTilt) <
-                  5
+                Math.hypot(a.panDeg - sel.lastPan, a.tiltDeg - sel.lastTilt) < 5
               )
                 continue
               if (a.slot !== undefined && drawnSlots.has(a.slot)) continue
