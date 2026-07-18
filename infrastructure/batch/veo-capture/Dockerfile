@@ -24,6 +24,10 @@ FROM mcr.microsoft.com/playwright:v1.58.2-noble
 WORKDIR /app
 COPY package.json ./
 RUN npm install --omit=dev --no-audit --no-fund
-COPY entrypoint.mjs ./
+# Glob, not a name list: entrypoint.mjs imports sibling modules, and a COPY that
+# names files individually is one more place to drift out of lockstep — the job
+# would build clean and then ERR_MODULE_NOT_FOUND at runtime, on Fargate, after
+# the sweep already claimed the row.
+COPY *.mjs ./
 
 CMD ["node", "entrypoint.mjs"]

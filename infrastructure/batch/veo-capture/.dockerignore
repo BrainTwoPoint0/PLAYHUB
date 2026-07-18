@@ -1,0 +1,11 @@
+# Bounds the Dockerfile's `COPY *.mjs ./`. The glob is deliberate — naming files
+# individually drifts silently and the job would die at ERR_MODULE_NOT_FOUND on
+# Fargate, after the sweep already claimed the row — but this repo has a strong
+# habit of dropping scratch probes next to the thing they debug
+# (veo-automations/probe-mes-v2.mjs, capture-pm-full.mjs, spiideo-health-fetch.mjs),
+# and an unbounded glob would ship one into the production image.
+__tests__
+node_modules
+*.test.mjs
+*.test.ts
+buildspec.yml

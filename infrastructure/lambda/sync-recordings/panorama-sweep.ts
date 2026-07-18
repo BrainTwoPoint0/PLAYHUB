@@ -587,7 +587,9 @@ export function isVeoCaptureClaimable(
   const status = row.capture_status
   if (status === 'ready') return false
   if (!row.capture_id || status === null) return true // never attempted
-  const startedAt = row.capture_started_at ? Date.parse(row.capture_started_at) : 0
+  const startedAt = row.capture_started_at
+    ? Date.parse(row.capture_started_at)
+    : 0
   if (status === 'error')
     return (
       (row.capture_attempts ?? 0) < MAX_ATTEMPTS &&

@@ -11,8 +11,11 @@ phases:
       - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REPO_URL"
   build:
     commands:
-      # Source zip root == infrastructure/batch/veo-capture/, so the Dockerfile
-      # + entrypoint.mjs + package.json are in the build context (".").
+      # Source zip root == infrastructure/batch/veo-capture/, so the Dockerfile,
+      # package.json and ALL of the job's *.mjs are in the build context (".").
+      # entrypoint.mjs imports siblings (field-dims.mjs) — zip the whole dir, and
+      # include dotfiles so .dockerignore travels with it, or `COPY *.mjs` is
+      # unbounded in CI and can ship a scratch probe into the image.
       # --pull matters here: the base is mcr.microsoft.com (not Docker Hub), so
       # CodeBuild's NAT does not hit the anonymous-pull 429s that forced the other
       # job images onto the ECR Public mirror.

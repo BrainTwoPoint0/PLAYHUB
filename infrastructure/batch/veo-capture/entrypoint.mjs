@@ -41,8 +41,20 @@ import { Upload } from '@aws-sdk/lib-storage'
 import { createClient } from '@supabase/supabase-js'
 import { chromium } from 'playwright-core'
 
-const { ROW_ID, MATCH_SLUG, VEO_EMAIL, VEO_PASSWORD, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } =
-  process.env
+import {
+  fetchAlignment,
+  parseFieldDims,
+  trackingSchema,
+} from './field-dims.mjs'
+
+const {
+  ROW_ID,
+  MATCH_SLUG,
+  VEO_EMAIL,
+  VEO_PASSWORD,
+  SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY,
+} = process.env
 // Must be the SAME private bucket the app signs from — a mismatch 404s
 // everything, or exposes minors' footage if pointed at a public bucket.
 const S3_BUCKET = process.env.S3_RECORDINGS_BUCKET
@@ -132,7 +144,9 @@ async function main() {
     await page.fill('input[type="email"]', VEO_EMAIL)
     await page.fill('input[type="password"]', VEO_PASSWORD)
     await page.click('button[type="submit"]')
-    await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {})
+    await page
+      .waitForLoadState('networkidle', { timeout: 20_000 })
+      .catch(() => {})
     await page.waitForTimeout(2500)
     if (!bearer) throw new Error('Veo login captured no bearer token')
 
@@ -140,7 +154,11 @@ async function main() {
       page.evaluate(
         async ([p, b, ua]) => {
           const r = await fetch(`https://app.veo.co${p}`, {
-            headers: { accept: 'application/json', authorization: `Bearer ${b}`, 'veo-agent': ua },
+            headers: {
+              accept: 'application/json',
+              authorization: `Bearer ${b}`,
+              'veo-agent': ua,
+            },
             credentials: 'include',
           })
           const t = await r.text()
@@ -156,10 +174,14 @@ async function main() {
     // ── 1. the renditions. The .ts is render_type=panorama + mime video/mp2t.
     const vids = await api(`/api/app/matches/${MATCH_SLUG}/videos/`)
     if (vids.s === 409)
-      throw new Error('Veo ToS acceptance required — a human must log in and accept')
+      throw new Error(
+        'Veo ToS acceptance required — a human must log in and accept'
+      )
     if (vids.s !== 200) throw new Error(`videos/ returned ${vids.s}`)
     const list = Array.isArray(vids.j) ? vids.j : vids.j?.results || []
-    const ts = list.find((v) => v.render_type === 'panorama' && v.mime_type === 'video/mp2t')
+    const ts = list.find(
+      (v) => v.render_type === 'panorama' && v.mime_type === 'video/mp2t'
+    )
     // TRANSIENT, and it must not burn an attempt. Veo renders the panorama some
     // time after the upload, so a freshly-published match legitimately has no .ts
     // yet. Burning attempts here settled fresh matches at error/attempts=3 within
@@ -173,7 +195,9 @@ async function main() {
         capture_error: 'panorama not rendered by Veo yet — will retry',
         capture_attempts: 0,
       })
-      console.log(`veo-capture: ${MATCH_SLUG} has no .ts yet; attempt not burned`)
+      console.log(
+        `veo-capture: ${MATCH_SLUG} has no .ts yet; attempt not burned`
+      )
       return
     }
     if (ts.availability && ts.availability !== 'available') {
@@ -186,30 +210,99 @@ async function main() {
         capture_error: `panorama already ${ts.availability} — too late to capture`,
         capture_attempts: 3,
       })
-      console.log(`veo-capture: ${MATCH_SLUG} already ${ts.availability}; settled`)
+      console.log(
+        `veo-capture: ${MATCH_SLUG} already ${ts.availability}; settled`
+      )
       return
     }
 
     // The match uuid is the first path segment of every CDN url.
     const uuid = new URL(ts.url).pathname.split('/').filter(Boolean)[0]
     if (!uuid) throw new Error('could not derive match uuid from the CDN url')
+    // Every artifact for this match lives under one prefix. Declared here because
+    // the calibration is stored before the labels are fetched.
+    const base = `${PREFIX}/${MATCH_SLUG}`
+    let alignText = ''
 
     // ── 2. the labels. step-events FIRST: `match_ongoing` gives the real periods,
     // and they are NOT a free parameter — an invented window returns 200 and
     // silently merges both halves, and teams SWAP ENDS at half time, so `side`
     // would mean a different team either side of the break.
     const se = await api(`/api/mes/v2/${uuid}/step-events`)
-    const halves = (Array.isArray(se.j) ? se.j : []).filter((e) => e.name === 'match_ongoing')
-    if (!halves.length) throw new Error('step-events carried no match_ongoing period')
+    const halves = (Array.isArray(se.j) ? se.j : []).filter(
+      (e) => e.name === 'match_ongoing'
+    )
+    if (!halves.length)
+      throw new Error('step-events carried no match_ongoing period')
 
-    const qs = halves.map((h) => `periods=${Math.round(h.start)}%2C${Math.round(h.end)}`).join('&')
-    const jn = await api(`/api/mes/v2/${uuid}/player-tracking/jersey-numbers?${qs}`)
+    const qs = halves
+      .map((h) => `periods=${Math.round(h.start)}%2C${Math.round(h.end)}`)
+      .join('&')
+    const jn = await api(
+      `/api/mes/v2/${uuid}/player-tracking/jersey-numbers?${qs}`
+    )
     const events = await api(`/api/mes/v2/${uuid}/match-events`)
+
+    // The CALIBRATION, and it is REQUIRED — fetched before the labels because the
+    // labels are undecodable without it.
+    //
+    // alignment.veo is not provenance, it is the geometry: K + a 14-param OpenCV
+    // rational distortion + lens->camera + camera->world + this match's real pitch
+    // dimensions. It is the only source of the metric scale (xNorm/yNorm are
+    // normalised against THIS match's pitch), and field_width is per-match, so it
+    // cannot be back-filled from a sibling capture.
+    //
+    // REQUIRED, BUT NOT FAIL-FAST — read this before "simplifying" it to a throw.
+    //
+    // "Required" and "abort before the transfer" are SEPARABLE, and coupling them
+    // is the wrong trade in a deadline race. The two artifacts have opposite
+    // recovery profiles: alignment.veo is re-fetchable (measured — it still returns
+    // 206 after the panorama Glaciers), the panorama is NOT (gone at ~150d).
+    // Aborting early protects the recoverable artifact by sacrificing the
+    // irreplaceable one.
+    //
+    // The failure that forces this is DETERMINISTIC drift, not an outage: if Veo
+    // renames field_length or nests `alignment` deeper, parseFieldDims throws
+    // identically on every row. There is no transient for the sweep's 3 attempts to
+    // absorb — it would march the whole backlog to error at 1/tick, and the sweep is
+    // deliberately non-fatal (console.error only), so Lambda Errors stays 0 and no
+    // alarm can see it. Silent, corpus-wide, irreversible. parseFieldDims' wide
+    // bounds defend against VALUE drift; nothing defends against SHAPE drift.
+    //
+    // So: capture the pixels regardless, record where they landed, and THEN fail
+    // the row visibly. The corpus survives a drift; recovery is
+    // `WHERE capture_status='error' AND panorama_s3_key IS NOT NULL` + a re-run.
+    let fieldDims = null
+    let calibrationError = null
+    try {
+      if (!ts.render_settings)
+        throw new Error('videos/ carried no render_settings')
+      alignText = await fetchAlignment(ts.render_settings)
+      // Store the bytes BEFORE parsing: a fetch that succeeded and a parse that
+      // failed are different events and must not share a fate. Discarding
+      // successfully-fetched bytes forces a re-fetch that may not be available.
+      await new Upload({
+        client: s3,
+        params: {
+          Bucket: S3_BUCKET,
+          Key: `${base}/alignment.veo`,
+          Body: Buffer.from(alignText),
+          ContentType: 'application/json',
+        },
+      }).done()
+      fieldDims = parseFieldDims(alignText) // refuses rather than guess a scale
+      console.log(
+        `veo-capture ${MATCH_SLUG}: pitch ${fieldDims.lengthM} x ${fieldDims.widthM.toFixed(2)}m`
+      )
+    } catch (e) {
+      calibrationError = `alignment.veo unusable: ${redact(e?.message || e).slice(0, 160)}`
+      console.error(`veo-capture ${MATCH_SLUG}: ${calibrationError}`)
+    }
 
     // player-tracking is the RICHEST primitive: every object, jersey-labelled.
     // Columns: [trackId, roleTeam, xNorm, yNorm, JERSEY, ?, speedKmh, team]
     //   roleTeam: 0=left GK, 1=left outfield, 2=right GK, 3=right outfield, 6=ball
-    //   metric:   x=(xNorm-0.5)*105, y=(yNorm-0.5)*68   (FIFA pitch; fitted at 100%)
+    //   metric:   per-match, from fieldDims above — NEVER a hardcoded constant.
     const frames = {}
     for (const h of halves) {
       for (let s = Math.floor(h.start); s < h.end; s += TRACK_PAGE_S) {
@@ -222,10 +315,12 @@ async function main() {
       }
     }
     const nFrames = Object.keys(frames).length
-    if (nFrames < 100) throw new Error(`player-tracking too sparse (${nFrames} frames)`)
-    console.log(`veo-capture ${MATCH_SLUG}: ${halves.length} periods, ${nFrames} tracking frames`)
+    if (nFrames < 100)
+      throw new Error(`player-tracking too sparse (${nFrames} frames)`)
+    console.log(
+      `veo-capture ${MATCH_SLUG}: ${halves.length} periods, ${nFrames} tracking frames`
+    )
 
-    const base = `${PREFIX}/${MATCH_SLUG}`
     const putJson = (name, body) =>
       new Upload({
         client: s3,
@@ -242,16 +337,16 @@ async function main() {
       matchUuid: uuid,
       capturedAt: new Date().toISOString(),
       // pitch + column semantics travel WITH the data: a bare array of numbers is
-      // undecodable in six months, and this service is undocumented.
-      schema: {
-        pitch: { lengthM: 105, widthM: 68 },
-        columns: ['trackId', 'roleTeam', 'xNorm', 'yNorm', 'jersey', 'unknown5', 'speedKmh', 'team'],
-        roleTeam: { 0: 'left-GK', 1: 'left-outfield', 2: 'right-GK', 3: 'right-outfield', 6: 'ball' },
-        team: { 2: 'left', 1: 'right', 0: 'ball' },
-        jersey: '-1 = not read',
-        metric: 'x = (xNorm - 0.5) * 105 ; y = (yNorm - 0.5) * 68',
-        sampleHz: 2.5,
-      },
+      // undecodable in six months, and this service is undocumented. Which is
+      // exactly why the pitch must be THIS match's, measured: a schema block that
+      // lies is worse than none, because it is what the reader trusts instead of
+      // checking. (It shipped 105x68 for every match until 2026-07-15.)
+      //
+      // When the scale is unknown the block OMITS `metric` rather than guessing or
+      // emitting a null formula — an absent formula misleads nobody, and the row is
+      // flagged at error anyway. Recoverable later from the same match's
+      // alignment.veo (scripts/player-identity/backfill_tracking_schema.mjs).
+      schema: trackingSchema(fieldDims),
       periods: halves.map((h) => ({ start: h.start, end: h.end })),
       stepEvents: se.j ?? null,
       jerseyNumbers: jn.j ?? null,
@@ -265,10 +360,17 @@ async function main() {
     // Deletion should be prefix-driven anyway, but the DB must not under-report.
     await setStatus({ tracking_s3_key: `${base}/tracking.json` })
 
-    // Cheap provenance, and Phase 2 may want them: the lens calibration and the
-    // per-frame follow-cam direction. Both are public CDN objects.
+    // NOTE: alignment.veo is stored up at the fetch, inside the try — never here.
+    // An unconditional upload at this point writes Buffer.from('') whenever the
+    // fetch failed, and since a calibration failure now banks the pixels and
+    // settles the row at error, the sweep re-runs it: attempt 2's transient blip
+    // would zero attempt 1's GOOD calibration, irreversibly (the bucket has
+    // versioning Suspended). That inverts this job's whole premise — the 2.4KB is
+    // what makes the 9GB decodable.
+
+    // Genuinely cheap provenance, unlike alignment.veo: the per-frame follow-cam
+    // direction. Nothing depends on it, so it stays best-effort.
     for (const [name, url] of [
-      ['alignment.veo', ts.render_settings],
       ['camera_directions.det', ts.camera_directions],
     ]) {
       if (!url) continue
@@ -277,10 +379,16 @@ async function main() {
         if (!r.ok) continue
         await new Upload({
           client: s3,
-          params: { Bucket: S3_BUCKET, Key: `${base}/${name}`, Body: Buffer.from(await r.arrayBuffer()) },
+          params: {
+            Bucket: S3_BUCKET,
+            Key: `${base}/${name}`,
+            Body: Buffer.from(await r.arrayBuffer()),
+          },
         }).done()
       } catch (e) {
-        console.log(`veo-capture: ${name} skipped (${redact(e?.message || e).slice(0, 80)})`)
+        console.log(
+          `veo-capture: ${name} skipped (${redact(e?.message || e).slice(0, 80)})`
+        )
       }
     }
 
@@ -297,62 +405,66 @@ async function main() {
     // stays exactly 1. (Observed: the first failed run orphaned 6.3GB.)
     const key = `${base}/panorama.ts`
     const heartbeat = setInterval(() => {
-      setStatus({ capture_started_at: new Date().toISOString() }).catch(() => {})
+      setStatus({ capture_started_at: new Date().toISOString() }).catch(
+        () => {}
+      )
     }, 120_000)
     let bytes = 0
     try {
       const res = await fetch(ts.url)
-      if (!res.ok || !res.body) throw new Error(`panorama fetch returned ${res.status}`)
+      if (!res.ok || !res.body)
+        throw new Error(`panorama fetch returned ${res.status}`)
       const declared = Number(res.headers.get('content-length') || 0)
       // No content-length = we cannot prove completeness, and a cleanly-closed
       // short response does not error the stream. Refuse rather than guess: this
       // corpus is unre-fetchable once Veo Glaciers it.
-      if (!declared) throw new Error('panorama response carried no content-length')
+      if (!declared)
+        throw new Error('panorama response carried no content-length')
 
-      // Count INSIDE the pipeline, not with a `.on('data')` side-channel on the
-      // same stream lib-storage consumes. That side-channel puts the stream in
-      // flowing mode while lib-storage pulls it in paused mode, and which
-      // listener wins is an ordering race in lib-storage's internals: it happens
-      // to be safe today, but when it loses, the counter counts bytes S3 NEVER
-      // RECEIVED — so `bytes === declared` passes and certifies a truncated
-      // object as 'ready' (terminal, never retried) on a key we can't re-fetch.
-      // A PassThrough is the same three lines and cannot invert.
-      const counter = new PassThrough()
-      counter.on('data', (c) => {
-        bytes += c.length
-      })
-      Readable.fromWeb(res.body).pipe(counter)
-
-      await new Upload({
-        client: s3,
-        params: { Bucket: S3_BUCKET, Key: key, Body: counter, ContentType: 'video/mp2t' },
-        queueSize: 4,
-        partSize: 32 * 1024 * 1024, // 9.5GB / 32MB ~= 300 parts, well under the 10k cap
-      }).done()
-
-      // Verify against what S3 ACTUALLY STORED, not against our own accounting.
-      // This is the only check that survives a lib-storage refactor, and the only
-      // one that means anything for a corpus we cannot re-fetch.
-      const head = await s3.send(
-        new HeadObjectCommand({ Bucket: S3_BUCKET, Key: key })
-      )
-      const stored = Number(head.ContentLength || 0)
-      if (Math.abs(stored - declared) > 1024)
-        throw new Error(`panorama truncated: S3 stored ${stored} of ${declared} bytes`)
-      if (Math.abs(bytes - declared) > 1024)
-        throw new Error(`panorama stream short: read ${bytes} of ${declared} bytes`)
-      if (stored < 10_000_000) throw new Error(`panorama implausibly small (${stored} bytes)`)
-      bytes = stored
+      // Already banked? Skip the transfer. The key is deterministic, so a re-run
+      // would otherwise re-pull 6-9GB — and re-runs are now NORMAL rather than
+      // exceptional: a calibration failure deliberately banks the pixels and THEN
+      // fails the row, so without this all 3 sweep attempts re-transfer the same
+      // object (~27GB/match, ~9TB across the backlog) against a drift that repeats
+      // by definition. Compared against S3's own accounting, never our own.
+      const prior = await s3
+        .send(new HeadObjectCommand({ Bucket: S3_BUCKET, Key: key }))
+        .catch(() => null)
+      // EXACT, not a tolerance: S3 stores exactly the bytes piped to it and a
+      // plain object GET's content-length is exactly the body length, so there is
+      // no source of legitimate slop to absorb. Anything else re-transfers, which
+      // is the safe direction.
+      const banked = Number(prior?.ContentLength || 0)
+      if (prior && banked === declared) {
+        await res.body.cancel().catch(() => {})
+        bytes = banked
+        console.log(
+          `veo-capture ${MATCH_SLUG}: panorama already banked (${bytes}B) — skipping transfer`
+        )
+      } else {
+        bytes = await transfer(res, key, declared)
+      }
     } finally {
       clearInterval(heartbeat)
     }
 
+    // Record the pointer AS SOON AS the bytes are verified — NOT at 'ready'.
+    // Same argument the tracking_s3_key write above makes: this is minors'
+    // footage, and an uploaded-but-unreferenced object is invisible to any
+    // erasure routine driven by this table. It also matters for the calibration
+    // failure path below, which reaches a throw with 6-9GB already stored: the
+    // recovery query is `WHERE capture_status='error' AND panorama_s3_key IS NOT
+    // NULL`, and it only works if the key was written before the throw.
+    await setStatus({ panorama_s3_key: key, panorama_bytes: bytes })
+
+    // The pixels are safe and referenced; NOW fail the row if the labels cannot be
+    // scaled. Deliberately last: this is the whole point of not failing fast.
+    if (calibrationError) throw new Error(calibrationError)
+
     await setStatus({
-      panorama_s3_key: key,
       tracking_s3_key: `${base}/tracking.json`,
       capture_status: 'ready',
       capture_error: null,
-      panorama_bytes: bytes,
     })
     console.log(`veo-capture ok match=${MATCH_SLUG} bytes=${bytes} key=${key}`)
   } finally {
@@ -360,9 +472,62 @@ async function main() {
   }
 }
 
+/** Stream the CDN object straight into S3 and prove S3 stored all of it.
+ * @returns the byte count S3 reports, never our own accounting. */
+async function transfer(res, key, declared) {
+  // Count INSIDE the pipeline, not with a `.on('data')` side-channel on the same
+  // stream lib-storage consumes. That side-channel puts the stream in flowing
+  // mode while lib-storage pulls it in paused mode, and which listener wins is an
+  // ordering race in lib-storage's internals: it happens to be safe today, but
+  // when it loses, the counter counts bytes S3 NEVER RECEIVED — so
+  // `bytes === declared` passes and certifies a truncated object as 'ready'
+  // (terminal, never retried) on a key we can't re-fetch. A PassThrough is the
+  // same three lines and cannot invert.
+  let read = 0
+  const counter = new PassThrough()
+  counter.on('data', (c) => {
+    read += c.length
+  })
+  Readable.fromWeb(res.body).pipe(counter)
+
+  await new Upload({
+    client: s3,
+    params: {
+      Bucket: S3_BUCKET,
+      Key: key,
+      Body: counter,
+      ContentType: 'video/mp2t',
+    },
+    queueSize: 4,
+    partSize: 32 * 1024 * 1024, // 9.5GB / 32MB ~= 300 parts, well under the 10k cap
+  }).done()
+
+  // Verify against what S3 ACTUALLY STORED, not against our own accounting. This
+  // is the only check that survives a lib-storage refactor, and the only one that
+  // means anything for a corpus we cannot re-fetch.
+  const head = await s3.send(
+    new HeadObjectCommand({ Bucket: S3_BUCKET, Key: key })
+  )
+  const stored = Number(head.ContentLength || 0)
+  if (Math.abs(stored - declared) > 1024)
+    throw new Error(
+      `panorama truncated: S3 stored ${stored} of ${declared} bytes`
+    )
+  if (Math.abs(read - declared) > 1024)
+    throw new Error(`panorama stream short: read ${read} of ${declared} bytes`)
+  if (stored < 10_000_000)
+    throw new Error(`panorama implausibly small (${stored} bytes)`)
+  return stored
+}
+
 main().catch(async (err) => {
-  const msg = err instanceof Error ? redact(err.message).slice(0, 300) : 'capture failed (see job logs)'
+  const msg =
+    err instanceof Error
+      ? redact(err.message).slice(0, 300)
+      : 'capture failed (see job logs)'
   console.error(`veo-capture FAILED match=${MATCH_SLUG}: ${msg}`)
-  await setStatus({ capture_status: 'error', capture_error: msg }).catch(() => {})
+  await setStatus({ capture_status: 'error', capture_error: msg }).catch(
+    () => {}
+  )
   process.exit(1)
 })
