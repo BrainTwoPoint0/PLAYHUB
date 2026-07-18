@@ -39,6 +39,30 @@ Rmount = (cv2.Rodrigues(np.array([0., 0., rz]))[0] @ cv2.Rodrigues(np.array([0.,
 # THETA_MAX 100: rays are projected manually (below), which is valid past 90 deg — the lens
 # captures >180 deg FOV — but single-K1 equidistant extrapolation degrades far past the
 # fitted range, so cap at 100 and require the projected pixel to land in-frame.
+# Optional line-straightening displacement field (flatten_lines.py output):
+# after projecting each vertex ray to raw px, add the interpolated (dx, dy).
+# Display cosmetic ONLY — see flatten_lines.py docstring for scope/limits.
+_flat = None
+if os.environ.get('FLATTEN'):
+    _fj = json.load(open(os.environ['FLATTEN']))
+    _flat = (np.array(_fj['dx'], np.float64), np.array(_fj['dy'], np.float64),
+             float(_fj['grid_step']))
+    print(f"  flatten field: {os.environ['FLATTEN']} "
+          f"({_flat[0].shape[1]}x{_flat[0].shape[0]} @ {_flat[2]:g}px)")
+
+def flatten_disp(px):
+    if _flat is None:
+        return px
+    DX, DY, step = _flat
+    gx = np.clip(px[:, 0] / step, 0, DX.shape[1] - 1.001)
+    gy = np.clip(px[:, 1] / step, 0, DX.shape[0] - 1.001)
+    i0 = np.floor(gx).astype(int); j0 = np.floor(gy).astype(int)
+    fx = gx - i0; fy = gy - j0
+    def bil(G):
+        return (G[j0, i0] * (1 - fx) * (1 - fy) + G[j0, i0 + 1] * fx * (1 - fy)
+                + G[j0 + 1, i0] * (1 - fx) * fy + G[j0 + 1, i0 + 1] * fx * fy)
+    return px + np.column_stack([bil(DX), bil(DY)])
+
 PAN = np.radians(env('PAN_DEG', 135)); TLO = np.radians(env('TILT_LO', -89.95)); THI = np.radians(env('TILT_HI', 2))
 TSPLIT = np.radians(env('TILT_SPLIT', -55))
 THETA_MAX = np.radians(env('THETA_MAX', 100))
@@ -86,6 +110,7 @@ for i, s in enumerate(specs):
     k1, k2, k3, k4 = D[:, 0]
     rr = F * th * (1 + k1 * th**2 + k2 * th**4 + k3 * th**6 + k4 * th**8)
     px = np.column_stack([CX + rr * np.cos(ph), CY + rr * np.sin(ph)])
+    px = flatten_disp(px)
     v[:, 2] = px[:, 0] / W; v[:, 3] = px[:, 1] / H
     valid = ((th <= THETA_MAX) & (px[:, 0] >= -0.02 * W) & (px[:, 0] <= 1.02 * W)
              & (px[:, 1] >= -0.02 * H) & (px[:, 1] <= 1.02 * H))
