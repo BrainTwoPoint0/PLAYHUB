@@ -740,3 +740,27 @@ Both venues live on the accepted fits (swap_meshes.py, promoted here):
 - REMAINING MANUAL: re-solve both venues' admin calibrations in the marking
   UI (raw-px marks stay valid; FP should read ~3px vs the stored 127.5px);
   Karim eyes-on a watch page per venue once artifacts trickle in.
+
+**FP tangential probe (2026-07-18 night, after Karim's "still quite curved"):**
+the kuwait recipe run on FP (tangential + reg constraint, window holdout).
+Result: p1=-0.0002 p2=+0.0009 — an ORDER smaller than kuwait's — with modest
+holdout gains (LEFT rim 4.79->3.75, near_touch 6.72->6.07, rest par) and
+marks slightly softer (max 3.48 vs 2.99 mrad). Verdict: FP's lens barely
+wants tangential; the remaining visible curvature at FP is dominated by real
+ground shape + ragged paint (same conclusion as Nazwa). Candidate staged at
+public/vp-mesh-footballplus-tangential (benchmarks/footballplus-tangential-
+candidate-fit.json) for eyes-on; expectation set to "barely visible". If
+adopted, swap via swap_meshes.py (minutes); if not, FP stays on the accepted
+refit and its curvature is accepted as physical.
+
+**FP tangential ADOPTED + swapped (2026-07-18 night).** Karim: "better —
+less curved at the near borders" (the remaining curvature on both meshes is
+the physical ground/paint, accepted). Frozen as
+baselines/footballplus-accepted-fit.json (refit preserved at
+baselines/footballplus-refit.json; report refreshed, gates PASS: marks
+0.13%, GATE G 1.14 deg vs refit). Second prod swap executed on the same 8
+game folders (sha 40291af0aa8e) — it caught and deleted 3 aim-tracks the
+sweeps had ALREADY rebuilt against the refit mesh (fast rebuilds are real);
+artifact columns reset a second time so everything derives from the
+tangential mesh. Optional: one more FP re-solve click (mount moved ~0.5
+deg; expected ~4px).
