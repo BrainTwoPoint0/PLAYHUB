@@ -158,7 +158,10 @@ export function distortionPenalty(
 ): number {
   if (!Number.isFinite(panDeg) || !Number.isFinite(tiltDeg)) return 0
   // how far inside the nearest pan extent (deg); 0 at the extent, big = central
-  const panInside = Math.min(panDeg - limitsDeg.minPan, limitsDeg.maxPan - panDeg)
+  const panInside = Math.min(
+    panDeg - limitsDeg.minPan,
+    limitsDeg.maxPan - panDeg
+  )
   const panPen = 1 - smoothstep(0, p.distEdgeMarginDeg, panInside)
   // how far above the downward floor (deg); 0 at the floor, big = higher up
   const tiltAboveFloor = tiltDeg - limitsDeg.minTilt
@@ -186,7 +189,10 @@ export function rawFramingFov(
   sceneFovMax: number,
   p: FramingParams = DEFAULT_FRAMING
 ): number {
-  const over = Math.max(0, (Number.isFinite(speedDeg) ? speedDeg : 0) - p.speedFloorDeg)
+  const over = Math.max(
+    0,
+    (Number.isFinite(speedDeg) ? speedDeg : 0) - p.speedFloorDeg
+  )
   const add = Math.min(over * p.speedFovGain, p.speedFovMaxAdd)
   return clampNum(p.baseFrameFov + add, FOV_MIN, sceneFovMax)
 }

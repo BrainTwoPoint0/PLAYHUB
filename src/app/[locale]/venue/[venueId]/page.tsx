@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useFormatter, useLocale, useTranslations } from 'next-intl'
 import { useParams } from 'next/navigation'
-import { useRouter } from '@/i18n/navigation'
+import { Link as RouterLink, useRouter } from '@/i18n/navigation'
 import {
   Button,
   Input,
@@ -36,6 +36,10 @@ import {
 import { HlsPlayer } from '@/components/streaming/HlsPlayer'
 import { AuditHistory } from '@/components/venue/AuditHistory'
 import { ClutchVenueStats } from '@/components/venue/ClutchVenueStats'
+import {
+  PitchCamerasCard,
+  type SceneCalibrationStatus,
+} from '@/components/calibration/PitchCamerasCard'
 
 interface Recording {
   id: string
@@ -50,6 +54,8 @@ interface Recording {
   s3_key?: string
   file_size_bytes?: number
   spiideo_game_id?: string
+  spiideo_scene_id?: string | null
+  pitch_focus?: 'full' | 'left_half' | 'right_half'
   clutch_video_id?: string | null
   clutch_match_stats?: {
     match_time_minutes?: number
@@ -400,6 +406,19 @@ export default function VenueManagementPage() {
   // Section loading states (for independent async sections)
   const [billingLoading, setBillingLoading] = useState(true)
   const [scenesLoading, setScenesLoading] = useState(true)
+  // scene_id → calibration status, reported up by PitchCamerasCard; gates the
+  // schedule form's pitch-focus picker (half framing needs an active midline)
+  const [calibrationStatuses, setCalibrationStatuses] = useState<
+    Record<string, SceneCalibrationStatus>
+  >({})
+  const [calibrationStatusesLoaded, setCalibrationStatusesLoaded] =
+    useState(false)
+  const [pitchFocus, setPitchFocus] = useState<
+    'full' | 'left_half' | 'right_half'
+  >('full')
+  const [editPitchFocus, setEditPitchFocus] = useState<
+    'full' | 'left_half' | 'right_half'
+  >('full')
   const [marketplaceLoading, setMarketplaceLoading] = useState(true)
 
   // Scheduling state
@@ -1067,6 +1086,7 @@ export default function VenueManagementPage() {
     setEditTitle(recording.title)
     setEditHomeTeam(recording.home_team)
     setEditAwayTeam(recording.away_team)
+    setEditPitchFocus(recording.pitch_focus ?? 'full')
   }
 
   async function handleSaveEdit() {
@@ -1083,6 +1103,23 @@ export default function VenueManagementPage() {
         }),
       })
       if (res.ok) {
+        let appliedFocus = editingRecording.pitch_focus ?? 'full'
+        if (editPitchFocus !== appliedFocus) {
+          try {
+            const focusRes = await fetch(
+              `/api/venue/${venueId}/recordings/${editingRecording.id}/pitch-focus`,
+              {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pitchFocus: editPitchFocus }),
+              }
+            )
+            if (focusRes.ok) appliedFocus = editPitchFocus
+            else setError(t('schedule.pitchFocusApplyFailedEdit'))
+          } catch {
+            setError(t('schedule.pitchFocusApplyFailedEdit'))
+          }
+        }
         setRecordings((prev) =>
           prev.map((r) =>
             r.id === editingRecording.id
@@ -1091,6 +1128,7 @@ export default function VenueManagementPage() {
                   title: editTitle,
                   home_team: editHomeTeam,
                   away_team: editAwayTeam,
+                  pitch_focus: appliedFocus,
                 }
               : r
           )
@@ -1476,6 +1514,27 @@ export default function VenueManagementPage() {
       if (data.error) {
         setError(data.error)
       } else {
+        // pitch_focus rides a separate PATCH (the games POST doesn't own it);
+        // failure is non-fatal — the recording exists, framing stays full
+        if (
+          pitchFocus !== 'full' &&
+          data.recordingId &&
+          calibrationStatuses[sceneId]?.hasMidline
+        ) {
+          try {
+            const focusRes = await fetch(
+              `/api/venue/${venueId}/recordings/${data.recordingId}/pitch-focus`,
+              {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pitchFocus }),
+              }
+            )
+            if (!focusRes.ok) setError(t('schedule.pitchFocusApplyFailed'))
+          } catch {
+            setError(t('schedule.pitchFocusApplyFailed'))
+          }
+        }
         setSuccess(t('feedback.recordingScheduled'))
         setTitle('')
         setDescription('')
@@ -1488,6 +1547,7 @@ export default function VenueManagementPage() {
         setMarketplaceEnabled(false)
         setMarketplacePrice('')
         setSelectedGraphicPackageId('default')
+        setPitchFocus('full')
         setShowScheduleForm(false)
         fetchRecordings()
       }
@@ -2602,6 +2662,18 @@ export default function VenueManagementPage() {
               )
             )}
 
+            {/* Pitch cameras — calibration status + entry to the marking UI */}
+            {venue?.feature_recordings !== false && !scenesLoading && (
+              <PitchCamerasCard
+                venueId={venueId}
+                scenes={scenes}
+                onStatuses={(m) => {
+                  setCalibrationStatuses(m)
+                  setCalibrationStatusesLoaded(true)
+                }}
+              />
+            )}
+
             {/* Schedule Recording */}
             {venue?.feature_recordings !== false &&
               (scenesLoading ? (
@@ -2656,7 +2728,10 @@ export default function VenueManagementPage() {
                               </label>
                               <Select
                                 value={sceneId}
-                                onValueChange={setSceneId}
+                                onValueChange={(v) => {
+                                  setSceneId(v)
+                                  setPitchFocus('full')
+                                }}
                                 disabled={scenes.length <= 1}
                               >
                                 <SelectTrigger>
@@ -2678,6 +2753,64 @@ export default function VenueManagementPage() {
                               </Select>
                             </div>
                           </div>
+
+                          {/* Half-pitch framing — needs an active calibration
+                              with a midline on the selected (Spiideo) scene */}
+                          {sceneId &&
+                            scenes.find((sc) => sc.id === sceneId)?.provider !==
+                              'clutch' && (
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium text-[var(--timberwolf)]">
+                                  {t('schedule.pitchFocusLabel')}
+                                </label>
+                                <Select
+                                  value={pitchFocus}
+                                  onValueChange={(v) =>
+                                    setPitchFocus(
+                                      v as 'full' | 'left_half' | 'right_half'
+                                    )
+                                  }
+                                  disabled={
+                                    !calibrationStatuses[sceneId]?.hasMidline
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="full">
+                                      {t('schedule.pitchFocusFull')}
+                                    </SelectItem>
+                                    <SelectItem value="left_half">
+                                      {t('schedule.pitchFocusLeft')}
+                                    </SelectItem>
+                                    <SelectItem value="right_half">
+                                      {t('schedule.pitchFocusRight')}
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                {!calibrationStatuses[sceneId]?.hasMidline &&
+                                  (!calibrationStatusesLoaded ? (
+                                    <p className="text-xs text-muted-foreground">
+                                      {t('schedule.pitchFocusChecking')}
+                                    </p>
+                                  ) : calibrationStatuses[sceneId] ? (
+                                    <p className="text-xs text-muted-foreground">
+                                      {t('schedule.pitchFocusNeedsCalibration')}{' '}
+                                      <RouterLink
+                                        href={`/venue/${venueId}/calibration/${sceneId}?name=${encodeURIComponent(scenes.find((sc) => sc.id === sceneId)?.name ?? '')}`}
+                                        className="underline hover:text-[var(--timberwolf)]"
+                                      >
+                                        {t('schedule.pitchFocusCalibrateLink')}
+                                      </RouterLink>
+                                    </p>
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground">
+                                      {t('schedule.pitchFocusUnknown')}
+                                    </p>
+                                  ))}
+                              </div>
+                            )}
 
                           <div className="space-y-2">
                             <label className="text-sm font-medium text-[var(--timberwolf)]">
@@ -4213,6 +4346,59 @@ export default function VenueManagementPage() {
                     className={inputClass}
                   />
                 </div>
+                {editingRecording.spiideo_scene_id && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-[var(--timberwolf)]">
+                      {t('schedule.pitchFocusLabel')}
+                    </label>
+                    <Select
+                      value={editPitchFocus}
+                      onValueChange={(v) =>
+                        setEditPitchFocus(
+                          v as 'full' | 'left_half' | 'right_half'
+                        )
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="full">
+                          {t('schedule.pitchFocusFull')}
+                        </SelectItem>
+                        {/* halves ENGAGE only with a midline calibration;
+                            the stored value stays selectable so the admin
+                            can always escape back to full */}
+                        <SelectItem
+                          value="left_half"
+                          disabled={
+                            !calibrationStatuses[
+                              editingRecording.spiideo_scene_id
+                            ]?.hasMidline && editPitchFocus !== 'left_half'
+                          }
+                        >
+                          {t('schedule.pitchFocusLeft')}
+                        </SelectItem>
+                        <SelectItem
+                          value="right_half"
+                          disabled={
+                            !calibrationStatuses[
+                              editingRecording.spiideo_scene_id
+                            ]?.hasMidline && editPitchFocus !== 'right_half'
+                          }
+                        >
+                          {t('schedule.pitchFocusRight')}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {!calibrationStatuses[editingRecording.spiideo_scene_id]
+                      ?.hasMidline && (
+                      <p className="text-xs text-muted-foreground">
+                        {t('schedule.pitchFocusNeedsCalibration')}
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <Button
                     className={`flex-1 ${primaryBtnClass}`}

@@ -2103,9 +2103,7 @@ export function VirtualPanoramaPlayer({
               )
                 continue
               if (
-                placed.some(
-                  (q) => Math.hypot(p.x - q.x, p.y - q.y) < mergePx
-                )
+                placed.some((q) => Math.hypot(p.x - q.x, p.y - q.y) < mergePx)
               )
                 continue
               placed.push(p)

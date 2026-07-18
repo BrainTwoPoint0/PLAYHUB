@@ -3,7 +3,14 @@
 import type { RefObject } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@braintwopoint0/playback-commons/ui'
-import { Minus, Plus, Frame, LocateFixed, UserSearch, Focus } from 'lucide-react'
+import {
+  Minus,
+  Plus,
+  Frame,
+  LocateFixed,
+  UserSearch,
+  Focus,
+} from 'lucide-react'
 import { cn } from '@braintwopoint0/playback-commons/utils'
 import type { DewarpSurfaceApi } from './VirtualPanoramaPlayer'
 
