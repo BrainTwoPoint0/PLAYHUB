@@ -521,8 +521,11 @@ export function CalibrationSurface(props: CalibrationSurfaceProps) {
       const h = host.clientHeight || 1
       const hFovRad = horizontalFov(pointerDown.view.fov, w / h) * DEG
       const vFovRad = pointerDown.view.fov * DEG
+      // Same drag convention as VirtualPanoramaPlayer (pan/tilt move WITH the
+      // pointer) — admins live in the Explore player; an inverted surface here
+      // reads as a bug (Karim, HCT marking session 2026-07-18).
       viewState = clampViewState({
-        pan: pointerDown.view.pan - (dx / w) * hFovRad,
+        pan: pointerDown.view.pan + (dx / w) * hFovRad,
         tilt: pointerDown.view.tilt + (dy / h) * vFovRad,
         fov: pointerDown.view.fov,
       })
