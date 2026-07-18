@@ -1,0 +1,22 @@
+# CodeBuild spec: build the jersey-labels container image and push to ECR.
+# Same pattern as player-tracklets: privileged CodeBuild container, source
+# zip root == infrastructure/batch/jersey-labels/ PLUS build_track.py +
+# mesh_rays.py staged in from ../player-tracklets (single-source shared
+# modules — the deploy step copies them into the zip).
+# Env: ECR_REPO_URL, AWS_REGION.
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "Logging in to ECR $ECR_REPO_URL"
+      - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REPO_URL"
+      - test -f build_track.py || { echo "build_track.py missing from zip (stage it from ../player-tracklets)"; exit 1; }
+      - test -f mesh_rays.py || { echo "mesh_rays.py missing from zip (stage it from ../player-tracklets)"; exit 1; }
+  build:
+    commands:
+      - docker build --pull -t "$ECR_REPO_URL:latest" .
+  post_build:
+    commands:
+      - docker push "$ECR_REPO_URL:latest"
+      - echo "Pushed $ECR_REPO_URL:latest"

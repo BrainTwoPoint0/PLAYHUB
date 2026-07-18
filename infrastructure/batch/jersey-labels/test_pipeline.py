@@ -1,0 +1,608 @@
+"""Unit tests for the jersey-labels pipeline (no torch/ultralytics needed —
+the DL stack is injected/lazy). Run: python -m pytest test_pipeline.py -q
+
+The enrich contract test imports the SHARED production build_track module
+from ../player-tracklets (the deploy zip stages it next to these files)."""
+import os
+import sys
+
+import numpy as np
+import pytest
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(HERE, '..', 'player-tracklets'))
+
+import enrich  # noqa: E402
+import harvest  # noqa: E402
+import kit  # noqa: E402
+import slots  # noqa: E402
+import split  # noqa: E402
+
+
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+def make_chain(t0_s, t1_s, xy_fn, hz=2.5):
+    ts = np.arange(t0_s * 1e6, t1_s * 1e6, 1e6 / hz)
+    xy = np.array([xy_fn(t / 1e6) for t in ts], float)
+    return ts, xy
+
+
+def rec(chain=0, t_vp=100.0, conf=0.95, read='10', leg=0.9, on_pitch=True,
+        in_match=True, play_dist=5.0, solo=True, kit_cluster=0, h_px=120.0):
+    return {'chain': chain, 't_vp': t_vp, 't_us': t_vp * 1e6, 'conf': conf,
+            'read': read, 'leg': leg, 'on_pitch': on_pitch,
+            'in_match': in_match, 'play_dist': play_dist, 'solo': solo,
+            'kit': kit_cluster, 'h_px': h_px}
+
+
+# ── harvest: play centroids + in-match spans ────────────────────────────────
+
+def test_play_centroids_needs_min_moving_samples():
+    # PLAY_MIN_MOVERS counts moving SAMPLES per bin (B2 semantics: one 2.5Hz
+    # mover contributes ~5 samples/bin). A stationary chain contributes none.
+    chains = [make_chain(0, 4, lambda t, i=i: (t * 2.0 + i * 5, 10.0))
+              for i in range(3)]
+    chains.append(make_chain(10, 14, lambda t: (30.0, 30.0)))  # stationary
+    cents = harvest.play_centroids(chains, 0)
+    assert 0 in cents          # moving samples present
+    assert 5 not in cents      # stationary-only bin gets no centroid
+
+
+def test_play_centroids_is_median_of_movers():
+    chains = [make_chain(0, 4, lambda t, i=i: (t * 2.0, float(i)))
+              for i in range(5)]
+    cents = harvest.play_centroids(chains, 0)
+    assert cents[0][1] == pytest.approx(2.0)  # median y of 0..4
+
+
+def test_in_match_spans_finds_active_region():
+    # quiet 0-500s, active 500-2500s, quiet after
+    counts = {}
+    for b in range(0, 1500):
+        t = b * harvest.PLAY_BIN_S
+        counts[b] = 12 if 500 <= t <= 2500 else 1
+    spans = harvest.in_match_spans(counts)
+    assert len(spans) == 1
+    lo, hi = spans[0]
+    assert lo == pytest.approx(500, abs=harvest.ACTIVITY_SMOOTH_S)
+    assert hi == pytest.approx(2500, abs=harvest.ACTIVITY_SMOOTH_S)
+
+
+def test_in_match_spans_closes_short_gaps_keeps_halftime_split():
+    counts = {}
+    for b in range(0, 2000):
+        t = b * harvest.PLAY_BIN_S
+        active = (200 <= t <= 1600) or (2200 <= t <= 3600)
+        counts[b] = 14 if active else 0
+    spans = harvest.in_match_spans(counts)  # 600s gap > MAX_GAP_S stays split
+    assert len(spans) == 2
+
+
+def test_in_match_spans_degrades_empty():
+    assert harvest.in_match_spans({}) == []
+    assert harvest.in_match_spans({b: 0 for b in range(100)}) == []
+
+
+def test_in_match_spans_drops_short_bursts():
+    counts = {b: (20 if b < 10 else 0) for b in range(1000)}
+    # 20s of activity < MIN_SPAN_S
+    assert harvest.in_match_spans(counts) == []
+
+
+# ── harvest: window + box geometry ──────────────────────────────────────────
+
+def test_window_bounds_min_size():
+    pts = np.array([[1000.0, 800.0]])
+    x0, y0, x1, y1 = harvest.window_bounds(pts, 3840, 2160)
+    assert x1 - x0 >= harvest.WIN_MIN
+    assert y1 - y0 >= harvest.WIN_MIN
+
+
+def test_window_bounds_max_size_centers_on_median():
+    xs = np.linspace(0, 3800, 30)
+    pts = np.stack([xs, np.full(30, 1000.0)], axis=1)
+    x0, y0, x1, y1 = harvest.window_bounds(pts, 3840, 2160)
+    assert x1 - x0 <= harvest.WIN_MAX_W
+    assert y1 - y0 <= harvest.WIN_MAX_H
+
+
+def test_window_bounds_clamped_to_frame():
+    pts = np.array([[10.0, 10.0], [50.0, 40.0]])
+    x0, y0, x1, y1 = harvest.window_bounds(pts, 3840, 2160)
+    assert x0 >= 0 and y0 >= 0 and x1 <= 3840 and y1 <= 2160
+
+
+def test_filter_boxes_truth_table():
+    seam = 1080.0
+    boxes = [
+        [100, 100, 160, 260],    # ok (h=160, aspect 0.375)
+        [100, 100, 130, 150],    # too short (h=50)
+        [100, 100, 400, 260],    # aspect too wide (1.875)
+        [100, 1000, 160, 1160],  # straddles seam
+        [100, 100, 105, 260],    # aspect too thin (0.03)
+    ]
+    kept = harvest.filter_boxes(np.array(boxes, float), seam)
+    assert len(kept) == 1
+    assert kept[0][0] == 100 and kept[0][3] == 260
+
+
+def test_solo_flag():
+    boxes = [[100, 100, 160, 260], [150, 100, 210, 260], [500, 500, 560, 660]]
+    crop = harvest.crop_box(boxes[0], 3840, 2160)
+    assert not harvest.solo_flag(0, boxes, crop)   # neighbour overlaps
+    crop2 = harvest.crop_box(boxes[2], 3840, 2160)
+    assert harvest.solo_flag(2, boxes, crop2)
+
+
+def test_harvest_frame_associates_and_gates():
+    # two chains near play, far apart in pixels; detector returns boxes at
+    # their projected feet
+    proj = [(0, 500.0, 500.0, 10.0, 10.0), (1, 900.0, 500.0, 12.0, 10.0),
+            (2, 1300.0, 500.0, 14.0, 10.0), (3, 1700.0, 500.0, 16.0, 10.0)]
+    cent = np.array([11.0, 10.0])
+    img = np.zeros((2160, 3840, 3), np.uint8)
+
+    def detect(win):
+        # boxes in window coords: feet at the projected points
+        return np.array([[470, 340, 530, 500], [870, 340, 930, 500]], float) \
+            - 0.0
+
+    # window will be offset; compute expected: window_bounds over all 4 near
+    # points... simpler: detector returns boxes in WINDOW coords, so shift by
+    # the window origin. Emulate via a closure that captures nothing and
+    # returns boxes positioned so that after +x0/+y0 they land on proj feet.
+    x0, y0, _, _ = harvest.window_bounds(
+        np.array([[p[1], p[2]] for p in proj]), 3840, 2160)
+
+    def detect2(win):
+        return np.array([
+            [500 - 30 - x0, 500 - 160 - y0, 500 + 30 - x0, 500 - y0],
+            [900 - 30 - x0, 500 - 160 - y0, 900 + 30 - x0, 500 - y0],
+        ], float)
+
+    recs = harvest.harvest_frame(img, 100.0, proj, cent, detect2, 3840, 2160)
+    assert {r['chain'] for r in recs} == {0, 1}
+    for r in recs:
+        assert r['solo']
+        assert r['play_dist'] <= harvest.NEAR_PLAY_M
+        assert r['crop'].size > 0
+
+
+def test_harvest_frame_needs_near_play_quorum():
+    proj = [(0, 500.0, 500.0, 10.0, 10.0), (1, 900.0, 500.0, 12.0, 10.0),
+            (2, 1300.0, 500.0, 80.0, 10.0), (3, 1700.0, 500.0, 90.0, 10.0)]
+    cent = np.array([11.0, 10.0])   # only 2 chains within 25m
+    img = np.zeros((2160, 3840, 3), np.uint8)
+    recs = harvest.harvest_frame(img, 100.0, proj, cent,
+                                 lambda w: np.zeros((0, 4)), 3840, 2160)
+    assert recs == []
+
+
+# ── kit ─────────────────────────────────────────────────────────────────────
+
+def _crop_with_shirt(shirt_bgr, grass_bgr=(40, 120, 60), h_px=120):
+    h = int(h_px * (1 + 2 * harvest.MARGIN))
+    w = 80
+    img = np.zeros((h, w, 3), np.uint8)
+    img[:, :] = grass_bgr
+    pad = int(harvest.MARGIN * h_px)
+    img[pad + int(0.15 * h_px):pad + int(0.45 * h_px), :] = shirt_bgr
+    return img
+
+
+def test_shirt_lab_separates_bright_and_dark():
+    cv2 = pytest.importorskip('cv2')  # noqa: F841
+    bright = kit.shirt_lab(_crop_with_shirt((240, 240, 240)), 120.0)
+    dark = kit.shirt_lab(_crop_with_shirt((20, 20, 20)), 120.0)
+    assert bright is not None and dark is not None
+    assert bright[0] > dark[0] + 30   # dL_p80 separates
+
+
+def test_kmeans_deterministic():
+    rng = np.random.default_rng(0)
+    X = np.vstack([rng.normal(0, 1, (20, 4)), rng.normal(50, 1, (20, 4))])
+    C1, a1 = kit.kmeans(2, X)
+    C2, a2 = kit.kmeans(2, X)
+    assert np.allclose(C1, C2) and np.array_equal(a1, a2)
+
+
+def test_cluster_kits_two_clear_clusters():
+    rng = np.random.default_rng(1)
+    X = np.vstack([rng.normal(0, 0.5, (10, 4)), rng.normal(60, 0.5, (10, 4))])
+    C, k, sil = kit.cluster_kits(X)
+    assert k == 2
+    assert sil > 0.8
+
+
+def test_cluster_kits_refuses_few_anchors():
+    with pytest.raises(ValueError):
+        kit.cluster_kits(np.zeros((3, 4)))
+
+
+def test_assign_kit_outlier():
+    C = np.array([[0, 0, 0, 0], [60, 0, 0, 0]], float)
+    assert kit.assign_kit([1, 0, 0, 0], C) == 0
+    assert kit.assign_kit([100, 100, 100, 100], C) == -1
+    assert kit.assign_kit(None, C) == -1
+
+
+# ── split truth-table ───────────────────────────────────────────────────────
+
+def _chain_with_seam(seam_at_s=50.0, t0=0.0, t1=100.0):
+    """2.5Hz chain with one bridged gap (2s) at seam_at_s."""
+    a = np.arange(t0, seam_at_s, 0.4)
+    b = np.arange(seam_at_s + 2.0, t1, 0.4)
+    ts = np.concatenate([a, b]) * 1e6
+    xy = np.stack([np.linspace(0, 50, len(ts)), np.zeros(len(ts))], axis=1)
+    return ts, xy
+
+
+def _crops(ts_s, kits):
+    return [t * 1e6 for t in ts_s], list(kits)
+
+
+def test_split_accepts_clean_flip_at_seam():
+    chain = _chain_with_seam(50.0)
+    crop_ts, crop_kits = _crops([10, 20, 30, 40, 60, 70, 80, 90],
+                                [0, 0, 0, 0, 1, 1, 1, 1])
+    d = split.propose_split(chain, crop_ts, crop_kits, min_span_s=3.0)
+    assert d['accepted'], d
+    assert d['kit_a'] == 0 and d['kit_b'] == 1
+    ts = chain[0]
+    assert ts[d['seam_idx'] + 1] - ts[d['seam_idx']] > split.SEAM_GAP_US
+
+
+def test_split_refuses_too_few_crops():
+    chain = _chain_with_seam(50.0)
+    crop_ts, crop_kits = _crops([10, 20, 60, 70], [0, 0, 1, 1])
+    d = split.propose_split(chain, crop_ts, crop_kits, min_span_s=3.0)
+    assert not d['accepted']
+    assert 'too few' in d['reason']
+
+
+def test_split_refuses_mixed_segments():
+    chain = _chain_with_seam(50.0)
+    crop_ts, crop_kits = _crops([10, 20, 30, 40, 60, 70, 80, 90],
+                                [0, 1, 0, 1, 1, 0, 1, 0])
+    d = split.propose_split(chain, crop_ts, crop_kits, min_span_s=3.0)
+    assert not d['accepted']
+
+
+def test_split_refuses_two_flips():
+    # A -> B -> A: three bodies (the chain-11259 class) must refuse
+    chain = _chain_with_seam(50.0)
+    crop_ts, crop_kits = _crops(
+        [5, 10, 15, 20, 40, 45, 50, 55, 75, 80, 85, 90],
+        [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0])
+    d = split.propose_split(chain, crop_ts, crop_kits, min_span_s=3.0)
+    assert not d['accepted']
+
+
+def test_split_refuses_no_seam_near_flip():
+    chain = _chain_with_seam(seam_at_s=20.0)   # seam far from the flip
+    crop_ts, crop_kits = _crops([30, 35, 40, 45, 60, 65, 70, 75],
+                                [0, 0, 0, 0, 1, 1, 1, 1])
+    d = split.propose_split(chain, crop_ts, crop_kits, min_span_s=3.0)
+    assert not d['accepted']
+    assert 'no stitch seam' in d['reason']
+
+
+def test_split_refuses_two_seams_near_flip():
+    a = np.arange(0.0, 48.0, 0.4)
+    b = np.arange(50.0, 52.0, 0.4)
+    c = np.arange(54.0, 100.0, 0.4)
+    ts = np.concatenate([a, b, c]) * 1e6
+    xy = np.stack([np.linspace(0, 50, len(ts)), np.zeros(len(ts))], axis=1)
+    crop_ts, crop_kits = _crops([10, 20, 30, 40, 60, 70, 80, 90],
+                                [0, 0, 0, 0, 1, 1, 1, 1])
+    d = split.propose_split((ts, xy), crop_ts, crop_kits, min_span_s=3.0)
+    assert not d['accepted']
+    assert 'ambiguous' in d['reason']
+
+
+def test_split_refuses_short_segment():
+    chain = _chain_with_seam(seam_at_s=4.0, t0=0.0, t1=100.0)
+    crop_ts, crop_kits = _crops([1, 2, 3, 3.5, 10, 20, 30, 40],
+                                [0, 0, 0, 0, 1, 1, 1, 1])
+    d = split.propose_split(chain, crop_ts, crop_kits, min_span_s=10.0)
+    assert not d['accepted']
+    assert 'too short' in d['reason']
+
+
+def test_apply_splits_and_remap():
+    chain = _chain_with_seam(50.0)
+    other = make_chain(0, 20, lambda t: (t, 5.0))
+    d = split.propose_split(
+        chain, *_crops([10, 20, 30, 40, 60, 70, 80, 90],
+                       [0, 0, 0, 0, 1, 1, 1, 1]), min_span_s=3.0)
+    assert d['accepted']
+    new_chains, index_map = split.apply_splits([chain, other], {0: d})
+    assert len(new_chains) == 3
+    assert index_map[1] == 2
+    ia, ib, split_t = index_map[0]
+    assert new_chains[ia][0][-1] < split_t < new_chains[ib][0][0]
+    recs = [rec(chain=0, t_vp=10.0), rec(chain=0, t_vp=90.0),
+            rec(chain=1, t_vp=5.0)]
+    split.remap_records(recs, index_map)
+    assert recs[0]['chain'] == ia
+    assert recs[1]['chain'] == ib
+    assert recs[2]['chain'] == 2
+
+
+# ── slots ───────────────────────────────────────────────────────────────────
+
+def test_confident_truth_table():
+    good = rec()
+    assert slots.confident([good]) == [good]
+    for bad in (rec(conf=0.85), rec(read='ab'), rec(read='123'),
+                rec(read=''), rec(on_pitch=False), rec(in_match=False),
+                rec(leg=0.5)):
+        assert slots.confident([bad]) == []
+
+
+def test_deployment_reads_play_gate_and_dedup():
+    far = rec(play_dist=40.0)
+    a = rec(t_vp=100.2, conf=0.92)
+    b = rec(t_vp=100.7, conf=0.97)   # same second, higher conf wins
+    out = slots.deployment_reads([far, a, b])
+    assert len(out) == 1 and out[0]['conf'] == 0.97
+
+
+def test_chain_label_strictness():
+    assert slots.chain_label([rec()], 0) is None                    # 1 read
+    assert slots.chain_label([rec(), rec()], 0) == ('10', 0)        # 2 agree
+    assert slots.chain_label([rec(), rec(), rec(read='7')], 0) == ('10', 0)
+    assert slots.chain_label([rec(), rec(read='7')], 0) is None     # tie
+    assert slots.chain_label(
+        [rec(), rec(), rec(read='7'), rec(read='7')], 0) is None    # 2-2
+    assert slots.chain_label([], 0) is None
+
+
+def test_kit_profile_and_inconsistency():
+    rs = [rec(chain=1, kit_cluster=0), rec(chain=1, kit_cluster=0),
+          rec(chain=1, kit_cluster=1)]
+    prof = slots.chain_kit_profile(rs)
+    top, frac, n = prof[1]
+    assert top == 0 and n == 3
+    assert 1 in slots.kit_inconsistent_chains(prof)   # 2/3 < 0.8
+    rs.append(rec(chain=1, kit_cluster=0))
+    rs.append(rec(chain=1, kit_cluster=0))
+    prof = slots.chain_kit_profile(rs)                # 4/5 >= 0.8
+    assert 1 not in slots.kit_inconsistent_chains(prof)
+
+
+def test_build_labels_refuses_other_kit_and_mismatched_reads():
+    # chain 0: clean kit 0, two reads -> labelled
+    # chain 1: kit -1 -> never labelled
+    # chain 2: read whose own crop kit differs from chain majority -> dropped
+    rs = [rec(chain=0, t_vp=10), rec(chain=0, t_vp=20),
+          rec(chain=1, t_vp=10, kit_cluster=-1),
+          rec(chain=1, t_vp=20, kit_cluster=-1)]
+    # 4 matching crops + 1 mismatch = 0.8 consistency (passes the chain
+    # gate exactly) while the mismatched read is dropped by the per-read gate
+    rs2 = [rec(chain=2, t_vp=t, kit_cluster=0) for t in (10, 20, 30, 35)]
+    mismatch = rec(chain=2, t_vp=40, kit_cluster=1, read='9')
+    labels, diag = slots.build_labels(rs + rs2 + [mismatch])
+    assert labels[0] == ('10', 0)
+    assert 1 not in labels
+    assert labels[2] == ('10', 0)   # the mismatched '9' read was excluded
+    assert diag['labelledChains'] == 2
+
+
+def test_assign_slots_duplicate_number_bodies():
+    # two chains, same (10, kit 0), concurrent at 20m apart -> two sub-slots
+    c0 = make_chain(0, 60, lambda t: (0.0, 0.0))
+    c1 = make_chain(0, 60, lambda t: (20.0, 0.0))
+    labels = {0: ('10', 0), 1: ('10', 0)}
+    slot_of, diag = slots.assign_slots(labels, [c0, c1])
+    assert slot_of[0] != slot_of[1]
+    assert diag['duplicateNumberGroups'] == 1
+    assert sorted({slot_of[0], slot_of[1]}) == ['a10', 'a10-2']
+
+
+def test_assign_slots_duplicate_fragments_one_body():
+    c0 = make_chain(0, 60, lambda t: (0.0, 0.0))
+    c1 = make_chain(30, 90, lambda t: (1.0, 0.0))   # 1m apart = same body
+    labels = {0: ('10', 0), 1: ('10', 0)}
+    slot_of, diag = slots.assign_slots(labels, [c0, c1])
+    assert slot_of[0] == slot_of[1] == 'a10'
+
+
+def test_assign_slots_gap_bridging():
+    c0 = make_chain(0, 30, lambda t: (0.0, 0.0))
+    c1 = make_chain(100, 130, lambda t: (40.0, 0.0))  # no overlap
+    labels = {0: ('7', 1), 1: ('7', 1)}
+    slot_of, _ = slots.assign_slots(labels, [c0, c1])
+    assert slot_of[0] == slot_of[1] == 'b7'
+
+
+# ── enrich ──────────────────────────────────────────────────────────────────
+
+def _payload_chains():
+    import build_track
+    H = np.eye(3)
+    chains = [
+        make_chain(0, 120, lambda t: (t * 0.1, 5.0)),    # longest
+        make_chain(0, 40, lambda t: (10.0, 10.0)),       # stationary, short
+        make_chain(0, 80, lambda t: (t * 0.2, -5.0)),    # middle
+    ]
+    payload = build_track.build_payload(chains, H, 0, {
+        'median_res': 0.005, 'matched_frames': 500,
+        'eval': {'rate': 0.5}})
+    return chains, payload
+
+
+def test_attach_labels_matches_build_payload_ids():
+    chains, payload = _payload_chains()
+    # span order: chain0 (120s) -> chain2 (80s) -> chain1 (40s)
+    labels = {0: ('10', 0), 2: ('7', 1), 1: ('99', 0)}
+    slot_of = {0: 'a10', 2: 'b7', 1: 'a99'}
+    n = enrich.attach_labels(payload, chains, labels, slot_of)
+    assert n == 3
+    by_id = {o['id']: o for o in payload['objects']}
+    assert by_id['o0']['jersey'] == '10' and by_id['o0']['slot'] == 'a10'
+    assert by_id['o1']['jersey'] == '7' and by_id['o1']['slot'] == 'b7'
+    assert by_id['o2']['jersey'] == '99'
+
+
+def test_attach_labels_requires_both_label_and_slot():
+    chains, payload = _payload_chains()
+    n = enrich.attach_labels(payload, chains, {0: ('10', 0)}, {})
+    assert n == 0
+    assert all('jersey' not in o for o in payload['objects'])
+
+
+def test_shared_decimation_keeps_endpoints_and_bounds_holds():
+    import build_track
+    objects = [{
+        't': [round(0.4 * i, 2) for i in range(100)],
+        'pan': [10.0] * 100,          # stationary
+        'tilt': [5.0] * 100,
+    }]
+    build_track._decimate_objects(objects, build_track.DECIMATE_MOVE_DEG,
+                                  build_track.DECIMATE_HOLD_S)
+    o = objects[0]
+    assert o['t'][0] == 0.0 and o['t'][-1] == pytest.approx(39.6)
+    assert len(o['t']) < 100
+    diffs = np.diff(o['t'][:-1])      # last gap may be < HOLD_S
+    assert (diffs <= build_track.DECIMATE_HOLD_S + 0.401).all()
+
+
+def test_shared_decimation_keeps_moving_samples():
+    import build_track
+    objects = [{
+        't': [round(0.4 * i, 2) for i in range(50)],
+        'pan': [i * 0.2 for i in range(50)],   # fast mover
+        'tilt': [0.0] * 50,
+    }]
+    build_track._decimate_objects(objects, build_track.DECIMATE_MOVE_DEG,
+                                  build_track.DECIMATE_HOLD_S)
+    assert len(objects[0]['t']) == 50
+
+
+def test_shared_decimation_idempotent():
+    import build_track
+    objects = [{
+        't': [round(0.4 * i, 2) for i in range(200)],
+        'pan': [10.0 + (0.08 if i % 7 == 0 else 0.0) for i in range(200)],
+        'tilt': [5.0] * 200,
+    }]
+    build_track._decimate_objects(objects, 0.12, 4.0)
+    once = [list(objects[0]['t'])]
+    build_track._decimate_objects(objects, 0.12, 4.0)
+    assert objects[0]['t'] == once[0]
+
+
+def test_build_payload_stamps_decimation_and_meets_caps():
+    _, payload = _payload_chains()
+    assert 'adaptiveDecimation' in payload['meta']
+    enrich.assert_caps(payload)
+
+
+def test_build_payload_stadium_scale_meets_caps():
+    """The HCT failure mode: many stationary crowd chains must decimate
+    under the client points cap instead of publishing an over-cap artifact."""
+    import build_track
+    H = np.eye(3)
+    rng = np.random.default_rng(3)
+    chains = []
+    for i in range(600):   # 600 chains x 10 min stationary = 900k raw pts
+        x0, y0 = rng.uniform(-40, 40), rng.uniform(-25, 25)
+        chains.append(make_chain(0, 600, lambda t, x0=x0, y0=y0: (x0, y0)))
+    payload = build_track.build_payload(chains, H, 0, {
+        'median_res': 0.005, 'matched_frames': 500, 'eval': {'rate': 0.5}})
+    n_pts = sum(len(o['t']) for o in payload['objects'])
+    assert n_pts <= build_track.PAYLOAD_MAX_POINTS
+    assert len(payload['objects']) == 600   # decimation, NOT deletion
+
+
+def test_assert_caps():
+    ok = {'objects': [{'t': [1, 2], 'pan': [0, 0], 'tilt': [0, 0]}],
+          'meta': {}}
+    enrich.assert_caps(ok)
+    over = {'objects': [{'t': list(range(200)), 'pan': [0] * 200,
+                         'tilt': [0] * 200}] * 4001, 'meta': {}}
+    with pytest.raises(RuntimeError):
+        enrich.assert_caps(over)
+
+
+def test_stamp_meta_fields():
+    p = {'objects': [], 'meta': {}}
+    enrich.stamp_meta(p, harvest_step_s=4.0, source_digest='abc', kits=2,
+                      slots=26, labelled=62, split_accepted=3,
+                      split_refused=5)
+    j = p['meta']['jersey']
+    assert j['version'] == 1 and j['slots'] == 26 and j['kits'] == 2
+    assert j['sourceDigest'] == 'abc'
+
+
+# ── review-mandated truth-table additions (CV + senior, 2026-07-18) ─────────
+
+def test_split_refuses_seam_outside_bracket():
+    # seam at t=20s but the kit flip bracket is (45s, 60s) — a cut at 20s is
+    # provably not the swap and must refuse
+    chain = _chain_with_seam(seam_at_s=20.0)
+    crop_ts, crop_kits = _crops([30, 35, 40, 45, 60, 65, 70, 75],
+                                [0, 0, 0, 0, 1, 1, 1, 1])
+    d = split.propose_split(chain, crop_ts, crop_kits, min_span_s=3.0)
+    assert not d['accepted']
+
+
+def test_split_accepts_short_gap_true_joint():
+    # the true stitch joint is a SHORT 0.8s bridge (below the old 1.2s
+    # floor) inside the bracket; a decoy 2s gap sits far outside it
+    a = np.arange(0.0, 50.0, 0.4)
+    b = np.arange(50.8, 90.0, 0.4)      # 0.8s bridge at 50s (the true joint)
+    c = np.arange(92.0, 100.0, 0.4)     # 2s decoy far outside the bracket
+    ts = np.concatenate([a, b, c]) * 1e6
+    xy = np.stack([np.linspace(0, 50, len(ts)), np.zeros(len(ts))], axis=1)
+    crop_ts, crop_kits = _crops([10, 20, 30, 45, 55, 60, 70, 80],
+                                [0, 0, 0, 0, 1, 1, 1, 1])
+    d = split.propose_split((ts, xy), crop_ts, crop_kits, min_span_s=3.0)
+    assert d['accepted'], d
+    assert abs(d['split_t_us'] / 1e6 - 50.4) < 0.5
+
+
+def test_assign_slots_ambiguous_fragment_gets_no_slot():
+    # duplicate-number group: A-early and B are concurrent-far (two proven
+    # bodies); A-late never overlaps anything — ambiguous between them, so
+    # it keeps its jersey but gets NO slot
+    a_early = make_chain(0, 60, lambda t: (0.0, 0.0))
+    b = make_chain(0, 60, lambda t: (20.0, 0.0))
+    a_late = make_chain(100, 160, lambda t: (5.0, 0.0))
+    labels = {0: ('10', 0), 1: ('10', 0), 2: ('10', 0)}
+    slot_of, diag = slots.assign_slots(labels, [a_early, b, a_late])
+    assert 0 in slot_of and 1 in slot_of
+    assert slot_of[0] != slot_of[1]
+    assert 2 not in slot_of          # honest ambiguity — no guessed body
+
+
+def test_assign_slots_refuses_internally_contradicted_component():
+    # transitive close-edges chain two bodies together: A~B close, B~C
+    # close, but A-C concurrent-far — the merged component contains a
+    # proven contradiction and must not ship a slot
+    a = make_chain(0, 60, lambda t: (0.0, 0.0))
+    b = make_chain(0, 60, lambda t: (2.0, 0.0))     # close to both
+    c = make_chain(0, 60, lambda t: (4.5, 0.0))     # >3m from a
+    labels = {0: ('9', 0), 1: ('9', 0), 2: ('9', 0)}
+    slot_of, diag = slots.assign_slots(labels, [a, b, c])
+    assert slot_of == {}            # whole component refused
+    assert diag['duplicateNumberGroups'] == 1
+
+
+def test_build_labels_leg_gate_cannot_mint_a_label():
+    # gated view [10,10] would be a strict majority, but the ungated view is
+    # a 2-2 tie — the gate removed the rival, and removal must not MINT
+    rs = [rec(chain=5, t_vp=10), rec(chain=5, t_vp=20),
+          rec(chain=5, t_vp=30, read='16', leg=0.2),
+          rec(chain=5, t_vp=40, read='16', leg=0.2)]
+    labels, _ = slots.build_labels(rs)
+    assert 5 not in labels
+
+
+def test_cluster_kits_refuses_weak_silhouette():
+    rng = np.random.default_rng(5)
+    X = rng.normal(0, 10, (30, 4))   # one blob — no real cluster structure
+    with pytest.raises(ValueError):
+        kit.cluster_kits(X)
