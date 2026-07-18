@@ -127,6 +127,9 @@ interface WatchClientProps {
   // "Explore the pitch" flow confirms mesh + raw VP availability before mounting
   // the pannable VirtualPanoramaPlayer; otherwise the Auto production plays.
   meshBaseUrl?: string | null
+  // Half-pitch focus pan window (radians), derived server-side from the
+  // scene's active calibration. Narrows the de-warp pan limits only.
+  panWindow?: { minRad: number; maxRad: number } | null
 }
 
 // Map fine-grained event types to coarse rail filters. Lets a coach narrow
@@ -187,6 +190,7 @@ export default function WatchClient({
   currentUserId,
   resumeSeconds,
   meshBaseUrl,
+  panWindow,
 }: WatchClientProps) {
   const t = useTranslations('watch')
   const eventLabels = useEventTypeLabels()
@@ -660,6 +664,7 @@ export default function WatchClient({
                   onProgressUpdate={currentUserId ? persistProgress : undefined}
                   className="rounded-xl"
                   meshBaseUrl={meshBaseUrl}
+                  panWindow={panWindow}
                   panoramaSrc={panoramaSrc}
                   exploreState={exploreState}
                   onExplore={onExplore}

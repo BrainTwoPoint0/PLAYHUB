@@ -18,6 +18,9 @@ import {
   isVenueAdmin,
 } from '@/lib/recordings/access-control'
 import { meshBaseUrl, meshExists } from '@/lib/panorama/mesh'
+import { panWindowForFocus } from '@/lib/panorama/pitch-focus'
+import { hasMidline } from '@/lib/panorama/pitch-marks'
+import { parseMeshGeometry } from '@/lib/panorama/pitch-solver'
 import WatchClient from './WatchClient'
 
 // Legacy /watch/<32-hex-share-token> URLs (still in admin clipboards and the
@@ -148,6 +151,58 @@ export default async function WatchPage({
     const base = meshBaseUrl(recording.spiideo_game_id)
     if (base && (await meshExists(recording.spiideo_game_id))) {
       panoramaMeshUrl = base
+    }
+  }
+
+  // Half-pitch watch framing: pitch_focus resolves against the scene's
+  // CURRENT active calibration at watch time (never snapshotted onto the
+  // recording). Requires a midline. Mesh artifacts are mostly-stable but DO
+  // get regenerated on calibration refits (2026-07-12/13) — bound staleness
+  // to a day rather than caching forever. Any failure degrades to full
+  // framing — a broken calibration must never block the watch page.
+  let panWindow: { minRad: number; maxRad: number } | null = null
+  if (
+    panoramaMeshUrl &&
+    recording.pitch_focus &&
+    recording.pitch_focus !== 'full' &&
+    recording.spiideo_scene_id
+  ) {
+    try {
+      const { data: cal } = await serviceClient
+        .from('playhub_pitch_calibrations')
+        .select('marks, frame_width, frame_height')
+        .eq('scene_id', recording.spiideo_scene_id)
+        .eq('status', 'active')
+        .maybeSingle()
+      if (cal?.marks && hasMidline(cal.marks)) {
+        const [sceneRes, vertsRes, idxRes] = await Promise.all([
+          fetch(`${panoramaMeshUrl}/scene.json`, {
+            next: { revalidate: 86400 },
+          }),
+          fetch(`${panoramaMeshUrl}/vertices.bin`, {
+            next: { revalidate: 86400 },
+          }),
+          fetch(`${panoramaMeshUrl}/indices.bin`, {
+            next: { revalidate: 86400 },
+          }),
+        ])
+        if (sceneRes.ok && vertsRes.ok && idxRes.ok) {
+          const mesh = parseMeshGeometry(
+            await sceneRes.json(),
+            await vertsRes.arrayBuffer(),
+            await idxRes.arrayBuffer()
+          )
+          panWindow = panWindowForFocus(
+            mesh,
+            cal.marks,
+            Number(cal.frame_width) || 3840,
+            Number(cal.frame_height) || 2160,
+            recording.pitch_focus
+          )
+        }
+      }
+    } catch (err) {
+      console.error('pitch-focus window derivation failed:', err)
     }
   }
 
@@ -283,6 +338,7 @@ export default async function WatchPage({
       isAdmin={isAdmin}
       currentUserId={user?.id || null}
       meshBaseUrl={panoramaMeshUrl}
+      panWindow={panWindow}
     />
   )
 }

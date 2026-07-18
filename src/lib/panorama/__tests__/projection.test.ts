@@ -27,6 +27,7 @@ import {
   curvedFovMax,
   CURVED_FOV_MAX_CEIL,
   type ViewLimits,
+  intersectPanWindow,
 } from '../projection'
 
 const L: ViewLimits = DEFAULT_LIMITS
@@ -335,5 +336,43 @@ describe('applyKeystone', () => {
     const [a, b, c] = pts
     const cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
     expect(Math.abs(cross)).toBeLessThan(1e-12)
+  })
+})
+
+describe('intersectPanWindow', () => {
+  it('narrows the mesh limits to the window', () => {
+    expect(
+      intersectPanWindow(-1.5, 1.5, { minRad: -0.4, maxRad: 0.9 })
+    ).toEqual({ minPan: -0.4, maxPan: 0.9 })
+  })
+  it('no window returns the mesh limits', () => {
+    expect(intersectPanWindow(-1.5, 1.5, null)).toEqual({
+      minPan: -1.5,
+      maxPan: 1.5,
+    })
+    expect(intersectPanWindow(-1.5, 1.5, undefined)).toEqual({
+      minPan: -1.5,
+      maxPan: 1.5,
+    })
+  })
+  it('a window may only NARROW — wider bounds clamp to the mesh', () => {
+    expect(intersectPanWindow(-1.0, 1.0, { minRad: -2, maxRad: 2 })).toEqual({
+      minPan: -1.0,
+      maxPan: 1.0,
+    })
+  })
+  it('inverted, disjoint, or non-finite windows are ignored', () => {
+    expect(intersectPanWindow(-1, 1, { minRad: 0.5, maxRad: -0.5 })).toEqual({
+      minPan: -1,
+      maxPan: 1,
+    })
+    expect(intersectPanWindow(-1, 1, { minRad: 2, maxRad: 3 })).toEqual({
+      minPan: -1,
+      maxPan: 1,
+    })
+    expect(intersectPanWindow(-1, 1, { minRad: NaN, maxRad: 0.5 })).toEqual({
+      minPan: -1,
+      maxPan: 1,
+    })
   })
 })

@@ -333,6 +333,25 @@ export function blendProject(
   return { x, y }
 }
 
+/**
+ * Intersect the mesh-derived pan limits (RADIANS) with an optional focus
+ * window (half-pitch watch framing). The window may only NARROW the range:
+ * a degenerate, inverted, non-finite, or disjoint window returns the mesh
+ * limits untouched — a broken calibration must never lock the view.
+ */
+export function intersectPanWindow(
+  minPan: number,
+  maxPan: number,
+  window: { minRad: number; maxRad: number } | null | undefined
+): { minPan: number; maxPan: number } {
+  if (!window) return { minPan, maxPan }
+  const lo = Math.max(minPan, window.minRad)
+  const hi = Math.min(maxPan, window.maxRad)
+  if (!Number.isFinite(lo) || !Number.isFinite(hi) || !(hi > lo))
+    return { minPan, maxPan }
+  return { minPan: lo, maxPan: hi }
+}
+
 /** Ceiling for the scene-derived zoom-out cap: the tallest real window
  *  (Nazwa, tilt −89.95°..+37.07° ≈ 127°) — also the value the player
  *  historically hardcoded for every scene. */

@@ -59,6 +59,7 @@ interface WatchPlayerProps {
   // De-warp surface: the published mesh + the (lazily-captured) raw-VP URL, plus
   // the capture poll state and its trigger (owned by WatchClient).
   meshBaseUrl?: string | null
+  panWindow?: { minRad: number; maxRad: number } | null
   panoramaSrc?: string | null
   exploreState?: ExploreState
   onExplore?: () => void
@@ -79,6 +80,7 @@ export function WatchPlayer({
   initialTimeSeconds,
   onProgressUpdate,
   meshBaseUrl,
+  panWindow,
   panoramaSrc,
   exploreState = 'idle',
   onExplore,
@@ -231,6 +233,7 @@ export function WatchPlayer({
           <VirtualPanoramaPlayer
             src={panoramaSrc as string}
             meshBaseUrl={meshBaseUrl as string}
+            panWindow={panWindow ?? undefined}
             masterVideoRef={t.videoRef}
             hideChrome
             apiRef={dewarpApiRef}
