@@ -63,13 +63,20 @@ INTERP_MAX_BRACKET_US = 600_000
 DET_DEDUPE_RAYN = 0.008
 
 
-def time_paired_sets(det_frames: dict, fragments: list, lo, hi) -> list:
+def time_paired_sets(det_frames: dict, fragments: list, lo, hi,
+                     fence_premasked: bool = False) -> list:
     """[(det rayn (N,2), interp tracklet metric (M,2)), ...] per detection
     frame. Tracklet positions are linearly interpolated per fragment at the
     exact detection timestamp — no nearest-frame slop, and never across a
     >0.6s intra-fragment dropout. Spectators are masked on both sides (pano
     fence line / metric pitch rect); near-duplicate detections (2-cam scenes)
-    are deduped on a rayn grid."""
+    are deduped on a rayn grid.
+
+    `fence_premasked`: the frames already had the fence applied in LENS
+    space (detections.LENS_FENCE_V, multi-camera layouts) and store VP-frame
+    uv — re-applying FENCE_V here would fence the TOP strip at an effective
+    lens v of k*FENCE_V (0.36 at k=2), eating exactly the far-pitch rows
+    the per-region gates need (2026-07-17 review)."""
     spans = [(int(ts[0]), int(ts[-1]), ts.astype(np.float64), xy)
              for ts, xy in fragments]
     out = []
@@ -89,7 +96,8 @@ def time_paired_sets(det_frames: dict, fragments: list, lo, hi) -> list:
         if not met:
             continue
         met = np.array(met, np.float64)
-        dm = fuv[:, 1] > FENCE_V
+        dm = np.ones(len(fuv), bool) if fence_premasked \
+            else fuv[:, 1] > FENCE_V
         drn_m = drn[dm]
         if len(drn_m):
             _, uniq = np.unique(
@@ -405,48 +413,19 @@ def lag_peak_s(det_frames: dict, fragments: list,
     return best
 
 
-def solve(det_frames: dict, fragments: list) -> dict:
-    """det_frames: {abs_ts_us: (uv (N,2), rayn (N,2))} from the dense solve
-    window; fragments: cadence-correct tracklet fragments. -> diagnostics
-    dict incl. 'H', 'eval' (global Hungarian eval on the solve window),
-    'pitch_lo'/'pitch_hi'."""
-    if not det_frames or not fragments:
-        raise RuntimeError('no detection frames or fragments to solve H from')
-    lo, hi = pitch_rect_metric(fragments)
-    pairs = time_paired_sets(det_frames, fragments, lo, hi)
-    if len(pairs) < 30:
-        raise RuntimeError(
-            f'only {len(pairs)} time-paired det/tracklet frames — '
-            'not enough for a homography solve')
+# Candidates within this fraction of the top subsample score get the FULL
+# refine + final-eval arbitration (see solve()); observed platform flips
+# were at ~7-9% margins. Floor 2 (the twin-basin incident), cap 4 (a full
+# refine is single-digit seconds; the cap bounds attempt cost).
+SOLVE_SCORE_MARGIN = 0.20
+SOLVE_MIN_FINALISTS = 2
+SOLVE_MAX_FINALISTS = 4
 
-    Mc = _robust_core(np.vstack([m for _, m in pairs]))
-    Rc = _robust_core(np.vstack([d for d, _ in pairs]))
-    candidates = _seed_candidates(Mc, Rc)
-    # Pick the seed by TIME-PAIRED matches, then refine one precise round per
-    # candidate first so a near-miss orientation gets a fair score.
-    scored = []
-    for Hc in candidates:
-        MM, RR = [], []
-        for drn, met in pairs[::max(1, len(pairs) // 80)]:
-            proj = cv2.perspectiveTransform(
-                met[None].astype(np.float64), Hc.astype(np.float64))[0]
-            C = np.linalg.norm(proj[:, None] - drn[None], axis=2)
-            ri, ci = linear_sum_assignment(C)
-            good = C[ri, ci] < PRECISE_GATE
-            MM.append(met[ri[good]])
-            RR.append(drn[ci[good]])
-        MM, RR = np.vstack(MM), np.vstack(RR)
-        Hr = Hc
-        if len(MM) >= 24:
-            Hn, _ = cv2.findHomography(*_balance(MM, RR), cv2.RANSAC, 0.02)
-            if Hn is not None:
-                Hr = Hn
-        scored.append((_subsample_score(Hr, pairs), Hr))
-    scored.sort(key=lambda s: -s[0])
-    H = scored[0][1]
 
-    # Precise: per-frame Hungarian at a loose gate, then refine with the
-    # shrinking-gate schedule + spatial balancing.
+def _refine(H: np.ndarray, pairs: list):
+    """The precise/shrinking-gate refinement: per-frame Hungarian at a loose
+    gate, then the shrinking schedule + spatial balancing. Returns
+    (H, MM, RR) of the last round; raises on match starvation."""
     for gate in (PRECISE_GATE,) * 6 + REFINE_GATES:
         MM, RR = [], []
         for drn, met in pairs:
@@ -471,15 +450,91 @@ def solve(det_frames: dict, fragments: list) -> dict:
         if Hn is None:
             raise RuntimeError(f'findHomography failed at gate {gate}')
         H = Hn
+    return H, MM, RR
+
+
+def solve(det_frames: dict, fragments: list,
+          fence_premasked: bool = False) -> dict:
+    """det_frames: {abs_ts_us: (uv (N,2), rayn (N,2))} from the dense solve
+    window; fragments: cadence-correct tracklet fragments. -> diagnostics
+    dict incl. 'H', 'eval' (global Hungarian eval on the solve window),
+    'pitch_lo'/'pitch_hi'. `fence_premasked` — see time_paired_sets."""
+    if not det_frames or not fragments:
+        raise RuntimeError('no detection frames or fragments to solve H from')
+    lo, hi = pitch_rect_metric(fragments)
+    pairs = time_paired_sets(det_frames, fragments, lo, hi,
+                             fence_premasked=fence_premasked)
+    if len(pairs) < 30:
+        raise RuntimeError(
+            f'only {len(pairs)} time-paired det/tracklet frames — '
+            'not enough for a homography solve')
+
+    Mc = _robust_core(np.vstack([m for _, m in pairs]))
+    Rc = _robust_core(np.vstack([d for d, _ in pairs]))
+    candidates = _seed_candidates(Mc, Rc)
+    # Pick the seed by TIME-PAIRED matches, then refine one precise round per
+    # candidate first so a near-miss orientation gets a fair score.
+    # NOT _refine() — deliberately a single loose round with non-fatal
+    # starvation semantics; do not "consolidate" the two.
+    scored = []
+    for Hc in candidates:
+        MM, RR = [], []
+        for drn, met in pairs[::max(1, len(pairs) // 80)]:
+            proj = cv2.perspectiveTransform(
+                met[None].astype(np.float64), Hc.astype(np.float64))[0]
+            C = np.linalg.norm(proj[:, None] - drn[None], axis=2)
+            ri, ci = linear_sum_assignment(C)
+            good = C[ri, ci] < PRECISE_GATE
+            MM.append(met[ri[good]])
+            RR.append(drn[ci[good]])
+        MM, RR = np.vstack(MM), np.vstack(RR)
+        Hr = Hc
+        if len(MM) >= 24:
+            Hn, _ = cv2.findHomography(*_balance(MM, RR), cv2.RANSAC, 0.02)
+            if Hn is not None:
+                Hr = Hn
+        scored.append((_subsample_score(Hr, pairs), Hr))
+    scored.sort(key=lambda s: -s[0])
+
+    # Refine the top-K candidates FULLY and pick by the final full eval
+    # rate. The one-round subsample score is a bad predictor of final
+    # quality and near-ties (~7%) flip deterministically across platforms
+    # (2026-07-17 HCT x86 incident: the basin scoring 1510-vs-1389 on the
+    # subsample refined to eval 0.57 while the 1389 basin refined to 0.96;
+    # ARM scored the same two basins 1293-vs-1389 the other way). Final
+    # eval rates separate basins ~2x — that comparison does not flip.
+    cut = (1.0 - SOLVE_SCORE_MARGIN) * scored[0][0]
+    n_fin = max(SOLVE_MIN_FINALISTS,
+                sum(1 for sc, _ in scored if sc >= cut))
+    finalists = []
+    starved = 0
+    refine_err = None
+    for _, H0 in scored[:min(n_fin, SOLVE_MAX_FINALISTS)]:
+        try:
+            Hf, MM, RR = _refine(H0, pairs)
+        except (RuntimeError, ValueError, cv2.error) as err:
+            # ValueError: linear_sum_assignment on non-finite costs (a
+            # degenerate H maps points across w~0); cv2.error is not a
+            # RuntimeError. Either on ONE candidate must not kill the solve.
+            starved += 1
+            refine_err = err
+            continue
+        finalists.append((evaluate(Hf, pairs, lo, hi), Hf, MM, RR))
+    if not finalists:
+        raise refine_err if refine_err is not None else RuntimeError(
+            'no seed candidate survived refinement')
+    finalists.sort(key=lambda f: -f[0]['rate'])
+    ev, H, MM, RR = finalists[0]
 
     res = np.linalg.norm(
         cv2.perspectiveTransform(MM[None].astype(np.float64),
                                  H.astype(np.float64))[0] - RR, axis=1)
-    ev = evaluate(H, pairs, lo, hi)
     return {
         'H': H,
         'median_res': float(np.median(res)),
         'eval': ev,
+        'basin_rates': [round(f[0]['rate'], 3) for f in finalists],
+        'basins_starved': starved,
         'matched_frames': len(pairs),
         'n_matches': int(len(MM)),
         'pitch_lo': lo.tolist(),

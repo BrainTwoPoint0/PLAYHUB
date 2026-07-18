@@ -74,7 +74,9 @@ def discover_streams(jwt: str, game_id: str) -> dict:
     'start_time_us': int|None} for the game.
 
     HCT-style 2-cam scenes publish one detection stream per camera — all are
-    returned and their frames merged by the H solver.
+    returned; the entrypoint arbitrates their uv LAYOUT (per-lens uv vs the
+    stacked VP frame the mesh describes — see detections.strip_candidates)
+    before merging frames for the H solver.
     """
     qs = '&'.join(f'type={t}' for t in ('object_data', 'tag'))
     raw = _get(f'{API}/v1/streams?gameId={urllib.parse.quote(game_id)}&{qs}',

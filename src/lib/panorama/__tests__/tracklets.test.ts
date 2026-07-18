@@ -41,7 +41,9 @@ describe('parseTracklets', () => {
 
   it('parses a positive-integer meta.rosterN, ignores absent/invalid (Tier 2a)', () => {
     expect(parseTracklets(VALID)!.rosterN).toBeUndefined() // no meta → no cap
-    expect(parseTracklets({ ...VALID, meta: { rosterN: 12 } })!.rosterN).toBe(12)
+    expect(parseTracklets({ ...VALID, meta: { rosterN: 12 } })!.rosterN).toBe(
+      12
+    )
     // non-integer / non-positive / non-object meta all degrade to no cap
     expect(
       parseTracklets({ ...VALID, meta: { rosterN: 11.5 } })!.rosterN
@@ -49,9 +51,7 @@ describe('parseTracklets', () => {
     expect(
       parseTracklets({ ...VALID, meta: { rosterN: 0 } })!.rosterN
     ).toBeUndefined()
-    expect(
-      parseTracklets({ ...VALID, meta: 'nope' })!.rosterN
-    ).toBeUndefined()
+    expect(parseTracklets({ ...VALID, meta: 'nope' })!.rosterN).toBeUndefined()
   })
 
   it('rejects null, wrong version, and non-objects', () => {
@@ -106,11 +106,18 @@ describe('parseTracklets', () => {
   })
 
   it('enforces the payload-level size caps', () => {
-    const many = Array.from({ length: 5001 }, (_, i) => ({
+    // 40k cap (raised from 5k for stadium-bowl venues — HCT publishes ~25k
+    // fragments legitimately; POINTS is the real size gate)
+    const many = Array.from({ length: 40_001 }, (_, i) => ({
       ...OBJ_A,
       id: `o${i}`,
     }))
     expect(parseTracklets({ ...VALID, objects: many })).toBeNull()
+    const legit = Array.from({ length: 25_000 }, (_, i) => ({
+      ...OBJ_A,
+      id: `o${i}`,
+    }))
+    expect(parseTracklets({ ...VALID, objects: legit })).not.toBeNull()
     const big = {
       id: 'big',
       t: Array.from({ length: 800_001 }, (_, i) => i * 0.2),

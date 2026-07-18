@@ -337,6 +337,60 @@ def test_solve_recovers_rotated_homography():
     assert np.median(np.linalg.norm(p_true - p_sol, axis=1)) < 0.02
 
 
+def test_solve_arbitrates_basins_by_final_eval_not_subsample_score():
+    # The 2026-07-17 HCT x86 incident: two seed basins near-tie on the
+    # one-round subsample score and the argmax flips across platforms,
+    # while the FINAL eval rates differ ~2x. Force the incident geometry:
+    # candidates = [180° mirror (a REAL wrong basin — full-refines to rate
+    # ~0.11), true], with the subsample score pinned constant so the stable
+    # sort keeps the mirror FIRST. A refine-only-scored[0] mutant returns
+    # the mirror (rate ~0.11) and fails; the final-eval arbitration refines
+    # both and returns the true basin. (Recipe verified against the mutant
+    # in review — a plain shear is NOT a refinement basin and made the
+    # earlier version of this test vacuous.)
+    det_frames, fragments, H_true = _synthetic_world()
+    mirror = H_true @ np.diag([-1.0, -1.0, 1.0])
+    orig_seed = solve_h._seed_candidates
+    orig_score = solve_h._subsample_score
+    solve_h._seed_candidates = lambda Mc, Rc: [mirror, H_true]
+    solve_h._subsample_score = lambda H, pairs, **kw: 100
+    try:
+        diag = solve_h.solve(det_frames, fragments)
+    finally:
+        solve_h._seed_candidates = orig_seed
+        solve_h._subsample_score = orig_score
+    assert diag['eval']['rate'] > 0.5, diag['eval']
+    assert len(diag['basin_rates']) >= 2
+    assert diag['basin_rates'][0] == max(diag['basin_rates'])
+    assert min(diag['basin_rates']) < 0.3   # the mirror stayed wrong
+
+
+def test_solve_survives_one_starving_candidate():
+    # a candidate whose refinement starves must be skipped, not fatal, when
+    # another candidate refines fine
+    det_frames, fragments, H_true = _synthetic_world()
+    junk = np.array([[1e-6, 0.0, 99.0], [0.0, 1e-6, 99.0], [0.0, 0.0, 1.0]])
+    orig = solve_h._seed_candidates
+    solve_h._seed_candidates = lambda Mc, Rc: [junk, H_true]
+    try:
+        diag = solve_h.solve(det_frames, fragments)
+    finally:
+        solve_h._seed_candidates = orig
+    assert diag['eval']['rate'] > 0.5
+
+
+def test_validation_panel_picks_only_video_covered_timestamps():
+    import validate_render
+    start = 1_000_000_000
+    dts = [start + int(s * 1e6) for s in (10, 100, 5000, 7000, 8000)]
+    # video covers 5400s of the stream: 7000/8000s picks must be dropped
+    assert validate_render._covered(dts, start, 5400.0) == dts[:3]
+    # unknown duration -> no filtering (old behavior)
+    assert validate_render._covered(dts, start, None) == dts
+    # nothing covered -> empty (caller raises its loud error)
+    assert validate_render._covered(dts, start + int(9e9), 5400.0) == []
+
+
 def test_evaluate_fails_sheared_h():
     det_frames, fragments, H_true = _synthetic_world()
     lo, hi = solve_h.pitch_rect_metric(fragments)
@@ -451,6 +505,170 @@ def test_fetch_window_items_missing_metadata():
         'g', {'id': 's'}, (0, int(100e6)), fetch=lambda i: None) == []
 
 
+# ── multi-camera det-uv layout (stacked strips) ──────────────────────────────
+
+def _det_item_bytes(ts, feet):
+    dets = [{'bounding_box': {'x': u - 0.01, 'y': v - 0.05,
+                              'width': 0.02, 'height': 0.05}, 'label': 1}
+            for u, v in feet]
+    return json.dumps({'camera_results': [{'results': [
+        {'timestamp': ts, 'detections': dets}]}]}).encode()
+
+
+def test_strip_candidates_single_stream_identity_only():
+    # single-camera scenes must be byte-identical to the pre-fix behavior
+    assert detections.strip_candidates([{'id': 'a'}]) == [('identity', None)]
+    assert detections.strip_candidates([]) == [('identity', None)]
+
+
+def test_strip_candidates_two_streams_offers_both_assignments():
+    out = detections.strip_candidates([{'id': 'aaaa'}, {'id': 'bbbb'}])
+    assert out[0] == ('identity', None)
+    assert len(out) == 3
+    pts = np.array([[0.3, 0.4]])
+    for _, tf in out[1:]:
+        va, vb = tf['aaaa'](pts)[0], tf['bbbb'](pts)[0]
+        assert va[0] == 0.3 and vb[0] == 0.3          # u untouched
+        # one stream to the top strip, the other to the bottom
+        assert {round(va[1], 2), round(vb[1], 2)} == {0.2, 0.7}
+    # the two permutations assign stream 'aaaa' to DIFFERENT strips
+    a_vs = sorted(round(tf['aaaa'](pts)[0][1], 2) for _, tf in out[1:])
+    assert a_vs == [0.2, 0.7]
+
+
+def test_strip_candidates_transform_does_not_mutate_input():
+    _, tf = detections.strip_candidates([{'id': 'a'}, {'id': 'b'}])[1]
+    pts = np.array([[0.3, 0.4]])
+    tf['a'](pts)
+    assert pts[0, 1] == 0.4
+
+
+def test_parse_uv_transform_stores_vp_frame_and_drops_lens_fence():
+    # 0.2 sits just above the lens fence (0.18) and must be KEPT — pins the
+    # fence threshold itself, not merely its existence
+    feet = [(0.2, 0.6), (0.4, 0.6), (0.6, 0.6), (0.8, 0.2), (0.5, 0.1)]
+    items = [(0, _det_item_bytes(1000, feet))]
+    tf = detections._strip_transform(1, 2)   # bottom strip
+    frames = detections.parse_detection_items(
+        items, lambda p: p.copy(), uv_transform=tf)
+    fuv, rn = frames[1000]
+    # the lens v=0.1 foot is a fence row in ITS OWN lens frame — dropped
+    # pre-transform (post-transform it would sit at VP v=0.55 and sail past
+    # any VP-frame fence mask)
+    assert len(fuv) == 4
+    assert np.allclose(sorted(fuv[:, 1]), [0.6, 0.8, 0.8, 0.8])  # VP-frame
+    assert np.allclose(rn, fuv)              # rayn queried with VP-frame uv
+
+
+def test_parse_without_transform_unchanged():
+    feet = [(0.2, 0.6), (0.4, 0.6), (0.6, 0.6), (0.8, 0.1)]
+    items = [(0, _det_item_bytes(1000, feet))]
+    frames = detections.parse_detection_items(items, lambda p: p.copy())
+    fuv, _ = frames[1000]
+    assert len(fuv) == 4                     # no lens fence without transform
+    assert np.allclose(fuv[3], [0.8, 0.1])   # uv stored as-is
+
+
+def _mk_windows(frames):
+    return {'solve': frames}
+
+
+def test_choose_layout_nan_never_wins_and_first_real_replaces_nan():
+    cands = [('identity', None), ('strips:a', {'a': 1}), ('strips:b', {'b': 1})]
+    scores = {'identity': (0.0, float('nan')),
+              'strips:a': (0.0, 0.3), 'strips:b': (0.0, 0.2)}
+    calls = []
+
+    def build(tf):
+        calls.append(tf)
+        return _mk_windows({1: 'frames'})
+    label, tf, dw, diag = detections.choose_layout(
+        cands, build, lambda pooled: scores[cands[len(calls) - 1][0]])
+    assert label == 'strips:a' and tf == {'a': 1}
+    assert diag['identity'] == {'lag_s': None, 'lag_r': None}
+    assert diag['strips:a'] == {'lag_s': 0.0, 'lag_r': 0.3}
+
+
+def test_choose_layout_all_nan_keeps_identity():
+    cands = [('identity', None), ('strips:a', {'a': 1})]
+    label, tf, _, _ = detections.choose_layout(
+        cands, lambda t: _mk_windows({1: 'f'}),
+        lambda pooled: (0.0, float('nan')))
+    assert label == 'identity' and tf is None
+
+
+def test_choose_layout_tie_keeps_earlier_candidate():
+    cands = [('identity', None), ('strips:a', {'a': 1})]
+    label, tf, _, _ = detections.choose_layout(
+        cands, lambda t: _mk_windows({1: 'f'}), lambda pooled: (0.0, 0.4))
+    assert label == 'identity'
+
+
+def test_choose_layout_empty_parse_scores_nan_not_zero():
+    # a candidate that parses ZERO frames must not outrank a NaN identity
+    # (lag_peak_s({}) returns a REAL 0.0 — senior review finding)
+    cands = [('identity', None), ('strips:a', {'a': 1})]
+
+    def build(tf):
+        return _mk_windows({} if tf else {1: 'f'})
+    label, tf, _, diag = detections.choose_layout(
+        cands, build, lambda pooled: (0.0, float('nan')))
+    assert label == 'identity'
+    assert diag['strips:a'] == {'lag_s': None, 'lag_r': None}
+
+
+def test_choose_layout_arbitrates_on_the_real_scorer():
+    # End-to-end on the ACTUAL scorer. 'bad' is the same world shifted +30s:
+    # under the CONSTRAINED scan (|lag| <= 1.5s) it scores a real but low r,
+    # so 'good' must win — and because 'bad' is ordered FIRST, this dies if
+    # the comparison flips OR if the scan constraint is removed ('bad' would
+    # then find its true peak at lag 30 and tie-keep-earlier would pick it).
+    det_frames, fragments, _ = _synthetic_world(n_frames=1200)
+    shifted = {ts + 30_000_000: v for ts, v in det_frames.items()}
+    frames_by = {'good': det_frames, 'bad': shifted}
+    label, _, _, diag = detections.choose_layout(
+        [('bad', {'x': 1}), ('good', {'y': 1})],
+        lambda tf: _mk_windows(frames_by['good' if tf == {'y': 1} else 'bad']),
+        lambda pooled: solve_h.lag_peak_s(pooled, fragments, max_lag_s=1.5))
+    assert label == 'good', diag
+
+
+def test_time_paired_sets_fence_premasked_skips_vp_mask():
+    det_frames, fragments, _ = _synthetic_world(n_frames=60)
+    # move every stored uv above the VP fence line: default masks ALL feet,
+    # premasked keeps them
+    low_uv = {ts: (np.full_like(fuv, 0.05), rn)
+              for ts, (fuv, rn) in det_frames.items()}
+    lo, hi = solve_h.pitch_rect_metric(fragments)
+    assert solve_h.time_paired_sets(low_uv, fragments, lo, hi) == []
+    pairs = solve_h.time_paired_sets(low_uv, fragments, lo, hi,
+                                     fence_premasked=True)
+    assert len(pairs) > 0
+
+
+def test_stacked_layout_correct_transform_recovers_geometry():
+    # A stacked-mesh-like uv_to_rayn: the two strips are DIFFERENT lenses
+    # looking at different parts of the world. Per-lens uv fed as identity
+    # routes lens-frame v<0.5 content through the TOP lens's geometry.
+    def uv_to_rayn(pts):
+        out = np.empty_like(pts)
+        top = pts[:, 1] < 0.5
+        out[top] = pts[top] * [1.0, 2.0]
+        out[~top] = (pts[~top] - [0.0, 0.5]) * [1.0, 2.0] + [10.0, 0.0]
+        return out
+
+    feet = [(0.2, 0.45), (0.4, 0.45), (0.6, 0.45), (0.8, 0.45)]
+    items = [(0, _det_item_bytes(1000, feet))]
+    # these feet belong to the BOTTOM camera: correct rayn is the +10 region
+    tf = detections._strip_transform(1, 2)
+    _, rn_ok = detections.parse_detection_items(
+        items, uv_to_rayn, uv_transform=tf)[1000]
+    assert np.all(rn_ok[:, 0] > 9.0)
+    # identity mismaps them through the top lens — wrong world region
+    _, rn_bad = detections.parse_detection_items(items, uv_to_rayn)[1000]
+    assert np.all(rn_bad[:, 0] < 1.0)
+
+
 # ── roster cardinality N estimate (Tier 2a) ───────────────────────────────────
 
 def _roster_chain(t0_s, t1_s, x, y, n=24):
@@ -488,3 +706,97 @@ def test_estimate_roster_n_empty_and_degenerate():
     a = (ts, np.array([[0.0, 0.0], [0.0, 0.0]]))
     b = (ts, np.array([[20.0, 0.0], [20.0, 0.0]]))
     assert build_track.estimate_roster_n([a, b]) == 2
+
+
+def test_dedup_merges_two_overlapping_colocated_chains():
+    # two fragments on ONE body (0.4 m apart, duplicate-grade), same span -> one
+    a = _roster_chain(0, 60, 0.0, 0.0)
+    b = _roster_chain(0, 60, 0.4, 0.0)
+    out = build_track.dedup_concurrent([a, b])
+    assert len(out) == 1
+
+
+def test_dedup_keeps_two_distinct_separated_players():
+    a = _roster_chain(0, 60, 0.0, 0.0)
+    b = _roster_chain(0, 60, 20.0, 0.0)
+    out = build_track.dedup_concurrent([a, b])
+    assert len(out) == 2
+
+
+def test_dedup_NEVER_bridges_temporally_disjoint_chains():
+    # SAME position but DISJOINT in time = a slot re-use / a real gap. Merging
+    # this is cross-gap identity bridging (unsafe) — dedup must NOT do it.
+    a = _roster_chain(0, 10, 0.0, 0.0)
+    b = _roster_chain(20, 30, 0.0, 0.0)
+    assert len(build_track.dedup_concurrent([a, b])) == 2
+
+
+def test_dedup_touching_chains_not_merged():
+    # a.end == b.start: zero overlap (the realistic slot-reuse case) -> not merged
+    a = _roster_chain(0, 10, 0.0, 0.0)
+    b = _roster_chain(10, 20, 0.0, 0.0)
+    assert len(build_track.dedup_concurrent([a, b])) == 2
+
+
+def test_dedup_ignores_a_transient_cross():
+    # two DIFFERENT players brushing close only briefly must not merge.
+    a = _roster_chain(0, 60, 0.0, 0.0, n=240)
+    tb = np.linspace(0, 60, 240) * 1e6
+    xb = np.linspace(-30, 30, 240)           # sweeps through x=0 briefly
+    b = (tb, np.column_stack([xb, np.zeros(240)]))
+    assert len(build_track.dedup_concurrent([a, b])) == 2
+
+
+def test_dedup_keeps_sustained_marking_pair():
+    # two DISTINCT players tight-marking at 1.2 m for the whole 8 s: > the merge
+    # radius, so they must NOT collapse (the close-marking identity-loss risk).
+    a = _roster_chain(0, 8, 0.0, 0.0)
+    b = _roster_chain(0, 8, 1.2, 0.0)
+    assert len(build_track.dedup_concurrent([a, b])) == 2
+
+
+def test_dedup_rejects_transitive_line_collapse():
+    # a wall/line of DISTINCT players 0.6 m apart: consecutive pairs are
+    # duplicate-grade but the ends are 1.2 m apart. Transitive union-find would
+    # collapse them to one dot at the goal moment — the cohesion guard must not.
+    chains = [_roster_chain(0, 10, 0.6 * i, 0.0) for i in range(3)]
+    assert len(build_track.dedup_concurrent(chains)) == 3
+
+
+def test_dedup_neighbour_of_a_duplicate_is_not_swallowed():
+    # P at 0, its duplicate D at 0.4, a distinct neighbour Q at 1.0. Q must NOT
+    # be merged away (invisible loss). The whole non-cohesive group is left
+    # un-merged — safe over clean.
+    P = _roster_chain(0, 10, 0.0, 0.0)
+    D = _roster_chain(0, 10, 0.4, 0.0)
+    Q = _roster_chain(0, 10, 1.0, 0.0)
+    out = build_track.dedup_concurrent([P, D, Q])
+    assert len(out) == 3
+
+
+def test_dedup_tolerance_collapses_near_coincident_samples():
+    # two interleaved uuids 0.4 m apart, timestamps offset 200 µs: the merged
+    # chain must not carry <tolerance-dt sample pairs (they seed a huge KF speed).
+    a = _roster_chain(0, 8, 0.0, 0.0, n=40)
+    tb = np.linspace(0, 8, 40) * 1e6 + 200.0   # +200 µs
+    b = (tb, np.column_stack([np.full(40, 0.4), np.zeros(40)]))
+    out = build_track.dedup_concurrent([a, b])
+    assert len(out) == 1
+    ts = out[0][0]
+    assert np.all(np.diff(ts) > build_track.DEDUP_TS_TOL_US)
+
+
+def test_dedup_singleton_and_empty_passthrough():
+    assert build_track.dedup_concurrent([]) == []
+    one = [_roster_chain(0, 10, 0.0, 0.0)]
+    assert build_track.dedup_concurrent(one) == one
+
+
+def test_dedup_merged_body_count_matches_roster_estimate():
+    # 10 players + 1 duplicate fragment -> dedup removes the duplicate, and the
+    # roster estimate (which dedups for COUNTING) is unchanged by the merge.
+    chains = [_roster_chain(0, 60, 5 * i, 0) for i in range(10)]
+    chains.append(_roster_chain(0, 60, 0.4, 0))   # dup of player 0
+    deduped = build_track.dedup_concurrent(chains)
+    assert len(deduped) == 10
+    assert build_track.estimate_roster_n(deduped) == 10

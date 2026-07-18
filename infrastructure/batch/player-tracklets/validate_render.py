@@ -56,13 +56,34 @@ def _grab_frame(url: str, tv: float) -> np.ndarray | None:
             pass
 
 
+def _video_duration_s(url: str) -> float | None:
+    try:
+        r = subprocess.run(['ffprobe', '-v', 'error', '-show_entries',
+                            'format=duration', '-of', 'default=nw=1:nk=1',
+                            url], capture_output=True, timeout=60)
+        return float(r.stdout.strip())
+    except (subprocess.TimeoutExpired, ValueError):
+        return None
+
+
+def _covered(dts: list, start_time_us: int, dur_s: float | None) -> list:
+    """Timestamps the banked VIDEO actually covers. The preserved panorama
+    can be SHORTER than the data streams (HCT: 5400s of a 9056s stream), and
+    an -ss seek past the end yields no frame — so panel picks must come from
+    covered timestamps only (the solve window may lie entirely outside)."""
+    if dur_s is None:
+        return dts
+    return [dt for dt in dts
+            if 0.0 <= (dt - start_time_us) / 1e6 <= dur_s - 1.0]
+
+
 def render_validation_png(url: str, start_time_us: int, det_frames: dict,
                           fragments: list, H: np.ndarray,
                           rayn_to_uv) -> bytes | None:
     """Stacked panels PNG as bytes, or None if no frame could be extracted."""
     spans = [(int(ts[0]), int(ts[-1]), ts.astype(np.float64), xy)
              for ts, xy in fragments]
-    dts = sorted(det_frames)
+    dts = _covered(sorted(det_frames), start_time_us, _video_duration_s(url))
     if not dts:
         return None
     picks = [dts[max(0, min(len(dts) - 1, int(len(dts) * f)))]

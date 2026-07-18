@@ -92,9 +92,22 @@ MAX_TOTAL_POINTS = 700_000
 # CLUSTER_M so two fragments on one body count once. Refs are on-pitch and are
 # NOT removed, so N includes on-field officials (loose by 1-3 is fine — a cap
 # that loose still kills the gross duplicates/phantoms).
-ROSTER_CLUSTER_M = 1.7
+ROSTER_CLUSTER_M = 1.7      # COUNTING radius — deliberately loose (over-merge is
+#                             harmless when only counting bodies). NOT for merging.
 ROSTER_PCT = 95
 ROSTER_SAMPLES = 240
+# MERGING is a different risk tolerance: an over-merge DESTROYS an identity (a
+# player vanishes from the overlay). A true two-fragments-on-one-body duplicate
+# separates only by detector+H noise (~0.2-0.5m); two DISTINCT players in close
+# marking / a wall / a scrum sit ~0.8-1.7m apart and sustain it for seconds. So
+# merge on a TIGHT radius, well below the marking regime, and gate on the HIGH
+# percentile of separation (a duplicate stays tiny the WHOLE overlap; a marking
+# pair exceeds it) — not the median, which passes sustained proximity.
+DEDUP_MERGE_M = 0.9         # merge radius (≪ ROSTER_CLUSTER_M) — duplicate-grade only
+DEDUP_SEP_PCT = 90          # p90 separation over the overlap must stay under merge_m
+DEDUP_MIN_OVERLAP_S = 2.0   # ignore transient brushes (co-located < this = a cross)
+DEDUP_TS_TOL_US = 50_000    # collapse near-coincident samples (<50ms) on merge, so
+#                             two interleaved uuids can't seed a huge KF start velocity
 
 
 # ── Parsing + per-fragment hygiene ───────────────────────────────────────────
@@ -502,6 +515,118 @@ def estimate_roster_n(chains: list, cluster_m: float = ROSTER_CLUSTER_M,
     return int(round(float(np.percentile(counts, pct))))
 
 
+# ── Concurrent de-duplication (spotlight overlay: two-dots-on-one-body fix) ───
+
+_SEP_GRID_CAP = 128  # separation percentile needs no more; caps per-pair cost
+
+
+def _overlap_sep(a: tuple, b: tuple, pct: float):
+    """p-th percentile of metric separation between two chains over their TEMPORAL
+    overlap (µs), on a grid capped at _SEP_GRID_CAP points. Returns None when they
+    do not overlap. The high percentile is the safety knob: a true duplicate stays
+    tiny the WHOLE overlap, so its p90 is small; two distinct players brushing
+    close exceed it the moment they separate, so their p90 rejects the merge."""
+    ts_a, xy_a = a
+    ts_b, xy_b = b
+    lo = max(ts_a[0], ts_b[0])
+    hi = min(ts_a[-1], ts_b[-1])
+    if hi <= lo:
+        return None
+    npts = int(min(_SEP_GRID_CAP, max(2, (hi - lo) / 1e6 / SAMPLE_DT)))
+    grid = np.linspace(lo, hi, npts)
+    ga = np.column_stack([np.interp(grid, ts_a, xy_a[:, 0]),
+                          np.interp(grid, ts_a, xy_a[:, 1])])
+    gb = np.column_stack([np.interp(grid, ts_b, xy_b[:, 0]),
+                          np.interp(grid, ts_b, xy_b[:, 1])])
+    return float(np.percentile(np.linalg.norm(ga - gb, axis=1), pct))
+
+
+def dedup_concurrent(chains: list, merge_m: float = DEDUP_MERGE_M,
+                     sep_pct: float = DEDUP_SEP_PCT,
+                     min_overlap_s: float = DEDUP_MIN_OVERLAP_S) -> list:
+    """Merge chains that are the SAME BODY seen twice — the two-fragments-on-one-
+    body duplicates the spotlight draws as two dots. A pair is duplicate-grade iff
+    it overlaps in time for >= min_overlap_s AND its p`sep_pct` separation stays
+    under `merge_m` (a TIGHT radius, well below the ~0.8-1.7m marking/wall regime —
+    see the DEDUP_* constants).
+
+    Two safety properties, both load-bearing (a wrong merge silently DELETES a
+    player from the overlay — worse than any duplicate):
+    - **Concurrent only** — temporally DISJOINT chains are NEVER merged. Merging
+      across a gap is cross-gap identity bridging, measured too swap-prone on dense
+      play (8-22% wrong-body); see `scripts/player-identity/tier2b/RECORD.md`.
+    - **Temporal-clique cohesion** — a group is merged only if EVERY overlapping
+      pair in it is duplicate-grade. Plain union-find is transitive, so A~B and B~C
+      would collapse a wall/huddle/line of DISTINCT players (A far from C) into one
+      dot at exactly the goal moment. The clique check rejects any group that isn't
+      a single tight body; a rejected group is left un-merged (safe over clean).
+      Members that overlap no one else in the group (a duplicate bridged by a
+      continuous member across its own gap) are allowed — that is not bridging."""
+    n = len(chains)
+    if n < 2:
+        return list(chains)
+    parent = list(range(n))
+
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+
+    # sweep by start time; each chain compares only to still-active earlier chains
+    order = sorted(range(n), key=lambda i: chains[i][0][0])
+    active: list[int] = []
+    for idx in order:
+        s_i = chains[idx][0][0]
+        active = [k for k in active if chains[k][0][-1] >= s_i]
+        for k in active:
+            ov = (min(chains[idx][0][-1], chains[k][0][-1]) - s_i) / 1e6
+            if ov < min_overlap_s:
+                continue
+            sep = _overlap_sep(chains[idx], chains[k], sep_pct)
+            if sep is not None and sep < merge_m:
+                union(idx, k)
+        active.append(idx)
+
+    groups: dict[int, list[int]] = {}
+    for i in range(n):
+        groups.setdefault(find(i), []).append(i)
+
+    out = []
+    for members in groups.values():
+        if len(members) == 1:
+            out.append(chains[members[0]])
+            continue
+        # cohesion: reject the group unless every OVERLAPPING pair is
+        # duplicate-grade (kills transitive huddle/line collapse)
+        cohesive = True
+        for a in range(len(members)):
+            for b in range(a + 1, len(members)):
+                sep = _overlap_sep(chains[members[a]], chains[members[b]], sep_pct)
+                if sep is not None and sep >= merge_m:
+                    cohesive = False
+                    break
+            if not cohesive:
+                break
+        if not cohesive:
+            out.extend(chains[m] for m in members)
+            continue
+        ts = np.concatenate([chains[m][0] for m in members])
+        xy = np.concatenate([chains[m][1] for m in members])
+        o = np.argsort(ts, kind='stable')
+        ts, xy = ts[o], xy[o]
+        # tolerance de-dup: drop samples <DEDUP_TS_TOL_US apart so two interleaved
+        # uuids can't seed a huge start velocity in the KF (Δpos / ~µs)
+        keep = np.concatenate([[True], np.diff(ts) > DEDUP_TS_TOL_US])
+        out.append((ts[keep], xy[keep]))
+    return out
+
+
 # ── Kalman + RTS smoothing ───────────────────────────────────────────────────
 
 def _kf_rts(ts: np.ndarray, xy: np.ndarray):
@@ -577,12 +702,16 @@ def smooth_and_resample(ts: np.ndarray, xy: np.ndarray):
 # ── Payload ──────────────────────────────────────────────────────────────────
 
 def build_payload(chains: list, H: np.ndarray, start_time_us: int,
-                  diag: dict) -> dict:
+                  diag: dict, roster_n: int | None = None) -> dict:
     """Chains + homography -> the public tracklets.json payload.
 
     t is seconds on the produced-video clock (assumes the produced video
     starts at the stream start — the aim-track pipeline's validated base);
-    t0OffsetSec lets a future per-game correction shift it client-side."""
+    t0OffsetSec lets a future per-game correction shift it client-side.
+
+    `roster_n` overrides the cap; pass the PRE-dedup estimate so the loose-high
+    count is not tightened by concurrent de-dup (dedup can only lower it). When
+    None it is estimated from `chains` (backward-compatible)."""
     chains = sorted(chains, key=lambda c: -(int(c[0][-1]) - int(c[0][0])))
     total = sum(len(c[0]) for c in chains)
     step = 2 if total > MAX_TOTAL_POINTS else 1
@@ -620,8 +749,9 @@ def build_payload(chains: list, H: np.ndarray, start_time_us: int,
             'evalRate': round(diag['eval']['rate'], 3) if diag.get('eval') else None,
             'nObjects': len(objects),
             # Roster cap (Tier 2a): the client shows at most this many trackers.
-            # Estimated from ALL on-pitch chains (not just the renderable ones).
-            'rosterN': estimate_roster_n(chains),
+            # From ALL on-pitch chains PRE-dedup (dedup can only lower the count).
+            'rosterN': roster_n if roster_n is not None
+            else estimate_roster_n(chains),
             'officialsIncluded': True,
             'downsampled': step > 1,
         },
