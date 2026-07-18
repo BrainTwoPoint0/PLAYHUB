@@ -1,6 +1,18 @@
 # Roster-cardinality player tracking — design
 
-**Status:** design (Tier 1 shipped; Tier 2 not built). 2026-07-17.
+**Status:** Tier 1 + Tier 2a SHIPPED (rosterN live, N=15 eyes-on validated). **Tier 2b
+fully explored 2026-07-17 → geometry is EXHAUSTED; both defects need Tier 3 (jersey).**
+Full trail: `scripts/player-identity/tier2b/RECORD.md`; B handoff: `tier2b/NEXT-SESSION-B.md`.
+Findings: (1) point-level per-frame Hungarian scatters identity — DEAD; (2) fragment-level
+bridging for the FOLLOW is 8-22% swap (venue-dependent; the FP holdout broke the Nazwa
+optimism), and min-cost flow does NOT beat the greedy (§3 ambiguity-refusal > global
+optimality); (3) the "cheap safe overlay dedup" (Option A) does NOT exist cleanly —
+Spiideo's duplicate fragments sit 1-1.7m apart, the same regime as close-marking players,
+so no safe radius separates them and motion only weakly does. **Both the duplicate dot (c)
+and the follow-drop (b) converge on Tier 3 (jersey): one number → one dot + a persistent
+follow.** `dedup_concurrent` (+11 tests, 2 specialist reviews) is kept dormant (not wired).
+Next = Tier 3, and its FIRST move is a gate: can a jersey be read off a SPIIDEO raw-VP crop
+at all? (the reader is Veo-trained; /watch is Spiideo). 2026-07-17.
 **Owner ask (Karim, after the Tier 1b lock eyes-on):** "as soon as you see the first image of
 the pitch, count how many players, and you can't have more trackers than players." Standardize the
 tracker count.
@@ -13,23 +25,24 @@ offline tracklets job. Related: [player-identity-reid-negative], [playhub-spotli
 ## 1. Context — what we saw, and why this is the identity layer
 
 On the shipped locked follow, three artifacts were observed on real footage:
+
 - **(a)** a locked player is lost and the camera **drifts to the pitch edge tracking nobody**, then goes "lost";
 - **(b)** a **new tracker id lands on that same player** a moment later;
 - **(c)** sometimes **two trackers sit on one player**.
 
 All three are symptoms of the one hard problem this workstream has measured to death: **we SEE every
 player (~101% coverage) but we cannot keep their NAME.** Spiideo's tracklets fragment every ~14–22s
-and are never re-linked past ~2s; appearance re-ID is a measured dead end (it reads the *kit*, not
+and are never re-linked past ~2s; appearance re-ID is a measured dead end (it reads the _kit_, not
 the player); geometric stitching tops out ~20–28s at high purity. The owner's "cap the trackers"
-instinct is the right *structural* move — it is **fixed-cardinality multi-object tracking** — but a
+instinct is the right _structural_ move — it is **fixed-cardinality multi-object tracking** — but a
 cap is a **cardinality** bound, not an **identity** solution. This doc draws that line precisely.
 
 ## 2. The load-bearing framing (do not lose this)
 
 **The roster is the substrate the parked jersey path plugs into.** The entire argument for jersey
-numbers in our re-ID work was: *stop chaining fragments; assign fragments to a fixed roster of N
+numbers in our re-ID work was: _stop chaining fragments; assign fragments to a fixed roster of N
 slots, so errors become independent against a label instead of compounding to ~0 over ~150 breaks a
-match.* That N-slot roster is exactly what "never more trackers than players" builds. So the slot
+match._ That N-slot roster is exactly what "never more trackers than players" builds. So the slot
 layer is **not** duplicate-dot polish — it is the scaffolding Tier 2 (identity) fills:
 
 > **the cap creates the slots; jersey OCR (or a human re-pick) labels them.**
@@ -40,7 +53,7 @@ client-side dedup. Build it as load-bearing infrastructure for the prize, and do
 
 ## 3. THE invariant — an empty slot beats a wrong slot
 
-**A slot layer can trade *visible* fragmentation for *invisible* slot-swaps.** When two players cross
+**A slot layer can trade _visible_ fragmentation for _invisible_ slot-swaps.** When two players cross
 and occlude, a naive assignment keeps the count at N and looks clean, but slot #7 can silently become
 player B after the crossing — rendered as a confident, solid slot-track gliding A→B. That is the
 **same failure mode as every wrong-follow we've hit** (the coach read as "4", the wrong-kid camera, a
@@ -50,7 +63,7 @@ than honestly-lost.**
 > **The slot optimizer MUST prefer to leave a slot UNFILLED (or the followed selection to go honestly
 > "lost") over guessing an assignment it isn't sure of.** This is the single most important line in
 > this design. Bake it into the cost/gating of the optimizer (an explicit "no-assignment" option per
-> slot with a finite cost, and a confidence gate on the *followed* slot). If that principle holds,
+> slot with a finite cost, and a confidence gate on the _followed_ slot). If that principle holds,
 > the rest is tuning.
 
 ## 4. Estimating N — robustly, across the match (not one frame)
@@ -76,8 +89,10 @@ keeper can be at the far post / behind the mast / outside the crop). And N is **
 ## 5. The plan — four tiers
 
 ### Tier 1 — display fixes (SHIPPED, client-only, no new data)
+
 Directly fixes the three observed artifacts at the render layer; keeps the honest-loss contract.
 Commit `7a53850` on `feat/tier1b-player-lock-camera`.
+
 - **(a)** post-loss **coast is decayed + capped** at the re-assoc radius (`SPOT_COAST_*` in
   `VirtualPanoramaPlayer.tsx`) — the aim eases to a stop where the player vanished instead of
   projecting terminal velocity to the frame edge.
@@ -87,6 +102,7 @@ Commit `7a53850` on `feat/tier1b-player-lock-camera`.
   identity-hop (a tracker re-index in place = the same player).
 
 ### Tier 2a — publish N + cap the count (SHIPPED, commit `1b3f3fd`)
+
 - `build_track.estimate_roster_n(chains)` = the **p95 of the de-duplicated (~1.7 m) concurrent
   on-pitch body count** over the tracked span (`ROSTER_*` consts); published as `meta.rosterN` +
   `meta.officialsIncluded` in `build_payload`. `tracklets.ts` parses the optional `rosterN` (absent →
@@ -98,9 +114,11 @@ Commit `7a53850` on `feat/tier1b-player-lock-camera`.
   bare in this workspace (drift replaces the ball-detection CE — see the veo-capture decision).
 
 ### Tier 2b — offline N-slot global assignment (the real layer)
+
 Replace the ~2000-fragment artifact with **N slot-tracks**. After `stitch`/`filter_chains_on_pitch`,
 solve a **fixed-cardinality assignment** of active fragments → N slots at each 5 Hz step, 1:1, on
 world distance + motion prediction, then run the existing `smooth_and_resample` → `build_payload`.
+
 - **Belongs offline** (not the client): it can be **non-causal** (use future frames, like the RTS
   smoother already does) — strictly better than the client's one-shot greedy re-assoc — and lives
   with the metric data.
@@ -109,17 +127,18 @@ world distance + motion prediction, then run the existing `smooth_and_resample` 
 - **Algorithm** (from prior art): start with **Hungarian per-frame + "only the N most-confident
   tracks are active"** as the fast baseline; the principled global version is **min-cost network
   flow** with a cardinality constraint (Zhang, Li & Nevatia 2008 — proven, polynomial, exact; ref
-  impl `muSSP`) or **lifted multicut** (LMGP, validated on SoccerNet — partitions *fragments* into
+  impl `muSSP`) or **lifted multicut** (LMGP, validated on SoccerNet — partitions _fragments_ into
   exactly N chains, so it consumes our input directly). Skip CPHD / JPDA / MHT (over-engineered:
   CPHD is for unknown cardinality under clutter; MHT is O(N!)).
 - **What 2b buys:** kills duplicates (1:1), kills phantoms (no seat when all N are claimed by better
   candidates), bounds the count to exactly N, flicker-free overlay.
 - **What 2b CANNOT do (say it plainly):** a slot is a **seat, not a name.** Across an occlusion the
   seat can swap occupants — count stays N and duplicate-free, but slot #7 is a different player. §3 is
-  the whole point. **Ship 2b for the OVERLAY/count-bounding only; keep the *followed* selection on
+  the whole point. **Ship 2b for the OVERLAY/count-bounding only; keep the _followed_ selection on
   honest-loss** (drop to "lost", human re-anchors) until identity (Tier 3) lands.
 
 ### Tier 3 — identity (the prize; still gated)
+
 Label the slots with a **chain-independent anchor** — **jersey number OCR** (what Veo, Second
 Spectrum, SkillCorner, TRACAB all do; never appearance) or a **human re-pick**. This is what makes
 "keep my kid all match, unattended" possible and unlocks the auto per-player reel. Parked; corpus =
@@ -135,14 +154,16 @@ segment), never random samples.
 
 Extend `veo-automations/spotlight-motion-verify.mjs` to log per frame
 `{clock, nDotsDrawn, nDupPairs, selIndex, lostSince, coastDeg, aimEdgeDistDeg}` → JSON, and measure:
-1. **tracker-count vs N** — ≤ N always; p95 sits *at* N (chronically under ⇒ estimator too high).
+
+1. **tracker-count vs N** — ≤ N always; p95 sits _at_ N (chronically under ⇒ estimator too high).
 2. **duplicate-on-one-player rate** — pairs within the merge threshold; ~0 post-dedup (artifact c).
 3. **edge-drift per loss** — coast ≤ `SPOT_COAST_MAX_DEG`, aim never rests at the frame edge (a).
 4. **co-located re-pickup rate** — fraction adopted vs dropped-to-lost when a fresh fragment sits in
    place (b); ~100%.
 5. **follow purity (the one that matters)** — P(ring still on the person you clicked at T=5/15/30/60s).
    Eyeball on recorded clips; **median chain/slot duration CANNOT referee this** — a wrong bridge /
-   slot-swap makes tracks *longer*, so duration rises under the failure mode being risked.
+   slot-swap makes tracks _longer_, so duration rises under the failure mode being risked.
+
 - **Render a VIDEO overlay, not a still**, on clips chosen where the artifacts live: goalmouth
   scramble (occlusion → c + cap), fast counter (a), throw-in/sub (roster count), keeper-behind-mast
   (N undercount).
@@ -165,11 +186,12 @@ slot-swap-vs-lost policy against everything measured in [player-identity-reid-ne
   honest-loss until jersey lands.
 
 ## 8. References
-- Zhang, Li & Nevatia 2008, *Global data association via min-cost network flow* — the proven exact
+
+- Zhang, Li & Nevatia 2008, _Global data association via min-cost network flow_ — the proven exact
   fixed-cardinality formulation. Ref impl: `muSSP` (github.com/yu-lab-vt/muSSP).
-- *LMGP: Lifted Multicut Meets Geometry Projections* (arXiv 2111.11892) — partitions tracklets into N
+- _LMGP: Lifted Multicut Meets Geometry Projections_ (arXiv 2111.11892) — partitions tracklets into N
   chains; validated on SoccerNet.
-- *Basketball-SORT* (arXiv 2406.19655) — dynamic cardinality cap (top-K longest-lived = the N players).
+- _Basketball-SORT_ (arXiv 2406.19655) — dynamic cardinality cap (top-K longest-lived = the N players).
 - SoccerNet Tracking / Re-ID challenge (github.com/SoccerNet/sn-tracking); MOTChallenge.
 - Commercial identity anchors are jersey/roster, never appearance: Veo Player Spotlight (jersey OCR),
   Second Spectrum / TRACAB (multi-cam 3D), SkillCorner All-22.

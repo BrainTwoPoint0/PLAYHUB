@@ -38,25 +38,25 @@ on players, so the aim-track + projection chain is correct.
 `time_align.py` + `fov_diag.py` quantified its own error against YOLO people
 detected directly in the produced frames:
 
-| | |
-|---|---|
-| best time offset | **dt = 0** (no time bug; ±3 s scan only worsens) |
-| error vs fov | 43 px @ fov 15-25° → **72 px @ fov 45-70°** (corr +0.30) |
-| error vs frame edge | 40 px centre → **96 px at r>0.75** (corr +0.44) |
-| floor (narrow fov, central) | ~40 px |
+|                             |                                                          |
+| --------------------------- | -------------------------------------------------------- |
+| best time offset            | **dt = 0** (no time bug; ±3 s scan only worsens)         |
+| error vs fov                | 43 px @ fov 15-25° → **72 px @ fov 45-70°** (corr +0.30) |
+| error vs frame edge         | 40 px centre → **96 px at r>0.75** (corr +0.44)          |
+| floor (narrow fov, central) | ~40 px                                                   |
 
 Spiideo rendered the Play mp4 with **their** projection; this overlay assumes
 a pinhole. It degrades exactly where a pinhole breaks down.
-**The Explore player is immune** — it projects the ring through the *same*
+**The Explore player is immune** — it projects the ring through the _same_
 camera that draws the pixels, so it is self-consistent by construction.
 Only judge the artifact on raw frames (`tracklets-validate.png`) or in Explore.
 
 ## 2. The corner error — `residual_field.py`, `field_shape.py`
 
 Measured in **metres on the grass** (rayn residual → metric via H⁻¹), on an
-unbiased loose-gate (0.06) correspondence set. *Note: the 0.03 product gate
+unbiased loose-gate (0.06) correspondence set. _Note: the 0.03 product gate
 truncates exactly where error is worst, so it understates — always diagnose
-at a loose gate.*
+at a loose gate._
 
 ```
 far end  y=-27.9 : |d| ~1.15 m,  dy = +0.79..+1.25   (points INWARD)
@@ -71,7 +71,7 @@ near end y=+26.1 : |d| ~0.79 m,  dy = -0.69..-1.64   (points INWARD)
   quartile (0.27/0.23/0.22/0.21 m). Clean null — the calibration is not the
   culprit (consistent with the "calibration is at the data floor" finding).
 
-**Why this proves non-planarity:** a homography maps any *flat* plane exactly
+**Why this proves non-planarity:** a homography maps any _flat_ plane exactly
 — tilt and height are absorbed for free. A systematic residual is only
 possible if the surface genuinely isn't planar. Candidate mechanisms (NOT
 separable from one game): pitch camber, a range-dependent bias in Spiideo's
@@ -84,7 +84,7 @@ tracker, or foot-point bias in the detections at long range.
 A polynomial residual field looked like it halved the corner error under a
 30 s-block-alternating split (0.795 → 0.369 m at the ends). **That split
 leaks spatially** — fit and val contain the same pitch locations. Under a
-strict *whole-window-excluded* test the corner median did **not** improve
+strict _whole-window-excluded_ test the corner median did **not** improve
 (1.18 → 1.25 m; only the within-0.30 m fraction rose 2% → 12%).
 
 > **Rule:** when fit and eval can touch the same region of the underlying
@@ -103,11 +103,11 @@ No registration fix can go below it.
 
 Chain statistics on the pilot (56 min, ~16 players):
 
-| | |
-|---|---|
-| chains | **2094** |
-| median identity duration | **14 s** (max 366 s; only 4 > 300 s) |
-| total tracked player-time | **101% of ideal** |
+|                                                 |                                                                       |
+| ----------------------------------------------- | --------------------------------------------------------------------- |
+| chains                                          | **2094**                                                              |
+| median identity duration                        | **14 s** (max 366 s; only 4 > 300 s)                                  |
+| total tracked player-time                       | **101% of ideal**                                                     |
 | chain deaths while another player is <1.5° away | **59%** (vs 36% at random; median separation at death 1.11° vs 3.41°) |
 
 **We see every player the whole match; we just cannot keep their name.**
@@ -117,27 +117,27 @@ Detection is solved and free. Re-identification is not.
 
 Within a chain Spiideo held identity → two crops from the same chain **are**
 the same player. 844 crops, 5 windows across the match, **median crop 117 px
-tall (99% ≥64 px)** — resolution is *not* the limit (Market-1501 uses 128×64).
+tall (99% ≥64 px)** — resolution is _not_ the limit (Market-1501 uses 128×64).
 
 Rank-1, "pick the right player out of the field at t+gap" (chance ≈12%):
 
-| gap | POSITION (stitcher today) | COLOUR | ResNet50 | DINOv2 |
-|-----|--------------------------|--------|----------|--------|
-| 2 s | **91.8%** | 56.2% | 52.6% | 56.1% |
-| 6 s | 74.6% | 36.3% | 36.3% | 43.0% |
-| 10 s | 54.8% | 35.5% | 38.6% | 42.1% |
+| gap  | POSITION (stitcher today) | COLOUR | ResNet50 | DINOv2 |
+| ---- | ------------------------- | ------ | -------- | ------ |
+| 2 s  | **91.8%**                 | 56.2%  | 52.6%    | 56.1%  |
+| 6 s  | 74.6%                     | 36.3%  | 36.3%    | 43.0%  |
+| 10 s | 54.8%                     | 35.5%  | 38.6%    | 42.1%  |
 
 **HARD subset (position picked WRONG — the occlusion breaks): appearance
-rescues only ~20%.** Naive position-gate + appearance-rank fusion was *worse*
+rescues only ~20%.** Naive position-gate + appearance-rank fusion was _worse_
 than position alone.
 
 ### Why — the ceiling is the kit
 
 Stratified by team (k-means on colour, per chain):
 
-| gap | mixed field (chance 12%) | same-team only (chance 25%) |
-|-----|--------------------------|-----------------------------|
-| 2 s | COLOUR 56.2% / DINOv2 56.1% | COLOUR 62.5% / DINOv2 **66.4%** |
+| gap  | mixed field (chance 12%)    | same-team only (chance 25%)     |
+| ---- | --------------------------- | ------------------------------- |
+| 2 s  | COLOUR 56.2% / DINOv2 56.1% | COLOUR 62.5% / DINOv2 **66.4%** |
 | 10 s | COLOUR 35.5% / DINOv2 42.1% | COLOUR 43.4% / DINOv2 **53.0%** |
 
 Lift over chance: **3.5-4.7× in a mixed field, only 2.1-2.6× among
@@ -158,12 +158,12 @@ reporting "lost" for a follow-my-kid product.
   jersey-numbered **event tags**, not from their tracking stream. Neither
   competitor solved this with appearance; they sidestepped it. → Phase 5 kit
   detection; CFA's 11,366 team-labelled highlights are the corpus.
-- **Narrow cheap win first:** `build_track.stitch`'s ambiguity gate *refuses*
+- **Narrow cheap win first:** `build_track.stitch`'s ambiguity gate _refuses_
   bridges precisely at occlusions (by design — "no-follow beats wrong-follow"),
   compounding Spiideo's breaks. There it is a **2-way** choice, not 1-in-8 —
   a far easier problem than full re-ID, and where the ~20% lives.
 - **Karim's photo-glimpse "find yourself" picker** offloads identity to the
-  *human*, who can recognise themselves at 117 px where every embedding
+  _human_, who can recognise themselves at 117 px where every embedding
   fails. But it is downstream of chain length: at a 14 s median a user would
   identify themselves ~240× per match. Fix identity duration first.
 
@@ -174,8 +174,9 @@ reporting "lost" for a follow-my-kid product.
 Scripts: `fetch_tracklets.py` (cache builder) → `stitch_diag.py` (noise + death
 taxonomy), `uuid_reuse.py`, `ceiling_probe.py`, `ceiling_eval.py`.
 Data: 4 games / **3 venues** — Nazwa `d9fee1fc` (tune), Football Plus `b3bf24bf`
-+ `f9d6898f`, HCT Dubai `4b4ecece` (all held out). Venue is the domain; the
-tuning game is never quoted as evidence on its own.
+
+- `f9d6898f`, HCT Dubai `4b4ecece` (all held out). Venue is the domain; the
+  tuning game is never quoted as evidence on its own.
 
 ## 4.1 The ambiguity gate is not the problem. It was never the problem.
 
@@ -183,18 +184,18 @@ tuning game is never quoted as evidence on its own.
 occlusions… that is where the ~20% lives". Measured share of chain deaths
 caused by that gate:
 
-| bucket | Nazwa | FB+ | FB+ | HCT |
-|---|---|---|---|---|
-| `a_no_candidate` | 34.4% | 58.3% | 20.4% | 7.8% |
-| `b_gate_distance` | 63.1% | 39.6% | 76.6% | 88.7% |
+| bucket            | Nazwa    | FB+      | FB+      | HCT      |
+| ----------------- | -------- | -------- | -------- | -------- |
+| `a_no_candidate`  | 34.4%    | 58.3%    | 20.4%    | 7.8%     |
+| `b_gate_distance` | 63.1%    | 39.6%    | 76.6%    | 88.7%    |
 | **`c_ambiguity`** | **0.0%** | **0.2%** | **0.0%** | **0.1%** |
-| `d_claimed` | 0.1% | 0.5% | 0.4% | 0.4% |
+| `d_claimed`       | 0.1%     | 0.5%     | 0.4%     | 0.4%     |
 
 **0.0-0.2%.** The gate barely runs, because the 1.5 s ceiling gets there first.
 The whole "2-way choice at a crossing" framing described a code path that
-essentially never executes. *Lesson: a plausible mechanism read off the source
+essentially never executes. _Lesson: a plausible mechanism read off the source
 is a hypothesis, not a finding. This one survived a full session, a written
-recommendation, and a specialist review before anyone counted.*
+recommendation, and a specialist review before anyone counted._
 
 Noise, for the record (it was assumed, never measured): σ = **0.054-0.067 m**
 (2nd- and 4th-difference kernels agree → acceleration is not contaminating it),
@@ -208,7 +209,7 @@ calibrated and **under 1σ** where it now operates. Open item.
 
 `uuid_reuse.py`: when a uuid vanishes and returns, is it the same player? Test
 is physical — implied speed |Δp|/Δt against a null that substitutes a
-*different* uuid live at the same instant.
+_different_ uuid live at the same instant.
 
 - Re-appearances **are** genuine: 100% physically reachable vs **28-74%** for
   the null (median 0.86-1.39 m/s vs 4.5-13.7).
@@ -219,7 +220,7 @@ is physical — implied speed |Δp|/Δt against a null that substitutes a
   ~22 s per player (±40%: assumes 16 players, and the count is pre-roster).
 
 `build_track.py`'s docstring said "uuid reuse is not trusted across absences" —
-that was an *assumption*, and the previous persistence result (0.29 m seam jump,
+that was an _assumption_, and the previous persistence result (0.29 m seam jump,
 n=3122) only ever covered ADJACENT items. It is now measured. The tracker mints
 identities and never takes them back; **no stitcher can recover an identity the
 upstream never kept.** That, not our gates, is why chains are short.
@@ -229,7 +230,7 @@ out — beyond the ceiling. (Caveat: that statistic uses a loose reach budget
 `d_fwd ≤ max(2, 7·gap)` = 21 m at 3 s, and it has **no null**, unlike the uuid
 test. Treat "1.5-5 s" as the shape, not a precise number.)
 
-## 4.3 A real bug: the ambiguity gate *demoted the winner*
+## 4.3 A real bug: the ambiguity gate _demoted the winner_
 
 Found by a unit test written against the gate's stated intent.
 
@@ -241,7 +242,7 @@ rival list came up empty and it was accepted.
 So when the gate fired it did not refuse an ambiguous bridge. It **discarded
 the best candidate and took the second-best** — reliably choosing wrong exactly
 where it had judged the choice unsafe. Measured: **3.6-5.4% of every bridge in
-production**. Fixed (rivals = any other *still-claimable* edge touching either
+production**. Fixed (rivals = any other _still-claimable_ edge touching either
 endpoint): demotions **12→1, 10→0, 23→0**, with **median chain duration
 unchanged**.
 
@@ -261,13 +262,13 @@ exactly).
 **production's own `stitch_edges` + `stitch_assign`**, ask whether it rejoined
 the true pair:
 
-| true gap | ceiling 1.5 (before) | ceiling 2.5 (after) |
-|---|---|---|
-| 0.6 s | 99.3% prec / 81% recall | 98.3% / 79% |
-| 1.0 s | 99.0% / 79% | 98.7% / 76% |
-| **1.4 s** | **18.9% / 1.4%** | **95.4% / 60%** |
-| **2.0 s** | **0% / 0%** | **94.3% / 52%** |
-| 2.4 s | 0% / 0% | 16.2% / 1.4% |
+| true gap  | ceiling 1.5 (before)    | ceiling 2.5 (after) |
+| --------- | ----------------------- | ------------------- |
+| 0.6 s     | 99.3% prec / 81% recall | 98.3% / 79%         |
+| 1.0 s     | 99.0% / 79%             | 98.7% / 76%         |
+| **1.4 s** | **18.9% / 1.4%**        | **95.4% / 60%**     |
+| **2.0 s** | **0% / 0%**             | **94.3% / 52%**     |
+| 2.4 s     | 0% / 0%                 | 16.2% / 1.4%        |
 
 (precision/recall on the **crowded** subset — cuts with another player <2 m,
 matching real deaths at 51-83% — not the optimistic all-cuts figure.)
@@ -276,7 +277,7 @@ matching real deaths at 51-83% — not the optimistic all-cuts figure.)
 beyond the ceiling, the stitcher does **not** refuse — it bridges to a
 **stranger**. At a 1.4 s break today it makes **86 wrong bridges and 20 right
 ones**. The extension takes that to **47 wrong and 948 right**: better on
-*both* axes. A ceiling does not buy safety, it just relocates the cliff — note
+_both_ axes. A ceiling does not buy safety, it just relocates the cliff — note
 2.4 s now collapses exactly as 1.4 s used to.
 
 Effect on real games: median **+9 to +22%** (Nazwa 14.0→16.0 s, FB+ 10.2→12.4
@@ -295,8 +296,8 @@ and 11.2→13.0, HCT 8.2→9.0).
 ## 4.5 What this means for the roadmap
 
 **Duration and purity are the same dial turned opposite ways.** A wrong bridge
-makes chains *longer*. So median chain duration — the metric this work is
-naturally reported on — *rises* under the failure mode it risks, and §4.3 is
+makes chains _longer_. So median chain duration — the metric this work is
+naturally reported on — _rises_ under the failure mode it risks, and §4.3 is
 the proof: removing 4-5% wrong bridges moved it by zero.
 
 The product metric is a survival curve: **P(the ring is still on the person you
@@ -309,7 +310,7 @@ q that long chains demand — this is arithmetic, not pessimism.
 **Which is the real argument for jersey, and it is stronger than "10× duration":
 jersey stops the compounding.** With a per-fragment jersey posterior you don't
 chain at all — you assign fragments to a 22-slot roster. Errors become i.i.d.
-against a *label*, so P(correct at T) is flat in T instead of `q^k`. A jersey
+against a _label_, so P(correct at T) is flat in T instead of `q^k`. A jersey
 signal that is only ~70% per fragment still yields a near-perfect roster when
 pooled over 100 fragments. Geometry's ceiling is ~20-28 s at high purity;
 **jersey's ceiling is the whole match, and it gets there by not chaining.**
@@ -334,22 +335,22 @@ pooled over 100 fragments. Geometry's ceiling is ~20-28 s at high purity;
   residual into along/cross-track; the along-track lower bound is what would
   recover decelerating players, who are probably a chunk of `b_gate_distance`.
 - **`b_gate_distance` may be partly self-inflicted.** `_endpoint_velocity` fits
-  the last ≤5 samples — the second *before the tracker lost the player*, i.e.
+  the last ≤5 samples — the second _before the tracker lost the player_, i.e.
   when constant-velocity is least valid, and (if Spiideo pre-smooths) lagged.
-  Free test: compare the *static* residual `|p_head − p_tail|/gap` against
+  Free test: compare the _static_ residual `|p_head − p_tail|/gap` against
   9 m/s. Reachable-but-CV-rejected ⇒ the gate SHAPE is the bug, not the ceiling.
 - **The gap-distribution statistic has no null.** `uuid_reuse.py` has one and
   is disciplined because of it. Point the same tool at this.
 - **The artifact cannot distinguish a bridged gap from tracked data.**
   `smooth_and_resample` interpolates across the hole, publishing ~12 fabricated
-  5 Hz samples at 2.5 s. So a wrong bridge renders as a *confident solid ring*
+  5 Hz samples at 2.5 s. So a wrong bridge renders as a _confident solid ring_
   gliding from player A to player B. Emit `bridged: [[t0,t1]…]` per object and
   reuse the client's existing lost-state dash inside those intervals — the
   rendering-layer form of "no-follow beats wrong-follow".
 - **`SEAM_MAX_GAP_US = 1.0 s` discards the only trustworthy upstream identity
   signal we have.** Re-appearances to 1.6 s are measured genuine; raising the
-  seam to ~2.0 s recovers them (~1.4% of deaths — small, but it is *upstream
-  truth* rather than a geometric guess). Tighten `SEAM_SPEED` 12 → 9 if so:
+  seam to ~2.0 s recovers them (~1.4% of deaths — small, but it is _upstream
+  truth_ rather than a geometric guess). Tighten `SEAM_SPEED` 12 → 9 if so:
   12 m/s over a 1.6 s seam authorises a 19 m jump, which is not a gate.
 - **`KF_SIGMA_M = 0.3`** is annotated "pilot MAD estimate"; measured σ is
   0.054-0.067 — a 25× variance error. Left alone deliberately: 0.3 is what
