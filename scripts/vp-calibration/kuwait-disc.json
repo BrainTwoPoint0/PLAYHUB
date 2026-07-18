@@ -6,5 +6,9 @@
   "n_points": 8,
   "source": "manual-left-arc",
   "src_w": 3840,
-  "src_h": 2160
+  "src_h": 2160,
+  "az_deg": [
+    160.0,
+    207.0
+  ]
 }

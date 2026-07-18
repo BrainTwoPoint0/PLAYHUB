@@ -286,6 +286,28 @@ def full_resids(theta, lines):
     return np.concatenate(r) if r else np.array([])
 
 
+# DISC-RIM constraint (SOLVE=full, EXPERIMENTS ONLY — default OFF). The
+# annotated disc arc CAN pin the ray field at the rim (each arc pixel
+# unprojects to DISC_THETA_DEG off the axis, disc_rim.py), but measured
+# 2026-07-18: injecting it into this FREE solve flips the CY basin — with
+# DISC_W=1 the kuwait solve ran to CX/CY (1682, 860), dragged toward the
+# annotated circle's CENTRE (which is ~300px from the principal point —
+# short-arc Taubin degeneracy), k's flipped sign and the marks mount
+# mirrored. Under the global soft_l1 the term is strong enough to perturb
+# the basin yet too loss-crushed to enforce its own satisfaction. Same
+# lesson as REFINE_LINES: new information belongs in auto_fit.py's BOUNDED,
+# x-scaled refinement (which now runs rim constraints for marks-less venues
+# too), not in this basin-fragile free solve.
+import disc_rim as _disc_rim
+DISC_W = float(os.environ.get('DISC_W', 0.0))
+_rim_disc = _disc_rim.load_disc(SITE) if os.environ.get('SOLVE') == 'full' else None
+RIM_PTS_W, RIM_THETA = None, None
+if _rim_disc is not None and DISC_W > 0:
+    RIM_PTS_W = _disc_rim.rim_points(_rim_disc) * s  # full-res -> working
+    RIM_THETA = _disc_rim.disc_theta_deg(_rim_disc)
+    print(f'RIM    disc arc constraint: {len(RIM_PTS_W)} pts pinned to '
+          f'theta={RIM_THETA:.1f} deg (DISC_W={DISC_W:g})')
+
 SIGMA_C = float(os.environ.get('SIGMA_C', 30.0))   # CX/CY prior sigma (working px)
 K_BOUND = [0.3, 0.15, 0.08, 0.04]
 # L2 on k, in mrad-cost units: keeps the flat gauge direction (θ→atan(c·tanθ)
@@ -347,7 +369,12 @@ def solve_full(lines, nk, cxy):
         if cxy:
             pri += [10.0 * (theta[1] - CXw) / SIGMA_C, 10.0 * (theta[2] - CYw) / SIGMA_C]
         pri += [K_REG_FULL[i] * theta[3 + i] for i in free_k]
-        return np.concatenate([base, np.array(pri)])
+        parts = [base, np.array(pri)]
+        if RIM_PTS_W is not None:
+            parts.append(DISC_W * _disc_rim.rim_theta_mrad(
+                RIM_PTS_W, theta[0], theta[1], theta[2],
+                list(theta[3:7]), RIM_THETA))
+        return np.concatenate(parts)
 
     sol = least_squares(resfn, x0, bounds=(lo, hi), loss='soft_l1', f_scale=5.0)
     return sol, unpack(sol.x)
@@ -451,6 +478,15 @@ if os.environ.get('SOLVE') == 'full':
            'TILT': float(os.environ.get('TILT', 32)), 'n_lines': len(comps),
            'disc_ok': bool(disc and disc['ok']), 'solver': f'full:{name}',
            'train_straightness': train_rms}
+    if RIM_PTS_W is not None:
+        rim_fin = _disc_rim.rim_theta_mrad(RIM_PTS_W, th[0], th[1], th[2],
+                                           list(th[3:7]), RIM_THETA)
+        print(f'RIM    solved arc theta error: median {np.median(rim_fin):+.1f} mrad '
+              f'({np.degrees(np.median(rim_fin)/1000):+.2f} deg) '
+              f'max |{np.max(np.abs(rim_fin)):.1f}| mrad')
+        out['rim_disc'] = {'w': DISC_W, 'theta_deg': RIM_THETA,
+                           'median_err_mrad': float(np.median(rim_fin)),
+                           'max_abs_err_mrad': float(np.max(np.abs(rim_fin)))}
     json.dump(out, open(f'PLAYHUB/scripts/vp-calibration/{SITE}-fit.json', 'w'), indent=2)
     print(f'params → {SITE}-fit.json (SOLVE=full)')
     raise SystemExit(0)

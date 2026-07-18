@@ -1,0 +1,16 @@
+{
+  "source": "playhub_pitch_calibrations 214f47a1-2b0c-427b-b660-c74a039541e8 (scene b3595080, Football Plus) exported 2026-07-18; marks made through the deployed game mesh f9d6898f; Karim re-clicked corner_sw between attempts (137.5 -> 127.5px) so the residual is stable under re-marking",
+  "lengthM": 38,
+  "widthM": 27,
+  "frameWidth": 3840,
+  "frameHeight": 2160,
+  "storedReprojectionErrorPx": 127.4569327402887,
+  "marks": [
+    { "name": "corner_nw", "uv": [1207.819308488915, 530.7355232941567] },
+    { "name": "corner_ne", "uv": [2655.7554394388885, 555.8202811708027] },
+    { "name": "corner_se", "uv": [3503.3039829838713, 1448.494060126283] },
+    { "name": "corner_sw", "uv": [348.8977135807108, 1406.6459107420185] },
+    { "name": "midline_n", "uv": [1930.8180223792356, 448.349654690965] },
+    { "name": "midline_s", "uv": [1886.649809105261, 2124.2713306034884] }
+  ]
+}

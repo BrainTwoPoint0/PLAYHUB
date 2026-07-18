@@ -1,0 +1,16 @@
+{
+  "source": "playhub_pitch_calibrations b762d0c9-5f77-43ee-b550-135440d5f68d (scene 131777a6, Nazwa) exported 2026-07-18; marks made through the deployed game mesh b923d40f (benchmarks/meshes/nazwa-b923)",
+  "lengthM": 30,
+  "widthM": 15,
+  "frameWidth": 3840,
+  "frameHeight": 2160,
+  "storedReprojectionErrorPx": 31.788511203676592,
+  "marks": [
+    { "name": "corner_nw", "uv": [1109.0369406254804, 713.1816493702022] },
+    { "name": "corner_ne", "uv": [2791.9190603969496, 602.2121437613104] },
+    { "name": "corner_se", "uv": [3529.805954794698, 1249.754590526113] },
+    { "name": "corner_sw", "uv": [416.83120348427605, 1425.3955402297427] },
+    { "name": "midline_n", "uv": [1943.1924954777353, 540.1240784192844] },
+    { "name": "midline_s", "uv": [2059.7115087385355, 1866.6215778865176] }
+  ]
+}

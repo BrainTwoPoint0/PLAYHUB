@@ -141,7 +141,22 @@ def main():
         if not fit:
             txt.set_text('need 3+ points to save'); fig.canvas.draw_idle(); return
         cx, cy, R, rms = fit
+        # az_deg = the clicked arc's azimuth span about the fitted centre —
+        # the only region where the circle is trusted (a short-arc Taubin fit
+        # extrapolates its centre badly; kuwait's was ~300px off). disc_rim.py
+        # refuses discs without it.
+        az = np.sort(np.degrees(np.arctan2([p[1] - cy for p in pts],
+                                           [p[0] - cx for p in pts])) % 360.0)
+        # arc span = complement of the largest angular gap between clicks
+        # (a plain min/max breaks on arcs crossing 0 deg)
+        gaps = np.diff(np.append(az, az[0] + 360.0))
+        k = int(np.argmax(gaps))
+        az_lo, az_hi = az[(k + 1) % len(az)], az[k]
+        if az_hi < az_lo:
+            az_hi += 360.0
         json.dump({'cx': cx, 'cy': cy, 'R': R, 'rms': rms, 'n_points': len(pts),
+                   'points': [[float(x), float(y)] for x, y in pts],
+                   'az_deg': [float(az_lo), float(az_hi)],
                    'source': 'manual', 'src_w': Wf, 'src_h': Hf},
                   open(OUT, 'w'), indent=2)
         state['saved'] = True
