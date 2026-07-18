@@ -124,7 +124,16 @@ locals {
     portrait    = aws_batch_job_definition.portrait_render
     tracklets   = aws_batch_job_definition.player_tracklets
     veo_capture = aws_batch_job_definition.veo_capture
+    jersey      = aws_batch_job_definition.jersey_labels
   }
+  # Queues the sweeps submit to. The job-def map above cannot cover queues,
+  # and SubmitJob authorizes against BOTH — a job class on a NEW queue whose
+  # ARN is missing here goes silently inert in exactly the player-tracklets
+  # 2026-07-15 pattern (0 submitted, N claimable, no alarm).
+  sweep_job_queues = [
+    aws_batch_job_queue.vp_materialize.arn,
+    aws_batch_job_queue.jersey_labels.arn,
+  ]
 }
 
 resource "aws_iam_role_policy" "sync_lambda_batch" {
@@ -137,11 +146,12 @@ resource "aws_iam_role_policy" "sync_lambda_batch" {
       {
         Effect = "Allow"
         Action = ["batch:SubmitJob"]
-        # All four classes share the vp-materialize queue; SubmitJob authorizes
-        # against BOTH the queue and the job definition, so a missing queue ARN
-        # denies identically to a missing job-def ARN.
+        # SubmitJob authorizes against BOTH the queue and the job definition,
+        # so a missing queue ARN denies identically to a missing job-def ARN.
+        # Queues come from locals.sweep_job_queues (jersey-labels runs on its
+        # own dedicated CE/queue; everything else shares vp-materialize).
         Resource = concat(
-          [aws_batch_job_queue.vp_materialize.arn],
+          local.sweep_job_queues,
           # The Lambda submits by NAME, so IAM authorizes against the
           # UNVERSIONED ARN — that is `arn_prefix`, and it is the entry that
           # actually grants access. (Confirmed by the live denial, which named
@@ -220,9 +230,14 @@ resource "aws_lambda_function" "sync_recordings" {
       TRACKLETS_JOB_DEF     = aws_batch_job_definition.player_tracklets.name
       PORTRAIT_JOB_DEF      = aws_batch_job_definition.portrait_render.name
       VEO_CAPTURE_JOB_DEF   = aws_batch_job_definition.veo_capture.name
+      JERSEY_JOB_DEF        = aws_batch_job_definition.jersey_labels.name
+      JERSEY_JOB_QUEUE      = aws_batch_job_queue.jersey_labels.name
       # Club allowlist for the portrait sweep; empty = disabled. Flip to "cfa"
       # after the pilot E2E validates.
       PORTRAIT_CLUBS = var.portrait_clubs
+      # Organized-kit venue allowlist (Spiideo scene ids) for the jersey
+      # sweep; empty = disabled. Enable HCT only after the pilot E2E.
+      JERSEY_VENUES = var.jersey_venues
     }
   }
 
