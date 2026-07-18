@@ -206,3 +206,15 @@ output "player_tracklets_job_definition" {
 output "player_tracklets_codebuild_project" {
   value = aws_codebuild_project.player_tracklets_image.name
 }
+
+# Scenes whose tracklets artifact SHIPS the calibrated field-of-play filter
+# (comma-separated Spiideo scene ids). Empty = dry-run everywhere: the job
+# still logs the polygon-vs-rect comparison for calibrated venues but ships
+# the percentile rect. Add a scene ONLY after reviewing its dry-run numbers.
+# NOTE: this only flows through the sync-Lambda's containerOverrides — a
+# hand-run `aws batch submit-job` (the pilot pattern) must pass
+# FIELD_FILTER_SCENES in its own env or it silently tests the dry-run branch.
+variable "field_filter_scenes" {
+  type    = string
+  default = ""
+}

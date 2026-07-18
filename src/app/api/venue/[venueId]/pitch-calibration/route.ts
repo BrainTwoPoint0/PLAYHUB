@@ -3,10 +3,15 @@
 // Venue-admin pitch-boundary calibration for a camera scene (Spiideo/Clutch).
 // GET returns the scene's ACTIVE calibration (gated to venue admins/platform
 // admins here — stricter than the table's member-read RLS, which exists for
-// direct-read consumers like dashboards). PUT saves a new
-// calibration: validates the marks, runs the ADVISORY mesh solve (reprojection
-// error shown to the operator for accept/redo), then atomically supersedes the
-// previous active row via the playhub_activate_pitch_calibration RPC.
+// direct-read consumers like dashboards). PUT saves a new calibration:
+// validates the marks, runs the mesh solve server-side, and BRANCHES on the
+// shared solveErrorBand verdict — good/ok solves atomically supersede the
+// previous active row via the playhub_activate_pitch_calibration RPC;
+// RED-band solves insert as status='draft' WITHOUT activating (the prior
+// active row stays; response carries activated:false + the band). Draft rows
+// are retained as operator-attempt provenance: GET never returns them, no UI
+// lists them, nothing prunes them — do not "fix" that by adding pruning or a
+// draft read path.
 //
 // Writes are venue-admin (not platform-only like group-tier-config): the marks
 // don't move money, and the venue operator is exactly who knows their pitch.
@@ -15,6 +20,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { meshBaseUrl } from '@/lib/panorama/mesh'
+import { solveErrorBand } from '@/lib/panorama/pitch-band'
 import { proposePitchMarksFromTracklets } from '@/lib/panorama/pitch-assist'
 import {
   PITCH_LENGTH_BOUNDS,
@@ -401,30 +407,79 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     )
   }
 
-  const { data, error } = await serviceClient.rpc(
-    'playhub_activate_pitch_calibration',
-    {
-      p_scene_id: sceneId,
-      p_venue_organization_id: venueId,
-      p_provider: scene.provider,
-      p_source: 'operator',
-      p_frame_s3_key: frameS3Key,
-      p_frame_width: frameWidth,
-      p_frame_height: frameHeight,
-      p_mesh_source_game_id: meshRow.source_game_id,
-      p_marks: validated.marks,
-      p_pitch_length_m: pitchLengthM,
-      p_pitch_width_m: pitchWidthM,
-      p_solver_version: solve.solverVersion,
-      p_homography: solve.homography,
-      p_field_polygon_rayn: solve.fieldPolygonRayn,
-      p_reprojection_error_px: solve.reprojectionErrorPx,
-      p_created_by: user.id,
-    }
-  )
+  // Red-band solves SAVE for reference but never ACTIVATE: the same
+  // solveErrorBand verdict the result screen shows (shared lib — lockstep is
+  // the product guarantee). A red solve means the marks or the camera model
+  // are wrong; letting it go live would feed watch half-framing and the
+  // tracklets field filter garbage geometry. The prior active calibration
+  // (if any) stays in place; the admin adjusts, or the camera model gets
+  // refit and a re-save activates then.
+  const band = solveErrorBand(solve.reprojectionErrorPx, validated.marks)
+  const activated = band !== 'bad'
+  let data: unknown
+  let error: { message?: string } | null = null
+  if (!activated) {
+    // SECOND WRITER besides the activating RPC (whose fk-fix migration
+    // comment assumed it would stay the only one): safe because both values
+    // come from checked inputs — venueId passed isVenueAdmin above, sceneId
+    // is bound to it by sceneForVenue — and a draft is inert on every read
+    // path (GET, watch, batch all filter status='active'). The RPC's
+    // advisory lock isn't needed here: drafts never touch the
+    // WHERE status='active' partial unique index, and no promotion path
+    // exists (re-save re-runs this whole gate).
+    const inserted = await serviceClient
+      .from('playhub_pitch_calibrations')
+      .insert({
+        scene_id: sceneId,
+        venue_organization_id: venueId,
+        provider: scene.provider,
+        source: 'operator',
+        status: 'draft',
+        frame_s3_key: frameS3Key,
+        frame_width: frameWidth,
+        frame_height: frameHeight,
+        mesh_source_game_id: meshRow.source_game_id,
+        marks: validated.marks,
+        pitch_length_m: pitchLengthM,
+        pitch_width_m: pitchWidthM,
+        solver_version: solve.solverVersion,
+        homography: solve.homography,
+        field_polygon_rayn: solve.fieldPolygonRayn,
+        reprojection_error_px: solve.reprojectionErrorPx,
+        created_by: user.id,
+      })
+      .select()
+      .single()
+    data = inserted.data
+    error = inserted.error
+  } else {
+    const activated = await serviceClient.rpc(
+      'playhub_activate_pitch_calibration',
+      {
+        p_scene_id: sceneId,
+        p_venue_organization_id: venueId,
+        p_provider: scene.provider,
+        p_source: 'operator',
+        p_frame_s3_key: frameS3Key,
+        p_frame_width: frameWidth,
+        p_frame_height: frameHeight,
+        p_mesh_source_game_id: meshRow.source_game_id,
+        p_marks: validated.marks,
+        p_pitch_length_m: pitchLengthM,
+        p_pitch_width_m: pitchWidthM,
+        p_solver_version: solve.solverVersion,
+        p_homography: solve.homography,
+        p_field_polygon_rayn: solve.fieldPolygonRayn,
+        p_reprojection_error_px: solve.reprojectionErrorPx,
+        p_created_by: user.id,
+      }
+    )
+    data = activated.data
+    error = activated.error
+  }
 
   if (error) {
-    console.error('Failed to activate pitch calibration:', error)
+    console.error('Failed to save pitch calibration:', error)
     return NextResponse.json(
       { error: 'Failed to save pitch calibration', code: 'internal' },
       { status: 500 }
@@ -433,10 +488,15 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 
   return NextResponse.json({
     calibration: data,
+    activated,
     solve: {
       reprojectionErrorPx: solve.reprojectionErrorPx,
       perMarkErrorRad: solve.perMarkErrorRad,
       perMarkErrorPx: solve.perMarkErrorPx,
+      // authoritative verdict: the client falls back to recomputing via the
+      // shared function when absent (old servers), but must prefer this so a
+      // stale-JS threshold change can never contradict what the server did
+      band,
     },
   })
 }

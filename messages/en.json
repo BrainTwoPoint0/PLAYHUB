@@ -448,6 +448,7 @@
       "resultTitle": "Boundary saved",
       "reprojectionError": "{px}px max error",
       "redoNote": "This calibration is now live. Adjusting and saving again replaces it.",
+      "redoNoteInactive": "Saved for reference — NOT live. The previous calibration, if any, stays active. Adjust the marks and save again; if every mark is placed correctly, the camera model needs a refit first.",
       "accept": "Done",
       "redo": "Adjust again",
       "placingHint": "Drag to look around and scroll or + to zoom in before clicking — precision here is what everything downstream inherits. The far side must be a touchline (a long side of the pitch).",

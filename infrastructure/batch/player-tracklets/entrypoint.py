@@ -27,6 +27,7 @@ import signal
 import sys
 import tarfile
 import threading
+import urllib.parse
 import urllib.request
 import uuid as _uuid
 
@@ -51,6 +52,13 @@ SPIIDEO_EMAIL = os.environ['SPIIDEO_PLAY_EMAIL']
 SPIIDEO_PASSWORD = os.environ['SPIIDEO_PLAY_PASSWORD']
 VP_S3_PREFIX = os.environ.get('VP_S3_PREFIX', 'panoramas')
 MESH_BUCKET = 'panorama-meshes'
+# Scenes whose SHIPPED artifact uses the calibrated field-of-play filter.
+# Everyone else runs it in DRY-RUN (comparison logged + stamped in meta,
+# percentile rect ships). Per-venue enablement happens only after a human
+# reviews the dry-run numbers for that venue.
+FIELD_FILTER_SCENES = {s.strip() for s in
+                       os.environ.get('FIELD_FILTER_SCENES', '').split(',')
+                       if s.strip()}
 
 # Detection windows for the H solve: one DENSE CONTIGUOUS solve window (the
 # shape the reference chain was validated on) + two held-out eval windows at
@@ -123,6 +131,45 @@ def fetch_row() -> dict:
     if not rows:
         raise RuntimeError('recording row not found')
     return rows[0]
+
+
+def fetch_calibration(scene_id: str | None) -> dict | None:
+    """Active pitch calibration for the scene, or None. Non-fatal by design:
+    the filter upgrade is optional — a fetch error must never fail the job."""
+    if not scene_id:
+        return None
+    try:
+        sid = urllib.parse.quote(str(scene_id), safe='')
+        out = _sb('GET',
+                  f'/rest/v1/playhub_pitch_calibrations'
+                  f'?scene_id=eq.{sid}&status=eq.active'
+                  f'&select=homography,pitch_length_m,pitch_width_m,'
+                  f'reprojection_error_px,marks,solver_version,'
+                  f'mesh_source_game_id')
+        rows = json.loads(out)
+        cal = rows[0] if rows else None
+        if cal:
+            # Mesh-epoch check: the calibration's marks were made through the
+            # scene mesh registered at MARKING time. If the registry has since
+            # moved to a different source game (a refit/fanout), the composed
+            # map is cross-epoch garbage — degrade to the rect until the admin
+            # re-marks (the refit acceptance flow). Same-source regeneration
+            # is not detectable here; the span/collapse fallbacks carry that.
+            reg = _sb('GET',
+                      f'/rest/v1/playhub_panorama_scene_meshes'
+                      f'?scene_id=eq.{sid}&select=source_game_id')
+            reg_rows = json.loads(reg)
+            src = reg_rows[0]['source_game_id'] if reg_rows else None
+            if (src and cal.get('mesh_source_game_id')
+                    and src != cal['mesh_source_game_id']):
+                print(f'calibration mesh epoch mismatch (marked on '
+                      f'{cal["mesh_source_game_id"]}, registry now {src}) — '
+                      f'ignoring calibration', flush=True)
+                return None
+        return cal
+    except Exception as err:  # noqa: BLE001
+        print(f'calibration fetch failed (non-fatal): {err}', flush=True)
+        return None
 
 
 def emit_calibration_still(row: dict):
@@ -422,12 +469,90 @@ def main():
     if problems:
         raise RuntimeError('quality gate: per-region — ' + '; '.join(problems))
 
-    on_pitch = build_track.filter_on_pitch(
-        fragments, diag['pitch_lo'], diag['pitch_hi'])
-    chains = build_track.stitch(on_pitch)
-    chains = build_track.filter_chains_on_pitch(
-        chains, diag['pitch_lo'], diag['pitch_hi'])
+    # On-pitch filtering: percentile rect always computed (and always what
+    # ships unless the scene is explicitly enabled); when a usable admin
+    # calibration exists, the calibrated field-of-play filter runs alongside
+    # it — dry-run comparison for un-enabled scenes, the shipped set for
+    # enabled ones. KNOWN LIMIT: calibration marks are mesh-epoch-coupled;
+    # after a mesh refit the admin re-marks (the refit acceptance flow),
+    # which restores alignment — the near-empty fallback below catches a
+    # stale epoch in the meantime.
+    rect_chains = build_track.filter_chains_on_pitch(
+        build_track.stitch(build_track.filter_on_pitch(
+            fragments, diag['pitch_lo'], diag['pitch_hi'])),
+        diag['pitch_lo'], diag['pitch_hi'])
+
+    # The ENTIRE polygon path is guarded: this feature is optional, so no
+    # failure inside it (novel stitch inputs — the polygon set is not a
+    # subset of the rect set — or a near-singular H_cal producing NaN maps)
+    # may ever kill a job that would otherwise ship rect_chains.
+    filter_cmp = None
+    use_polygon = False
+    poly_chains = None
+    chains = rect_chains
+    cal = fetch_calibration(row.get('spiideo_scene_id'))
+    cal_reason = build_track.calibration_unusable_reason(cal)
+    if cal_reason is None:
+        try:
+            # sign/scale reference: the median of all fragment medians is a
+            # physical on-ground tracker position (premise-validated) — it
+            # fixes the composed map's projective sign so beyond-horizon
+            # points cannot mirror into the pitch box.
+            ref = np.median(np.vstack(
+                [np.median(xy, axis=0) for _, xy in fragments]), axis=0)
+            pmap = build_track.pitch_frame_map(
+                diag['H'], cal['homography'], ref_metric_xy=ref)
+            length_m = float(cal['pitch_length_m'])
+            width_m = float(cal['pitch_width_m'])
+            poly_chains = build_track.filter_on_pitch_calibrated(
+                build_track.stitch(build_track.filter_on_pitch_calibrated(
+                    fragments, pmap, length_m, width_m,
+                    apron=build_track.FIELD_FRAGMENT_APRON_M)),
+                pmap, length_m, width_m,
+                apron=build_track.FIELD_CHAIN_APRON_M)
+        except Exception as err:  # noqa: BLE001 — degrade to rect, never die
+            cal_reason = f'polygon filter failed: {err}'
+            poly_chains = None
+    if poly_chains is not None:
+        enabled = (row.get('spiideo_scene_id') or '') in FIELD_FILTER_SCENES
+        # premise-as-code: a healthy calibrated filter keeps a cloud spanning
+        # most of the pitch; a partially-wrong map (epoch drift amputating a
+        # flank) fails this even when the count ratio looks plausible.
+        span_x, span_y = build_track.pitch_span_m(poly_chains, pmap)
+        span_ok = span_x >= 0.6 * length_m and span_y >= 0.6 * width_m
+        use_polygon, fallback = build_track.choose_filter(
+            enabled, len(rect_chains), len(poly_chains), span_ok=span_ok)
+        filter_cmp = {'rectChains': len(rect_chains),
+                      'polygonChains': len(poly_chains),
+                      'polygonSpanM': [round(span_x, 1), round(span_y, 1)]}
+        if fallback:
+            # Loud: a frame/epoch mismatch maps the pitch elsewhere and would
+            # ship a near-empty artifact. 'ready' is terminal.
+            print(f'FIELD FILTER FALLBACK: polygon kept {len(poly_chains)}/'
+                  f'{len(rect_chains)} chains (<5%) — shipping percentile '
+                  f'rect; check the calibration / mesh epoch', flush=True)
+            filter_cmp['fallback'] = True
+        if use_polygon:
+            chains = poly_chains
+        print(f'field filter {"ENABLED" if use_polygon else "dry-run"}: '
+              f'polygon kept {len(poly_chains)} chains vs rect '
+              f'{len(rect_chains)}', flush=True)
+    else:
+        print(f'field filter: percentile rect ({cal_reason})', flush=True)
+
     conc = median_concurrency(chains)
+    if conc < MIN_MEDIAN_CONCURRENT and use_polygon:
+        # The polygon, not the footage, may be starving the gate (a wrong-but-
+        # not-collapsed calibration). Ship the honest rect rather than settle
+        # the row at error — and say so loudly.
+        print(f'FIELD FILTER FALLBACK: polygon chains fail the concurrency '
+              f'gate ({conc:.0f} < {MIN_MEDIAN_CONCURRENT}; polygon '
+              f'{len(poly_chains)} vs rect {len(rect_chains)} chains) — '
+              f'shipping percentile rect', flush=True)
+        use_polygon = False
+        filter_cmp['fallback'] = True
+        chains = rect_chains
+        conc = median_concurrency(chains)
     if conc < MIN_MEDIAN_CONCURRENT:
         raise RuntimeError(
             f'quality gate: median concurrent tracked objects {conc:.0f} < '
@@ -480,6 +605,10 @@ def main():
     # and the duplicate-dot artifact converges on Tier-3 (jersey). See
     # scripts/player-identity/tier2b/RECORD.md §"Phase 1b".
     payload = build_track.build_payload(chains, diag['H'], start_us, diag)
+    payload['meta']['pitchFilter'] = ('polygon' if use_polygon
+                                      else 'percentile-rect')
+    if filter_cmp is not None:
+        payload['meta']['pitchFilterCompare'] = filter_cmp
     upload_track(payload)
     solve_doc = {
         'H': diag['H'].tolist(),

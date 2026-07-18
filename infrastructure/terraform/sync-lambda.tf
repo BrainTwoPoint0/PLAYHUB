@@ -228,6 +228,7 @@ resource "aws_lambda_function" "sync_recordings" {
       PANORAMA_JOB_DEF      = aws_batch_job_definition.vp_materialize.name
       AIM_TRACK_JOB_DEF     = aws_batch_job_definition.aim_track.name
       TRACKLETS_JOB_DEF     = aws_batch_job_definition.player_tracklets.name
+      FIELD_FILTER_SCENES   = var.field_filter_scenes
       PORTRAIT_JOB_DEF      = aws_batch_job_definition.portrait_render.name
       VEO_CAPTURE_JOB_DEF   = aws_batch_job_definition.veo_capture.name
       JERSEY_JOB_DEF        = aws_batch_job_definition.jersey_labels.name

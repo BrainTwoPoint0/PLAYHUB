@@ -34,6 +34,12 @@ export interface SolveSummary {
   reprojectionErrorPx: number
   perMarkErrorRad: Record<string, number>
   perMarkErrorPx?: Record<string, number>
+  /** False when the server saved the solve as a draft WITHOUT activating it
+   *  (red band). Absent = activated (pre-gate server responses). */
+  activated?: boolean
+  /** The server's authoritative verdict; prefer it over recomputing so a
+   *  stale client can never contradict what the server actually did. */
+  band?: 'good' | 'ok' | 'bad'
 }
 
 export interface CalibrationState {
@@ -110,38 +116,10 @@ export function hasFullMidline(marks: PitchMark[]): boolean {
   return MIDLINE_MARK_NAMES.every((n) => has(marks, n))
 }
 
-/**
- * Verdict band for a solve's max reprojection error, RELATIVE to the pitch's
- * on-screen size (max pairwise corner distance in raw-frame px). Absolute
- * thresholds mislead: 32px is huge on a pitch spanning 300px and ~1% on one
- * spanning 3000px — and venue meshes carry residual lens distortion that no
- * homography can absorb, so a well-marked pitch on an imperfect fit lands
- * around 0.5–1.5%. That reads "usable", never "your marks are wrong".
- */
-export function solveErrorBand(
-  errPx: number,
-  marks: PitchMark[]
-): 'good' | 'ok' | 'bad' {
-  if (!Number.isFinite(errPx)) return 'bad'
-  const corners = marks.filter((m) =>
-    (CORNER_MARK_NAMES as readonly string[]).includes(m.name)
-  )
-  let diag = 0
-  for (let i = 0; i < corners.length; i++) {
-    for (let j = i + 1; j < corners.length; j++) {
-      diag = Math.max(
-        diag,
-        Math.hypot(
-          corners[i].uv[0] - corners[j].uv[0],
-          corners[i].uv[1] - corners[j].uv[1]
-        )
-      )
-    }
-  }
-  if (diag <= 0) return errPx < 15 ? 'good' : errPx < 45 ? 'ok' : 'bad'
-  const rel = errPx / diag
-  return rel < 0.005 ? 'good' : rel < 0.015 ? 'ok' : 'bad'
-}
+// Moved to the shared lib so the server (pitch-calibration PUT) can gate
+// activation on the SAME verdict the screens show — re-exported here so the
+// result screen + venue card keep their import path.
+export { solveErrorBand } from '@/lib/panorama/pitch-band'
 
 /** The mark the next surface click will place, or null outside placing. */
 export function nextMark(state: CalibrationState): MarkName | null {

@@ -484,6 +484,179 @@ def filter_chains_on_pitch(chains: list, lo, hi) -> list:
     return out
 
 
+# Calibrated-filter aprons. The chain apron matches the config the HCT
+# premise was VALIDATED at (7,077/26,461 chains inside pitch+2m, inside
+# cloud spanning the full pitch) and keeps assistant referees + corner/
+# throw-in takers whose chain medians sit on or just outside the true line
+# (the percentile rect they replace carried ~3m of slack). Fragments get
+# more: a keeper retrieving a ball 3-4m off the line must not shatter
+# their chain (the rect path gave fragments percentile+3m pad+2m apron).
+FIELD_CHAIN_APRON_M = 2.0
+FIELD_FRAGMENT_APRON_M = 4.0
+
+
+def pitch_frame_map(h_job, h_cal, ref_metric_xy=None) -> np.ndarray:
+    """Compose tracker-metric → pitch-metres as a single 3×3 homography.
+
+    H_job maps tracker metric → rayn (x/z, y/z) and the admin calibration's
+    homography H_cal maps pitch metres → the SAME ray space up to scale
+    (rayn is just the z-dehomogenization of the ray), so
+    ``inv(H_cal) @ H_job`` is a plane-to-plane map. Validated on the HCT
+    production artifact: players span the full pitch, the stadium bowl lands
+    outside.
+
+    ``ref_metric_xy`` (a tracker-metric point KNOWN to be on the physical
+    ground near the play, e.g. the median of all fragment medians) fixes the
+    projective SIGN and SCALE: the composed map is only defined up to a
+    scalar, and without normalization a point past the map's horizon line
+    mirrors through the origin and can land INSIDE the pitch box (same
+    failure family as cv2.fisheye folding z<0 rays back into the disc). The
+    matrix is divided by w(ref) so w(ref) = +1 and the filter can reject
+    w <= eps as beyond-horizon. Production callers must pass it.
+
+    Raises ``numpy.linalg.LinAlgError`` on a singular H_cal and
+    ``ValueError`` when the reference lands on the composed horizon —
+    callers must treat both as "no usable calibration" (percentile rect).
+    """
+    h_cal = np.asarray(h_cal, dtype=float).reshape(3, 3)
+    h_job = np.asarray(h_job, dtype=float).reshape(3, 3)
+    pmap = np.linalg.inv(h_cal) @ h_job
+    if ref_metric_xy is not None:
+        w = pmap[2] @ np.array([ref_metric_xy[0], ref_metric_xy[1], 1.0])
+        if not np.isfinite(w) or abs(w) < 1e-9:
+            raise ValueError('reference point lands on the composed horizon')
+        pmap = pmap / w
+    return pmap
+
+
+def filter_on_pitch_calibrated(items: list, pmap: np.ndarray,
+                               length_m: float, width_m: float,
+                               apron: float = 0.0) -> list:
+    """Calibrated field-of-play test — the admin-marked boundary instead of
+    the occupancy percentile rect (which fits the whole BOWL at stadium
+    venues: crowd, track walkers, staff).
+
+    Maps each track's median tracker-metric position through ``pmap`` (see
+    pitch_frame_map — sign-normalized so on-ground points have w > 0) into
+    the pitch frame (origin corner_nw, +x along length, +y across width —
+    the calibration convention) and keeps it iff it lies within the pitch
+    expanded by ``apron`` metres. Points with w <= eps are BEYOND the
+    composed horizon — mirrored garbage, never an on-pitch body — and are
+    dropped, not dehomogenized. Same ``(ts, xy)`` tuple shape as the rect
+    filters: fragments use FIELD_FRAGMENT_APRON_M, chains
+    FIELD_CHAIN_APRON_M.
+    """
+    out = []
+    for ts, xy in items:
+        med = np.median(xy, axis=0)
+        v = pmap @ np.array([med[0], med[1], 1.0])
+        if not np.isfinite(v[2]) or v[2] <= 1e-6:
+            continue  # beyond the composed horizon — mirrored, not on-pitch
+        x = v[0] / v[2]
+        y = v[1] / v[2]
+        if (-apron <= x <= length_m + apron
+                and -apron <= y <= width_m + apron):
+            out.append((ts, xy))
+    return out
+
+
+def pitch_span_m(chains: list, pmap: np.ndarray) -> tuple[float, float]:
+    """Bounding-box extents (metres, pitch frame) of the chains' mapped
+    medians — the validated premise as a runtime check: a healthy calibrated
+    filter keeps a cloud spanning most of the pitch. Returns (0, 0) for
+    empty input."""
+    pts = []
+    for _, xy in chains:
+        med = np.median(xy, axis=0)
+        v = pmap @ np.array([med[0], med[1], 1.0])
+        if np.isfinite(v[2]) and v[2] > 1e-6:
+            pts.append((v[0] / v[2], v[1] / v[2]))
+    if not pts:
+        return 0.0, 0.0
+    arr = np.asarray(pts)
+    return (float(arr[:, 0].max() - arr[:, 0].min()),
+            float(arr[:, 1].max() - arr[:, 1].min()))
+
+
+def choose_filter(enabled: bool, n_rect: int, n_poly: int,
+                  span_ok: bool = True) -> tuple[bool, bool]:
+    """The shipping decision, extracted pure so it is testable (the branch
+    that decides what goes into a TERMINAL 'ready' artifact must not live
+    untested inline — the 07-15 'score the branch you ship' lesson).
+
+    Returns (use_polygon, fallback): dry-run scenes never use the polygon
+    and never "fall back"; enabled scenes fall back LOUDLY when the polygon
+    kept <5% of what the rect kept (near-total frame/epoch mismatch) or the
+    kept cloud fails the span premise."""
+    if not enabled:
+        return False, False
+    collapse = n_rect > 0 and n_poly < 0.05 * n_rect
+    if collapse or not span_ok:
+        return False, True
+    return True, False
+
+
+# ── Calibrated field-of-play gate ────────────────────────────────────────────
+# The web solver's band boundaries (solveErrorBand in src/lib/panorama):
+# error relative to the pitch's on-screen corner diagonal; red >= 1.5%.
+# A red-band calibration (camera model needs a refit) must NOT drive the
+# filter — e.g. Football Plus's 137px solve stays on the percentile rect.
+CAL_SOLVER_VERSION = 1
+CAL_BAND_REL_MAX = 0.015
+CAL_BAND_ABS_MAX = 45.0  # fallback when the corner span is unavailable
+
+
+def _marks_corner_diag(marks) -> float | None:
+    """Max pairwise distance between CORNER marks in raw-frame px — the
+    denominator of the web solveErrorBand's relative verdict."""
+    try:
+        pts = [m['uv'] for m in marks
+               if str(m.get('name', '')).startswith('corner_')]
+        best = 0.0
+        for i in range(len(pts)):
+            for j in range(i + 1, len(pts)):
+                dx = float(pts[i][0]) - float(pts[j][0])
+                dy = float(pts[i][1]) - float(pts[j][1])
+                d = (dx * dx + dy * dy) ** 0.5
+                best = max(best, d)
+        return best if best > 0 else None
+    except Exception:  # noqa: BLE001 — malformed marks = no diag, use abs
+        return None
+
+
+def calibration_unusable_reason(cal: dict | None) -> str | None:
+    """Why this calibration must NOT drive the field filter, or None if it
+    may. Mirrors the web red-band boundary so 'active row exists' plus this
+    gate together mean band <= ok."""
+    if not cal:
+        return 'no active calibration'
+    if cal.get('solver_version') != CAL_SOLVER_VERSION:
+        return f'solver_version {cal.get("solver_version")!r}'
+    if not cal.get('homography'):
+        return 'no homography'
+    try:
+        length_m = float(cal['pitch_length_m'])
+        width_m = float(cal['pitch_width_m'])
+    except (KeyError, TypeError, ValueError):
+        return 'missing pitch dims'
+    if not (length_m > 0 and width_m > 0):
+        return 'non-positive pitch dims'
+    try:
+        err = float(cal.get('reprojection_error_px'))
+    except (TypeError, ValueError):
+        return 'no reprojection error'
+    if not np.isfinite(err):
+        return 'non-finite reprojection error'
+    diag_px = _marks_corner_diag(cal.get('marks'))
+    if diag_px is not None:
+        if err / diag_px >= CAL_BAND_REL_MAX:
+            return f'red band ({err:.0f}px over {diag_px:.0f}px diagonal)'
+    elif err >= CAL_BAND_ABS_MAX:
+        return f'red band ({err:.0f}px absolute)'
+    return None
+
+
+
 # ── Roster cardinality (Tier 2a) ─────────────────────────────────────────────
 
 def _cluster_count(pts: list, r: float) -> int:

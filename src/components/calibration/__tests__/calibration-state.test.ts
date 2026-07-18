@@ -210,6 +210,22 @@ describe('save / solve', () => {
     expect(s.solve).toEqual(solve)
   })
 
+  it('SOLVE_OK carries the server activation verdict into the result', () => {
+    // red solves save WITHOUT activating — the result screen branches its
+    // "now live" copy on this flag, and REDO must clear it with the solve
+    const solve = {
+      reprojectionErrorPx: 137.5,
+      perMarkErrorRad: {},
+      activated: false,
+      band: 'bad' as const,
+    }
+    const s = run(ready(), { type: 'SAVE' }, { type: 'SOLVE_OK', solve })
+    expect(s.solve?.activated).toBe(false)
+    expect(s.solve?.band).toBe('bad')
+    const redone = run(s, { type: 'REDO' })
+    expect(redone.solve).toBeNull()
+  })
+
   it('SAVE is refused outside a saveable state', () => {
     const s = initialCalibrationState()
     expect(run(s, { type: 'SAVE' })).toBe(s)
