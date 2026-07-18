@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { isPlatformAdmin } from '@/lib/admin/auth'
 import { meshBaseUrl } from '@/lib/panorama/mesh'
+import { solveErrorBand } from '@/lib/panorama/pitch-band'
 import { proposePitchMarksFromTracklets } from '@/lib/panorama/pitch-assist'
 import {
   PITCH_LENGTH_BOUNDS,
@@ -401,30 +402,70 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     )
   }
 
-  const { data, error } = await serviceClient.rpc(
-    'playhub_activate_pitch_calibration',
-    {
-      p_scene_id: sceneId,
-      p_venue_organization_id: venueId,
-      p_provider: scene.provider,
-      p_source: 'operator',
-      p_frame_s3_key: frameS3Key,
-      p_frame_width: frameWidth,
-      p_frame_height: frameHeight,
-      p_mesh_source_game_id: meshRow.source_game_id,
-      p_marks: validated.marks,
-      p_pitch_length_m: pitchLengthM,
-      p_pitch_width_m: pitchWidthM,
-      p_solver_version: solve.solverVersion,
-      p_homography: solve.homography,
-      p_field_polygon_rayn: solve.fieldPolygonRayn,
-      p_reprojection_error_px: solve.reprojectionErrorPx,
-      p_created_by: user.id,
-    }
-  )
+  // Red-band solves SAVE for reference but never ACTIVATE: the same
+  // solveErrorBand verdict the result screen shows (shared lib — lockstep is
+  // the product guarantee). A red solve means the marks or the camera model
+  // are wrong; letting it go live would feed watch half-framing and the
+  // tracklets field filter garbage geometry. The prior active calibration
+  // (if any) stays in place; the admin adjusts, or the camera model gets
+  // refit and a re-save activates then.
+  const band = solveErrorBand(solve.reprojectionErrorPx, validated.marks)
+  let data: unknown
+  let error: { message?: string } | null = null
+  if (band === 'bad') {
+    const inserted = await serviceClient
+      .from('playhub_pitch_calibrations')
+      .insert({
+        scene_id: sceneId,
+        venue_organization_id: venueId,
+        provider: scene.provider,
+        source: 'operator',
+        status: 'draft',
+        frame_s3_key: frameS3Key,
+        frame_width: frameWidth,
+        frame_height: frameHeight,
+        mesh_source_game_id: meshRow.source_game_id,
+        marks: validated.marks,
+        pitch_length_m: pitchLengthM,
+        pitch_width_m: pitchWidthM,
+        solver_version: solve.solverVersion,
+        homography: solve.homography,
+        field_polygon_rayn: solve.fieldPolygonRayn,
+        reprojection_error_px: solve.reprojectionErrorPx,
+        created_by: user.id,
+      })
+      .select()
+      .single()
+    data = inserted.data
+    error = inserted.error
+  } else {
+    const activated = await serviceClient.rpc(
+      'playhub_activate_pitch_calibration',
+      {
+        p_scene_id: sceneId,
+        p_venue_organization_id: venueId,
+        p_provider: scene.provider,
+        p_source: 'operator',
+        p_frame_s3_key: frameS3Key,
+        p_frame_width: frameWidth,
+        p_frame_height: frameHeight,
+        p_mesh_source_game_id: meshRow.source_game_id,
+        p_marks: validated.marks,
+        p_pitch_length_m: pitchLengthM,
+        p_pitch_width_m: pitchWidthM,
+        p_solver_version: solve.solverVersion,
+        p_homography: solve.homography,
+        p_field_polygon_rayn: solve.fieldPolygonRayn,
+        p_reprojection_error_px: solve.reprojectionErrorPx,
+        p_created_by: user.id,
+      }
+    )
+    data = activated.data
+    error = activated.error
+  }
 
   if (error) {
-    console.error('Failed to activate pitch calibration:', error)
+    console.error('Failed to save pitch calibration:', error)
     return NextResponse.json(
       { error: 'Failed to save pitch calibration', code: 'internal' },
       { status: 500 }
@@ -433,6 +474,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 
   return NextResponse.json({
     calibration: data,
+    activated: band !== 'bad',
     solve: {
       reprojectionErrorPx: solve.reprojectionErrorPx,
       perMarkErrorRad: solve.perMarkErrorRad,

@@ -448,6 +448,7 @@
       "resultTitle": "Límite guardado",
       "reprojectionError": "{px}px de error máximo",
       "redoNote": "Esta calibración ya está activa. Si ajustas y guardas de nuevo, la sustituye.",
+      "redoNoteInactive": "Guardada solo como referencia — NO está activa. La calibración anterior, si existe, sigue activa. Ajusta las marcas y guarda de nuevo; si todas las marcas están bien colocadas, el modelo de cámara necesita un reajuste primero.",
       "accept": "Hecho",
       "redo": "Seguir ajustando",
       "placingHint": "Arrastra para mirar alrededor y haz zoom con la rueda o + antes de hacer clic: la precisión aquí es la que hereda todo lo demás. El lado lejano debe ser una banda (un lado largo del campo).",

@@ -800,3 +800,212 @@ def test_dedup_merged_body_count_matches_roster_estimate():
     deduped = build_track.dedup_concurrent(chains)
     assert len(deduped) == 10
     assert build_track.estimate_roster_n(deduped) == 10
+
+
+# ── Calibrated field-of-play filter ──────────────────────────────────────────
+
+def _affine_h(rot_deg=30.0, tx=12.0, ty=-7.0):
+    """Homogeneous tracker-metric -> pitch-metres map (rotation+translation)."""
+    c, s = np.cos(np.radians(rot_deg)), np.sin(np.radians(rot_deg))
+    return np.array([[c, -s, tx], [s, c, ty], [0.0, 0.0, 1.0]])
+
+
+def test_pitch_frame_map_recovers_the_metric_to_pitch_transform():
+    # Construct H_cal (pitch->ray) arbitrarily and H_job = H_cal @ T so the
+    # composition must recover T exactly (up to homogeneous scale).
+    T = _affine_h()
+    H_cal = np.array([[0.02, 0.001, -0.4],
+                      [0.002, -0.015, 0.3],
+                      [0.0001, 0.0004, 1.0]])
+    H_job = H_cal @ T
+    P = build_track.pitch_frame_map(H_job, H_cal.tolist())
+    for pt in [(0.0, 0.0), (30.0, 18.0), (-11.0, 4.5)]:
+        v = P @ np.array([pt[0], pt[1], 1.0])
+        expect = T @ np.array([pt[0], pt[1], 1.0])
+        assert np.allclose(v / v[2], expect / expect[2], atol=1e-9)
+
+
+def test_pitch_frame_map_raises_on_singular_h_cal():
+    with pytest.raises(np.linalg.LinAlgError):
+        build_track.pitch_frame_map(np.eye(3), np.zeros((3, 3)))
+
+
+def test_filter_on_pitch_calibrated_keeps_inside_drops_outside():
+    # Identity map: tracker metric IS the pitch frame (L=100, W=60).
+    P = np.eye(3)
+    inside = _line_frag(0, 10, (50, 30), (0.5, 0))
+    outside = _line_frag(0, 10, (50, 75), (0.5, 0))   # 15 m past the far line
+    out = build_track.filter_on_pitch_calibrated(
+        [inside, outside], P, 100.0, 60.0, apron=0.0)
+    assert out == [inside]
+
+
+def test_filter_on_pitch_calibrated_apron_is_lenient():
+    P = np.eye(3)
+    keeper_off = _line_frag(0, 10, (-1.2, 30), (0, 0))  # 1.2 m off the goal line
+    strict = build_track.filter_on_pitch_calibrated(
+        [keeper_off], P, 100.0, 60.0, apron=0.0)
+    lenient = build_track.filter_on_pitch_calibrated(
+        [keeper_off], P, 100.0, 60.0, apron=build_track.PITCH_APRON_M)
+    assert strict == []
+    assert lenient == [keeper_off]
+
+
+def test_filter_on_pitch_calibrated_through_a_real_transform():
+    # Points expressed in tracker metric, pitch frame reached via T: an
+    # on-pitch player and a spectator 10 m beyond the touchline (in PITCH
+    # coords) must be classified by their PITCH positions, not tracker ones.
+    T = _affine_h()
+    Tinv = np.linalg.inv(T)
+
+    def tracker(px, py):
+        v = Tinv @ np.array([px, py, 1.0])
+        return v[0] / v[2], v[1] / v[2]
+
+    player = _line_frag(0, 10, tracker(40.0, 20.0), (0, 0))
+    fan = _line_frag(0, 10, tracker(40.0, 70.0), (0, 0))
+    out = build_track.filter_on_pitch_calibrated(
+        [player, fan], T, 100.0, 60.0, apron=0.0)
+    assert out == [player]
+
+
+def test_filter_on_pitch_calibrated_drops_degenerate_projection():
+    # A map sending the point to w≈0 must drop it, not crash or keep it.
+    P = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, -30.0]])
+    frag = _line_frag(0, 10, (10.0, 30.0), (0, 0))   # w = 30 - 30 = 0
+    assert build_track.filter_on_pitch_calibrated(
+        [frag], P, 100.0, 60.0, apron=0.0) == []
+
+
+# ── Calibration usability gate ───────────────────────────────────────────────
+
+def _cal(err=10.0, diag_scale=1.0, **over):
+    marks = [
+        {'name': 'corner_nw', 'uv': [500 * diag_scale, 400]},
+        {'name': 'corner_ne', 'uv': [3300 * diag_scale, 420]},
+        {'name': 'corner_se', 'uv': [3500 * diag_scale, 1900]},
+        {'name': 'corner_sw', 'uv': [300 * diag_scale, 1850]},
+        {'name': 'midline_n', 'uv': [1900, 410]},
+    ]
+    cal = {'solver_version': 1, 'homography': np.eye(3).tolist(),
+           'pitch_length_m': 100.0, 'pitch_width_m': 60.0,
+           'reprojection_error_px': err, 'marks': marks}
+    cal.update(over)
+    return cal
+
+
+def test_calibration_gate_accepts_good_band():
+    assert build_track.calibration_unusable_reason(_cal(err=10.0)) is None
+
+
+def test_calibration_gate_rejects_red_band():
+    # ~3300 px corner diagonal -> 1.5% boundary ≈ 50 px; 137 px is red
+    # (the live Football Plus case must stay on the percentile rect).
+    reason = build_track.calibration_unusable_reason(_cal(err=137.5))
+    assert reason is not None and 'red band' in reason
+
+
+def test_calibration_gate_rejects_missing_and_malformed():
+    assert build_track.calibration_unusable_reason(None) is not None
+    assert build_track.calibration_unusable_reason(
+        _cal(solver_version=2)) is not None
+    assert build_track.calibration_unusable_reason(
+        _cal(homography=None)) is not None
+    assert build_track.calibration_unusable_reason(
+        _cal(pitch_length_m=None)) is not None
+    assert build_track.calibration_unusable_reason(
+        _cal(reprojection_error_px='nan')) is not None
+
+
+def test_calibration_gate_absolute_fallback_without_corner_marks():
+    # No corner marks -> no diagonal -> absolute threshold applies.
+    no_corners = _cal(err=60.0, marks=[{'name': 'midline_n', 'uv': [1, 2]}])
+    assert build_track.calibration_unusable_reason(no_corners) is not None
+    ok_abs = _cal(err=20.0, marks=[{'name': 'midline_n', 'uv': [1, 2]}])
+    assert build_track.calibration_unusable_reason(ok_abs) is None
+
+
+def test_filter_on_pitch_calibrated_drops_mirrored_negative_w():
+    # A point past the composed map's horizon mirrors through the origin and
+    # would land INSIDE the box if dehomogenized: w = 0.1*(-30) - 2 = -5,
+    # (x, y) = (10, 6). The filter must reject w <= eps, not |w| ~ 0.
+    P = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.1, -2.0]])
+    frag = _line_frag(0, 10, (-50.0, -30.0), (0, 0))
+    assert build_track.filter_on_pitch_calibrated(
+        [frag], P, 100.0, 60.0, apron=0.0) == []
+
+
+def test_pitch_frame_map_reference_fixes_sign():
+    # Same composition scaled by -1 (projectively identical): without the
+    # reference the on-pitch point lands at negative w; with it, positive.
+    T = _affine_h()
+    H_cal = np.array([[0.02, 0.001, -0.4],
+                      [0.002, -0.015, 0.3],
+                      [0.0001, 0.0004, 1.0]])
+    H_job = (-1.0) * (H_cal @ T)
+    Tinv = np.linalg.inv(T)
+    v_ref = Tinv @ np.array([50.0, 30.0, 1.0])   # tracker point == pitch centre
+    ref = (v_ref[0] / v_ref[2], v_ref[1] / v_ref[2])
+    P = build_track.pitch_frame_map(H_job, H_cal, ref_metric_xy=ref)
+    w = P[2] @ np.array([ref[0], ref[1], 1.0])
+    assert w == pytest.approx(1.0)
+    frag = _line_frag(0, 10, ref, (0, 0))
+    assert build_track.filter_on_pitch_calibrated(
+        [frag], P, 100.0, 60.0, apron=0.0) == [frag]
+
+
+def test_field_chain_apron_keeps_assistant_referee():
+    # A chain median 0.8 m outside the touchline (assistant referee) must be
+    # kept at the shipped FIELD_CHAIN_APRON_M and dropped at apron=0 — pins
+    # the decision that the chain filter ships at the VALIDATED +2m config.
+    P = np.eye(3)
+    ar = _line_frag(0, 10, (50.0, -0.8), (0.5, 0))
+    assert build_track.filter_on_pitch_calibrated(
+        [ar], P, 100.0, 60.0, apron=0.0) == []
+    assert build_track.filter_on_pitch_calibrated(
+        [ar], P, 100.0, 60.0,
+        apron=build_track.FIELD_CHAIN_APRON_M) == [ar]
+
+
+def test_calibration_gate_relative_band_rejects_small_pitch():
+    # 20px error is fine on a ~4400px diagonal but RED on a ~1000px one —
+    # kills the "always use the absolute threshold" mutant (the relative
+    # band is the load-bearing design decision).
+    small_marks = [
+        {'name': 'corner_nw', 'uv': [1000, 1000]},
+        {'name': 'corner_ne', 'uv': [1800, 1020]},
+        {'name': 'corner_se', 'uv': [1850, 1500]},
+        {'name': 'corner_sw', 'uv': [950, 1480]},
+    ]
+    small = _cal(err=20.0, marks=small_marks)   # diag ~986px -> 2.0% = red
+    reason = build_track.calibration_unusable_reason(small)
+    assert reason is not None and 'red band' in reason
+    big = _cal(err=20.0)                        # diag ~3300px -> 0.6% = ok
+    assert build_track.calibration_unusable_reason(big) is None
+
+
+def test_choose_filter_decision_table():
+    # dry-run scenes never use the polygon and never "fall back"
+    assert build_track.choose_filter(False, 1000, 10) == (False, False)
+    assert build_track.choose_filter(False, 1000, 900, span_ok=False) == \
+        (False, False)
+    # enabled + healthy -> polygon ships (incl. a stadium-scale 73% drop)
+    assert build_track.choose_filter(True, 26461, 7077) == (True, False)
+    # enabled + near-total collapse (<5% of rect) -> loud fallback
+    assert build_track.choose_filter(True, 1000, 49) == (False, True)
+    assert build_track.choose_filter(True, 1000, 50) == (True, False)
+    # enabled + span premise failed -> loud fallback even with sane counts
+    assert build_track.choose_filter(True, 1000, 700, span_ok=False) == \
+        (False, True)
+    # empty rect edge: no count baseline -> polygon ships if span holds
+    assert build_track.choose_filter(True, 0, 12) == (True, False)
+
+
+def test_pitch_span_m_measures_kept_cloud():
+    P = np.eye(3)
+    chains = [_line_frag(0, 5, (2.0, 3.0), (0, 0)),
+              _line_frag(0, 5, (95.0, 55.0), (0, 0))]
+    dx, dy = build_track.pitch_span_m(chains, P)
+    assert dx == pytest.approx(93.0, abs=0.5)
+    assert dy == pytest.approx(52.0, abs=0.5)
+    assert build_track.pitch_span_m([], P) == (0.0, 0.0)

@@ -232,7 +232,10 @@ export function PitchCalibrationClient({
         body?.solve &&
         Number.isFinite(body.solve.reprojectionErrorPx)
       ) {
-        dispatch({ type: 'SOLVE_OK', solve: body.solve })
+        dispatch({
+          type: 'SOLVE_OK',
+          solve: { ...body.solve, activated: body.activated !== false },
+        })
         return
       }
       const code: string = body?.code ?? 'internal'
@@ -738,7 +741,9 @@ function ResultPanel({
           </div>
         ))}
       </div>
-      <p className="text-xs text-[var(--ash-grey)]">{t('redoNote')}</p>
+      <p className="text-xs text-[var(--ash-grey)]">
+        {solve.activated === false ? t('redoNoteInactive') : t('redoNote')}
+      </p>
       <div className="flex gap-2">
         {band === 'bad' ? (
           <>
