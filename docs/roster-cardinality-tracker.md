@@ -196,3 +196,34 @@ slot-swap-vs-lost policy against everything measured in [player-identity-reid-ne
 - Commercial identity anchors are jersey/roster, never appearance: Veo Player Spotlight (jersey OCR),
   Second Spectrum / TRACAB (multi-cam 3D), SkillCorner All-22.
 - `scipy.optimize.linear_sum_assignment` (Hungarian baseline).
+
+## Eval harness — Tier-2b's OPENING MOVE (contract locked 2026-07-18, build in a fresh session, plan-first)
+
+Before any slot-assignment code: a standard identity-eval harness, because median
+chain duration provably cannot see identity errors (wrong bridges LENGTHEN chains)
+and every measurement so far has been bespoke. Base = `roboflow/trackers`'
+TrackEval-aligned evaluator (HOTA/IDF1/MOTA) + its Optuna tuner; GT = the Veo
+capture corpus (tracking.json, 97.4% jersey-labelled, per-match camera model).
+
+Three constraints are LOAD-BEARING — carrying them in is the whole point of this
+section:
+
+1. **Regime split.** Dev on Veo GT, but Veo's fragmentation regime (2.5 Hz,
+   65.6s median tracks) is NOT what we ship into (Spiideo 5 Hz, ~16s). Final
+   sign-off for anything Tier-2b ships = Spiideo data scored against HCT jersey
+   GT (and successors). A number earned only on Veo describes a friendlier world
+   — the "scored a branch production doesn't use" failure class.
+2. **Crossing-correlated cuts.** When synthesizing Spiideo-like fragmentation on
+   Veo tracks, cut where inter-player distance collapses — 59% of real chain
+   deaths happen with another player <1.5° away (2026-07-15 measurement).
+   Uniform-random cuts produce isolated-player gaps and inflate every score.
+   Match the synthetic gap-length distribution to the measured one (~22s uuid
+   lifetime, gaps 1.5-5s dominant) and keep identity truth across cuts via the
+   jersey labels.
+3. **Per-T curve on top.** The product metric is P(ring on the right player at
+   T = 5/15/30/60s) — a time-conditioned curve. Stock HOTA/IDF1 collapse time
+   to a scalar; budget the small custom layer that emits the per-T curve, since
+   that is the number eyes-on actually correlates with.
+
+Baselines to score on day one: the shipped stitcher, the 2.5s-ceiling variant,
+and no-stitch (raw fragments) — then Tier-2b candidates against all three.

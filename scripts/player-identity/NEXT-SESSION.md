@@ -347,3 +347,42 @@ is exact. Always hold out a DOMAIN (match / venue / corner), never samples.
 - **Corpus manifest** — which capture fed which model version.
 - **S3 lifecycle**: `GLACIER_IR` at 60d **filtered to objects >100MB** so the labels stay hot. ~2.2 TB Standard ≈ $52/mo → ~$11/mo.
 - The 5-sweep-old open item: a CloudWatch alarm on `"submit failed for"` → `sync_alerts`. Cheap, covers all classes, and this workstream is the one where silence costs data.
+
+## QUEUED — field-of-play polygon filter in the tracklets job (Karim's step 5, recon done 2026-07-18)
+
+Sketch (Karim): field_polygon_rayn from the ACTIVE pitch calibration replaces the
+percentile rect in filter_on_pitch/filter_chains_on_pitch, keyed per venue with
+rect fallback, behind a dry-run flag logging kept/dropped chain diffs on a real
+game before enabling. Recon facts for the plan:
+
+- Rect today: solve_h.pitch_rect_metric (p3/p97 of all tracklet xy + 3m pad) →
+  diag.pitch_lo/hi (also in tracklets-solve.json); filter_on_pitch
+  (build_track.py:459, +2m apron, per-fragment median) pre-stitch;
+  filter_chains_on_pitch (:473, exact rect, whole-chain median) post-stitch.
+  Both test METRIC xy; jersey-labels/chains_source.py reuses them.
+- Calibration: playhub_pitch_calibrations, one active row per scene (partial
+  unique idx), marks JSONB = raw-frame px + pitch_length/width_m are the ground
+  truth; field_polygon_rayn/homography are ADVISORY (recompute from marks —
+  pitch-focus.ts is the consumption pattern). Solver emits fieldPolygonRayn in
+  canonical nw,ne,se,sw order (pitch-solver.ts:429-445); z<=0 corners null.
+- SPACE BRIDGE is the core decision: polygon is rayn, filters are metric —
+  project the chain median through the job's own H (like build_payload
+  build_track.py:743) OR build the metric quad from [0,0],[L,0],[L,W],[0,W]
+  (needs the calibration H↔job H relationship thought through).
+- Fetch: entrypoint._sb GET /rest/v1/playhub_pitch_calibrations?scene_id=eq.X
+  &status=eq.active&select=marks,pitch_length_m,pitch_width_m,... (service role
+  bypasses RLS); no row → rect fallback.
+- Point-in-polygon: cv2.pointPolygonTest (opencv already pinned); no shapely.
+- Dry-run precedent: spiideo-health DRY_RUN=1 "would drop N (rect kept M)"
+  logging shape; no dry-run exists in the tracklets job yet (env-flag style).
+- Plan-mode this before building (workflow rule); do NOT fold into B3.
+
+## QUEUED — Tier-2b opening move: MOT/HOTA eval harness (contract locked 2026-07-18)
+
+Full contract in `PLAYHUB/docs/roster-cardinality-tracker.md` §"Eval harness".
+Plan-first in its own session. The three load-bearing constraints (do not
+re-derive): dev-on-Veo / sign-off-on-Spiideo+HCT-jersey-GT regime split;
+crossing-correlated fragment cuts matched to the measured gap distribution;
+a per-T P(ring-on-right-player) curve layered on stock HOTA. Baselines:
+shipped stitcher, 2.5s ceiling, no-stitch. Base lib: roboflow/trackers
+(TrackEval-aligned evaluator + Optuna tuner, MIT).

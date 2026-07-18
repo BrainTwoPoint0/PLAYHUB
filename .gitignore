@@ -110,3 +110,4 @@ scripts/player-identity/crops/
 scripts/player-identity/mesh/
 scripts/player-identity/prod-solve.json
 scripts/player-identity/*.png
+scripts/player-identity/mot-eval/cache/
