@@ -1656,6 +1656,19 @@ export function VirtualPanoramaPlayer({
         const SPOT_FOV_SEARCH_SMOOTH = 1.1
         const SPOT_REASSOC_DEG = 2.0
         const SPOT_LOST_SEC = 3
+        // WATCHING window (eyes-on finding, 2026-07-18): the tracker drops
+        // STATIONARY players (goalkeepers!) for tens of seconds routinely —
+        // measured on the HCT pilot: inter-fragment gaps at the goal cells
+        // have median 15-56s and 80% exceed the 3s drop window, while the
+        // player is plainly visible. Past SPOT_LOST_SEC the selection is not
+        // dropped; it WATCHES the frozen spot for up to SPOT_WATCH_SEC and
+        // re-acquires ONLY on strong evidence: a slot-mate, or a CO-LOCATED
+        // pickup at the frozen position with no rival nearby (after a long
+        // gap the co-location IS the identity evidence; stale velocity is
+        // not, so the velocity gate deliberately does not apply). No 2°
+        // wandering re-assoc past SPOT_LOST_SEC — that would be guessing.
+        const SPOT_WATCH_SEC = 60
+        const SPOT_WATCH_COLOCATED_DEG = 1.0
         // Post-loss coast: decay the terminal velocity and CAP total coast
         // displacement at the re-assoc radius, so a lost aim eases to a stop
         // near where the player vanished instead of walking to the frame edge
@@ -1796,17 +1809,20 @@ export function VirtualPanoramaPlayer({
             // ONE-SHOT re-association with ambiguity refusal: the server
             // already bridged everything unambiguous, so what reaches the
             // client is by construction harder — be stricter, and refuse
-            // rather than risk following a stranger.
-            const cand = slotAdopted
-              ? null
-              : nearestObject(
-                  track,
-                  clock,
-                  sel.lastPan,
-                  sel.lastTilt,
-                  SPOT_REASSOC_DEG,
-                  sel.index
-                )
+            // rather than risk following a stranger. Geometry re-assoc only
+            // runs inside the short loss window; past it the WATCHING state
+            // below owns re-acquisition (co-located or slot-mate only).
+            const cand =
+              slotAdopted || gap > SPOT_LOST_SEC
+                ? null
+                : nearestObject(
+                    track,
+                    clock,
+                    sel.lastPan,
+                    sel.lastTilt,
+                    SPOT_REASSOC_DEG,
+                    sel.index
+                  )
             if (cand) {
               const d1 = Math.hypot(
                 cand.panDeg - sel.lastPan,
@@ -1873,31 +1889,77 @@ export function VirtualPanoramaPlayer({
                 if (!coLocated) sel.hops += 1 // a re-index in place is not a hop
                 sel.adoptedAt = clock
                 if (d1 > 1) sel.fadeUntil = performance.now() + 350 // hop = fade, not swoosh
-              } else if ((ambiguous || !velOk) && gap > SPOT_LOST_SEC) {
-                spotSelRef.current = null // unresolvable — honest loss
-                spotNoticeOverride.current = {
-                  kind: 'lost',
-                  until: Date.now() + 3000,
+              }
+              // A refused/gated candidate no longer ends the follow — the
+              // WATCHING window below owns the endgame (an ambiguous crossing
+              // resolves when the player re-emerges at the frozen spot or a
+              // slot-mate appears; dropping at 3s threw away goalkeepers).
+            } else if (!slotAdopted && gap > SPOT_LOST_SEC) {
+              // WATCHING: co-located re-acquisition at the frozen spot. The
+              // tracker drops stationary players for tens of seconds (HCT
+              // measured: median goal-cell gap 15-56s) — a body reappearing
+              // exactly where the lost one stood, with no rival nearby, is
+              // the same evidence tier as the co-located re-index (velocity
+              // gate deliberately absent: after a long gap the co-location
+              // IS the evidence and the stale velocity is meaningless).
+              const pickup = nearestObject(
+                track,
+                clock,
+                sel.lastPan,
+                sel.lastTilt,
+                SPOT_WATCH_COLOCATED_DEG,
+                sel.index
+              )
+              if (pickup) {
+                const d1 = Math.hypot(
+                  pickup.panDeg - sel.lastPan,
+                  pickup.tiltDeg - sel.lastTilt
+                )
+                const rival = nearestObject(
+                  track,
+                  clock,
+                  sel.lastPan,
+                  sel.lastTilt,
+                  SPOT_WATCH_COLOCATED_DEG * 2,
+                  pickup.index
+                )
+                const slotConflict =
+                  sel.slot !== null &&
+                  pickup.slot !== undefined &&
+                  pickup.slot !== sel.slot
+                const ambiguous =
+                  slotConflict ||
+                  (rival &&
+                    rival.index !== sel.index &&
+                    Math.hypot(
+                      rival.panDeg - sel.lastPan,
+                      rival.tiltDeg - sel.lastTilt
+                    ) < Math.max(2 * d1, d1 + 0.8))
+                if (!ambiguous) {
+                  sel.index = pickup.index
+                  if (pickup.slot !== undefined) sel.slot = pickup.slot
+                  sel.lastPan = pickup.panDeg
+                  sel.lastTilt = pickup.tiltDeg
+                  sel.lostSince = null
+                  sel.coastDeg = 0
+                  sel.frameFov = 0
+                  sel.adoptedAt = clock
+                  sel.fadeUntil = performance.now() + 350
                 }
-                return
-              } else if (!dwellOk || sel.hops >= 2) {
-                // hop budget spent — end rather than daisy-chain identities
-                spotSelRef.current = null
+              }
+              if (
+                spotSelRef.current === sel &&
+                sel.lostSince !== null &&
+                gap > SPOT_WATCH_SEC &&
+                !slotDeferred
+              ) {
+                spotSelRef.current = null // truly gone — drop the ring
                 spotNoticeOverride.current = {
                   kind: 'lost',
                   until: Date.now() + 3000,
                 }
                 return
               }
-            } else if (!slotAdopted && !slotDeferred && gap > SPOT_LOST_SEC) {
-              // (a deferred slot-mate keeps the selection alive — the dwell
-              // resolves within 2s, far better than dropping a proven player)
-              spotSelRef.current = null // gone for good — drop the ring
-              spotNoticeOverride.current = {
-                kind: 'lost',
-                until: Date.now() + 3000,
-              }
-              return
             }
           }
           if (sel.follow && sel.lostSince === null) {
