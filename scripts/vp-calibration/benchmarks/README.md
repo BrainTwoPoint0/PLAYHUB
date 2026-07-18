@@ -718,3 +718,25 @@ kuwait pipeline produces a radial fit; the tangential refit lives in the
 session probe — port it into auto_fit before the next kuwait refit).
 GATE A note: per-line n counts only the points visible in the fov-46
 virtual framing (near_touch 60-64 of 159) — not an unprojection failure.
+
+## PROD SWAP EXECUTED (2026-07-18, Karim "go")
+
+Both venues live on the accepted fits (swap_meshes.py, promoted here):
+- **Football Plus**: fresh mesh from baselines/footballplus-accepted-fit.json
+  (regenerated + re-gated: marks 0.11% of span, PASS — NOTE the staged
+  public/vp-mesh-footballplus-auto had drifted from the frozen fit and was
+  refreshed to match). Canonical f9d6898f + all 8 game folders overwritten,
+  verified by content hash.
+- **Nazwa/kuwait**: the TANGENTIAL mesh (byte-identical to the staged
+  vp-mesh-kuwait-tangential Karim eyes-on'd). Canonical b923d40f + all 24
+  game folders, hash-verified. Pre-swap prod had TWO variants (23 games
+  post-mount-fix + game 0e4ff5b8 on an older one) — per-variant backups +
+  game->variant map in benchmarks/meshes/nazwa-prod-mesh-20260718/ (FP:
+  fp-prod-mesh-20260718/). Rollback = re-upload per the map.
+- Stale aim-track.json / tracklets.json artifacts DELETED (honest absence
+  beats a ~3 deg-wrong overlay); aim_track_*/tracklets_* columns reset on
+  all 32 recordings -> the existing sweeps rebuild against the new meshes
+  (aim ~20 jobs at 4-7h, cap 2, ~3-5 days; tracklets ~2min/game).
+- REMAINING MANUAL: re-solve both venues' admin calibrations in the marking
+  UI (raw-px marks stay valid; FP should read ~3px vs the stored 127.5px);
+  Karim eyes-on a watch page per venue once artifacts trickle in.
