@@ -259,12 +259,46 @@ describe('slot field (Tier 3 / B3)', () => {
     }
   })
 
-  it('drops a slot without a jersey (co-presence contract)', () => {
+  it('keeps a g-slot without a jersey (synthetic GK zone-slots)', () => {
+    const track = parseTracklets({
+      ...VALID,
+      objects: [{ ...OBJ_A, slot: 'g1' }],
+    })
+    expect(track!.objects[0].slot).toBe('g1')
+    expect(track!.objects[0].jersey).toBeUndefined()
+    const active = objectsAt(track!, 10.3)
+    expect(active.find((a) => a.index === 0)?.slot).toBe('g1')
+  })
+
+  it('kit slots keep the jersey co-presence contract', () => {
+    // a kit-letter slot without a jersey is a buggy producer — dropped
     const track = parseTracklets({
       ...VALID,
       objects: [{ ...OBJ_A, slot: 'a10' }],
     })
     expect(track!.objects[0].slot).toBeUndefined()
+  })
+
+  it('still drops a malformed slot when no jersey is present', () => {
+    const track = parseTracklets({
+      ...VALID,
+      objects: [{ ...OBJ_A, slot: 'G1' }],
+    })
+    expect(track!.objects[0].slot).toBeUndefined()
+  })
+
+  it('builds slotEnd from the last fragment end per slot', () => {
+    const track = parseTracklets({
+      ...VALID,
+      objects: [
+        { ...OBJ_A, slot: 'g1' }, // ends 10.6
+        { ...OBJ_B, slot: 'g1' }, // ends 11.4
+        { id: 'o9', t: [3, 4], pan: [0, 0], tilt: [0, 0], jersey: '7', slot: 'b7' },
+      ],
+    })!
+    expect(track.slotEnd['g1']).toBe(track.objects[1].t.at(-1))
+    expect(track.slotEnd['b7']).toBe(4)
+    expect(track.slotEnd['a99']).toBeUndefined()
   })
 })
 
@@ -295,5 +329,18 @@ describe('slotMate', () => {
     const track = parseTracklets(slotted)!
     expect(slotMate(track, 10.3, 'a99', 0, 0)).toBeNull()
     expect(slotMate(track, 10.3, 'b7', 0, 0, 2)).toBeNull()
+  })
+
+  it('hands off on a jersey-less GK slot exactly like a kit slot', () => {
+    const track = parseTracklets({
+      ...VALID,
+      objects: [
+        { ...OBJ_A, slot: 'g1' },
+        { ...OBJ_B, slot: 'g1' },
+      ],
+    })!
+    // t=10.8: fragment o0 has ended; its GK slot-mate o1 is live
+    const mate = slotMate(track, 10.8, 'g1', 0, 0, 0)
+    expect(mate?.index).toBe(1)
   })
 })

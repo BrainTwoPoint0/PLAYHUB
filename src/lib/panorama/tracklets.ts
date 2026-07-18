@@ -19,10 +19,13 @@ export interface TrackletObject {
    *  chain). Absent = honest-unlabelled — never inferred client-side. */
   jersey?: string
   /** Identity SLOT (Tier 3 / B3): kit-cluster letter + number (e.g. "a10"),
-   *  with a "-2" suffix when two real bodies provably share a (number, kit).
-   *  Fragments sharing a slot are the SAME player — one dot, and the follow
-   *  rides the slot across fragment gaps. Opaque equality key; present iff
-   *  `jersey` is. Absent = honest-unlabelled. */
+   *  with a "-2" suffix when two real bodies provably share a (number, kit),
+   *  or a synthetic goalkeeper zone-slot ("g1".."g4" — per end per half,
+   *  no jersey; the badge stays hidden). Kit slots mean SAME player;
+   *  g-slots mean ZONE identity — "the keeper defending that end that
+   *  half" (a mid-half keeper substitution rides the slot). Fragments
+   *  sharing a slot draw one dot and the follow rides the slot across
+   *  fragment gaps. Opaque equality key. Absent = honest-unlabelled. */
   slot?: string
 }
 
@@ -34,6 +37,10 @@ export interface Tracklets {
   /** Roster cap (Tier 2a, meta.rosterN): players on the pitch. The overlay
    *  shows at most this many trackers. Absent on pre-Tier-2a artifacts → no cap. */
   rosterN?: number
+  /** Last fragment end time (seconds) per slot id. Lets the follow prove a
+   *  slot is EXHAUSTED (no fragment can ever re-appear — e.g. a per-half GK
+   *  slot after half time) and expire instead of watching forever. */
+  slotEnd: Record<string, number>
 }
 
 export interface TrackletSample {
@@ -98,14 +105,18 @@ export function parseTracklets(raw: unknown): Tracklets | null {
       typeof e.jersey === 'string' && /^\d{1,2}$/.test(e.jersey)
         ? e.jersey
         : undefined
-    // Optional slot key — kit letter + number (+ body suffix). Only kept
-    // alongside a valid jersey (they are co-present by construction; a slot
-    // without a jersey would render an unlabelled badge).
-    const slot =
-      jersey !== undefined &&
-      typeof e.slot === 'string' &&
-      /^[a-z]\d{1,2}(-\d{1,2})?$/.test(e.slot)
+    // Optional slot key — kit letter + number (+ body suffix), or a
+    // synthetic GK zone-slot ("g1".."g4"). Kit slots keep the jersey
+    // co-presence contract (they are minted FROM jerseys — one without is
+    // a buggy producer and gets dropped); only g-slots are valid alone
+    // (they carry no number by design, badge stays hidden).
+    const slotRaw =
+      typeof e.slot === 'string' && /^[a-z]\d{1,2}(-\d{1,2})?$/.test(e.slot)
         ? e.slot
+        : undefined
+    const slot =
+      slotRaw !== undefined && (jersey !== undefined || /^g\d$/.test(slotRaw))
+        ? slotRaw
         : undefined
     objects.push({
       id,
@@ -117,6 +128,18 @@ export function parseTracklets(raw: unknown): Tracklets | null {
     })
   }
   if (objects.length === 0) return null
+
+  // Last fragment end per slot — the client's proof that a slot is
+  // exhausted (its label can never re-appear), which bounds the otherwise
+  // indefinite slot watch.
+  const slotEnd: Record<string, number> = {}
+  for (const obj of objects) {
+    if (obj.slot !== undefined) {
+      const end = obj.t[obj.t.length - 1]
+      if (slotEnd[obj.slot] === undefined || end > slotEnd[obj.slot])
+        slotEnd[obj.slot] = end
+    }
+  }
 
   // Optional roster cap (meta.rosterN) — a positive integer or nothing.
   const meta =
@@ -134,6 +157,7 @@ export function parseTracklets(raw: unknown): Tracklets | null {
     t0OffsetSec: Number.isFinite(o.t0OffsetSec) ? (o.t0OffsetSec as number) : 0,
     objects,
     rosterN,
+    slotEnd,
   }
 }
 

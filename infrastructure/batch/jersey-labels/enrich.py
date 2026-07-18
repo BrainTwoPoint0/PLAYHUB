@@ -54,6 +54,24 @@ def attach_labels(payload: dict, chains: list, labels: dict,
     return attached
 
 
+def attach_slots(payload: dict, chains: list, slot_of: dict) -> int:
+    """Attach `slot` ONLY (no jersey) to payload objects — the synthetic GK
+    zone-slot path. Objects already carrying a slot are never overwritten
+    (jersey evidence wins). Returns the number of objects slotted."""
+    order = span_order(chains)
+    by_oid = {}
+    for pos, orig in enumerate(order):
+        if orig in slot_of:
+            by_oid[f'o{pos}'] = slot_of[orig]
+    attached = 0
+    for o in payload['objects']:
+        s = by_oid.get(o['id'])
+        if s is not None and 'slot' not in o:
+            o['slot'] = s
+            attached += 1
+    return attached
+
+
 def payload_sizes(payload: dict) -> tuple:
     n_obj = len(payload['objects'])
     n_pts = sum(len(o['t']) for o in payload['objects'])
@@ -71,7 +89,8 @@ def assert_caps(payload: dict) -> None:
 
 def stamp_meta(payload: dict, *, harvest_step_s: float, source_digest: str,
                kits: int, slots: int, labelled: int,
-               split_accepted: int, split_refused: int) -> None:
+               split_accepted: int, split_refused: int,
+               gk_slots: int = 0) -> None:
     payload['meta']['jersey'] = {
         'version': 1,
         'slots': slots,
@@ -81,6 +100,7 @@ def stamp_meta(payload: dict, *, harvest_step_s: float, source_digest: str,
         'sourceDigest': source_digest,
         'splitAccepted': split_accepted,
         'splitRefused': split_refused,
+        'gkSlots': gk_slots,
     }
 
 

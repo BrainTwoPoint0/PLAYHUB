@@ -30,6 +30,7 @@ import signal
 import sys
 import tarfile
 import threading
+import urllib.parse
 import urllib.request
 import uuid as _uuid
 
@@ -115,12 +116,87 @@ def set_status(fields: dict, retries: int = 0):
 def fetch_row() -> dict:
     out = _sb('GET',
               f'/rest/v1/playhub_match_recordings?id=eq.{RECORDING_ID}'
-              f'&select=spiideo_game_id,panorama_s3_key,'
+              f'&select=spiideo_game_id,spiideo_scene_id,panorama_s3_key,'
               f'tracklets_status,tracklets_started_at')
     rows = json.loads(out)
     if not rows:
         raise JobError('recording row not found')
     return rows[0]
+
+
+def fetch_calibration(scene_id: str | None) -> dict | None:
+    """Active pitch calibration for the scene, or None. Non-fatal by design:
+    GK zone-slots are optional — a fetch error must never fail the job.
+
+    LOCKSTEP: mirrors player-tracklets/entrypoint.py fetch_calibration
+    (importing that module is impossible here — it hard-requires Spiideo env
+    at import and modules absent from this image). Keep the select list and
+    the mesh-epoch check identical to the original.
+    """
+    if not scene_id:
+        return None
+    try:
+        sid = urllib.parse.quote(str(scene_id), safe='')
+        out = _sb('GET',
+                  f'/rest/v1/playhub_pitch_calibrations'
+                  f'?scene_id=eq.{sid}&status=eq.active'
+                  f'&select=homography,pitch_length_m,pitch_width_m,'
+                  f'reprojection_error_px,marks,solver_version,'
+                  f'mesh_source_game_id')
+        rows = json.loads(out)
+        cal = rows[0] if rows else None
+        if cal:
+            # Mesh-epoch check: marks were made through the mesh registered
+            # at MARKING time; a refit/fanout since makes the composed map
+            # cross-epoch garbage — skip until the admin re-marks.
+            reg = _sb('GET',
+                      f'/rest/v1/playhub_panorama_scene_meshes'
+                      f'?scene_id=eq.{sid}&select=source_game_id')
+            reg_rows = json.loads(reg)
+            src = reg_rows[0]['source_game_id'] if reg_rows else None
+            if (src and cal.get('mesh_source_game_id')
+                    and src != cal['mesh_source_game_id']):
+                print(f'calibration mesh epoch mismatch (marked on '
+                      f'{cal["mesh_source_game_id"]}, registry now {src}) — '
+                      f'ignoring calibration', flush=True)
+                return None
+        return cal
+    except Exception as err:  # noqa: BLE001
+        print(f'calibration fetch failed (non-fatal): {err}', flush=True)
+        return None
+
+
+def fetch_half_bounds(start_us: int, end_s: float, spans: list) -> tuple:
+    """((half1_us, half2_us), source) or (None, reason). Halves on the chain
+    µs clock: chain_µs = start_us + video_seconds × 1e6 (build_payload's
+    exact inverse — timestamp_seconds and the harvest t_vp share the
+    produced-video clock).
+
+    Primary: admin-tagged phase events. Fallback: the harvest's own activity
+    spans when they split cleanly into exactly two. Anything ambiguous →
+    None (no GK slots — honest beats guessed halves; keepers swap ends at
+    half time, so a wrong boundary silently swaps bodies)."""
+    try:
+        out = _sb('GET',
+                  f'/rest/v1/playhub_recording_events'
+                  f'?match_recording_id=eq.{RECORDING_ID}'
+                  f'&event_type=in.(kick_off,half_time,full_time)'
+                  f'&select=event_type,timestamp_seconds'
+                  f'&order=timestamp_seconds.asc')
+        events = json.loads(out)
+    except Exception as err:  # noqa: BLE001
+        print(f'phase events fetch failed (non-fatal): {err}', flush=True)
+        events = []
+    bounds = slots.half_bounds_from_events(events, start_us, end_s)
+    if bounds is not None:
+        return bounds, 'phase events'
+    if events:
+        print(f'phase events unusable ({len(events)} events)', flush=True)
+    bounds = slots.halves_from_spans(spans, start_us)
+    if bounds is not None:
+        return bounds, 'activity spans'
+    return (None, f'no usable half bounds ({len(events)} phase events, '
+                  f'{len(spans)} activity spans)')
 
 
 def heartbeat_loop(stop: threading.Event):
@@ -418,6 +494,44 @@ def main():
     slot_of, slot_diag = slots.assign_slots(labels, final_chains)
     print(f'labels: {label_diag}; slots: {slot_diag}', flush=True)
 
+    # ── synthetic GK zone-slots (2026-07-18) ────────────────────────────
+    # Keepers never earn a jersey slot (harvest windows the play, kit
+    # clustering excludes the GK kit) yet are the players the follow loses
+    # hardest. Every failure here degrades to "no GK slots" — this block
+    # must never settle the row at error.
+    gk_slot_of: dict = {}
+    gk_diag: dict = {}
+    try:
+        cal = fetch_calibration(row.get('spiideo_scene_id'))
+        reason = build_track.calibration_unusable_reason(cal)
+        if reason:
+            print(f'gk slots skipped: {reason}', flush=True)
+        else:
+            meds = np.asarray([np.median(xy, axis=0)
+                               for _, xy in final_chains])
+            pmap = build_track.pitch_frame_map(
+                Hm, cal['homography'], np.median(meds, axis=0))
+            length_m = float(cal['pitch_length_m'])
+            width_m = float(cal['pitch_width_m'])
+            span_x, span_y = build_track.pitch_span_m(final_chains, pmap)
+            if span_x < 0.6 * length_m or span_y < 0.6 * width_m:
+                print(f'gk slots skipped: span premise failed '
+                      f'({span_x:.1f}x{span_y:.1f}m mapped on a '
+                      f'{length_m:.0f}x{width_m:.0f}m pitch)', flush=True)
+            else:
+                bounds, src = fetch_half_bounds(start_us, dur_s, spans)
+                if bounds is None:
+                    print(f'gk slots skipped: {src}', flush=True)
+                else:
+                    gk_slot_of, gk_diag = slots.assign_gk_slots(
+                        final_chains, pmap, length_m, width_m, bounds,
+                        set(slot_of))
+                    print(f'gk slots ({src}): {gk_diag}', flush=True)
+    except Exception as err:  # noqa: BLE001 — optional enrichment only
+        print(f'gk slots skipped (non-fatal): '
+              f'{type(err).__name__}: {err}', flush=True)
+        gk_slot_of, gk_diag = {}, {'error': type(err).__name__}
+
     # ── enriched artifact ───────────────────────────────────────────────
     diag = {'median_res': solve['median_res'],
             'matched_frames': solve['matched_frames'],
@@ -428,11 +542,13 @@ def main():
     except RuntimeError as err:  # caps message — self-authored, safe
         raise JobError(str(err)) from err
     attached = enrich.attach_labels(payload, final_chains, labels, slot_of)
+    gk_attached = enrich.attach_slots(payload, final_chains, gk_slot_of)
     enrich.stamp_meta(
         payload, harvest_step_s=HARVEST_STEP_S, source_digest=source_digest,
         kits=int(k), slots=slot_diag['slots'], labelled=attached,
         split_accepted=len(accepted),
-        split_refused=len(decisions) - len(accepted))
+        split_refused=len(decisions) - len(accepted),
+        gk_slots=gk_diag.get('gkSlots', 0))
     try:
         enrich.assert_caps(payload)
     except RuntimeError as err:  # self-authored caps message
@@ -461,6 +577,7 @@ def main():
                 'anchors': len(anchors)},
         'labelDiag': label_diag,
         'slotDiag': slot_diag,
+        'gkDiag': gk_diag,
         'roster': enrich.summarize(labels, slot_of),
         'splitDecisions': {str(c): d for c, d in decisions.items()},
         'meta': payload['meta'],
@@ -471,8 +588,9 @@ def main():
     set_status({'jersey_status': 'ready', 'jersey_error': None}, retries=3)
     n_obj, n_pts = enrich.payload_sizes(payload)
     print(f'jersey ready: {attached} labelled objects across '
-          f'{slot_diag["slots"]} slots; artifact {n_obj} objects / '
-          f'{n_pts} pts / {size / 1e6:.1f}MB', flush=True)
+          f'{slot_diag["slots"]} slots + {gk_attached} gk-slotted objects '
+          f'across {gk_diag.get("gkSlots", 0)} gk slots; artifact '
+          f'{n_obj} objects / {n_pts} pts / {size / 1e6:.1f}MB', flush=True)
 
 
 def _on_sigterm(signum, frame):  # noqa: ARG001

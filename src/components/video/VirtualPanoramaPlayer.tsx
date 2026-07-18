@@ -1234,6 +1234,10 @@ export function VirtualPanoramaPlayer({
         aimTrackRef.current = aimTrack
         setHasAimTrack(aimTrack !== null)
         trackletsRef.current = tracklets
+        // A selection indexes into the PREVIOUS artifact — stale indices
+        // into a refetched object list would ring the wrong body (and a
+        // slot-bearing selection no longer expires on the 60s clock).
+        spotSelRef.current = null
         setHasTracklets(tracklets !== null)
         // Curved mode (the product path): Perform's exact de-warp — every mesh
         // vertex is a WORLD ray, viewed by a perspective camera at the origin;
@@ -1947,10 +1951,25 @@ export function VirtualPanoramaPlayer({
                   sel.fadeUntil = performance.now() + 350
                 }
               }
+              // A slot-bearing selection outlives the 60s cap: the slot
+              // label is proof whenever its next fragment appears, and
+              // goalkeepers go UNTRACKED for minutes while play is away
+              // (measured HCT: multi-minute holes between keeper
+              // fragments). But it must NOT outlive the slot itself: once
+              // the clock passes the slot's LAST fragment (track.slotEnd)
+              // the label provably cannot re-appear — a per-half GK slot
+              // after half time, a subbed-off jersey — and watching on
+              // would eventually confidently adopt whoever stands at the
+              // frozen goalmouth (the other team's keeper). Geometry-only
+              // selections keep the 60s cap — past it a co-located pickup
+              // is a guess about whoever wandered in.
+              const slotExhausted =
+                sel.slot !== null &&
+                clock > (track.slotEnd[sel.slot] ?? -Infinity) + SPOT_WATCH_SEC
               if (
                 spotSelRef.current === sel &&
                 sel.lostSince !== null &&
-                gap > SPOT_WATCH_SEC &&
+                (sel.slot === null ? gap > SPOT_WATCH_SEC : slotExhausted) &&
                 !slotDeferred
               ) {
                 spotSelRef.current = null // truly gone — drop the ring

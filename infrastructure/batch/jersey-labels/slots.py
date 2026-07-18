@@ -28,6 +28,8 @@ from collections import Counter, defaultdict
 
 import numpy as np
 
+from kit import K_RANGE
+
 CONF = 0.9
 LEG_GATE = 0.6
 PLAY_GATE_M = 25.0
@@ -35,6 +37,35 @@ OVLP_S = 2.0
 SEP_M = 3.0
 KIT_CONSISTENCY_MIN = 0.8
 MIN_KIT_CROPS = 3
+
+# ── Synthetic goalkeeper slots (zone identity, 2026-07-18) ───────────────
+# Keepers are structurally unlabelled (play-anchored harvest rarely windows
+# the goal; kit clustering excludes the GK's third kit), yet they are the one
+# position identifiable by pure geometry: goal-cell residency over a half.
+GK_BAND_M = 18.0        # goal band depth (penalty box 16.5m + margin)
+GK_BAND_APRON_M = 2.0   # behind-the-line apron (keepers retrieve balls)
+GK_Y_HALF_SPAN_M = 20.0  # central band only — touchline warmup traffic out
+GK_RES_FRAC = 0.6       # duration-weighted fraction of samples in the band
+# Per-CHAIN persistence bar (measured on HCT, 2026-07-18): box-siege traffic
+# never holds 30s in-band at frac>=0.6 (a 9s box visit has frac 1.0 — the
+# frac alone is meaningless for short chains), while the keeper's real
+# fragment relay runs 31-59s. A component-UNION bar was measured wrong: the
+# relay is sequential singles, so a 45s union bar refused the keeper.
+GK_MIN_CHAIN_S = 30.0
+# Refuting evidence bar (CV review): a sub-bar keeper fragment (short but
+# box-resident at the same frac) must still be able to REFUTE a parked
+# defender who alone passes the 30s bar — otherwise the guard is blind
+# exactly when the keeper is occluded/fragmented. Passing attackers don't
+# reach this pool: their chains extend beyond the box, so frac stays low.
+GK_REFUTE_MIN_S = 10.0
+GK_SLOT_LETTER = 'g'
+# Kit slot letters mint chr(ord('a') + cluster) for clusters 0..max(K_RANGE)-1
+# (a..f today). The GK letter must stay outside that namespace — one K_RANGE
+# edit away from a silent collision otherwise. Explicit raise, not assert:
+# an -O interpreter must not strip the guard.
+if ord('a') + max(K_RANGE) - 1 >= ord(GK_SLOT_LETTER):
+    raise RuntimeError(
+        'GK_SLOT_LETTER collides with the kit slot-letter namespace')
 
 
 def confident(records: list) -> list:
@@ -244,4 +275,285 @@ def assign_slots(labels: dict, chains: list) -> tuple:
     diag = {'slots': len(set(slot_of.values())),
             'labelledChains': len(slot_of),
             'duplicateNumberGroups': n_conflict_groups}
+    return slot_of, diag
+
+
+# Plausibility floors for phase-event tagging noise (CV review): a bogus
+# kick_off at t~0 would widen half 1 into pre-match warmup — where sub
+# keepers take shooting drills IN the goalmouth (the canonical wrong-body
+# input). A missing full_time must not extend half 2 to the end of the
+# banked file (post-match shootarounds put non-keepers in the goal).
+HALF_MIN_S = 900.0          # a real half is at least 15 min
+BREAK_MAX_S = 3600.0        # a real half-time break is under an hour
+FT_FALLBACK_SLACK_S = 600.0  # half-2 <= half-1 + 10 min when FT untagged
+
+
+def half_bounds_from_events(events: list, start_us: int, end_s: float):
+    """Pure ordering/validation of admin-tagged phase events →
+    [(lo_us, hi_us), (lo_us, hi_us)] on the chain µs clock, or None.
+
+    Requires exactly one half_time, a kick_off on each side of it in strict
+    order (KO1 < HT < KO2 < FT-or-capped-end), and plausible durations
+    (HALF_MIN_S / BREAK_MAX_S). Extra kick_offs AFTER the ones used are
+    tolerated (venues may tag restarts); near-zero timestamps are dropped
+    as bogus markers. Anything else is ambiguous and returns None: keepers
+    swap ends at half time, so a wrong boundary silently swaps bodies."""
+    def stamps(kind):
+        out = []
+        for e in events:
+            if e.get('event_type') != kind:
+                continue
+            try:
+                t = float(e.get('timestamp_seconds'))
+            except (TypeError, ValueError):
+                continue
+            if t > 0.5:   # t~0 markers are tagging noise, not kick-offs
+                out.append(t)
+        return sorted(out)
+
+    kos, hts, fts = stamps('kick_off'), stamps('half_time'), stamps('full_time')
+    if len(hts) != 1 or len(kos) < 2:
+        return None
+    ko1, ht = kos[0], hts[0]
+    ko2 = next((k for k in kos if k > ht), None)
+    if ko2 is None:
+        return None
+    if ht - ko1 < HALF_MIN_S or ko2 - ht > BREAK_MAX_S:
+        return None
+    ft = next((f for f in fts if f > ko2), None)
+    if ft is None:
+        # cap the fallback: half 2 is about as long as half 1, never
+        # "until the file ends"
+        ft = min(end_s, ko2 + (ht - ko1) + FT_FALLBACK_SLACK_S)
+    if not ko1 < ht < ko2 < ft:
+        return None
+    return [(start_us + ko1 * 1e6, start_us + ht * 1e6),
+            (start_us + ko2 * 1e6, start_us + ft * 1e6)]
+
+
+def halves_from_spans(spans: list, start_us: int):
+    """Fallback halves from the harvest's activity spans — accepted ONLY
+    when the 2-span shape is plausible as two halves (senior review): both
+    at least HALF_MIN_S and within 2x of each other. A warmup merged into
+    span 1 or a mid-half stoppage split fails the shape and returns None."""
+    if len(spans) != 2:
+        return None
+    (lo1, hi1), (lo2, hi2) = spans
+    d1, d2 = hi1 - lo1, hi2 - lo2
+    if d1 < HALF_MIN_S or d2 < HALF_MIN_S:
+        return None
+    if not (0.5 <= d1 / d2 <= 2.0):
+        return None
+    return [(start_us + lo1 * 1e6, start_us + hi1 * 1e6),
+            (start_us + lo2 * 1e6, start_us + hi2 * 1e6)]
+
+
+def _pitch_points(chain: tuple, pmap: np.ndarray):
+    """Map every sample into pitch metres. Returns (P Nx2 with NaN where
+    invalid, valid mask). w <= eps = beyond the composed horizon (mirrored
+    garbage) — invalid, never dehomogenized."""
+    _, xy = chain
+    v = np.concatenate([xy, np.ones((len(xy), 1))], axis=1) @ np.asarray(
+        pmap, float).T
+    w = v[:, 2]
+    valid = np.isfinite(w) & (w > 1e-6)
+    pts = np.full((len(xy), 2), np.nan)
+    pts[valid] = v[valid, :2] / w[valid, None]
+    return pts, valid
+
+
+def _inband_segments(chain: tuple, in_band: np.ndarray) -> list:
+    """[(t_lo_us, t_hi_us)] segments where consecutive samples are both
+    inside the band — the duration-weighted residency basis (sample counts
+    would mis-weight irregular post-hygiene timestamps). `in_band` must
+    already include the validity mask."""
+    ts = chain[0]
+    segs = []
+    for i in range(len(ts) - 1):
+        if in_band[i] and in_band[i + 1]:
+            lo, hi = float(ts[i]), float(ts[i + 1])
+            if segs and lo <= segs[-1][1]:
+                segs[-1][1] = max(segs[-1][1], hi)
+            else:
+                segs.append([lo, hi])
+    return segs
+
+
+def _clip_segments(segs: list, lo: float, hi: float) -> list:
+    """Intersect segments with [lo, hi] — residency must only count time
+    INSIDE the routed half (CV review: a chain straddling kick-off must not
+    credit warmup/break goalmouth time toward the persistence bar)."""
+    out = []
+    for a, b in segs:
+        a2, b2 = max(a, lo), min(b, hi)
+        if b2 > a2:
+            out.append([a2, b2])
+    return out
+
+
+def _union_seconds(segs: list) -> float:
+    total, prev_hi = 0.0, None
+    for lo, hi in sorted(segs):
+        if prev_hi is None or lo > prev_hi:
+            total += hi - lo
+            prev_hi = hi
+        elif hi > prev_hi:
+            total += hi - prev_hi
+            prev_hi = hi
+    return total / 1e6
+
+
+def assign_gk_slots(chains: list, pmap: np.ndarray, length_m: float,
+                    width_m: float, half_bounds_us: list,
+                    taken: set) -> tuple:
+    """Synthetic goalkeeper slots by goal-cell residency: {chain_idx:
+    'g1'..'g4'} + diagnostics.
+
+    Zone + persistence IS the identity evidence here — this deliberately
+    relaxes assign_slots' temporal-overlap-evidence rule (which exists
+    because a jersey NUMBER alone can be two bodies; a body resident in one
+    goal cell for most of a half is the keeper). The §3 guard survives as
+    the contradiction check: two components concurrently in the same cell
+    but far apart are two real bodies (keeper + parked defender) and BOTH
+    are refused for that group — a guessed slot would teleport the follow.
+
+    Slot ids are per (end, half) — 'g1'/'g2' the two ends of half 1,
+    'g3'/'g4' half 2. No cross-half linking: keepers swap ends at half time
+    and linking would need kit/team evidence; a follow through the break
+    honestly ends. Chains in `taken` (jersey-slotted) are excluded.
+
+    KNOWN SEMANTIC (documented, accepted for the pilot): a g-slot is ZONE
+    identity — "the keeper defending that end that half". A mid-half keeper
+    substitution rides the slot silently (two sequential uncontradicted
+    components share the sid). Kit-based within-slot linking is the future
+    tightening if it ever bites.
+    """
+    # Small-pitch guard (CV review): below this the two x-bands overlap /
+    # cover most of the pitch and "goal-cell residency" stops meaning
+    # keeper. Latent until a small venue joins the allowlist — refuse
+    # loudly rather than mint noise.
+    if length_m < 2 * GK_BAND_M + 10 or width_m < 30:
+        return {}, {'gkSlots': 0, 'gkChains': 0,
+                    'gkSkippedPitch': f'{length_m:.0f}x{width_m:.0f}m'}
+
+    groups: dict = defaultdict(list)     # (half, end) -> [(idx, segs, dist)]
+    refuters: dict = defaultdict(list)   # (half, end) -> [(idx, dist)]
+    n_skipped_invalid = 0
+    y_lo = max(0.0, width_m / 2 - GK_Y_HALF_SPAN_M)
+    y_hi = min(width_m, width_m / 2 + GK_Y_HALF_SPAN_M)
+    goal_x = (0.0, length_m)
+    for idx, chain in enumerate(chains):
+        if idx in taken:
+            continue
+        ts = chain[0]
+        mid = (float(ts[0]) + float(ts[-1])) / 2
+        half = next((h for h, (lo, hi) in enumerate(half_bounds_us)
+                     if lo <= mid <= hi), None)
+        if half is None:
+            continue
+        h_lo, h_hi = half_bounds_us[half]
+        pts, valid = _pitch_points(chain, pmap)
+        if valid.sum() < max(2, len(valid) * 0.5):
+            n_skipped_invalid += 1
+            continue
+        on_y = (pts[:, 1] >= y_lo) & (pts[:, 1] <= y_hi)
+        # Residency counts ONLY time inside the routed half: both the
+        # segments and the denominator are clipped, so a chain straddling
+        # kick-off cannot credit warmup/break goalmouth time.
+        span_lo = max(float(ts[0]), h_lo)
+        span_hi = min(float(ts[-1]), h_hi)
+        total_s = (span_hi - span_lo) / 1e6
+        if total_s <= 0:
+            continue
+        for end, in_x in enumerate((
+                (pts[:, 0] >= -GK_BAND_APRON_M) & (pts[:, 0] <= GK_BAND_M),
+                (pts[:, 0] >= length_m - GK_BAND_M)
+                & (pts[:, 0] <= length_m + GK_BAND_APRON_M))):
+            in_band = in_x & on_y & valid
+            segs = _clip_segments(_inband_segments(chain, in_band),
+                                  h_lo, h_hi)
+            band_s = _union_seconds(segs)
+            if band_s <= 0 or band_s / total_s < GK_RES_FRAC:
+                continue
+            # median distance to THIS end's goal centre — the keeper prior
+            # that arbitrates sub-bar refutations below
+            dist = float(np.nanmedian(np.hypot(
+                pts[:, 0] - goal_x[end], pts[:, 1] - width_m / 2)))
+            if band_s >= GK_REFUTE_MIN_S:
+                refuters[(half, end)].append((idx, dist))
+            if band_s >= GK_MIN_CHAIN_S:
+                groups[(half, end)].append((idx, segs, dist))
+
+    slot_of: dict = {}
+    coverage: dict = {}
+    n_refused_components = 0
+    for (half, end), members in sorted(groups.items()):
+        cs = [idx for idx, _, _ in members]
+        segs_of = {idx: segs for idx, segs, _ in members}
+        dist_of = {idx: d for idx, _, d in members}
+        cs_set = set(cs)
+        parent = {c: c for c in cs}
+
+        def find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        # Link duplicates among the qualified; collect contradiction
+        # evidence from the WIDER refuter pool (a sub-bar keeper fragment
+        # must still refute a parked defender — CV review). A sub-bar
+        # refuter only refutes when it sits CLOSER to the goal centre than
+        # the qualified chain: in the parked-defender failure the occluded
+        # keeper's shrapnel is the goalmouth-deep one; in an ordinary
+        # attack the box visitor is the shallow one and the resident keeper
+        # keeps the slot (measured: without this asymmetry, routine attacks
+        # refused the keeper's own relay and halved coverage).
+        conflicted_members = set()
+        internal_pairs = []
+        for c in cs:
+            for r, r_dist in refuters[(half, end)]:
+                if r == c or (r in cs_set and r <= c):
+                    continue  # each qualified pair once; refuters always
+                ov, sep = overlap_sep(chains[c], chains[r])
+                if ov < OVLP_S or sep is None:
+                    continue
+                if sep <= SEP_M:
+                    if r in cs_set:
+                        parent[find(c)] = find(r)
+                    # a close sub-bar refuter is the keeper's own duplicate
+                    # shrapnel — supporting, not refuting
+                elif r in cs_set:
+                    internal_pairs.append((c, r))
+                elif r_dist < dist_of[c]:
+                    conflicted_members.add(c)
+        comps = defaultdict(list)
+        for c in cs:
+            comps[find(c)].append(c)
+        comp_of = {c: find(c) for c in cs}
+        # Contradicted = every component with a proven far-concurrent body
+        # in the cell (qualified-vs-qualified pairs incl. internal
+        # transitive contradictions, plus qualified-vs-refuter evidence).
+        contradicted = set()
+        for a, b in internal_pairs:
+            contradicted.add(comp_of[a])
+            contradicted.add(comp_of[b])
+        for c in conflicted_members:
+            contradicted.add(comp_of[c])
+        n_refused_components += len(
+            {root for root in comps if root in contradicted})
+        sid = f'{GK_SLOT_LETTER}{half * 2 + end + 1}'
+        for root, comp in comps.items():
+            if root in contradicted:
+                continue
+            comp_segs = [s for c in comp for s in segs_of[c]]
+            for c in comp:
+                slot_of[c] = sid
+            coverage[sid] = round(
+                coverage.get(sid, 0.0) + _union_seconds(comp_segs), 1)
+    diag = {'gkSlots': len(set(slot_of.values())),
+            'gkChains': len(slot_of),
+            'gkRefusedComponents': n_refused_components,
+            'gkSkippedInvalid': n_skipped_invalid,
+            'gkCoverageS': coverage}
     return slot_of, diag

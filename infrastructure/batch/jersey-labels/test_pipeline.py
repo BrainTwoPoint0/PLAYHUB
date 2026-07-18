@@ -606,3 +606,254 @@ def test_cluster_kits_refuses_weak_silhouette():
     X = rng.normal(0, 10, (30, 4))   # one blob — no real cluster structure
     with pytest.raises(ValueError):
         kit.cluster_kits(X)
+
+
+# ── synthetic GK zone-slots ──────────────────────────────────────────────────
+# pmap = identity: tests build chains directly in pitch metres (100 x 60).
+
+GK_PMAP = np.eye(3)
+GK_L, GK_W = 100.0, 60.0
+# halves on the µs clock: [0, 3000s] and [3600s, 7000s]
+GK_HALVES = [(0.0, 3000e6), (3600e6, 7000e6)]
+
+
+def gk(chains, taken=frozenset(), halves=GK_HALVES, pmap=GK_PMAP):
+    return slots.assign_gk_slots(chains, pmap, GK_L, GK_W, halves, set(taken))
+
+
+def test_gk_relay_across_a_gap_shares_one_slot():
+    # two sequential keeper chains at the west goal, 20s apart — the relay
+    # the client's slot hand-off rides
+    a = make_chain(100, 200, lambda t: (8.0, 30.0))
+    b = make_chain(220, 320, lambda t: (9.0, 32.0))
+    slot_of, diag = gk([a, b])
+    assert slot_of == {0: 'g1', 1: 'g1'}
+    assert diag['gkSlots'] == 1
+
+
+def test_gk_per_chain_persistence_bar():
+    # the keeper's real fragments (31-59s in-band, measured HCT) qualify;
+    # box-siege shrapnel (a 20s visit at frac 1.0) does not — the frac alone
+    # is meaningless for short chains
+    ok = make_chain(100, 140, lambda t: (8.0, 30.0))     # 40s in-band
+    short = make_chain(300, 320, lambda t: (8.0, 30.0))  # 20s, frac 1.0
+    slot_of, _ = gk([ok, short])
+    assert slot_of == {0: 'g1'}
+
+
+def test_gk_duplicate_fragments_link_into_one_slot():
+    # concurrent-close duplicates (the two-dots-on-one-keeper reality) end
+    # up in ONE slot, not a contradiction
+    a = make_chain(100, 140, lambda t: (8.0, 30.0))
+    b = make_chain(110, 150, lambda t: (9.5, 30.5))
+    slot_of, diag = gk([a, b])
+    assert slot_of == {0: 'g1', 1: 'g1'}
+    assert diag['gkRefusedComponents'] == 0
+
+
+def test_gk_residency_fraction_excludes_visitors():
+    # a fullback passing through the band (x: 5 -> 60 over 100s) never
+    # qualifies despite starting deep
+    a = make_chain(100, 200, lambda t: (5.0 + (t - 100) * 0.55, 30.0))
+    slot_of, _ = gk([a])
+    assert slot_of == {}
+
+
+def test_gk_siege_contradiction_refuses_both_components_only():
+    # keeper resident 100-300s; a defender parks 12m away for 60s inside the
+    # band (overlapping the keeper) -> proven two bodies -> BOTH refused.
+    # A later keeper chain (no overlap with the defender) keeps the slot.
+    keeper = make_chain(100, 300, lambda t: (6.0, 30.0))
+    defender = make_chain(200, 260, lambda t: (10.0, 45.0))  # sep ~15m
+    later = make_chain(320, 400, lambda t: (6.0, 30.0))
+    slot_of, diag = gk([keeper, defender, later])
+    assert 0 not in slot_of and 1 not in slot_of
+    assert slot_of.get(2) == 'g1'
+    assert diag['gkRefusedComponents'] == 2
+
+
+def test_gk_subbar_keeper_fragments_refute_a_parked_defender():
+    # The keeper is occluded/fragmented (3x20s box-resident shrapnel — below
+    # the 30s qualification bar but above the refute bar) while a defender
+    # parks 40s in the band: the shrapnel is EVIDENCE of a second body and
+    # must refuse the defender's slot (CV review C5).
+    k1 = make_chain(100, 120, lambda t: (3.0, 33.0))
+    k2 = make_chain(122, 142, lambda t: (3.5, 33.5))
+    k3 = make_chain(144, 164, lambda t: (3.0, 34.0))
+    defender = make_chain(100, 165, lambda t: (12.0, 40.0))  # ~11m away
+    slot_of, diag = gk([k1, k2, k3, defender])
+    assert slot_of == {}
+    assert diag['gkRefusedComponents'] == 1
+
+
+def test_gk_box_visitor_does_not_refute_the_resident_keeper():
+    # an ordinary attack: a sub-bar box visitor (20s shrapnel, ~10m out)
+    # coexists with the qualified goalmouth-deep keeper — the keeper KEEPS
+    # the slot (the refuter asymmetry: only a goalmouth-DEEPER sub-bar body
+    # refutes; without it, routine attacks refused the keeper's own relay)
+    keeper = make_chain(100, 140, lambda t: (3.0, 30.0))
+    visitor = make_chain(110, 130, lambda t: (13.0, 27.0))
+    slot_of, diag = gk([keeper, visitor])
+    assert slot_of == {0: 'g1'}
+    assert diag['gkRefusedComponents'] == 0
+
+
+def test_gk_internal_transitive_contradiction_refused():
+    # A-B close, B-C close, A-C far and concurrent: transitive linking
+    # chained two bodies into ONE component — internally contradicted,
+    # no slot for any member.
+    a = make_chain(100, 160, lambda t: (8.0, 30.0))
+    b = make_chain(100, 160, lambda t: (8.0, 32.5))   # 2.5m from a
+    c = make_chain(100, 160, lambda t: (8.0, 35.0))   # 2.5m from b, 5m from a
+    slot_of, diag = gk([a, b, c])
+    assert slot_of == {}
+    assert diag['gkRefusedComponents'] == 1
+
+
+def test_gk_residency_clipped_to_half_bounds():
+    # a chain straddling the half-2 kickoff with goalmouth residency
+    # throughout: only the in-half portion counts (CV review C4) — 20s
+    # inside half 2 < 30s bar -> no slot, despite 80s of raw residency
+    halves = [(0.0, 1000e6), (2000e6, 5000e6)]
+    straddle = make_chain(1940, 2020, lambda t: (8.0, 30.0))
+    slot_of, _ = gk([straddle], halves=halves)
+    assert slot_of == {}
+    # the same chain fully inside the half qualifies
+    inside = make_chain(2100, 2180, lambda t: (8.0, 30.0))
+    slot_of, _ = gk([inside], halves=halves)
+    assert slot_of == {0: 'g3'}
+
+
+def test_gk_small_pitch_guard():
+    # Nazwa-class pitch: the two 18m bands overlap — refuse loudly
+    slot_of, diag = slots.assign_gk_slots(
+        [make_chain(100, 200, lambda t: (5.0, 8.0))], GK_PMAP, 30.0, 15.0,
+        GK_HALVES, set())
+    assert slot_of == {}
+    assert 'gkSkippedPitch' in diag
+
+
+def test_gk_half_and_end_routing():
+    west_h1 = make_chain(100, 200, lambda t: (8.0, 30.0))
+    east_h1 = make_chain(100, 200, lambda t: (94.0, 30.0))
+    west_h2 = make_chain(3700, 3800, lambda t: (8.0, 30.0))
+    in_break = make_chain(3100, 3500, lambda t: (8.0, 30.0))  # HT break
+    slot_of, diag = gk([west_h1, east_h1, west_h2, in_break])
+    assert slot_of == {0: 'g1', 1: 'g2', 2: 'g3'}
+    assert diag['gkSlots'] == 3
+
+
+def test_gk_taken_and_bounds():
+    keeper = make_chain(100, 200, lambda t: (8.0, 30.0))
+    # jersey evidence wins — a taken chain is never gk-slotted
+    slot_of, _ = gk([keeper], taken={0})
+    assert slot_of == {}
+    # off the pitch width (behind the touchline) never qualifies
+    off_w = make_chain(100, 200, lambda t: (8.0, -6.0))
+    slot_of, _ = gk([off_w])
+    assert slot_of == {}
+    # behind the goal line inside the apron still counts
+    on_line = make_chain(100, 200, lambda t: (-1.0, 30.0))
+    slot_of, _ = gk([on_line])
+    assert slot_of == {0: 'g1'}
+
+
+def test_gk_beyond_horizon_samples_are_skipped():
+    # a pmap that puts every sample past the horizon (w <= 0) must skip the
+    # chain, never mirror it into the band
+    pmap = np.array([[1.0, 0, 0], [0, 1.0, 0], [0, 0, -1.0]])
+    keeper = make_chain(100, 200, lambda t: (8.0, 30.0))
+    slot_of, diag = gk([keeper], pmap=pmap)
+    assert slot_of == {}
+    assert diag['gkSkippedInvalid'] == 1
+
+
+def test_half_bounds_from_events_ordering():
+    def ev(kind, t):
+        return {'event_type': kind, 'timestamp_seconds': t}
+    good = [ev('kick_off', 796.26), ev('half_time', 3564.6),
+            ev('kick_off', 4528.7), ev('full_time', 7738.36)]
+    got = slots.half_bounds_from_events(good, 0, 9000.0)
+    assert got == [(796.26e6, 3564.6e6), (4528.7e6, 7738.36e6)]
+    # missing full_time -> CAPPED at ko2 + half-1 duration + slack, never
+    # "until the file ends" (post-match shootarounds are wrong-body input)
+    got = slots.half_bounds_from_events(good[:3], 0, 9000.0)
+    cap = 4528.7 + (3564.6 - 796.26) + slots.FT_FALLBACK_SLACK_S
+    assert got[1] == (4528.7e6, pytest.approx(cap * 1e6))
+    # start_us offsets the chain clock
+    got = slots.half_bounds_from_events(good, 5e6, 9000.0)
+    assert got[0][0] == 5e6 + 796.26e6
+    # PostgREST numeric-as-string coerces; None timestamps are skipped
+    stringy = [{**e, 'timestamp_seconds': str(e['timestamp_seconds'])}
+               for e in good]
+    assert slots.half_bounds_from_events(
+        stringy + [ev('kick_off', None)], 0, 9000.0
+    ) == slots.half_bounds_from_events(good, 0, 9000.0)
+    # ambiguous/inverted inputs refuse
+    assert slots.half_bounds_from_events([], 0, 9000.0) is None
+    assert slots.half_bounds_from_events(good[:2], 0, 9000.0) is None
+    assert slots.half_bounds_from_events(
+        good + [ev('half_time', 5000.0)], 0, 9000.0) is None
+    assert slots.half_bounds_from_events(
+        [ev('kick_off', 4000.0), ev('half_time', 3000.0),
+         ev('kick_off', 5000.0)], 0, 9000.0) is None
+    # plausibility floors: a bogus t~0 kick_off is dropped, an implausibly
+    # short half or long break refuses
+    assert slots.half_bounds_from_events(
+        [ev('kick_off', 0.2)] + good, 0, 9000.0
+    ) == slots.half_bounds_from_events(good, 0, 9000.0)
+    assert slots.half_bounds_from_events(
+        [ev('kick_off', 3000.0), ev('half_time', 3500.0),
+         ev('kick_off', 4000.0)], 0, 9000.0) is None       # 500s half
+    assert slots.half_bounds_from_events(
+        [ev('kick_off', 100.0), ev('half_time', 2000.0),
+         ev('kick_off', 6000.0)], 0, 9000.0) is None       # 4000s break
+
+
+def test_halves_from_spans_shape_gate():
+    # plausible 2-span shape -> halves on the chain clock
+    got = slots.halves_from_spans([(100.0, 2800.0), (3800.0, 6400.0)], 5e6)
+    assert got == [(5e6 + 100.0e6, 5e6 + 2800.0e6),
+                   (5e6 + 3800.0e6, 5e6 + 6400.0e6)]
+    # warmup merged into span 1 (3x duration ratio) -> refuse
+    assert slots.halves_from_spans([(0.0, 4500.0), (5000.0, 6400.0)],
+                                   0) is None
+    # a short span is not a half
+    assert slots.halves_from_spans([(0.0, 500.0), (1000.0, 3000.0)],
+                                   0) is None
+    # only exactly-2 spans are halves
+    assert slots.halves_from_spans([(0.0, 5000.0)], 0) is None
+    assert slots.halves_from_spans(
+        [(0.0, 2000.0), (2500.0, 4400.0), (5000.0, 7000.0)], 0) is None
+
+
+def test_attach_slots_matches_build_payload_ids_and_never_overwrites():
+    import build_track
+    a = make_chain(0, 400, lambda t: (10.0, 10.0), hz=5)   # longest -> o0
+    b = make_chain(0, 200, lambda t: (t * 0.1, 5.0), hz=5)  # -> o1
+    c = make_chain(0, 100, lambda t: (30.0, 30.0), hz=5)   # -> o2
+    tiny = make_chain(0, 1, lambda t: (40.0, 40.0), hz=5)  # skipped -> o3 gap
+    chains = [b, a, tiny, c]   # deliberately not span-ordered
+    payload = build_track.build_payload(chains, np.eye(3), 0, {
+        'median_res': 0.005, 'matched_frames': 500, 'eval': {'rate': 0.5}})
+    n = enrich.attach_labels(payload, chains, {1: ('10', 0)}, {1: 'a10'})
+    assert n == 1
+    got = enrich.attach_slots(payload, chains,
+                              {1: 'g1', 0: 'g1', 3: 'g2', 2: 'g2'})
+    by_id = {o['id']: o for o in payload['objects']}
+    # o0 (chain index 1) already jersey-slotted -> NOT overwritten
+    assert by_id['o0']['slot'] == 'a10'
+    assert got == 2
+    assert by_id['o1']['slot'] == 'g1' and 'jersey' not in by_id['o1']
+    assert by_id['o2']['slot'] == 'g2'
+    # the too-short chain was skipped by build_payload (id gap, o3 absent) —
+    # its slot attaches nowhere rather than remapping onto a neighbour
+    assert 'o3' not in by_id
+
+
+def test_stamp_meta_carries_gk_slots():
+    payload = {'meta': {}}
+    enrich.stamp_meta(payload, harvest_step_s=4.0, source_digest='x',
+                      kits=2, slots=5, labelled=10, split_accepted=0,
+                      split_refused=0, gk_slots=3)
+    assert payload['meta']['jersey']['gkSlots'] == 3
