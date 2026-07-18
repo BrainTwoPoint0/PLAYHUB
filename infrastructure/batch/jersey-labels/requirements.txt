@@ -6,6 +6,12 @@ torchvision==0.19.1+cpu
 # timm pinned to parseq's own generation (helpers API moved in 0.7+).
 pytorch-lightning==2.4.0
 timm==0.6.13
+# strhub transitive imports (lmdb/nltk/yaml are pulled at import time by
+# strhub.data/models even though we never touch datasets — first live run
+# died at ModuleNotFoundError: lmdb)
+lmdb==1.5.1
+nltk==3.9.1
+pyyaml==6.0.2
 ultralytics==8.3.49
 opencv-python==4.10.0.84
 numpy==2.1.3
