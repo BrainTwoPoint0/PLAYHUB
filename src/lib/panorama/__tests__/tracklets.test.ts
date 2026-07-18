@@ -4,6 +4,7 @@ import {
   sampleObject,
   objectsAt,
   nearestObject,
+  slotMate,
 } from '../tracklets'
 
 const OBJ_A = {
@@ -221,5 +222,78 @@ describe('jersey field (Tier 3)', () => {
       objects: [{ ...OBJ_A, jersey: '7' }],
     })
     expect(track!.objects[0].jersey).toBe('7')
+  })
+})
+
+describe('slot field (Tier 3 / B3)', () => {
+  it('parses a valid slot alongside a jersey and exposes it on ActiveObject', () => {
+    const track = parseTracklets({
+      ...VALID,
+      objects: [{ ...OBJ_A, jersey: '10', slot: 'a10' }, OBJ_B],
+    })
+    expect(track!.objects[0].slot).toBe('a10')
+    expect(track!.objects[1].slot).toBeUndefined()
+    const active = objectsAt(track!, 10.3)
+    const a0 = active.find((a) => a.index === 0)
+    expect(a0?.slot).toBe('a10')
+  })
+
+  it('accepts the duplicate-body suffix form', () => {
+    const track = parseTracklets({
+      ...VALID,
+      objects: [{ ...OBJ_A, jersey: '10', slot: 'a10-2' }],
+    })
+    expect(track!.objects[0].slot).toBe('a10-2')
+  })
+
+  it('drops malformed slot values but keeps the object', () => {
+    const bad = ['', 'A10', '10', 'a', 'a123', 'a10-', 'a10-x', 7, null, {}]
+    for (const slot of bad) {
+      const track = parseTracklets({
+        ...VALID,
+        objects: [{ ...OBJ_A, jersey: '10', slot }, OBJ_B],
+      })
+      expect(track).not.toBeNull()
+      expect(track!.objects[0].slot).toBeUndefined()
+      expect(track!.objects[0].jersey).toBe('10')
+    }
+  })
+
+  it('drops a slot without a jersey (co-presence contract)', () => {
+    const track = parseTracklets({
+      ...VALID,
+      objects: [{ ...OBJ_A, slot: 'a10' }],
+    })
+    expect(track!.objects[0].slot).toBeUndefined()
+  })
+})
+
+describe('slotMate', () => {
+  const slotted = {
+    ...VALID,
+    objects: [
+      { ...OBJ_A, jersey: '10', slot: 'a10' },
+      { ...OBJ_B, jersey: '10', slot: 'a10' },
+      { id: 'o9', t: [10, 11], pan: [50, 50], tilt: [0, 0], jersey: '7', slot: 'b7' },
+    ],
+  }
+
+  it('finds the live fragment carrying the slot, excluding the current one', () => {
+    // t=10.8: fragment o0 has ended, its slot-mate o1 is live — the hand-off
+    const track = parseTracklets(slotted)!
+    const mate = slotMate(track, 10.8, 'a10', 0, 0, 0)
+    expect(mate?.index).toBe(1)
+  })
+
+  it('adopts at ANY distance (the label does not decay with gap length)', () => {
+    const track = parseTracklets(slotted)!
+    const mate = slotMate(track, 10.3, 'b7', -179, -80, 0)
+    expect(mate?.index).toBe(2)
+  })
+
+  it('returns null when no live fragment carries the slot', () => {
+    const track = parseTracklets(slotted)!
+    expect(slotMate(track, 10.3, 'a99', 0, 0)).toBeNull()
+    expect(slotMate(track, 10.3, 'b7', 0, 0, 2)).toBeNull()
   })
 })

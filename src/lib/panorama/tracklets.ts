@@ -18,6 +18,12 @@ export interface TrackletObject {
    *  strictly established (≥2 agreeing legible reads on a kit-consistent
    *  chain). Absent = honest-unlabelled — never inferred client-side. */
   jersey?: string
+  /** Identity SLOT (Tier 3 / B3): kit-cluster letter + number (e.g. "a10"),
+   *  with a "-2" suffix when two real bodies provably share a (number, kit).
+   *  Fragments sharing a slot are the SAME player — one dot, and the follow
+   *  rides the slot across fragment gaps. Opaque equality key; present iff
+   *  `jersey` is. Absent = honest-unlabelled. */
+  slot?: string
 }
 
 export interface Tracklets {
@@ -40,9 +46,9 @@ export interface TrackletSample {
 // real payload/memory guard; the object cap only bounds bookkeeping.
 // Stadium-bowl venues (HCT: whole-bowl tracking, ~9s median fragments over a
 // 2.5h stream) legitimately publish ~25k fragments at 2.5Hz — a 5k object
-// cap silently killed Spotlight there. Objects are >=3 points each, so the
-// points cap already implies <= ~266k objects; 40k is a sanity bound, not
-// the size gate.
+// cap silently killed Spotlight there. Decimated objects can be as small as
+// 2 points (endpoints only), so the points cap implies <= 400k objects; 40k
+// is a sanity bound, not the size gate.
 const MAX_TOTAL_POINTS = 800_000
 const MAX_OBJECTS = 40_000
 
@@ -92,12 +98,22 @@ export function parseTracklets(raw: unknown): Tracklets | null {
       typeof e.jersey === 'string' && /^\d{1,2}$/.test(e.jersey)
         ? e.jersey
         : undefined
+    // Optional slot key — kit letter + number (+ body suffix). Only kept
+    // alongside a valid jersey (they are co-present by construction; a slot
+    // without a jersey would render an unlabelled badge).
+    const slot =
+      jersey !== undefined &&
+      typeof e.slot === 'string' &&
+      /^[a-z]\d{1,2}(-\d{1,2})?$/.test(e.slot)
+        ? e.slot
+        : undefined
     objects.push({
       id,
       t: t as number[],
       pan: pan as number[],
       tilt: tilt as number[],
       ...(jersey !== undefined ? { jersey } : {}),
+      ...(slot !== undefined ? { slot } : {}),
     })
   }
   if (objects.length === 0) return null
@@ -152,6 +168,8 @@ export interface ActiveObject {
   id: string
   panDeg: number
   tiltDeg: number
+  /** Slot key of the underlying object, when labelled (see TrackletObject.slot). */
+  slot?: string
 }
 
 /**
@@ -166,7 +184,13 @@ export function objectsAt(track: Tracklets, sec: number): ActiveObject[] {
     const obj = track.objects[i]
     const s = sampleObject(obj, sec)
     if (s)
-      out.push({ index: i, id: obj.id, panDeg: s.panDeg, tiltDeg: s.tiltDeg })
+      out.push({
+        index: i,
+        id: obj.id,
+        panDeg: s.panDeg,
+        tiltDeg: s.tiltDeg,
+        ...(obj.slot !== undefined ? { slot: obj.slot } : {}),
+      })
   }
   return out
 }
@@ -176,6 +200,37 @@ export function objectsAt(track: Tracklets, sec: number): ActiveObject[] {
  * angular distance. Used for click-to-select and for fragment hand-off
  * (re-associating the followed player when its fragment ends).
  */
+/**
+ * The active fragment carrying `slot`, excluding `excludeIndex` — the
+ * slot-riding hand-off: fragments sharing a slot are the same player by
+ * strict (number, kit) labelling, so the follow may adopt a slot-mate at ANY
+ * distance (the label, unlike geometry, does not decay with gap length).
+ * Slots are unique among concurrent fragments by construction; if an
+ * artifact ever violates that, the nearest mate to (panDeg, tiltDeg) wins.
+ */
+export function slotMate(
+  track: Tracklets,
+  sec: number,
+  slot: string,
+  panDeg: number,
+  tiltDeg: number,
+  excludeIndex = -1
+): ActiveObject | null {
+  let best: ActiveObject | null = null
+  let bestD = Infinity
+  for (const cand of objectsAt(track, sec)) {
+    if (cand.index === excludeIndex || cand.slot !== slot) continue
+    const dp = cand.panDeg - panDeg
+    const dt = cand.tiltDeg - tiltDeg
+    const d = Math.sqrt(dp * dp + dt * dt)
+    if (d < bestD) {
+      bestD = d
+      best = cand
+    }
+  }
+  return best
+}
+
 export function nearestObject(
   track: Tracklets,
   sec: number,

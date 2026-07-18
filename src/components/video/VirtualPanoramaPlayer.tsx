@@ -34,6 +34,7 @@ import {
   sampleObject,
   objectsAt,
   nearestObject,
+  slotMate,
   type Tracklets,
 } from '@/lib/panorama/tracklets'
 import { computeFraming, searchFov } from '@/lib/panorama/framing'
@@ -984,6 +985,8 @@ export function VirtualPanoramaPlayer({
   }, [spotlight])
   const spotSelRef = useRef<{
     index: number
+    slot: string | null // identity slot (Tier 3): fragments sharing it are the
+    // same player by strict (number, kit) labelling — the follow rides the slot
     follow: boolean
     lock: boolean // camera zoom-LOCK on the player (Tier 1b) — off = ring+aim only
     frameFov: number // committed fov goal (deg) for the lock; 0 = seed (reset damp)
@@ -1740,18 +1743,70 @@ export function VirtualPanoramaPlayer({
                 sel.coastDeg += mag * k
               }
             }
+            // SLOT hand-off first (Tier 3): a live fragment carrying the same
+            // slot IS the followed player — the strict (number, kit) label
+            // does not decay with gap length, so adopt at any distance with
+            // no ambiguity/velocity/dwell gates and no hop spent. This is
+            // what makes the follow survive occlusions geometry cannot.
+            let slotAdopted = false
+            let slotDeferred = false
+            if (sel.slot) {
+              const mate = slotMate(
+                track,
+                clock,
+                sel.slot,
+                sel.lastPan,
+                sel.lastTilt,
+                sel.index
+              )
+              if (mate) {
+                const jump = Math.hypot(
+                  mate.panDeg - sel.lastPan,
+                  mate.tiltDeg - sel.lastTilt
+                )
+                // Beyond-geometry jumps (> 2× the re-assoc radius) are moves
+                // the old system could never make. Two guards on them:
+                // (a) anti-ping-pong dwell — an impure slot (two real bodies
+                //     sharing a number+kit) would otherwise yank the camera
+                //     cross-pitch on every fragment death; rate-limit long
+                //     adoptions to once per dwell period (UX review),
+                // (b) a visible caption when one happens (below) — a silent
+                //     cross-pitch glide reads as the camera going rogue.
+                const longJump = jump > SPOT_REASSOC_DEG * 2
+                if (longJump && clock - sel.adoptedAt < 2) {
+                  slotDeferred = true // mate exists — keep the selection alive
+                } else {
+                  sel.index = mate.index
+                  sel.lastPan = mate.panDeg
+                  sel.lastTilt = mate.tiltDeg
+                  sel.lostSince = null
+                  sel.coastDeg = 0
+                  sel.frameFov = 0 // recovered → re-seed the zoom damp
+                  sel.adoptedAt = clock
+                  if (jump > 1) sel.fadeUntil = performance.now() + 350
+                  if (longJump)
+                    spotNoticeOverride.current = {
+                      kind: 'following',
+                      until: Date.now() + 2500,
+                    }
+                  slotAdopted = true
+                }
+              }
+            }
             // ONE-SHOT re-association with ambiguity refusal: the server
             // already bridged everything unambiguous, so what reaches the
             // client is by construction harder — be stricter, and refuse
             // rather than risk following a stranger.
-            const cand = nearestObject(
-              track,
-              clock,
-              sel.lastPan,
-              sel.lastTilt,
-              SPOT_REASSOC_DEG,
-              sel.index
-            )
+            const cand = slotAdopted
+              ? null
+              : nearestObject(
+                  track,
+                  clock,
+                  sel.lastPan,
+                  sel.lastTilt,
+                  SPOT_REASSOC_DEG,
+                  sel.index
+                )
             if (cand) {
               const d1 = Math.hypot(
                 cand.panDeg - sel.lastPan,
@@ -1765,13 +1820,20 @@ export function VirtualPanoramaPlayer({
                 SPOT_REASSOC_DEG * 2,
                 cand.index
               )
+              // A labelled pickup carrying a DIFFERENT slot is a proven other
+              // player — geometry proximity cannot override the label.
+              const slotConflict =
+                sel.slot !== null &&
+                cand.slot !== undefined &&
+                cand.slot !== sel.slot
               const ambiguous =
-                rival &&
-                rival.index !== sel.index &&
-                Math.hypot(
-                  rival.panDeg - sel.lastPan,
-                  rival.tiltDeg - sel.lastTilt
-                ) < Math.max(2 * d1, d1 + 0.8)
+                slotConflict ||
+                (rival &&
+                  rival.index !== sel.index &&
+                  Math.hypot(
+                    rival.panDeg - sel.lastPan,
+                    rival.tiltDeg - sel.lastTilt
+                  ) < Math.max(2 * d1, d1 + 0.8))
               // velocity consistency: the pickup must MOVE like the player
               // we lost (a sprinter must not hand off to a stander)
               const n1 = sampleObject(track.objects[cand.index], clock + 0.2)
@@ -1797,6 +1859,12 @@ export function VirtualPanoramaPlayer({
                 sel.hops < 2
               ) {
                 sel.index = cand.index
+                // Upgrade identity ONLY on the co-located evidence tier — a
+                // same-spot re-index is the same body; an ordinary 2° hop is
+                // heuristic, and inheriting a slot from it would convert one
+                // wrong pickup into permanent confident wrong identity
+                // (CV + senior reviews, 2026-07-18).
+                if (coLocated && cand.slot !== undefined) sel.slot = cand.slot
                 sel.lastPan = cand.panDeg
                 sel.lastTilt = cand.tiltDeg
                 sel.lostSince = null
@@ -1821,7 +1889,9 @@ export function VirtualPanoramaPlayer({
                 }
                 return
               }
-            } else if (gap > SPOT_LOST_SEC) {
+            } else if (!slotAdopted && !slotDeferred && gap > SPOT_LOST_SEC) {
+              // (a deferred slot-mate keeps the selection alive — the dwell
+              // resolves within 2s, far better than dropping a proven player)
               spotSelRef.current = null // gone for good — drop the ring
               spotNoticeOverride.current = {
                 kind: 'lost',
@@ -2090,11 +2160,29 @@ export function VirtualPanoramaPlayer({
             const maxDots = Math.min(dotPool.length, dotCap)
             // Zoom factor shared with the ring: marks shrink as you zoom out.
             const zoomK = clamp((26 / viewRef.current.fov) * (h / 800), 0.5, 2)
+            // One dot per SLOT (Tier 3): concurrent duplicate fragments of a
+            // labelled body share a slot — pixel-merge can miss them at high
+            // zoom (world 2-3m apart), the slot key cannot.
+            const drawnSlots = new Set<string>()
             for (const a of active) {
               if (sel && a.index === sel.index) continue
+              // Same-slot dot near the ring = duplicate fragment of the
+              // followed body — the ring covers it. A same-slot dot FAR
+              // from the ring is contradiction evidence (mislabelled slot)
+              // and must stay visible for the pilot's eyes-on.
+              if (
+                sel &&
+                sel.slot !== null &&
+                a.slot === sel.slot &&
+                Math.hypot(a.panDeg - sel.lastPan, a.tiltDeg - sel.lastTilt) <
+                  5
+              )
+                continue
+              if (a.slot !== undefined && drawnSlots.has(a.slot)) continue
               if (di >= maxDots) break
               const p = projectToPx(a.panDeg, a.tiltDeg, w, h)
               if (!p) continue
+              if (a.slot !== undefined) drawnSlots.add(a.slot)
               const ts = tiltScale(a.tiltDeg)
               const mergePx = SPOT_DOT_MERGE_PX * ts * zoomK
               if (
@@ -2556,6 +2644,7 @@ export function VirtualPanoramaPlayer({
       lastSelectTapRef.current = now
       spotSelRef.current = {
         index: hit.index,
+        slot: hit.slot ?? null,
         follow: true,
         lock: dbl,
         frameFov: 0,
@@ -2669,6 +2758,7 @@ export function VirtualPanoramaPlayer({
         if (hit) {
           spotSelRef.current = {
             index: hit.index,
+            slot: hit.slot ?? null,
             follow: true,
             lock: false,
             frameFov: 0,
