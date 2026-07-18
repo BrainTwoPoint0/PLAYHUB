@@ -658,8 +658,9 @@ function ResultPanel({
   const solve = state.solve!
   const err = solve.reprojectionErrorPx
   // relative to the pitch's on-screen span — absolute px thresholds misread
-  // venue-fit distortion as bad marking
-  const band = solveErrorBand(err, state.marks)
+  // venue-fit distortion as bad marking. The server's verdict wins when
+  // present (it decided activation); recompute only for old responses.
+  const band = solve.band ?? solveErrorBand(err, state.marks)
   const BandIcon =
     band === 'good' ? Check : band === 'ok' ? TriangleAlert : XCircle
   const perMark = Object.entries(solve.perMarkErrorRad).sort(

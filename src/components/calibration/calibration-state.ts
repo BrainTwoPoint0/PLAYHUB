@@ -37,6 +37,9 @@ export interface SolveSummary {
   /** False when the server saved the solve as a draft WITHOUT activating it
    *  (red band). Absent = activated (pre-gate server responses). */
   activated?: boolean
+  /** The server's authoritative verdict; prefer it over recomputing so a
+   *  stale client can never contradict what the server actually did. */
+  band?: 'good' | 'ok' | 'bad'
 }
 
 export interface CalibrationState {
