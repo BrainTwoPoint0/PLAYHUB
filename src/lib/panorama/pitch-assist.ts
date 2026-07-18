@@ -32,6 +32,18 @@ export interface PitchProposal {
 // occupancy is too sparse to bound a pitch — return null, admin marks manually.
 const MIN_SAMPLES = 200
 
+// Occupancy ≈ pitch only holds when the tracker population is players-only.
+// Stadium-bowl venues track the whole bowl (crowd, track walkers, staff), so
+// the rect fits the bowl, not the pitch — measured on HCT: corners landed
+// 320-1535px from the admin's marks, with rotated labeling. The artifact's
+// rosterN (p95 of deduped concurrent bodies) is the population-size signal:
+// 15 at Nazwa (players-only) vs 56 at HCT (bowl). 11-a-side + refs tops out
+// ~26 concurrent, so anything above this is not a players-only population —
+// suppress the proposal and let the admin place marks cleanly from scratch.
+// Pre-rosterN artifacts (no meta.rosterN) can't be gated; they keep the
+// proposal, which matches every venue validated before the gate existed.
+const BOWL_ROSTER_MAX = 32
+
 export interface Pt {
   x: number
   y: number
@@ -176,11 +188,16 @@ function labelCorners(rect: Pt[]): Record<string, Pt> {
  * the mesh. Midline is never proposed.
  */
 export function proposePitchMarksFromTracklets(
-  tracklets: { objects: { pan: number[]; tilt: number[] }[] },
+  tracklets: {
+    objects: { pan: number[]; tilt: number[] }[]
+    rosterN?: number
+  },
   mesh: MeshGeometry,
   frameWidth: number,
   frameHeight: number
 ): PitchProposal | null {
+  if (tracklets.rosterN !== undefined && tracklets.rosterN > BOWL_ROSTER_MAX)
+    return null
   const pts: Pt[] = []
   for (const obj of tracklets.objects) {
     const n = obj.pan.length

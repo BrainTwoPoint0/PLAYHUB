@@ -80,6 +80,46 @@ describe('proposePitchMarksFromTracklets', () => {
     ).toBeNull()
   })
 
+  it('returns null when rosterN says the population is a stadium bowl', () => {
+    // HCT: crowd/track/staff in the occupancy → rect fits the bowl, not the
+    // pitch (measured 320-1535px corner error vs admin marks). rosterN 56.
+    const pan: number[] = []
+    const tilt: number[] = []
+    for (let i = 0; i < 500; i++) {
+      pan.push(-50 + (i % 100))
+      tilt.push(-10 - (i % 25))
+    }
+    const bowl = { objects: [{ pan, tilt }], rosterN: 56 }
+    expect(
+      proposePitchMarksFromTracklets(bowl, {} as MeshGeometry, FW, FH)
+    ).toBeNull()
+  })
+
+  it.skipIf(!HAS_MESH)(
+    'players-only rosterN and absent rosterN both keep the proposal',
+    () => {
+      const mesh = loadMesh()
+      const pan: number[] = []
+      const tilt: number[] = []
+      for (let p = -55; p <= 55; p += 2) {
+        for (let ti = -12; ti >= -34; ti -= 2) {
+          pan.push(p)
+          tilt.push(ti)
+        }
+      }
+      for (const rosterN of [15, undefined]) {
+        const prop = proposePitchMarksFromTracklets(
+          { objects: [{ pan, tilt }], rosterN },
+          mesh,
+          FW,
+          FH
+        )
+        expect(prop).not.toBeNull()
+        expect(prop!.marks).toHaveLength(4)
+      }
+    }
+  )
+
   it.skipIf(!HAS_MESH)(
     'proposes 4 on-mesh corners bounding a pan/tilt occupancy cloud',
     () => {
