@@ -1,0 +1,171 @@
+{
+  "site": "kuwait",
+  "fov": 46.0,
+  "gateA": {
+    "lines": [
+      {
+        "name": "far_touch",
+        "rms_px": 1.491209237109988,
+        "max_px": 2.82065633359235,
+        "n": 105,
+        "chord_px": 1691.4465924591625,
+        "pct_max": 0.16675999976395653
+      },
+      {
+        "name": "near_touch",
+        "rms_px": 6.7919785402991755,
+        "max_px": 27.733618599431132,
+        "n": 65,
+        "chord_px": 1362.4655162314164,
+        "pct_max": 2.0355464611054823
+      },
+      {
+        "name": "halfway",
+        "rms_px": 7.8996251960917885,
+        "max_px": 17.72798944763686,
+        "n": 33,
+        "chord_px": 942.3382899695657,
+        "pct_max": 1.881276568758488
+      },
+      {
+        "name": "rbox_front",
+        "rms_px": 12.991136819072105,
+        "max_px": 19.773329772168292,
+        "n": 9,
+        "chord_px": 303.0491477303868,
+        "pct_max": 6.524793064179807
+      },
+      {
+        "name": "rbox_north",
+        "rms_px": 0.9321562030968934,
+        "max_px": 2.912818307241821,
+        "n": 16,
+        "chord_px": 228.12275457544692,
+        "pct_max": 1.276864428830341
+      },
+      {
+        "name": "rbox_south",
+        "rms_px": 4.492151742998426,
+        "max_px": 8.834747094491249,
+        "n": 9,
+        "chord_px": 178.88838935466248,
+        "pct_max": 4.938692290965603
+      },
+      {
+        "name": "lbox_front",
+        "rms_px": 11.556410033375258,
+        "max_px": 19.833932659174206,
+        "n": 9,
+        "chord_px": 240.88377742760105,
+        "pct_max": 8.233818346333184
+      },
+      {
+        "name": "lbox_south",
+        "rms_px": 9.342566443759816,
+        "max_px": 15.55798016579056,
+        "n": 11,
+        "chord_px": 202.81120321222235,
+        "pct_max": 7.671164077415702
+      },
+      {
+        "name": "lbox_north",
+        "rms_px": 5.891271517539757,
+        "max_px": 9.930529662191681,
+        "n": 11,
+        "chord_px": 269.22034091465133,
+        "pct_max": 3.6886253202316066
+      }
+    ],
+    "weighted_median_rms_px": 5.891271517539757,
+    "worst_long_chord_pct": 2.0355464611054823
+  },
+  "gateB": {
+    "coverage_pct": 99.03428819444444
+  },
+  "gateE": {
+    "per_mark_err_px": {
+      "corner_nw": 5.206368215555062,
+      "corner_ne": 7.467767419162133,
+      "corner_se": 12.105797035653419,
+      "corner_sw": 13.439269744524335,
+      "midline_n": 2.895320304757903,
+      "midline_s": 16.827286222636452
+    },
+    "max_err_px": 16.827286222636452,
+    "span_px": 3117.925840283726,
+    "pct_of_span": 0.5396948832209941
+  },
+  "gateF": {
+    "chains": [
+      {
+        "name": "vert_0",
+        "dev_deg": 10.069915082405188,
+        "theta_max_deg": 62.13855316387073
+      },
+      {
+        "name": "vert_1",
+        "dev_deg": 10.205751835980879,
+        "theta_max_deg": 59.63066812064119
+      },
+      {
+        "name": "vert_2",
+        "dev_deg": 3.3758224475254743,
+        "theta_max_deg": 57.61914291252133
+      },
+      {
+        "name": "vert_3",
+        "dev_deg": 7.937570032512866,
+        "theta_max_deg": 57.05542361890142
+      },
+      {
+        "name": "vert_4",
+        "dev_deg": 5.415177805482401,
+        "theta_max_deg": 58.75191242371478
+      },
+      {
+        "name": "vert_5",
+        "dev_deg": 4.41968886115701,
+        "theta_max_deg": 58.38006184404124
+      },
+      {
+        "name": "vert_6",
+        "dev_deg": 5.579174571105715,
+        "theta_max_deg": 57.864659295178896
+      },
+      {
+        "name": "vert_7",
+        "dev_deg": 2.3610986526966093,
+        "theta_max_deg": 56.03103477685559
+      },
+      {
+        "name": "vert_8",
+        "dev_deg": 6.503314064896391,
+        "theta_max_deg": 57.334215846973414
+      }
+    ],
+    "qualifying": 9,
+    "x_cols": [
+      3,
+      4
+    ],
+    "median_dev_deg": 5.579174571105715,
+    "hard_gate_viable": false
+  },
+  "gateG": {
+    "incumbent": {
+      "ref": "/Users/karimfawaz/Dev Projects/PLAYBACK Workspace/PLAYHUB/scripts/vp-calibration/benchmarks/baselines/kuwait-accepted-fit.json",
+      "interior_median_deg": 0.11900408424384001,
+      "rim_median_deg": 1.7728025118954138,
+      "rim_p90_deg": 2.345301214669328
+    },
+    "disc": {
+      "theta_mean_deg": 90.93872226117955,
+      "theta_sd_deg": 1.2698659130357577,
+      "theta_ref_deg": 88.2,
+      "err_deg": 2.7387222611795465
+    }
+  },
+  "failures": [
+    "gate G: disc arc theta error +2.74 deg beyond +/-2.0"
+  ]
+}

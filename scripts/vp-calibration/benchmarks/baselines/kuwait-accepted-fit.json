@@ -1,0 +1,18 @@
+{
+ "F": 1160.7297633076787,
+ "CX": 2006.4979749294316,
+ "CY": 1057.79586314095,
+ "K1": -0.07336260878754085,
+ "K2": 0.0008297860229852526,
+ "K3": 0.006495304569418517,
+ "K4": 0.006499373823734676,
+ "TILT": 40.085,
+ "n_lines": 17,
+ "disc_ok": true,
+ "solver": "full:k1..k4+cxy",
+ "train_straightness": 1.2777775144010226,
+ "refined": "lines+marks joint (MARK_W=20, rim=disc W=1.5, regsift W=1)",
+ "YAW": -1.44,
+ "ROLL": -3.361,
+ "mount_source": "marks-homography"
+}
