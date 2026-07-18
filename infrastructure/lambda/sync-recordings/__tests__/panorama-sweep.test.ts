@@ -19,9 +19,13 @@ import {
   TRK_SWEEP_MAX_PER_RUN,
   TRK_INFLIGHT_CAP,
   TRK_STUCK_MS,
+  isJerseyClaimable,
+  sweepJerseyLabels,
+  JERSEY_STUCK_MS,
   type PanoramaCandidate,
   type AimTrackCandidate,
   type TrackletsCandidate,
+  type JerseyCandidate,
 } from '../panorama-sweep'
 
 const NOW = Date.parse('2026-07-07T12:00:00Z')
@@ -743,5 +747,147 @@ describe('sweepPlayerTracklets', () => {
     expect(submit).not.toHaveBeenCalled()
     expect(claims).toHaveLength(0)
     expect(out.submitted).toBe(0)
+  })
+})
+
+// ── Jersey-labels sweep ──────────────────────────────────────────────────────
+
+const JERSEY_VENUES = new Set(['scene-1'])
+
+function jerseyRow(overrides: Partial<JerseyCandidate> = {}): JerseyCandidate {
+  return {
+    id: 'rec-1',
+    spiideo_game_id: 'game-1',
+    spiideo_scene_id: 'scene-1',
+    panorama_s3_key: 'panoramas/game-1/rec-1.mp4',
+    tracklets_status: 'ready',
+    jersey_status: null,
+    jersey_started_at: null,
+    jersey_attempts: null,
+    ...overrides,
+  }
+}
+
+describe('isJerseyClaimable', () => {
+  it('claims a never-attempted ready-tracklets row on an allowlisted venue', () => {
+    expect(isJerseyClaimable(jerseyRow(), JERSEY_VENUES, NOW)).toBe(true)
+  })
+
+  it('requires game id, allowlisted scene, ready tracklets, and a panorama', () => {
+    expect(
+      isJerseyClaimable(jerseyRow({ spiideo_game_id: null }), JERSEY_VENUES, NOW)
+    ).toBe(false)
+    expect(
+      isJerseyClaimable(
+        jerseyRow({ spiideo_scene_id: 'scene-2' }),
+        JERSEY_VENUES,
+        NOW
+      )
+    ).toBe(false)
+    expect(
+      isJerseyClaimable(
+        jerseyRow({ tracklets_status: 'pending' }),
+        JERSEY_VENUES,
+        NOW
+      )
+    ).toBe(false)
+    expect(
+      isJerseyClaimable(
+        jerseyRow({ panorama_s3_key: null }),
+        JERSEY_VENUES,
+        NOW
+      )
+    ).toBe(false)
+  })
+
+  it('never reclaims ready, fresh pending, or attempts-capped rows', () => {
+    expect(
+      isJerseyClaimable(jerseyRow({ jersey_status: 'ready' }), JERSEY_VENUES, NOW)
+    ).toBe(false)
+    expect(
+      isJerseyClaimable(
+        jerseyRow({
+          jersey_status: 'pending',
+          jersey_started_at: new Date(NOW - 60_000).toISOString(),
+        }),
+        JERSEY_VENUES,
+        NOW
+      )
+    ).toBe(false)
+    expect(
+      isJerseyClaimable(
+        jerseyRow({
+          jersey_status: 'error',
+          jersey_attempts: MAX_ATTEMPTS,
+          jersey_started_at: new Date(
+            NOW - ERROR_COOLDOWN_MS * 10
+          ).toISOString(),
+        }),
+        JERSEY_VENUES,
+        NOW
+      )
+    ).toBe(false)
+  })
+
+  it('reclaims an error row only past the cooldown', () => {
+    expect(
+      isJerseyClaimable(
+        jerseyRow({
+          jersey_status: 'error',
+          jersey_attempts: 1,
+          jersey_started_at: new Date(NOW - ERROR_COOLDOWN_MS + 5000).toISOString(),
+        }),
+        JERSEY_VENUES,
+        NOW
+      )
+    ).toBe(false)
+    expect(
+      isJerseyClaimable(
+        jerseyRow({
+          jersey_status: 'error',
+          jersey_attempts: 1,
+          jersey_started_at: new Date(NOW - ERROR_COOLDOWN_MS - 5000).toISOString(),
+        }),
+        JERSEY_VENUES,
+        NOW
+      )
+    ).toBe(true)
+  })
+
+  it('reclaims a dead pending only past JERSEY_STUCK_MS (5h > job timeout)', () => {
+    expect(
+      isJerseyClaimable(
+        jerseyRow({
+          jersey_status: 'pending',
+          jersey_attempts: 1,
+          jersey_started_at: new Date(NOW - JERSEY_STUCK_MS + 60_000).toISOString(),
+        }),
+        JERSEY_VENUES,
+        NOW
+      )
+    ).toBe(false)
+    expect(
+      isJerseyClaimable(
+        jerseyRow({
+          jersey_status: 'pending',
+          jersey_attempts: 1,
+          jersey_started_at: new Date(NOW - JERSEY_STUCK_MS - 1000).toISOString(),
+        }),
+        JERSEY_VENUES,
+        NOW
+      )
+    ).toBe(true)
+  })
+})
+
+describe('sweepJerseyLabels', () => {
+  it('is a no-op with an empty allowlist (feature disabled)', async () => {
+    const from = vi.fn()
+    const client = { from } as unknown as SupabaseClient
+    const submit = vi.fn(async () => 'job-1')
+    const out = await sweepJerseyLabels(client, [], submit, NOW)
+    expect(out).toEqual({ submitted: 0, candidates: 0 })
+    expect(from).not.toHaveBeenCalled()
+    expect(submit).not.toHaveBeenCalled()
   })
 })

@@ -23,6 +23,7 @@ import {
 import {
   sweepPanoramaCaptures,
   sweepAimTracks,
+  sweepJerseyLabels,
   sweepPlayerTracklets,
   sweepVeoCaptures,
   sweepPortraitRenders,
@@ -55,6 +56,13 @@ const PANORAMA_JOB_DEF = process.env.PANORAMA_JOB_DEF || ''
 const AIM_TRACK_JOB_DEF = process.env.AIM_TRACK_JOB_DEF || ''
 // Player-tracklets (spotlight) jobs share the panorama queue too.
 const TRACKLETS_JOB_DEF = process.env.TRACKLETS_JOB_DEF || ''
+const JERSEY_JOB_DEF = process.env.JERSEY_JOB_DEF || ''
+const JERSEY_JOB_QUEUE = process.env.JERSEY_JOB_QUEUE || ''
+// Organized-kit venue allowlist (Spiideo scene ids); empty = jersey disabled.
+const JERSEY_VENUES = (process.env.JERSEY_VENUES || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
 // Veo capture (2026-07-15): preserves the native panorama + jersey labels
 // before Veo Glacier-archives them. Unset = the sweep is off.
 const VEO_CAPTURE_JOB_DEF = process.env.VEO_CAPTURE_JOB_DEF || ''
@@ -1386,6 +1394,40 @@ export const handler = async (): Promise<{
         } catch (err) {
           console.error(
             'Tracklets sweep failed (non-fatal):',
+            err instanceof Error ? err.message : err
+          )
+        }
+      }
+      if (JERSEY_JOB_DEF && JERSEY_JOB_QUEUE && JERSEY_VENUES.length > 0) {
+        try {
+          const batch = new BatchClient({ region: S3_REGION })
+          const { submitted, candidates } = await sweepJerseyLabels(
+            supabase,
+            JERSEY_VENUES,
+            async (recordingId, gameId) => {
+              const out = await batch.send(
+                new SubmitJobCommand({
+                  jobName: `jersey-labels-${recordingId}`,
+                  jobQueue: JERSEY_JOB_QUEUE,
+                  jobDefinition: JERSEY_JOB_DEF,
+                  containerOverrides: {
+                    environment: [
+                      { name: 'RECORDING_ID', value: recordingId },
+                      { name: 'GAME_ID', value: gameId },
+                    ],
+                  },
+                })
+              )
+              return out.jobId
+            }
+          )
+          if (candidates > 0)
+            console.log(
+              `Jersey sweep: ${submitted} submitted, ${candidates} claimable`
+            )
+        } catch (err) {
+          console.error(
+            'Jersey sweep failed (non-fatal):',
             err instanceof Error ? err.message : err
           )
         }

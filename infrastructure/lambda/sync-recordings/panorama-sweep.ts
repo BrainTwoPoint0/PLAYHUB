@@ -484,6 +484,171 @@ export async function sweepPlayerTracklets(
   return { submitted, candidates: claimable.length }
 }
 
+// ── Jersey-labels sweep ──────────────────────────────────────────────────────
+// Downstream of the tracklets sweep (Tier-3 identity): for allowlisted
+// organized-kit venues whose tracklets are `ready` AND whose raw panorama is
+// banked, submit the jersey-labels Batch job (reads numbers off the raw
+// panorama, assembles (number, kit) slots, republishes the enriched
+// tracklets.json). The tracklets job resets jersey_status on its own success,
+// so a tracklets re-run automatically queues re-enrichment here.
+// JERSEY_VENUES (scene ids) empty = feature disabled — rec-football venues
+// have nothing to read (measured; the spotlight stays honest-loss there).
+
+export const JERSEY_SWEEP_MAX_PER_RUN = 1
+export const JERSEY_INFLIGHT_CAP = 1 // dedicated 8-vCPU CE fits exactly one
+// Jobs run ~60-90 min with a 4h Batch timeout; a QUEUED job has no heartbeat,
+// so reclaim only after the timeout has certainly fired.
+export const JERSEY_STUCK_MS = 18_000_000 // 5h > the 4h job timeout
+
+export interface JerseyCandidate {
+  id: string
+  spiideo_game_id: string | null
+  spiideo_scene_id: string | null
+  panorama_s3_key: string | null
+  tracklets_status: string | null
+  jersey_status: string | null
+  jersey_started_at: string | null
+  jersey_attempts: number | null
+}
+
+/** Same claimability contract as isTrackletsClaimable, over jersey_* columns,
+ *  plus the upstream gates: tracklets ready + raw panorama banked + venue
+ *  allowlisted. */
+export function isJerseyClaimable(
+  row: JerseyCandidate,
+  jerseyVenues: Set<string>,
+  nowMs: number
+): boolean {
+  if (!row.spiideo_game_id || !row.spiideo_scene_id) return false
+  if (!jerseyVenues.has(row.spiideo_scene_id)) return false
+  if (row.tracklets_status !== 'ready') return false
+  if (!row.panorama_s3_key) return false
+  const status = row.jersey_status
+  if (status === 'ready') return false
+  const startedAt = row.jersey_started_at
+    ? Date.parse(row.jersey_started_at)
+    : 0
+  if (status === null) return true
+  if (status === 'error')
+    return (
+      (row.jersey_attempts ?? 0) < MAX_ATTEMPTS &&
+      nowMs - startedAt >= ERROR_COOLDOWN_MS
+    )
+  if (status === 'pending')
+    return (
+      (row.jersey_attempts ?? 0) < MAX_ATTEMPTS &&
+      nowMs - startedAt >= JERSEY_STUCK_MS
+    )
+  return false
+}
+
+export async function sweepJerseyLabels(
+  supabase: SupabaseClient,
+  jerseyVenues: string[],
+  submitJob: SubmitPanoramaJob,
+  nowMs = Date.now()
+): Promise<{ submitted: number; candidates: number }> {
+  if (jerseyVenues.length === 0) return { submitted: 0, candidates: 0 }
+  const venueSet = new Set(jerseyVenues)
+
+  const { data, error } = await supabase
+    .from('playhub_match_recordings')
+    .select(
+      'id, spiideo_game_id, spiideo_scene_id, panorama_s3_key, tracklets_status, jersey_status, jersey_started_at, jersey_attempts'
+    )
+    .eq('status', 'published')
+    .eq('tracklets_status', 'ready')
+    .not('spiideo_game_id', 'is', null)
+    .not('panorama_s3_key', 'is', null)
+    .in('spiideo_scene_id', jerseyVenues)
+    // NOT .neq(...,'ready') — three-valued logic drops NULL rows (the point).
+    .or(`jersey_status.is.null,jersey_status.neq.ready`)
+    // NULL status is claimable REGARDLESS of attempts (all three layers —
+    // query, isJerseyClaimable, CAS — agree), so an operator reset of the
+    // status alone is a real reset, not the silent no-op the veo-capture
+    // lockstep incident shipped. Settled errors (status=error, attempts>=3)
+    // stay excluded so they can't starve the LIMIT window.
+    .or(
+      `jersey_status.is.null,jersey_attempts.is.null,jersey_attempts.lt.${MAX_ATTEMPTS}`
+    )
+    // Enrichment queue, not a deadline race: newest content first is right
+    // here (fresh matches are what admins/players open).
+    .order('match_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
+    .limit(25)
+  if (error) throw new Error(`jersey sweep query: ${error.message}`)
+
+  const claimable = (data ?? []).filter((r) =>
+    isJerseyClaimable(r, venueSet, nowMs)
+  )
+
+  const freshCutoff = new Date(nowMs - JERSEY_STUCK_MS).toISOString()
+  const { count: inFlight, error: inFlightErr } = await supabase
+    .from('playhub_match_recordings')
+    .select('id', { count: 'exact', head: true })
+    .eq('jersey_status', 'pending')
+    .gte('jersey_started_at', freshCutoff)
+  if (inFlightErr)
+    throw new Error(`jersey sweep in-flight count: ${inFlightErr.message}`)
+  const budget = Math.max(
+    0,
+    Math.min(JERSEY_SWEEP_MAX_PER_RUN, JERSEY_INFLIGHT_CAP - (inFlight ?? 0))
+  )
+
+  let submitted = 0
+  let attempted = 0
+  for (const row of claimable) {
+    if (attempted >= budget) break
+    const stuckCutoff = new Date(nowMs - JERSEY_STUCK_MS).toISOString()
+    const errorCutoff = new Date(nowMs - ERROR_COOLDOWN_MS).toISOString()
+    const { count, error: claimErr } = await supabase
+      .from('playhub_match_recordings')
+      .update(
+        {
+          jersey_status: 'pending',
+          jersey_started_at: new Date(nowMs).toISOString(),
+          jersey_error: null,
+          jersey_attempts: (row.jersey_attempts ?? 0) + 1,
+        },
+        { count: 'exact' }
+      )
+      .eq('id', row.id)
+      .or(
+        `jersey_status.is.null,` +
+          `and(jersey_status.eq.error,jersey_attempts.lt.${MAX_ATTEMPTS},jersey_started_at.lt.${errorCutoff}),` +
+          `and(jersey_status.eq.pending,jersey_attempts.lt.${MAX_ATTEMPTS},jersey_started_at.lt.${stuckCutoff})`
+      )
+    if (claimErr) {
+      console.error(
+        `jersey sweep: claim failed for ${row.id}: ${claimErr.message}`
+      )
+      continue
+    }
+    if (!count) continue
+
+    attempted++
+    try {
+      const jobId = await submitJob(row.id, String(row.spiideo_game_id))
+      if (!jobId) throw new Error('no jobId returned')
+      console.log(`jersey sweep: submitted ${row.id} -> job ${jobId}`)
+      submitted++
+    } catch (err) {
+      console.error(
+        `jersey sweep: submit failed for ${row.id}: ${err instanceof Error ? err.message : err}`
+      )
+      await supabase
+        .from('playhub_match_recordings')
+        .update({
+          jersey_status: 'error',
+          jersey_error: 'sweep submit failed',
+          jersey_attempts: row.jersey_attempts ?? 0,
+        })
+        .eq('id', row.id)
+    }
+  }
+  return { submitted, candidates: claimable.length }
+}
+
 // ── Portrait-render sweep ────────────────────────────────────────────────────
 // Feed for the portrait-render Batch job (9:16 goal drafts, review-first):
 // club-allowlisted Veo matches with unrendered tagged goals, served by the
