@@ -37,6 +37,7 @@ from scipy.spatial import cKDTree
 import spiideo
 import solve_h
 import build_track
+import calibration_still
 import detections
 import validate_render
 from mesh_rays import load_mesh_rays
@@ -116,11 +117,53 @@ def set_status(fields: dict, retries: int = 0):
 def fetch_row() -> dict:
     out = _sb('GET',
               f'/rest/v1/playhub_match_recordings?id=eq.{RECORDING_ID}'
-              f'&select=spiideo_game_id,panorama_s3_key,s3_bucket')
+              f'&select=spiideo_game_id,spiideo_scene_id,'
+              f'panorama_s3_key,s3_bucket')
     rows = json.loads(out)
     if not rows:
         raise RuntimeError('recording row not found')
     return rows[0]
+
+
+def emit_calibration_still(row: dict):
+    """Best-effort median still for the pitch-calibration marking UI, keyed
+    the way the pitch-calibration API enforces:
+    calibration-stills/{scene_id}/{recording_id}.jpg
+
+    Deliberately independent of the tracklets quality gates — a still is
+    useful even when the solve fails, and for venues whose tracker rollout
+    postdates the game (those jobs die at 'no tracklets stream'). Never
+    fails the job."""
+    try:
+        scene_id = row.get('spiideo_scene_id')
+        pano_key = row.get('panorama_s3_key')
+        if not scene_id or not pano_key:
+            print('calibration still: no scene id or banked panorama — '
+                  'skipping', flush=True)
+            return
+        key = f'calibration-stills/{scene_id}/{RECORDING_ID}.jpg'
+        try:
+            s3.head_object(Bucket=BUCKET, Key=key)
+            print(f'calibration still already banked at {key} — skipping',
+                  flush=True)
+            return
+        except Exception:  # noqa: BLE001
+            # DELIBERATELY broad: without s3:ListBucket a missing object
+            # surfaces as 403 (not 404), and a throttle just means an
+            # idempotent re-render + overwrite. Do not narrow to 404.
+            pass
+        url = s3.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': BUCKET, 'Key': pano_key}, ExpiresIn=3600)
+        jpg = calibration_still.render_median_still(url)
+        if jpg is None:
+            return
+        s3.put_object(Bucket=BUCKET, Key=key, Body=jpg,
+                      ContentType='image/jpeg')
+        print(f'calibration still uploaded ({len(jpg) // 1024} KB) → {key}',
+              flush=True)
+    except Exception as err:  # noqa: BLE001 — never fails the job
+        print(f'calibration still failed (non-fatal): {err}', flush=True)
 
 
 def download_mesh(dest_dir: str):
@@ -193,6 +236,10 @@ def main():
     threading.Thread(target=heartbeat_loop, args=(HEARTBEAT_STOP,),
                      daemon=True).start()
 
+    # Before stream discovery: games predating the venue's tracker rollout
+    # die there, and their stills are exactly the ones calibration needs.
+    emit_calibration_still(row)
+
     jwt = spiideo.sign_in(SPIIDEO_EMAIL, SPIIDEO_PASSWORD)
     streams = spiideo.discover_streams(jwt, GAME_ID)
     if not streams['tracklets']:
@@ -251,49 +298,85 @@ def main():
         raise RuntimeError(
             'no independent eval window with player activity — cannot gate '
             'the calibration')
-    det_windows: dict = {name: {} for name in windows}
+    # Fetch once per (stream, window); parsing re-runs per layout candidate.
+    raw_det_items: dict = {}
     for det_stream in streams['detections']:
         for name, w in windows.items():
-            items = detections.fetch_window_items(GAME_ID, det_stream, w)
-            # shared dict: ts collisions across 2-cam streams concatenate;
-            # window clamp keeps solve frames out of the held-out windows
-            detections.parse_detection_items(items, uv_to_rayn,
-                                             frames=det_windows[name],
-                                             window_us=w)
+            raw_det_items[(det_stream['id'], name)] = \
+                detections.fetch_window_items(GAME_ID, det_stream, w)
+
+    def build_det_windows(transforms: dict | None) -> dict:
+        dw: dict = {name: {} for name in windows}
+        for det_stream in streams['detections']:
+            tf = None if transforms is None else transforms[det_stream['id']]
+            for name, w in windows.items():
+                # shared dict: ts collisions across 2-cam streams
+                # concatenate; window clamp keeps solve frames out of the
+                # held-out windows
+                detections.parse_detection_items(
+                    raw_det_items[(det_stream['id'], name)], uv_to_rayn,
+                    frames=dw[name], window_us=w, uv_transform=tf)
+        return dw
+
+    # Det-uv layout arbitration (multi-camera scenes): per-lens uv fed into
+    # the stacked mesh is spatial garbage that presents as a time-base
+    # failure (the 2026-07-17 HCT incident: occupancy correlated at lag 0
+    # while the speed-profile canary showed a spurious -4s/r=0.20). Each
+    # candidate is scored with the speed-profile correlation CONSTRAINED to
+    # |lag| <= MAX_LAG_S — an unconstrained scan would let a wrong layout
+    # shop ~480 lag bins for a noise peak while the true layout reports its
+    # lag-0 r (review finding). Single-camera scenes have exactly one
+    # candidate (identity) and behave as before.
+    layout_label, layout_transforms, det_windows, layout_diag = \
+        detections.choose_layout(
+            detections.strip_candidates(streams['detections']),
+            build_det_windows,
+            lambda pooled: solve_h.lag_peak_s(pooled, fragments,
+                                              max_lag_s=MAX_LAG_S))
+    fence_premasked = layout_transforms is not None
+    for lbl, d in layout_diag.items():
+        print(f'det layout {lbl}: lag {d["lag_s"]} r={d["lag_r"]} '
+              f'(scan |lag|<={MAX_LAG_S:.1f}s)', flush=True)
     print('windows: ' + ' '.join(
         f'{k}@{(windows[k][0] - start_us) / 1e6:.0f}s'
         f'={len(det_windows[k])}f' for k in windows), flush=True)
 
-    # Time-base canary: with the right cadence the det<->trk speed-profile
-    # correlation peaks at ~0 lag. A shifted/absent peak means the item
-    # cadence model no longer matches Spiideo's stream — fail loudly.
-    all_det: dict = {}
+    # Time-base canary on the CHOSEN layout, full +-120s scan: with the
+    # right cadence and layout the correlation peaks at ~0 lag. A shifted
+    # peak means the item cadence model no longer matches Spiideo's stream;
+    # a weak/absent one at every layout means an unrecognized det-uv layout
+    # — fail loudly either way.
+    pooled_chosen: dict = {}
     for frames in det_windows.values():
-        all_det.update(frames)
-    lag_s, lag_r = solve_h.lag_peak_s(all_det, fragments)
-    print(f'time-base check: lag {lag_s:+.1f}s (r={lag_r:.2f})', flush=True)
+        pooled_chosen.update(frames)
+    lag_s, lag_r = solve_h.lag_peak_s(pooled_chosen, fragments)
+    print(f'time-base check ({layout_label}): lag {lag_s:+.1f}s '
+          f'(r={lag_r:.2f})', flush=True)
     if np.isnan(lag_r):
         raise RuntimeError(
             'time-base gate: no overlapping det/trk speed profile '
             '(detection stream too sparse for the canary)')
     if abs(lag_s) > MAX_LAG_S or lag_r < MIN_LAG_CORR:
         raise RuntimeError(
-            f'time-base gate: det/trk lag {lag_s:+.1f}s (r={lag_r:.2f}) — '
-            'item cadence model mismatch')
+            f'time-base gate: det/trk lag {lag_s:+.1f}s (r={lag_r:.2f}) '
+            f'with det layout {layout_label} — cadence drift or '
+            'unrecognized det-uv layout')
 
-    diag = solve_h.solve(det_windows['solve'], fragments)
+    diag = solve_h.solve(det_windows['solve'], fragments,
+                         fence_premasked=fence_premasked)
     ev = diag['eval']
     print(f'H solved: inlier median {diag["median_res"]:.4f} rayn; solve-'
           f'window eval rate {ev["rate"]:.2f} median {ev["median"]:.4f} '
           f'({ev["matches"]}/{ev["offered"]} over {diag["matched_frames"]} '
-          'frames)', flush=True)
+          f'frames); basin rates {diag["basin_rates"]}', flush=True)
     if diag['matched_frames'] < MIN_MATCHED_FRAMES:
         raise RuntimeError(
             f'quality gate: only {diag["matched_frames"]} paired frames')
     evals = {'solve': ev}
     lo, hi = diag['pitch_lo'], diag['pitch_hi']
     for name in eval_names:
-        pairs = solve_h.time_paired_sets(det_windows[name], fragments, lo, hi)
+        pairs = solve_h.time_paired_sets(det_windows[name], fragments, lo, hi,
+                                         fence_premasked=fence_premasked)
         evals[name] = solve_h.evaluate(diag['H'], pairs, lo, hi)
         e = evals[name]
         print(f'held-out {name}: rate {e["rate"]:.2f} median '
@@ -374,8 +457,11 @@ def main():
             'get_object',
             Params={'Bucket': BUCKET, 'Key': row['panorama_s3_key']},
             ExpiresIn=3600)
+        # pooled frames from ALL windows: the banked video can be shorter
+        # than the streams, leaving the solve window uncovered — the early
+        # eval window still yields verifiable panels
         validation_png = validate_render.render_validation_png(
-            url, start_us, det_windows['solve'], fragments, diag['H'],
+            url, start_us, pooled_chosen, fragments, diag['H'],
             rayn_to_uv)
         if validation_png is None:
             raise RuntimeError(
@@ -387,6 +473,12 @@ def main():
         print('no panorama_s3_key on row — skipping validation PNG',
               flush=True)
 
+    # NOTE: `build_track.dedup_concurrent` exists + is tested, but is deliberately
+    # NOT wired in: measurement showed a SAFE metric dedup barely helps (Spiideo's
+    # duplicate fragments sit 1-1.7m apart — the same regime as close-marking
+    # players — so no radius separates them safely; concurrent-p95 only 19→18),
+    # and the duplicate-dot artifact converges on Tier-3 (jersey). See
+    # scripts/player-identity/tier2b/RECORD.md §"Phase 1b".
     payload = build_track.build_payload(chains, diag['H'], start_us, diag)
     upload_track(payload)
     solve_doc = {
@@ -395,6 +487,9 @@ def main():
         'cadence_us': cadence_us,
         'lag_s': lag_s,
         'lag_r': lag_r,
+        'det_layout': {'chosen': layout_label, 'candidates': layout_diag,
+                       'selection_scan_s': MAX_LAG_S},
+        'basin_rates': diag.get('basin_rates'),
         'windows': {k: [(w[0] - start_us) / 1e6, (w[1] - start_us) / 1e6]
                     for k, w in windows.items()},
         'pitch_lo': diag['pitch_lo'],

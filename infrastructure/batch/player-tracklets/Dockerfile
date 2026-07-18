@@ -14,8 +14,10 @@ RUN apt-get update \
 WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
-COPY spiideo.py mesh_rays.py solve_h.py build_track.py detections.py \
-     validate_render.py entrypoint.py ./
+# Glob, not a name list — naming files individually drifts silently and the
+# job dies at ModuleNotFoundError on Fargate AFTER the sweep claimed the row
+# (veo-capture lesson, 2026-07-15). .dockerignore excludes tests/caches.
+COPY *.py ./
 
 RUN useradd -r -u 10001 tracklets
 USER tracklets

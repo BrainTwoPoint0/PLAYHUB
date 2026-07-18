@@ -37,6 +37,21 @@ resource "aws_iam_user_policy" "netlify_s3" {
         Resource = "${aws_s3_bucket.recordings.arn}/recordings/*"
       },
       {
+        # Pitch-calibration stills (median frames from the raw panorama,
+        # written by the player-tracklets Batch job). The app lists +
+        # presigns them for the marking UI, and DELETES a scene's stills
+        # when the scene is unassigned/reassigned to another org (they are
+        # derived from the old org's footage — cross-tenant otherwise).
+        # Never PutObject: only the Batch job renders stills.
+        Sid    = "CalibrationStills"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:DeleteObject",
+        ]
+        Resource = "${aws_s3_bucket.recordings.arn}/calibration-stills/*"
+      },
+      {
         Sid      = "CloudFrontKeyRead"
         Effect   = "Allow"
         Action   = "s3:GetObject"
@@ -49,7 +64,7 @@ resource "aws_iam_user_policy" "netlify_s3" {
         Resource = aws_s3_bucket.recordings.arn
         Condition = {
           StringLike = {
-            "s3:prefix" = ["recordings/*", "keys/*"]
+            "s3:prefix" = ["recordings/*", "keys/*", "calibration-stills/*"]
           }
         }
       },
