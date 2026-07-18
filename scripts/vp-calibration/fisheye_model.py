@@ -46,28 +46,60 @@ def euler_from_mount_R(R):
 
 
 def kb_params(fit):
+    """ks is a 4- or 6-vector: [k1..k4] radial, optionally + [p1, p2] Brown
+    tangential (fits with P1/P2 keys — the reg-SIFT-constrained capacity
+    extension, 2026-07-18). project/unproject accept both forms, so every
+    consumer supports tangential fits without call-site changes."""
     F = float(fit['F'])
     cx, cy = float(fit['CX']), float(fit['CY'])
     ks = [float(fit.get(f'K{i}', 0)) for i in (1, 2, 3, 4)]
+    if 'P1' in fit or 'P2' in fit:
+        ks += [float(fit.get('P1', 0)), float(fit.get('P2', 0))]
     return F, cx, cy, ks
 
 
+def _tang(ks):
+    return (float(ks[4]), float(ks[5])) if len(ks) > 4 else (0.0, 0.0)
+
+
 def project(dc, F, cx, cy, ks):
-    """Camera-frame unit rays (N,3) -> pixels (N,2). Manual arccos KB form."""
+    """Camera-frame unit rays (N,3) -> pixels (N,2). Manual arccos KB form,
+    plus Brown tangential in normalized coords when ks carries p1/p2."""
     th = np.arccos(np.clip(dc[:, 2], -1.0, 1.0))
     ph = np.arctan2(dc[:, 1], dc[:, 0])
-    k1, k2, k3, k4 = ks
+    k1, k2, k3, k4 = ks[:4]
     r = F * th * (1 + k1 * th**2 + k2 * th**4 + k3 * th**6 + k4 * th**8)
+    p1, p2 = _tang(ks)
+    if p1 or p2:
+        x = (r / F) * np.cos(ph)
+        y = (r / F) * np.sin(ph)
+        r2 = x * x + y * y
+        return np.column_stack([
+            cx + F * (x + 2 * p1 * x * y + p2 * (r2 + 2 * x * x)),
+            cy + F * (y + p1 * (r2 + 2 * y * y) + 2 * p2 * x * y)])
     return np.column_stack([cx + r * np.cos(ph), cy + r * np.sin(ph)])
 
 
 def unproject(px, F, cx, cy, ks):
-    """Pixels (N,2) -> camera-frame unit rays (N,3). Bisection on theta(r)."""
-    dx = px[:, 0] - cx
-    dy = px[:, 1] - cy
+    """Pixels (N,2) -> camera-frame unit rays (N,3). Fixed-point removal of
+    the tangential term (when present), then bisection on theta(r)."""
+    p1, p2 = _tang(ks)
+    if p1 or p2:
+        x = (px[:, 0] - cx) / F
+        y = (px[:, 1] - cy) / F
+        xr, yr = x.copy(), y.copy()
+        for _ in range(6):
+            r2 = xr * xr + yr * yr
+            xr = x - (2 * p1 * xr * yr + p2 * (r2 + 2 * xr * xr))
+            yr = y - (p1 * (r2 + 2 * yr * yr) + 2 * p2 * xr * yr)
+        dx = F * xr
+        dy = F * yr
+    else:
+        dx = px[:, 0] - cx
+        dy = px[:, 1] - cy
     r = np.hypot(dx, dy)
     ph = np.arctan2(dy, dx)
-    k1, k2, k3, k4 = ks
+    k1, k2, k3, k4 = ks[:4]
 
     def r_of(th):
         return F * th * (1 + k1 * th**2 + k2 * th**4 + k3 * th**6 + k4 * th**8)

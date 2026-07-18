@@ -639,3 +639,82 @@ nor by display warps (measured out twice). Remaining genuine lever: the
 modest lens share via p1/p2 tangential constrained by the dense reg-SIFT
 data with window holdout — expected gain is the ~20-25% class, pursue only
 if the percept still matters after the regsift fits reach prod.
+
+## PROD-SWAP PLAN (drafted 2026-07-18, awaiting Karim scope sign-off)
+
+Swap targets (both eyes-on accepted): kuwait = the regsift fit
+(baselines/kuwait-accepted-fit.json, mesh == staged vp-mesh-kuwait-regsift);
+footballplus = the marks refit (baselines/footballplus-accepted-fit.json,
+mesh == staged vp-mesh-footballplus-auto). FP FIRST — its deployed model is
+the broken-127px one.
+
+Mechanism (from vp-materialize's ensureSceneMesh): per-game meshes are
+COPIES of the canonical mesh at panorama-meshes/{source_game_id}/, resolved
+via playhub_panorama_scene_meshes (Nazwa 131777a6 -> b923d40f, FP b3595080
+-> f9d6898f). The swap switch = overwrite the canonical folder; future
+games fan out the new mesh automatically.
+
+Per venue:
+1. BACK UP the canonical mesh folder (rollback = re-upload old files).
+2. Upload the new venue mesh over panorama-meshes/{source_game_id}/
+   (service role; scene.json LAST — the presence gate keys off it).
+3. Overwrite the mesh files in every existing game folder on the scene
+   (FP: 8 games with panoramas; Nazwa: 24).
+4. Reset aim_track_* and tracklets_* columns (status/error/attempts ->
+   NULL/NULL/0) on the scene's recordings -> the EXISTING sweeps rebuild
+   everything against the new mesh autonomously. Cost: tracklets ~2min/game
+   (18 total = noise); aim-tracks 4-7h/match on Batch (FP 8 + Nazwa 12 = 20
+   jobs, in-flight cap 2 -> ~3-5 days trickle, tens of dollars). Analytic
+   rotation-migration of old artifacts was considered and rejected: it
+   preserves the OLD lens's recovery error and the sweeps make re-derivation
+   free in engineering time.
+5. Re-solve the venue's admin calibration through the new mesh (raw-px marks
+   stay valid; one Solve click in the marking UI, or scripted PUT). FP's
+   marks through its new mesh should read ~2.7px (vs stored 127.5).
+6. Verify: watch-page Explore on one game per venue (Karim), stored
+   calibration error updated, spotlight ring rides correctly on the pilot.
+
+Known windows/risks: CDN + next revalidate 86400 -> up to ~1 day of
+mixed old-mesh/new-artifact (or vice versa) per game; reads as a ~3 deg
+ring/aim offset until caches settle — accepted (same class as the
+aim-track republish staleness). Rollback at any point = restore canonical
++ game folders from backup and re-reset the artifact columns.
+
+## TANGENTIAL (p1/p2) CAPACITY TEST (2026-07-18 late) — WINS on every axis, STAGED for eyes-on
+
+The reg-SIFT-constrained tangential test (scratchpad tangential.py; NEVER
+from the 6 marks alone): refit CX/CY/k1..k4 + Brown p1/p2 (F frozen)
+against lines + marks(W20) + disc(W1.5) + reg train windows (W1), evaluated
+on held-out windows. Result: p1=-0.0067 p2=-0.0108, and the fit improves
+EVERY measured axis vs the accepted regsift baseline:
+- holdout arbiter: ALL 2.96->2.52 mrad; RIGHT rim>78 8.73->3.54 (the
+  radial-model left/right asymmetry limit, closed); LEFT rim par.
+- line straightness: near_touch 10.73->8.33 (-22%, the predicted class),
+  far_touch 1.95->1.36, others par.
+- marks ALL improve (max 8.99 vs 11.2 mrad), disc arc 88.07 vs 88.2
+  (accepted read 88.59), r(theta) monotonic to 100 deg.
+Candidate frozen at benchmarks/kuwait-tangential-candidate-fit.json (P1/P2
+keys; marks mount re-solved through the tangential model: TILT 40.646 YAW
+0.961 ROLL -3.364). generate_mesh.py now applies P1/P2 when present (baked
+into UVs — the player needs no change). STAGED: public/vp-mesh-kuwait-
+tangential, A/B vs /vp-mesh-kuwait-regsift. ADOPTION COST if accepted:
+fisheye_model/gates/auto_fit/marks_solver do not yet understand P1/P2 —
+GATE A/G and future refits need the tangential unprojection plumbed
+(tangential.py has the reference implementation); mesh-mediated paths
+(GATE E, the product) work today.
+
+**Tangential ADOPTED as kuwait accepted baseline (2026-07-18 late).** Karim's
+eyes-on: tangential and regsift "both look good" — visual parity + strict
+instrumental dominance = the tangential fit is the new accepted baseline and
+prod-swap target. Frozen: baselines/kuwait-accepted-fit.json (P1/P2 keys) +
+baselines/kuwait.json (its report, gates ALL PASS: marks 0.34% of span —
+best ever, wmed 6.0, GATE G vs regsift rim 1.30 deg, disc arc -0.13).
+Superseded regsift preserved at baselines/kuwait-regsift{,-report}.json.
+Plumbing DONE: fisheye_model kb_params/project/unproject accept the 4-or-6
+ks vector (P1/P2 flow to every consumer incl. gates + generate_mesh; radial
+paths byte-identical, roundtrip 2.5e-4 px, matches the probe impl at 6e-8).
+Remaining: auto_fit's REFINEMENT is still radial-only (a re-run of the
+kuwait pipeline produces a radial fit; the tangential refit lives in the
+session probe — port it into auto_fit before the next kuwait refit).
+GATE A note: per-line n counts only the points visible in the fov-46
+virtual framing (near_touch 60-64 of 159) — not an unprojection failure.
