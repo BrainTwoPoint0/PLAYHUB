@@ -109,7 +109,19 @@ for i, s in enumerate(specs):
     ph = np.arctan2(dc[:, 1], dc[:, 0])
     k1, k2, k3, k4 = D[:, 0]
     rr = F * th * (1 + k1 * th**2 + k2 * th**4 + k3 * th**6 + k4 * th**8)
-    px = np.column_stack([CX + rr * np.cos(ph), CY + rr * np.sin(ph)])
+    # optional Brown tangential (P1/P2 in the fit json or env) applied in
+    # normalized coords — the reg-SIFT-constrained capacity extension that
+    # closes the left/right rim asymmetry a radial model cannot express
+    P1, P2 = env('P1', 0), env('P2', 0)
+    if P1 or P2:
+        xn = (rr / F) * np.cos(ph)
+        yn = (rr / F) * np.sin(ph)
+        r2 = xn * xn + yn * yn
+        px = np.column_stack([
+            CX + F * (xn + 2 * P1 * xn * yn + P2 * (r2 + 2 * xn * xn)),
+            CY + F * (yn + P1 * (r2 + 2 * yn * yn) + 2 * P2 * xn * yn)])
+    else:
+        px = np.column_stack([CX + rr * np.cos(ph), CY + rr * np.sin(ph)])
     px = flatten_disp(px)
     v[:, 2] = px[:, 0] / W; v[:, 3] = px[:, 1] / H
     valid = ((th <= THETA_MAX) & (px[:, 0] >= -0.02 * W) & (px[:, 0] <= 1.02 * W)
