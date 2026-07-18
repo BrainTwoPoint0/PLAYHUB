@@ -485,6 +485,10 @@ def main():
         'H': diag['H'].tolist(),
         'median_res': diag['median_res'],
         'cadence_us': cadence_us,
+        # lets the downstream jersey-labels job reconstruct chains on the
+        # ABSOLUTE clock (older docs lack it; the job then uses 0 = relative,
+        # which shifts the resample grid phase by < SAMPLE_DT, nothing more)
+        'start_time_us': start_us,
         'lag_s': lag_s,
         'lag_r': lag_r,
         'det_layout': {'chosen': layout_label, 'candidates': layout_diag,
@@ -502,7 +506,12 @@ def main():
     archive_provenance(trk_items, solve_doc, validation_png)
 
     HEARTBEAT_STOP.set()
-    set_status({'tracklets_status': 'ready', 'tracklets_error': None},
+    # jersey_status reset: a fresh base artifact + provenance supersede any
+    # previous jersey enrichment — the jersey sweep re-claims allowlisted
+    # venues naturally (unconditional: the sweep's allowlist is the one gate)
+    set_status({'tracklets_status': 'ready', 'tracklets_error': None,
+                'jersey_status': None, 'jersey_error': None,
+                'jersey_attempts': 0},
                retries=3)
     print(f'tracklets ready: {payload["meta"]["nObjects"]} objects, '
           f'median concurrency {conc:.0f}, span {span_s:.0f}s', flush=True)

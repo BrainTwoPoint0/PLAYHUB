@@ -83,6 +83,20 @@ KF_SIGMA_M = 0.3           # m — measurement noise (pilot MAD estimate)
 KF_SIGMA_A = 3.0           # m/s² — process noise (follows sprints, kills jitter)
 # Artifact size budget — beyond this, halve the sample rate (client lerps).
 MAX_TOTAL_POINTS = 700_000
+# Client self-DoS caps (src/lib/panorama/tracklets.ts): parseTracklets()
+# returns null — Spotlight silently dead — on any artifact beyond these. The
+# HCT stadium-bowl incident: 26,461 objects / 1.11M pts published, over the
+# then-5k/800k caps. Step-halving alone cannot guarantee the points cap
+# (it halves ONCE); motion-adaptive decimation + the tightening backstop in
+# build_payload does.
+PAYLOAD_MAX_OBJECTS = 40_000
+PAYLOAD_MAX_POINTS = 800_000
+# Motion-adaptive decimation (validated on HCT, 2026-07-17 eyes-on): keep a
+# sample iff it moved >= MOVE_DEG (|dpan|+|dtilt|) since the last kept one OR
+# HOLD_S elapsed (lerp across a held pose stays anchored); endpoints always.
+# Stationary crowd collapses to a few points; movers keep full rate.
+DECIMATE_MOVE_DEG = 0.12
+DECIMATE_HOLD_S = 4.0
 
 # Roster cardinality (Tier 2a): estimate N = players on the pitch, so the client
 # can cap the visible trackers at N ("never more trackers than players"). N is
@@ -738,6 +752,22 @@ def build_payload(chains: list, H: np.ndarray, start_time_us: int,
             'tilt': [round(float(v), 2) for v in tilt[keep]],
         })
 
+    # Motion-adaptive decimation, tightened until the CLIENT caps hold — an
+    # over-cap artifact must never be built (a stadium-bowl venue's 26k
+    # chains beat step-halving alone; see the constants block).
+    move_deg, hold_s = DECIMATE_MOVE_DEG, DECIMATE_HOLD_S
+    for _ in range(5):
+        _decimate_objects(objects, move_deg, hold_s)
+        if sum(len(o['t']) for o in objects) <= PAYLOAD_MAX_POINTS:
+            break
+        move_deg *= 1.5
+        hold_s *= 1.5
+    if sum(len(o['t']) for o in objects) > PAYLOAD_MAX_POINTS \
+            or len(objects) > PAYLOAD_MAX_OBJECTS:
+        raise RuntimeError(
+            f'payload over client caps after decimation: {len(objects)} '
+            f'objects / {sum(len(o["t"]) for o in objects)} points')
+
     return {
         'version': 1,
         'sampleFps': (1 / SAMPLE_DT) / step,
@@ -754,5 +784,26 @@ def build_payload(chains: list, H: np.ndarray, start_time_us: int,
             else estimate_roster_n(chains),
             'officialsIncluded': True,
             'downsampled': step > 1,
+            'adaptiveDecimation': {'moveDeg': round(move_deg, 4),
+                                   'holdS': round(hold_s, 2)},
         },
     }
+
+
+def _decimate_objects(objects: list, move_deg: float, hold_s: float) -> None:
+    """In-place motion-adaptive decimation (idempotent for fixed params —
+    re-running on decimated arrays keeps the same subset, so the tightening
+    loop in build_payload composes)."""
+    for o in objects:
+        t, pan, tilt = o['t'], o['pan'], o['tilt']
+        keep = [0]
+        for i in range(1, len(t) - 1):
+            k = keep[-1]
+            if (abs(pan[i] - pan[k]) + abs(tilt[i] - tilt[k]) >= move_deg
+                    or t[i] - t[k] >= hold_s):
+                keep.append(i)
+        if len(t) > 1:
+            keep.append(len(t) - 1)
+        o['t'] = [t[i] for i in keep]
+        o['pan'] = [pan[i] for i in keep]
+        o['tilt'] = [tilt[i] for i in keep]
