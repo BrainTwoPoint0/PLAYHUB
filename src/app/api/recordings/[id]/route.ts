@@ -8,6 +8,9 @@ import {
 import { getPlaybackUrl } from '@/lib/s3/client'
 import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3'
 
+// GET embeds a per-viewer signed video URL — never statically cache it.
+export const dynamic = 'force-dynamic'
+
 const s3Client = new S3Client({
   region: process.env.PLAYHUB_AWS_REGION || 'eu-west-2',
   credentials: {
@@ -45,7 +48,7 @@ export async function GET(
   let videoUrl = null
   if (recording.s3_key) {
     try {
-      videoUrl = await getPlaybackUrl(recording.s3_key, 3600)
+      videoUrl = await getPlaybackUrl(recording.s3_key, 4 * 60 * 60) // 4h — must outlive one match viewing (a 1h URL on a 1h match expired mid-playback)
     } catch (err) {
       console.error('Failed to generate signed URL:', err)
     }
@@ -108,24 +111,28 @@ export async function GET(
     }
   }
 
-  return NextResponse.json({
-    recording: {
-      id: recording.id,
-      title: recording.title,
-      description: recording.description,
-      matchDate: recording.match_date,
-      homeTeam: recording.home_team,
-      awayTeam: recording.away_team,
-      venue: recording.venue,
-      pitchName: recording.pitch_name,
-      status: recording.status,
-      duration: recording.duration_seconds,
+  return NextResponse.json(
+    {
+      recording: {
+        id: recording.id,
+        title: recording.title,
+        description: recording.description,
+        matchDate: recording.match_date,
+        homeTeam: recording.home_team,
+        awayTeam: recording.away_team,
+        venue: recording.venue,
+        pitchName: recording.pitch_name,
+        status: recording.status,
+        duration: recording.duration_seconds,
+      },
+      videoUrl,
+      access: accessResult,
+      graphicPackage,
+      mediaPack,
     },
-    videoUrl,
-    access: accessResult,
-    graphicPackage,
-    mediaPack,
-  })
+    // Carries a per-viewer signed video URL — no proxy/browser caching.
+    { headers: { 'Cache-Control': 'no-store' } }
+  )
 }
 
 export async function PATCH(

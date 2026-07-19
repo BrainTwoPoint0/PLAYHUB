@@ -30,8 +30,8 @@ import WatchClient from './WatchClient'
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-// The rendered HTML embeds a 1h signed S3 URL; CDNs / corporate proxies must
-// not cache one buyer's URL into another buyer's response.
+// The rendered HTML embeds a per-viewer signed video URL; CDNs / corporate
+// proxies must not cache one buyer's URL into another buyer's response.
 export const dynamic = 'force-dynamic'
 
 export default async function WatchPage({
@@ -133,7 +133,7 @@ export default async function WatchPage({
   let videoUrl: string | null = null
   if (recording.s3_key) {
     try {
-      videoUrl = await getPlaybackUrl(recording.s3_key, 3600)
+      videoUrl = await getPlaybackUrl(recording.s3_key, 4 * 60 * 60) // 4h — must outlive one match viewing (a 1h URL on a 1h match expired mid-playback)
     } catch (err) {
       console.error('Failed to generate playback URL:', err)
     }

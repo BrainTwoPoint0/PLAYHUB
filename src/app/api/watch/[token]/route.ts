@@ -3,6 +3,9 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getPlaybackUrl } from '@/lib/s3/client'
 
+// Response embeds a per-viewer signed video URL — never statically cache it.
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ token: string }> }
@@ -38,7 +41,7 @@ export async function GET(
   let videoUrl = null
   if (recording.s3_key) {
     try {
-      videoUrl = await getPlaybackUrl(recording.s3_key, 3600)
+      videoUrl = await getPlaybackUrl(recording.s3_key, 4 * 60 * 60) // 4h — must outlive one match viewing (a 1h URL on a 1h match expired mid-playback)
     } catch (err) {
       console.error('Failed to generate signed URL:', err)
     }
@@ -107,20 +110,26 @@ export async function GET(
     }
   }
 
-  return NextResponse.json({
-    recording: {
-      id: recording.id,
-      title: recording.title,
-      description: recording.description,
-      matchDate: recording.match_date,
-      homeTeam: recording.home_team,
-      awayTeam: recording.away_team,
-      venue: recording.venue,
-      pitchName: recording.pitch_name,
+  return NextResponse.json(
+    {
+      recording: {
+        id: recording.id,
+        title: recording.title,
+        description: recording.description,
+        matchDate: recording.match_date,
+        homeTeam: recording.home_team,
+        awayTeam: recording.away_team,
+        venue: recording.venue,
+        pitchName: recording.pitch_name,
+      },
+      videoUrl,
+      events: events || [],
+      graphicPackage,
+      mediaPack,
     },
-    videoUrl,
-    events: events || [],
-    graphicPackage,
-    mediaPack,
-  })
+    // Response carries a viewer-specific signed URL (unauthenticated share-token
+    // path, potentially minors' footage) — no proxy/browser may cache it and
+    // serve one viewer's URL to another. Same guard panorama-source uses.
+    { headers: { 'Cache-Control': 'no-store' } }
+  )
 }

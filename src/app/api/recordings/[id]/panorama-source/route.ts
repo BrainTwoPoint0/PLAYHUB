@@ -37,7 +37,7 @@ export const dynamic = 'force-dynamic'
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const SIGNED_URL_TTL = 3600 // 1h, matches the production's getPlaybackUrl
+const SIGNED_URL_TTL = 4 * 60 * 60 // 4h — matches getPlaybackUrl's default; must outlive one viewing (a 1h URL on a ≥1h asset expired mid-playback)
 const CAPTURE_STUCK_MS = 10 * 60_000 // a pending capture older than this can retry
 // (the Batch job heartbeats started_at, so a genuinely-running job never looks stuck)
 const ERROR_COOLDOWN_MS = 5 * 60_000 // wait this long before retrying a failed capture
