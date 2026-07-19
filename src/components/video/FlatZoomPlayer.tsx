@@ -25,6 +25,7 @@ import {
   Move,
 } from 'lucide-react'
 import { cn } from '@braintwopoint0/playback-commons/utils'
+import { refreshDelayMs, isExpiryError } from '@/lib/video/signed-url-refresh'
 
 interface FlatZoomPlayerProps {
   /** Full-pitch recording URL (HLS `.m3u8` or progressive mp4). */
@@ -33,6 +34,12 @@ interface FlatZoomPlayerProps {
   /** Max digital zoom factor. */
   maxZoom?: number
   className?: string
+  // Signed-URL re-signing (opt-in, mirrors useVideoTransport): when recordingId
+  // is set, the URL is refreshed before/on expiry and swapped in place,
+  // preserving position (zoom/pan already live in React state). shareToken lets
+  // bearer viewers re-sign. Omit both to disable.
+  recordingId?: string
+  shareToken?: string | null
 }
 
 const KEY_PAN_STEP_PX = 40
@@ -60,12 +67,24 @@ export function FlatZoomPlayer({
   posterUrl,
   maxZoom = 6,
   className = '',
+  recordingId,
+  shareToken,
 }: FlatZoomPlayerProps) {
   const t = useTranslations('player')
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const hlsRef = useRef<Hls | null>(null)
+  // The URL actually loaded — starts at `src`, replaced in place by re-signing
+  // (which must NOT go through the `src` prop). A prop change resyncs it below.
+  const [currentSrc, setCurrentSrc] = useState(src)
+  // Set just before a re-sign swap; restored on the next loadedmetadata.
+  const resumeAfterSwapRef = useRef<{ time: number; wasPaused: boolean } | null>(
+    null
+  )
+  const resigningRef = useRef(false)
+  const lastResignAtRef = useRef(0)
+  const resignRef = useRef<() => void>(() => {})
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -90,20 +109,74 @@ export function FlatZoomPlayer({
     return { w: el?.clientWidth ?? 0, h: el?.clientHeight ?? 0 }
   }
 
+  // A genuinely new video (prop change) resets currentSrc; re-signing updates it
+  // directly. Drop any pending swap-restore — a new video mustn't resume the old.
+  useEffect(() => {
+    resumeAfterSwapRef.current = null
+    setCurrentSrc(src)
+  }, [src])
+
+  // Re-sign the URL and swap it in place, preserving position (zoom/pan already
+  // live in state). No-op without recordingId; rate-limited + concurrency-guarded.
+  const resignAndSwap = useCallback(async () => {
+    const video = videoRef.current
+    if (!video || !recordingId || resigningRef.current) return
+    const now = Date.now()
+    if (now - lastResignAtRef.current < 10_000) return
+    resigningRef.current = true
+    lastResignAtRef.current = now
+    try {
+      const res = await fetch(`/api/recordings/${recordingId}/playback-url`, {
+        cache: 'no-store',
+        headers: shareToken ? { 'x-share-token': shareToken } : undefined,
+      })
+      if (!res.ok) throw new Error(`resign HTTP ${res.status}`)
+      const { url } = (await res.json()) as { url?: string }
+      if (!url) throw new Error('resign: no url')
+      resumeAfterSwapRef.current = {
+        time: video.currentTime,
+        wasPaused: video.paused,
+      }
+      setError(null)
+      setCurrentSrc(url)
+    } catch (err) {
+      console.error('[FlatZoomPlayer] re-sign failed:', err)
+    } finally {
+      resigningRef.current = false
+    }
+  }, [recordingId, shareToken])
+  useEffect(() => {
+    resignRef.current = resignAndSwap
+  }, [resignAndSwap])
+
+  // Proactive refresh at ~80% of the URL's TTL; re-arms on each swap.
+  useEffect(() => {
+    if (!recordingId) return
+    const delay = refreshDelayMs(currentSrc, Date.now())
+    if (delay === null) return
+    const id = setTimeout(() => resignRef.current(), delay)
+    return () => clearTimeout(id)
+  }, [currentSrc, recordingId])
+
   // --- HLS / <video> setup (mirrors VideoPlayer's proven pattern) ---
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
 
-    const isHls = src.includes('.m3u8')
+    const isHls = currentSrc.includes('.m3u8')
     if (isHls && Hls.isSupported()) {
       const hls = new Hls({ enableWorker: true })
-      hls.loadSource(src)
+      hls.loadSource(currentSrc)
       hls.attachMedia(video)
       hls.on(Hls.Events.ERROR, (_e, data) => {
         if (!data.fatal) return
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad()
-        else if (data.type === Hls.ErrorTypes.MEDIA_ERROR)
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          // An expired signed URL 403s here and never reaches video.error;
+          // re-sign instead of retrying the dead url.
+          const status = (data.response as { code?: number } | undefined)?.code
+          if (status === 403 && recordingId) resignRef.current()
+          else hls.startLoad()
+        } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR)
           hls.recoverMediaError()
         else {
           hls.destroy()
@@ -113,17 +186,30 @@ export function FlatZoomPlayer({
       })
       hlsRef.current = hls
     } else {
-      video.src = src
+      video.src = currentSrc
     }
 
     const onLoaded = () => {
       setDuration(video.duration || 0)
       setIsLoading(false)
+      // Re-sign swap: restore the live position (invisible mid-watch refresh).
+      const swap = resumeAfterSwapRef.current
+      if (swap) {
+        resumeAfterSwapRef.current = null
+        video.currentTime = Math.min(swap.time, Math.max(0, video.duration - 0.1))
+        if (!swap.wasPaused) void video.play().catch(() => {})
+      }
     }
     const onTime = () => setCurrentTime(video.currentTime)
     const onPlay = () => setIsPlaying(true)
     const onPause = () => setIsPlaying(false)
     const onError = () => {
+      // A dead signed URL surfaces as a network/src MediaError — re-sign + swap
+      // instead of showing the error card (no-op without recordingId → error).
+      if (recordingId && isExpiryError(video.error)) {
+        resignRef.current()
+        return
+      }
       setIsLoading(false)
       setError(t('loadFailed'))
     }
@@ -142,7 +228,7 @@ export function FlatZoomPlayer({
       hlsRef.current?.destroy()
       hlsRef.current = null
     }
-  }, [src, retry])
+  }, [currentSrc, retry, recordingId])
 
   useEffect(() => {
     if (!showHint) return

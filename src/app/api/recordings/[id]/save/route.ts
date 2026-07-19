@@ -3,6 +3,7 @@
 import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { grantRecordingAccess } from '@/lib/recordings/access-control'
+import { timingSafeStrEqual } from '@/lib/recordings/route-guards'
 
 export async function POST(
   request: NextRequest,
@@ -53,7 +54,11 @@ export async function POST(
     )
   }
 
-  if (!recording.share_token || recording.share_token !== token) {
+  if (
+    !token ||
+    !recording.share_token ||
+    !timingSafeStrEqual(String(token), recording.share_token)
+  ) {
     return NextResponse.json({ error: 'Invalid share token' }, { status: 403 })
   }
 

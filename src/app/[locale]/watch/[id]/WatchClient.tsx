@@ -705,6 +705,8 @@ export default function WatchClient({
                 // (no separate flat production), so keep the FlatZoom path.
                 <FlatZoomPlayer
                   src={videoUrl}
+                  recordingId={recording.id}
+                  shareToken={token}
                   posterUrl={recording.thumbnailUrl}
                   className="rounded-xl"
                 />

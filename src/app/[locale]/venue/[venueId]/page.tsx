@@ -1025,6 +1025,61 @@ export default function VenueManagementPage() {
     }
   }
 
+  // Rotate the share token: kills any previously-shared link and copies a fresh
+  // one. The security control for a leaked link (paired with Disable below).
+  async function resetPublicLink(recording: Recording) {
+    if (!confirm(t('feedback.resetLinkConfirm'))) return
+    setGeneratingLink(recording.id)
+    try {
+      const res = await fetch(`/api/recordings/${recording.id}/share-token`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ regenerate: true }),
+      })
+      const data = await res.json()
+      if (data.shareUrl) {
+        const fullUrl = data.shareUrl.startsWith('/')
+          ? `${window.location.origin}${data.shareUrl}`
+          : data.shareUrl
+        try {
+          await navigator.clipboard.writeText(fullUrl)
+        } catch {
+          window.prompt(t('feedback.copyLinkPrompt'), fullUrl)
+        }
+        setSuccess(t('feedback.publicLinkReset'))
+        setTimeout(() => setSuccess(null), 3000)
+      } else {
+        setError(t('feedback.publicLinkFailed'))
+      }
+    } catch {
+      setError(t('feedback.publicLinkFailed'))
+    } finally {
+      setGeneratingLink(null)
+    }
+  }
+
+  // Revoke sharing entirely — sets share_token to null, so every existing link
+  // 404s. Re-enable later via Public Link (which mints a fresh token).
+  async function disablePublicLink(recording: Recording) {
+    if (!confirm(t('feedback.disableLinkConfirm'))) return
+    setGeneratingLink(recording.id)
+    try {
+      const res = await fetch(`/api/recordings/${recording.id}/share-token`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        setSuccess(t('feedback.publicLinkDisabled'))
+        setTimeout(() => setSuccess(null), 3000)
+      } else {
+        setError(t('feedback.publicLinkDisableFailed'))
+      }
+    } catch {
+      setError(t('feedback.publicLinkDisableFailed'))
+    } finally {
+      setGeneratingLink(null)
+    }
+  }
+
   async function toggleBillable(recording: Recording) {
     setTogglingBillable(recording.id)
     try {
@@ -3775,6 +3830,30 @@ export default function VenueManagementPage() {
                           {generatingLink === recording.id
                             ? t('recordings.copying')
                             : t('recordings.publicLink')}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={outlineBtnClass}
+                          onClick={() => resetPublicLink(recording)}
+                          disabled={
+                            generatingLink === recording.id ||
+                            recording.status !== 'published'
+                          }
+                        >
+                          {t('recordings.resetLink')}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={outlineBtnClass}
+                          onClick={() => disablePublicLink(recording)}
+                          disabled={
+                            generatingLink === recording.id ||
+                            recording.status !== 'published'
+                          }
+                        >
+                          {t('recordings.disableLink')}
                         </Button>
                         <Button
                           variant="outline"

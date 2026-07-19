@@ -1,4 +1,6 @@
-// POST /api/recordings/[id]/share-token - Generate or get public share token
+// POST /api/recordings/[id]/share-token - Generate or get public share token.
+// Body { regenerate: true } forces a fresh token (rotating out any existing one
+// so previously-shared links stop working) — the admin "regenerate link" action.
 import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
@@ -40,16 +42,19 @@ export async function POST(
   // /watch/<bearer> form keeps working — the watch route handles non-UUID
   // segments via a backward-compat redirect.
   const base = process.env.NEXT_PUBLIC_APP_URL || ''
+  const regenerate = (await request.json().catch(() => ({})))?.regenerate === true
 
-  // If token already exists, return it
-  if (recording.share_token) {
+  // Get-or-create: return the existing token UNLESS the admin asked to
+  // regenerate (which rotates it, killing any previously-shared links).
+  if (recording.share_token && !regenerate) {
     return NextResponse.json({
       token: recording.share_token,
       shareUrl: `${base}/watch/${recording.id}?token=${recording.share_token}`,
+      regenerated: false,
     })
   }
 
-  // Generate new token
+  // Mint a new token (a regenerate overwrites the old one → old links 404).
   const token = randomBytes(16).toString('hex')
 
   const { error } = await (serviceClient as any)
@@ -67,6 +72,7 @@ export async function POST(
   return NextResponse.json({
     token,
     shareUrl: `${base}/watch/${recording.id}?token=${token}`,
+    regenerated: regenerate && !!recording.share_token,
   })
 }
 

@@ -17,6 +17,7 @@ import {
   checkRecordingAccess,
   isVenueAdmin,
 } from '@/lib/recordings/access-control'
+import { timingSafeStrEqual } from '@/lib/recordings/route-guards'
 import { meshBaseUrl, meshExists } from '@/lib/panorama/mesh'
 import { panWindowForFocus } from '@/lib/panorama/pitch-focus'
 import { hasMidline } from '@/lib/panorama/pitch-marks'
@@ -77,7 +78,7 @@ export default async function WatchPage({
   const tokenMatches = !!(
     token &&
     recording.share_token &&
-    token === recording.share_token
+    timingSafeStrEqual(String(token), recording.share_token)
   )
 
   const { user } = await getAuthUser()
