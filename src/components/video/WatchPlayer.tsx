@@ -41,6 +41,11 @@ type ExploreState =
 interface WatchPlayerProps {
   // The flat production (Spiideo Play) — the MASTER clock/audio + default view.
   src: string
+  // Enable signed-URL re-signing: the master video's URL is refreshed in place
+  // before it expires (and on an expiry error), preserving position. Forwarded
+  // to useVideoTransport; `shareToken` lets bearer viewers re-sign.
+  recordingId?: string
+  shareToken?: string | null
   events?: RecordingEvent[]
   canEdit?: boolean
   onAddTag?: (
@@ -67,6 +72,8 @@ interface WatchPlayerProps {
 
 export function WatchPlayer({
   src,
+  recordingId,
+  shareToken,
   events = [],
   canEdit = false,
   onAddTag,
@@ -92,6 +99,8 @@ export function WatchPlayer({
     onSeek,
     canEdit,
     onAddTag,
+    recordingId,
+    shareToken,
   })
   const { state, commands } = t
   const tw = useTranslations('watch')

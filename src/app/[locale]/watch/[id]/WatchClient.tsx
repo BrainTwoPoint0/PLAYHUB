@@ -2,7 +2,8 @@
 
 import { Link } from '@/i18n/navigation'
 import { useFormatter, useTranslations } from 'next-intl'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { refreshDelayMs } from '@/lib/video/signed-url-refresh'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
@@ -234,9 +235,17 @@ export default function WatchClient({
   const explorePollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const exploreDeadlineRef = useRef<number>(0)
   const explorePollsRef = useRef<number>(0)
+  // One-shot retry timer for a failed raw-VP proactive re-sign; `used` bounds it
+  // to a single retry per proactive cycle.
+  const panoramaResignRetryRef = useRef<{
+    timer: ReturnType<typeof setTimeout> | null
+    used: boolean
+  }>({ timer: null, used: false })
   useEffect(
     () => () => {
       if (explorePollRef.current) clearTimeout(explorePollRef.current)
+      if (panoramaResignRetryRef.current.timer)
+        clearTimeout(panoramaResignRetryRef.current.timer)
     },
     []
   )
@@ -301,6 +310,59 @@ export default function WatchClient({
     setExploreState('loading')
     void requestPanorama()
   }
+
+  // Raw-VP re-sign: the de-warp's signed URL expires like the master's, but the
+  // capture poll stops at 'ready' and never refreshes it. Re-call panorama-source
+  // (which re-signs on every hit) and publish the fresh URL — VirtualPanoramaPlayer
+  // rebuilds its texture and the slave re-seeks to the master. Quiet on failure;
+  // no deadline/state churn (unlike requestPanorama, which drives the capture).
+  const resignPanorama = useCallback(async () => {
+    let ok = false
+    try {
+      const res = await fetch(
+        `/api/recordings/${recording.id}/panorama-source${token ? `?token=${encodeURIComponent(token)}` : ''}`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: '{}',
+          cache: 'no-store',
+        }
+      )
+      if (res.ok) {
+        const data = (await res.json().catch(() => ({}))) as {
+          status?: string
+          url?: string
+        }
+        if (data.status === 'ready' && data.url) {
+          panoramaResignRetryRef.current.used = false // success → fresh budget
+          setPanoramaSrc(data.url) // re-arms the proactive effect
+          ok = true
+        }
+      }
+    } catch {
+      // fall through to the bounded retry below
+    }
+    // One bounded retry per cycle — a single blip shouldn't leave the de-warp to
+    // 403 at expiry. After that the player's own error path is the fallback.
+    if (!ok && !panoramaResignRetryRef.current.used) {
+      panoramaResignRetryRef.current.used = true
+      panoramaResignRetryRef.current.timer = setTimeout(() => {
+        void resignPanorama()
+      }, 30_000)
+    }
+  }, [recording.id, token])
+
+  // Proactive: re-arm at ~80% of the current panorama URL's TTL. Re-runs each
+  // time panoramaSrc changes (initial ready + each resign).
+  useEffect(() => {
+    if (!panoramaSrc) return
+    const delay = refreshDelayMs(panoramaSrc, Date.now())
+    if (delay === null) return
+    const id = setTimeout(() => {
+      void resignPanorama()
+    }, delay)
+    return () => clearTimeout(id)
+  }, [panoramaSrc, resignPanorama])
 
   // View-progress persistence: skip duplicate writes when the user is
   // paused (player still pings every 5s). Use sendBeacon when the page is
@@ -652,6 +714,8 @@ export default function WatchClient({
                 // without ever hiding the transport controls (never locked out).
                 <WatchPlayer
                   src={videoUrl}
+                  recordingId={recording.id}
+                  shareToken={token}
                   events={events}
                   canEdit={canTag}
                   onAddTag={openTagOverlay}

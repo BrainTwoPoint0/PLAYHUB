@@ -24,19 +24,22 @@
 //    multi-instance serverless deploy doesn't share) + a global in-flight cap
 //    rate-limit the Spiideo-actuating capture.
 
-import { NextRequest, NextResponse } from 'next/server'
-import { timingSafeEqual } from 'node:crypto'
+import { NextRequest } from 'next/server'
 import { BatchClient, SubmitJobCommand } from '@aws-sdk/client-batch'
 import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
 import { checkRecordingAccess } from '@/lib/recordings/access-control'
 import { getPlaybackUrl } from '@/lib/s3/client'
 import { meshExists } from '@/lib/panorama/mesh'
+import {
+  RECORDING_UUID_RE,
+  timingSafeStrEqual,
+  sameOriginOk,
+  noStore,
+} from '@/lib/recordings/route-guards'
 
 // Signed URLs (minors' footage) must never be cached across viewers.
 export const dynamic = 'force-dynamic'
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const SIGNED_URL_TTL = 4 * 60 * 60 // 4h — matches getPlaybackUrl's default; must outlive one viewing (a 1h URL on a ≥1h asset expired mid-playback)
 const CAPTURE_STUCK_MS = 10 * 60_000 // a pending capture older than this can retry
 // (the Batch job heartbeats started_at, so a genuinely-running job never looks stuck)
@@ -44,34 +47,12 @@ const ERROR_COOLDOWN_MS = 5 * 60_000 // wait this long before retrying a failed 
 const MAX_ATTEMPTS = 3 // stop re-submitting the Batch job for a VP that can't materialize
 const GLOBAL_INFLIGHT_CAP = 5 // max concurrent captures across all recordings
 
-function timingSafeStrEqual(a: string, b: string): boolean {
-  const ab = Buffer.from(a)
-  const bb = Buffer.from(b)
-  return ab.length === bb.length && timingSafeEqual(ab, bb)
-}
-
-function sameOriginOk(request: NextRequest): boolean {
-  const origin = request.headers.get('origin')
-  if (!origin) return true // same-origin navigations may omit Origin
-  try {
-    return new URL(origin).origin === new URL(request.url).origin
-  } catch {
-    return false
-  }
-}
-
-function noStore(json: unknown, status = 200): NextResponse {
-  const res = NextResponse.json(json, { status })
-  res.headers.set('Cache-Control', 'no-store')
-  return res
-}
-
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  if (!UUID_RE.test(id))
+  if (!RECORDING_UUID_RE.test(id))
     return noStore({ error: 'bad id', code: 'bad_request' }, 400)
   if (!sameOriginOk(request))
     return noStore({ error: 'forbidden', code: 'forbidden' }, 403)

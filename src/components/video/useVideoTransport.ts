@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import Hls from 'hls.js'
+import { refreshDelayMs, isExpiryError } from '@/lib/video/signed-url-refresh'
 
 // The HTML5 <video> + hls.js transport, extracted verbatim from VideoPlayer so
 // BOTH the flat marketplace player and the unified WatchPlayer drive one master
@@ -20,6 +21,13 @@ interface UseVideoTransportOptions {
     timestampSeconds: number,
     videoEl: HTMLVideoElement | null
   ) => void
+  // Signed-URL re-signing (opt-in). When `recordingId` is set, the hook fetches
+  // a fresh signed URL before the current one expires (and reactively on an
+  // expiry error) and swaps it in place, preserving playback position — so a
+  // long session never 403-loops on a dead URL. `shareToken` is forwarded to
+  // the re-sign endpoint for bearer (share-link) viewers. Omit both to disable.
+  recordingId?: string
+  shareToken?: string | null
 }
 
 export function useVideoTransport({
@@ -29,10 +37,30 @@ export function useVideoTransport({
   onSeek,
   canEdit = false,
   onAddTag,
+  recordingId,
+  shareToken,
 }: UseVideoTransportOptions) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const hlsRef = useRef<Hls | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  // The URL the <video> is actually loading. Starts at the server-signed `src`
+  // and is replaced in place by re-signing (which must NOT go through the `src`
+  // prop, or the resume-seek would fire against the OLD position). A prop change
+  // to `src` (a genuinely new video) resyncs it below.
+  const [currentSrc, setCurrentSrc] = useState(src)
+  // Set just before a re-sign swap; the loadedmetadata handler restores from it
+  // (live position/paused/rate) instead of the first-load resume seek.
+  const resumeAfterSwapRef = useRef<{
+    time: number
+    wasPaused: boolean
+    rate: number
+  } | null>(null)
+  const resigningRef = useRef(false)
+  const lastResignAtRef = useRef(0)
+  // Declared here (before the HLS setup effect) so that effect's error handler
+  // can invoke the latest resign. Populated by the sync effect below; a no-op
+  // until then (errors can't fire before the video loads, post-commit).
+  const resignRef = useRef<() => void>(() => {})
   // Held in a ref so the keyboard handler doesn't re-attach every render
   // when toggleFullscreen's identity changes.
   const toggleFullscreenRef = useRef<(() => void) | null>(null)
@@ -61,10 +89,18 @@ export function useVideoTransport({
 
   const controlsTimeoutRef = useRef<NodeJS.Timeout>(undefined)
 
-  // HLS setup
+  // A genuinely new video (prop change) resets the internal src; re-signing
+  // updates currentSrc directly and never touches the prop. Drop any pending
+  // swap-restore — a new video must never resume the OLD video's position.
+  useEffect(() => {
+    resumeAfterSwapRef.current = null
+    setCurrentSrc(src)
+  }, [src])
+
+  // HLS setup — keyed on currentSrc so a re-sign swap re-runs it cleanly.
   useEffect(() => {
     const video = videoRef.current
-    if (!video || !src) return
+    if (!video || !currentSrc) return
 
     if (hlsRef.current) {
       hlsRef.current.destroy()
@@ -77,16 +113,23 @@ export function useVideoTransport({
     setQualityLevels([])
     setCurrentLevel(-1)
 
-    const isHls = src.includes('.m3u8')
+    const isHls = currentSrc.includes('.m3u8')
 
     if (isHls && Hls.isSupported()) {
       const hls = new Hls({ enableWorker: true, lowLatencyMode: true })
-      hls.loadSource(src)
+      hls.loadSource(currentSrc)
       hls.attachMedia(video)
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad()
-          else if (data.type === Hls.ErrorTypes.MEDIA_ERROR)
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            // An expired signed URL 403s here and never bubbles to
+            // `video.error`, so hls.js would retry the DEAD url forever. On a
+            // 403 with re-signing enabled, re-sign + swap instead of startLoad.
+            const status = (data.response as { code?: number } | undefined)
+              ?.code
+            if (status === 403 && recordingId) resignRef.current()
+            else hls.startLoad()
+          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR)
             hls.recoverMediaError()
           else hls.destroy()
         }
@@ -109,9 +152,9 @@ export function useVideoTransport({
       })
       hlsRef.current = hls
     } else if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = src
+      video.src = currentSrc
     } else {
-      video.src = src
+      video.src = currentSrc
     }
 
     return () => {
@@ -120,7 +163,68 @@ export function useVideoTransport({
         hlsRef.current = null
       }
     }
-  }, [src])
+    // recordingId is a stable page-level prop (only gates the HLS 403 re-sign);
+    // included to satisfy exhaustive-deps — it never changes mid-session, so it
+    // never forces a spurious reload.
+  }, [currentSrc, recordingId])
+
+  // Re-sign the playback URL and swap it in place, preserving the live
+  // position/paused/rate. No-op unless `recordingId` is set. Rate-limited and
+  // concurrency-guarded so a persistently-failing URL can't tight-loop.
+  const resignAndSwap = useCallback(async () => {
+    const video = videoRef.current
+    if (!video || !recordingId || resigningRef.current) return
+    const now = Date.now()
+    if (now - lastResignAtRef.current < 10_000) return
+    resigningRef.current = true
+    lastResignAtRef.current = now
+    try {
+      // Token in a header (not the query) so this repeatedly-polled endpoint
+      // doesn't leak a non-expiring token into access logs.
+      const res = await fetch(
+        `/api/recordings/${recordingId}/playback-url`,
+        {
+          cache: 'no-store',
+          headers: shareToken ? { 'x-share-token': shareToken } : undefined,
+        }
+      )
+      if (!res.ok) throw new Error(`resign HTTP ${res.status}`)
+      const { url } = (await res.json()) as { url?: string }
+      if (!url) throw new Error('resign: no url')
+      // Restore the live position on the next loadedmetadata (see below).
+      resumeAfterSwapRef.current = {
+        time: video.currentTime,
+        wasPaused: video.paused,
+        rate: video.playbackRate,
+      }
+      setCurrentSrc(url) // re-runs the setup effect → reloads → restores
+    } catch (err) {
+      // Leave any existing error state; the proactive timer fired once and the
+      // reactive path is rate-limited, so this fails safe (no loop).
+      console.error('[useVideoTransport] re-sign failed:', err)
+    } finally {
+      resigningRef.current = false
+    }
+  }, [recordingId, shareToken])
+
+  // Keep the ref (declared above the setup effect) pointed at the latest
+  // resign, so the mount-once listener effect + the HLS handler always call it.
+  useEffect(() => {
+    resignRef.current = resignAndSwap
+  }, [resignAndSwap])
+
+  // Proactive refresh: re-arm whenever the loaded URL changes (initial + after
+  // each swap). Fires at ~80% of the URL's remaining TTL. Disabled without a
+  // recordingId or when the URL carries no parseable expiry (reactive covers it).
+  useEffect(() => {
+    if (!recordingId) return
+    const delay = refreshDelayMs(currentSrc, Date.now())
+    if (delay === null) return
+    const id = setTimeout(() => {
+      resignRef.current()
+    }, delay)
+    return () => clearTimeout(id)
+  }, [currentSrc, recordingId])
 
   // Video event listeners
   useEffect(() => {
@@ -134,6 +238,20 @@ export function useVideoTransport({
     const onLoadedMetadata = () => {
       setDuration(video.duration)
       setIsLoading(false)
+      // Re-sign swap: restore the LIVE position/rate and resume if it was
+      // playing. Takes precedence over the first-load resume seek so a mid-watch
+      // URL refresh is invisible.
+      const swap = resumeAfterSwapRef.current
+      if (swap) {
+        resumeAfterSwapRef.current = null
+        video.currentTime = Math.min(
+          swap.time,
+          Math.max(0, video.duration - 0.1)
+        )
+        video.playbackRate = swap.rate
+        if (!swap.wasPaused) video.play().catch(() => {})
+        return
+      }
       if (
         !didResumeSeek &&
         typeof initialTimeSeconds === 'number' &&
@@ -144,6 +262,11 @@ export function useVideoTransport({
         video.currentTime = initialTimeSeconds
         didResumeSeek = true
       }
+    }
+    // A dead signed URL surfaces as a network/src MediaError. Re-sign + swap
+    // (no-op without a recordingId). Not an expiry error → left unhandled.
+    const onError = () => {
+      if (isExpiryError(video.error)) resignRef.current()
     }
     const onTimeUpdate = () => setCurrentTime(video.currentTime)
     const onPlay = () => {
@@ -176,6 +299,7 @@ export function useVideoTransport({
     video.addEventListener('canplay', onCanPlay)
     video.addEventListener('progress', onProgress)
     video.addEventListener('ratechange', onRateChange)
+    video.addEventListener('error', onError)
     video.addEventListener('enterpictureinpicture', onPiPEnter)
     video.addEventListener('leavepictureinpicture', onPiPLeave)
 
@@ -190,6 +314,7 @@ export function useVideoTransport({
       video.removeEventListener('canplay', onCanPlay)
       video.removeEventListener('progress', onProgress)
       video.removeEventListener('ratechange', onRateChange)
+      video.removeEventListener('error', onError)
       video.removeEventListener('enterpictureinpicture', onPiPEnter)
       video.removeEventListener('leavepictureinpicture', onPiPLeave)
     }
