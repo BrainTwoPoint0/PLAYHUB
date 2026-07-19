@@ -96,6 +96,26 @@ async function withParams(s) {
   return JSON.parse(await d.text())
 }
 
+/** Expand a GL triangle strip to a triangle list (skip degenerate restarts). */
+function stripToTriangleList(u32) {
+  const out = []
+  for (let i = 0; i < u32.length - 2; i++) {
+    const a = u32[i],
+      b = u32[i + 1],
+      c = u32[i + 2]
+    if (a === b || b === c || a === c) continue
+    if (i % 2 === 0) out.push(a, b, c)
+    else out.push(b, a, c)
+  }
+  return Uint32Array.from(out)
+}
+
+function looksLikeStrip(u32) {
+  if (u32.length < 3) return false
+  if (u32.length % 3 !== 0) return true
+  return u32[0] === u32[1]
+}
+
 mkdirSync(outDir, { recursive: true })
 let got = false
 for (const s0 of spd) {
@@ -108,6 +128,7 @@ for (const s0 of spd) {
   // Prefer version==1 (the mesh the player selects).
   const v = variants.find((x) => parseInt(x.version, 10) === 1) || variants[0]
   if (!v) continue
+  const files = {}
   for (const key of ['scene.json', 'indices.bin', 'vertices.bin']) {
     const url = v[key]?.url
     if (!url) {
@@ -119,13 +140,59 @@ for (const s0 of spd) {
       console.log(`  ${key} download HTTP ${resp.status}`)
       continue
     }
-    const buf = Buffer.from(await resp.arrayBuffer())
-    const dest = resolve(outDir, key)
-    writeFileSync(dest, buf)
-    console.log(`  ✓ ${key}  ${buf.length} bytes  <- ${url.slice(0, 90)}...`)
+    files[key] = Buffer.from(await resp.arrayBuffer())
+    console.log(`  ✓ ${key}  ${files[key].length} bytes  <- ${url.slice(0, 90)}...`)
     got = true
   }
-  if (got) break // one good mesh is enough (scene mesh is shared across Nazwa games)
+  if (!got) continue
+  // Spiideo ships triangle STRIPS; our player expects a triangle LIST.
+  // Convert PER projection (HCT is 2-cam — whole-file convert left proj1 empty).
+  if (files['indices.bin'] && files['scene.json']) {
+    const I = new Uint32Array(
+      files['indices.bin'].buffer,
+      files['indices.bin'].byteOffset,
+      files['indices.bin'].byteLength / 4
+    )
+    const sc = JSON.parse(files['scene.json'].toString('utf8'))
+    const projs = sc.projections || []
+    const outChunks = []
+    let ioff = 0
+    let any = false
+    for (let pi = 0; pi < projs.length; pi++) {
+      const nv = projs[pi].n_vertices
+      const ni = projs[pi].n_indices
+      const raw = I.subarray(ioff, ioff + ni)
+      ioff += ni
+      if (looksLikeStrip(raw)) {
+        const list = stripToTriangleList(raw)
+        outChunks.push(list)
+        projs[pi].n_indices = list.length
+        any = true
+        console.log(
+          `  ✓ proj${pi} strip→trilist  ${raw.length} → ${list.length} (${list.length / 3} tris, nv=${nv})`
+        )
+      } else {
+        outChunks.push(raw)
+        console.log(`  · proj${pi} already trilist  ${raw.length} indices (nv=${nv})`)
+      }
+    }
+    if (any) {
+      const total = outChunks.reduce((n, c) => n + c.length, 0)
+      const merged = new Uint32Array(total)
+      let o = 0
+      for (const c of outChunks) {
+        merged.set(c, o)
+        o += c.length
+      }
+      files['indices.bin'] = Buffer.from(merged.buffer)
+      sc.index_description = 'uint32'
+      files['scene.json'] = Buffer.from(JSON.stringify(sc, null, 2) + '\n')
+    }
+  }
+  for (const [key, buf] of Object.entries(files)) {
+    writeFileSync(resolve(outDir, key), buf)
+  }
+  break // one good mesh is enough (scene mesh is shared across Nazwa games)
 }
 console.log(
   got

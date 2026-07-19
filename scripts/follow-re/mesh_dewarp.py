@@ -40,6 +40,8 @@ def ctx():
 
 
 def load_mesh(mesh_dir: str):
+    from mesh_indices import ensure_triangle_list
+
     sc = json.load(open(f"{mesh_dir}/scene.json"))
     V = np.frombuffer(open(f"{mesh_dir}/vertices.bin", "rb").read(), np.float32).reshape(-1, 5)
     I = np.frombuffer(open(f"{mesh_dir}/indices.bin", "rb").read(), np.uint32)
@@ -53,13 +55,16 @@ def load_mesh(mesh_dir: str):
         img = np.column_stack([vv[:, 0], vv[:, 1], np.ones(nv)])  # (f0,f1,1)
         world = (tw @ img.T).T.astype("f4")                    # Nx3
         uv = vv[:, 2:4].astype("f4")
-        tris = I[ioff:ioff + ni].astype(np.int64) - voff        # global → local rebase
-        t3 = tris[:len(tris) - len(tris) % 3].reshape(-1, 3)    # Spiideo meshes can have ni % 3 != 0 — iterate triples tolerantly like the TSX
-        keep = np.all((t3 >= 0) & (t3 < nv), axis=1)            # drop out-of-range (TSX 492-500)
+        raw = I[ioff:ioff + ni]
+        # Spiideo projectionParameters meshes are triangle STRIPS; our generated
+        # meshes are triangle LISTS. Auto-convert strips so bake coverage is
+        # solid (strip-as-list → ~33% speckles — FP pilot recon).
+        lis, _ = ensure_triangle_list(raw, n_vertices=nv)
+        t3 = (lis.astype(np.int64) - voff).reshape(-1, 3)
+        keep = np.all((t3 >= 0) & (t3 < nv), axis=1)
         projs.append(dict(world=world, uv=uv, tris=t3[keep].reshape(-1).astype("i4")))
         voff += nv; ioff += ni
     return projs, sc
-
 
 def camera_basis(pan, tilt):
     """Camera axes for the follow view. forward/right/up canonical (TSX 518-520),
