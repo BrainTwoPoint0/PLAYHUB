@@ -37,6 +37,60 @@ the player); geometric stitching tops out ~20–28s at high purity. The owner's 
 instinct is the right _structural_ move — it is **fixed-cardinality multi-object tracking** — but a
 cap is a **cardinality** bound, not an **identity** solution. This doc draws that line precisely.
 
+### 1.1 Concrete eyes-on frame (2026-07-19) — why distance can't fix it
+
+Captured on the shipped Spotlight during the display-honesty eyes-on. Reproduce:
+`/watch/435be371-3a89-4e5e-b17a-7287639b65f8` (Nazwa, game `afb81f5f…`, scene `131777a6…`),
+Explore → Spotlight, **462 % zoom**, t ≈ 0:17. A central 5-a-side scrum: a referee, a white-shirt
+player, and a yellow-bib player all within **~2 m** of each other carry **4 dots for 3 bodies** —
+one duplicate fragment (artifact **c**) sitting **2–3 m** off its body — plus a **4th isolated dot
+drifting onto empty grass** below the cluster (artifact **a**: a fragment that "got lost while
+tracking").
+
+This frame is the proof that **no distance threshold can separate a duplicate from a distinct
+player**:
+
+- The duplicate sits **above** both dedup radii the pipeline already uses — the producer's
+  `DEDUP_MERGE_M = 0.9 m` (metric, pre-homography) and the client's `SPOT_DOT_MERGE_DEG = 0.5°`
+  (≈ sub-metre near-side). Both are deliberately duplicate-grade.
+- Yet **three genuinely distinct players are within ~2 m** in the very same frame. Any radius wide
+  enough to merge the 2–3 m duplicate would collapse the scrum's real players into one dot —
+  swallowing a real body (the exact loss §3 forbids).
+- So the ambiguous 0.9–3 m band contains **both** duplicates and distinct-in-a-scrum players, and
+  distance alone cannot tell them apart. **Only identity can** — assign each fragment to a fixed
+  slot, and the duplicate shares the followed body's slot (→ one dot) while the grass-phantom
+  matches **no** reachable slot and is left **unfilled** rather than drawn (§3, in the wild).
+
+The shipped display fixes (angular zoom-stable dedup + dashed bridged spans) were only ever the
+_honesty_ layer: they stop close duplicates splitting on zoom and stop a bridged glide masquerading
+as tracked. They **cannot** and were never meant to remove this frame's duplicate or phantom — that
+is precisely Tier-2b's job.
+
+**Frame 2 (same session, 384 % zoom, Football Plus-style scrimmage) — the lock drop that proves the
+point.** A white-shirt player carried **two dots** (a duplicate). The viewer was locked on one; that
+fragment **ended**, and the lock went **"lost"** — even though the twin dot was **still visible on
+the very same player**. This is artifact **(a)/(b)** in its purest form, and it is not a bug in the
+re-association to be "tuned away":
+
+- On fragment death the follow tries geometry re-association within `SPOT_REASSOC_DEG` (2.5°), but
+  with a **deliberate ambiguity refusal** — if any rival sits within ~`d+0.8°` of the lost spot it
+  **refuses** rather than risk following a stranger (`VirtualPanoramaPlayer.tsx`, the `ambiguous`
+  gate). In a scrimmage the twin is a **different fragment id 2–3 m away**, and geometry alone
+  **cannot distinguish "my player's duplicate" from "a different player who wandered close."** So it
+  correctly refuses — **honest-lost, which §3 says beats confidently-wrong.** The frustration ("the
+  right body was RIGHT THERE") is exactly the cost the identity layer is meant to remove, and it is
+  the reason a distance heuristic is the wrong tool.
+- **Tier-2b dissolves it:** the twin would carry the **same slot**, and the slot hand-off adopts a
+  slot-mate **at any distance with no ambiguity gate** (already wired: the `sel.slot` → `slotMate`
+  path). One slot = one dot also means the duplicate never renders as a second dot in the first
+  place. The follow survives the fragment death because it is riding a **label**, not chasing
+  geometry.
+
+So the two frames together are the whole argument: **Frame 1** — distance can't separate duplicate
+from distinct; **Frame 2** — distance can't hand a lock across a fragment death without risking a
+stranger. Both need a per-fragment **identity/slot**, assigned offline (§5, Tier-2b), preferring an
+**unfilled slot / honest-lost** over a guess (§3).
+
 ## 2. The load-bearing framing (do not lose this)
 
 **The roster is the substrate the parked jersey path plugs into.** The entire argument for jersey

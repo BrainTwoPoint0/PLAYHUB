@@ -35,6 +35,8 @@ import {
   objectsAt,
   nearestObject,
   slotMate,
+  angDistDeg,
+  isBridged,
   type Tracklets,
 } from '@/lib/panorama/tracklets'
 import { computeFraming, searchFov } from '@/lib/panorama/framing'
@@ -1684,9 +1686,22 @@ export function VirtualPanoramaPlayer({
         // place (a fresh fragment id, not an identity jump) — adopt it without
         // spending a hop, so a player re-fragmenting in place stays followed.
         const SPOT_COLOCATED_DEG = 0.5
-        // Overlay dots closer than this on screen are the same body (or the
-        // ring's own player) — merged, killing the "two trackers on one player".
-        const SPOT_DOT_MERGE_PX = 12
+        // Overlay dots closer than this in pan/tilt are the same body (or the
+        // ring's own player) — merged, killing the "two trackers on one
+        // player". ANGULAR (not pixel) so it is identical at every zoom: a
+        // pixel radius shrinks in world terms as you zoom in, so co-located
+        // duplicates that merged at wide zoom split apart when zoomed in.
+        // 0.5° matches SPOT_COLOCATED_DEG (the "same body re-indexed" grade).
+        // Duplicate-grade near-side (≈0.17 m). FAR-side, foreshortening makes
+        // 0.5° span several metres of DEPTH along one line of sight, so two
+        // distinct players stacked in tilt can merge there — bounded by venue
+        // geometry (safe on small pitches; worst on a wide pitch with a low
+        // mast). Accepted, not a regression: the old pixel merge foreshortened
+        // the same way, this only fixes the zoomed-in UNDER-merge; the affected
+        // region is a small far-side fraction. The 2-3 m concurrent duplicates
+        // need slot identity (Tier-2b), not a wider radius (that would swallow
+        // real players in open play).
+        const SPOT_DOT_MERGE_DEG = 0.5
         // Distinguishes a real seek from a suspended RAF (backgrounded tab).
         let lastRafMs = performance.now()
         // The SLAVE raw-VP video is what the user SEES (its frames feed the
@@ -2223,14 +2238,12 @@ export function VirtualPanoramaPlayer({
           const active = objectsAt(track, clock)
           let di = 0
           if (spotlightRef.current) {
-            // De-duplicate on screen: skip a dot within SPOT_DOT_MERGE_PX of an
-            // already-placed dot or of the followed player's ring. Two tracker
-            // fragments on one body (or ring + a stray dot on the same player)
-            // read as a bug; pixel-space is what the eye actually sees.
-            const placed: { x: number; y: number }[] = []
-            const ringPx = sel
-              ? projectToPx(sel.lastPan, sel.lastTilt, w, h)
-              : null
+            // De-duplicate: skip a dot within SPOT_DOT_MERGE_DEG (pan/tilt) of
+            // an already-placed dot or of the followed player's ring. Two
+            // tracker fragments on one body (or ring + a stray dot on the same
+            // player) read as a bug; angular space keeps the merge identical at
+            // every zoom (pixel space split the pair apart when zoomed in).
+            const placed: { pan: number; tilt: number }[] = []
             // Roster cap (Tier 2a): never show more trackers than players. The
             // followed player's ring is one of the N, so its dot budget is N-1.
             // Absent rosterN (pre-Tier-2a artifacts) → no cap.
@@ -2255,30 +2268,43 @@ export function VirtualPanoramaPlayer({
                 sel &&
                 sel.slot !== null &&
                 a.slot === sel.slot &&
-                Math.hypot(a.panDeg - sel.lastPan, a.tiltDeg - sel.lastTilt) < 5
+                angDistDeg(a.panDeg, a.tiltDeg, sel.lastPan, sel.lastTilt) < 5
               )
                 continue
               if (a.slot !== undefined && drawnSlots.has(a.slot)) continue
               if (di >= maxDots) break
+              // Angular (zoom-stable) de-dup: on the followed ring's player, or
+              // on a body already drawn this frame.
+              if (
+                sel &&
+                angDistDeg(a.panDeg, a.tiltDeg, sel.lastPan, sel.lastTilt) <
+                  SPOT_DOT_MERGE_DEG
+              )
+                continue
+              if (
+                placed.some(
+                  (q) =>
+                    angDistDeg(a.panDeg, a.tiltDeg, q.pan, q.tilt) <
+                    SPOT_DOT_MERGE_DEG
+                )
+              )
+                continue
               const p = projectToPx(a.panDeg, a.tiltDeg, w, h)
               if (!p) continue
               if (a.slot !== undefined) drawnSlots.add(a.slot)
+              placed.push({ pan: a.panDeg, tilt: a.tiltDeg })
               const ts = tiltScale(a.tiltDeg)
-              const mergePx = SPOT_DOT_MERGE_PX * ts * zoomK
-              if (
-                ringPx &&
-                Math.hypot(p.x - ringPx.x, p.y - ringPx.y) < mergePx
-              )
-                continue
-              if (
-                placed.some((q) => Math.hypot(p.x - q.x, p.y - q.y) < mergePx)
-              )
-                continue
-              placed.push(p)
               const c = dotPool[di]
               c.setAttribute('cx', p.x.toFixed(1))
               c.setAttribute('cy', p.y.toFixed(1))
               c.setAttribute('r', clamp(4 * ts * zoomK, 2, 9).toFixed(1))
+              // Inferred position (interpolated across a bridged gap): a faded
+              // "ghost" fill vs the solid tracked dot — same "less certain"
+              // grammar as the ring's dash. Set every frame (pooled dots).
+              c.setAttribute(
+                'fill',
+                a.bridged ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.8)'
+              )
               // stand down once someone is selected — the ring is the story
               c.style.opacity = sel ? '0.35' : '1'
               c.style.display = ''
@@ -2306,6 +2332,16 @@ export function VirtualPanoramaPlayer({
           }
           if (sel && ringEl && ringCasingEl && trailEl) {
             const lost = sel.lostSince !== null
+            // Following, but the current position is interpolated across a
+            // bridged gap — a guess, not tracked. Dash the (still emerald) ring
+            // so a wrong glide reads as uncertain. Milder than the grey "lost"
+            // dash; only meaningful while actively following.
+            // SCOPE: this only flags intra-fragment np.interp gaps. A
+            // cross-fragment re-association hand-off (adopting a mate/pickup)
+            // is a bigger identity guess and still renders SOLID — Tier-2b
+            // territory, not covered here.
+            const inferred =
+              !lost && isBridged(track.objects[sel.index], clock)
             // Ring position is smoothed separately from the camera: raw 5 Hz
             // samples inside a smooth-damped frame read as wobble.
             if (ringSm.forIndex !== sel.index) {
@@ -2345,8 +2381,13 @@ export function VirtualPanoramaPlayer({
                 ringEl.style.opacity = '0.8'
               } else {
                 ringEl.setAttribute('stroke', '#34d399')
-                ringEl.setAttribute('stroke-dasharray', '')
-                ringEl.setAttribute('fill', 'rgba(16,185,129,0.1)')
+                // Dashed emerald = following but position inferred; solid
+                // emerald = tracked. (Grey dash is the separate "lost" state.)
+                ringEl.setAttribute('stroke-dasharray', inferred ? '5 4' : '')
+                ringEl.setAttribute(
+                  'fill',
+                  inferred ? 'none' : 'rgba(16,185,129,0.1)'
+                )
                 // After a >1° hand-off the ring FADES in at the new player —
                 // a lerped swoosh across the pitch would read as motion.
                 const fadeLeft = sel.fadeUntil - performance.now()

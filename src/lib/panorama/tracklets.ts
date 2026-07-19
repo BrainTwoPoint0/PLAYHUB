@@ -27,6 +27,13 @@ export interface TrackletObject {
    *  sharing a slot draw one dot and the follow rides the slot across
    *  fragment gaps. Opaque equality key. Absent = honest-unlabelled. */
   slot?: string
+  /** Inferred (interpolated) spans, `[t0, t1]` pairs on the same clock as `t`.
+   *  The producer marks any gap in the ORIGINAL samples wider than its bridge
+   *  threshold; smooth_and_resample lerps straight across it, so a sample
+   *  whose time falls strictly inside a span is a GUESS (a stitch bridge or a
+   *  dropout), not tracked data. The overlay dashes it so a wrong glide reads
+   *  as uncertain instead of confident. Absent = fully tracked. */
+  bridged?: [number, number][]
 }
 
 export interface Tracklets {
@@ -118,6 +125,19 @@ export function parseTracklets(raw: unknown): Tracklets | null {
       slotRaw !== undefined && (jersey !== undefined || /^g\d$/.test(slotRaw))
         ? slotRaw
         : undefined
+    // Optional bridged spans — finite `[t0, t1]` pairs with t0 < t1. Malformed
+    // pairs are dropped individually (same degrade contract as jersey/slot); an
+    // all-bad or absent array simply omits the field (fully-tracked).
+    const bridged: [number, number][] = Array.isArray(e.bridged)
+      ? (e.bridged.filter(
+          (s): s is [number, number] =>
+            Array.isArray(s) &&
+            s.length === 2 &&
+            Number.isFinite(s[0]) &&
+            Number.isFinite(s[1]) &&
+            (s[0] as number) < (s[1] as number)
+        ) as [number, number][])
+      : []
     objects.push({
       id,
       t: t as number[],
@@ -125,6 +145,7 @@ export function parseTracklets(raw: unknown): Tracklets | null {
       tilt: tilt as number[],
       ...(jersey !== undefined ? { jersey } : {}),
       ...(slot !== undefined ? { slot } : {}),
+      ...(bridged.length > 0 ? { bridged } : {}),
     })
   }
   if (objects.length === 0) return null
@@ -187,6 +208,32 @@ export function sampleObject(
   }
 }
 
+/**
+ * Angular distance between two pan/tilt directions, in degrees. View- and
+ * zoom-independent, unlike a pixel distance — the overlay merges duplicate
+ * dots on this so two fragments of one body stay one dot at every zoom.
+ */
+export function angDistDeg(
+  aPan: number,
+  aTilt: number,
+  bPan: number,
+  bTilt: number
+): number {
+  return Math.hypot(aPan - bPan, aTilt - bTilt)
+}
+
+/**
+ * Is the object's position at `sec` interpolated across a bridged gap? True
+ * only STRICTLY inside a span — the endpoints are observed samples. Linear
+ * over the (few) spans; called per active object per frame.
+ */
+export function isBridged(obj: TrackletObject, sec: number): boolean {
+  const spans = obj.bridged
+  if (!spans) return false
+  for (const [t0, t1] of spans) if (sec > t0 && sec < t1) return true
+  return false
+}
+
 export interface ActiveObject {
   index: number
   id: string
@@ -194,6 +241,9 @@ export interface ActiveObject {
   tiltDeg: number
   /** Slot key of the underlying object, when labelled (see TrackletObject.slot). */
   slot?: string
+  /** True when this sample is interpolated across a bridged gap (see
+   *  isBridged) — the overlay dashes it as inferred rather than tracked. */
+  bridged: boolean
 }
 
 /**
@@ -214,6 +264,7 @@ export function objectsAt(track: Tracklets, sec: number): ActiveObject[] {
         panDeg: s.panDeg,
         tiltDeg: s.tiltDeg,
         ...(obj.slot !== undefined ? { slot: obj.slot } : {}),
+        bridged: isBridged(obj, sec),
       })
   }
   return out

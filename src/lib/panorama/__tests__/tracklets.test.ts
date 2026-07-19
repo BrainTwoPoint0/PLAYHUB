@@ -5,6 +5,8 @@ import {
   objectsAt,
   nearestObject,
   slotMate,
+  angDistDeg,
+  isBridged,
 } from '../tracklets'
 
 const OBJ_A = {
@@ -356,5 +358,63 @@ describe('slotMate', () => {
     // t=10.8: fragment o0 has ended; its GK slot-mate o1 is live
     const mate = slotMate(track, 10.8, 'g1', 0, 0, 0)
     expect(mate?.index).toBe(1)
+  })
+})
+
+describe('angDistDeg', () => {
+  it('is the euclidean pan/tilt distance in degrees', () => {
+    expect(angDistDeg(0, 0, 3, 4)).toBe(5)
+    expect(angDistDeg(-10, -30, -10, -30)).toBe(0)
+  })
+})
+
+describe('bridged field (dashed inferred spans)', () => {
+  const withBridge = {
+    ...VALID,
+    objects: [{ ...OBJ_A, bridged: [[10.2, 10.5]] }],
+  }
+
+  it('parses valid [t0,t1] spans onto the object', () => {
+    const obj = parseTracklets(withBridge)!.objects[0]
+    expect(obj.bridged).toEqual([[10.2, 10.5]])
+  })
+
+  it('omits the field when absent, and degrades malformed entries', () => {
+    expect(parseTracklets(VALID)!.objects[0].bridged).toBeUndefined()
+    // wrong shape / non-finite / t0>=t1 all dropped; all-bad omits the field
+    const bad = parseTracklets({
+      ...VALID,
+      objects: [
+        {
+          ...OBJ_A,
+          bridged: [[10.5, 10.2], [1], ['a', 'b'], [Infinity, 2]],
+        },
+      ],
+    })!.objects[0]
+    expect(bad.bridged).toBeUndefined()
+    // a mix keeps only the good pair
+    const mix = parseTracklets({
+      ...VALID,
+      objects: [{ ...OBJ_A, bridged: [[10.2, 10.5], [9, 9]] }],
+    })!.objects[0]
+    expect(mix.bridged).toEqual([[10.2, 10.5]])
+  })
+
+  it('isBridged is true strictly inside a span, false on/after endpoints', () => {
+    const obj = parseTracklets(withBridge)!.objects[0]
+    expect(isBridged(obj, 10.35)).toBe(true)
+    expect(isBridged(obj, 10.2)).toBe(false) // endpoint = observed
+    expect(isBridged(obj, 10.5)).toBe(false) // endpoint = observed
+    expect(isBridged(obj, 10.1)).toBe(false)
+  })
+
+  it('objectsAt carries the bridged flag at the sampled time', () => {
+    const track = parseTracklets(withBridge)!
+    expect(objectsAt(track, 10.35).find((a) => a.id === 'o0')?.bridged).toBe(
+      true
+    )
+    expect(objectsAt(track, 10.1).find((a) => a.id === 'o0')?.bridged).toBe(
+      false
+    )
   })
 })

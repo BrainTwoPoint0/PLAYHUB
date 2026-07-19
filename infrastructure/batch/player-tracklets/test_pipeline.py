@@ -1009,3 +1009,58 @@ def test_pitch_span_m_measures_kept_cloud():
     assert dx == pytest.approx(93.0, abs=0.5)
     assert dy == pytest.approx(52.0, abs=0.5)
     assert build_track.pitch_span_m([], P) == (0.0, 0.0)
+
+
+# ── Bridged-span honesty (dashed inferred glides) ─────────────────────────────
+
+_BRIDGE_DIAG = {'median_res': 0.01, 'matched_frames': 10, 'eval': None}
+
+
+def _gapped_chain():
+    """A chain with a single 1.5 s hole (2.5 s -> 4.0 s) — a bridge that
+    smooth_and_resample interpolates straight across."""
+    ts = np.concatenate([np.linspace(0, 2.5, 26),
+                         np.linspace(4.0, 6.0, 21)]) * 1e6
+    xy = np.column_stack([np.linspace(0, 6, ts.size), np.zeros(ts.size)])
+    return ts, xy
+
+
+def test_bridge_spans_marks_a_wide_gap():
+    ts, _ = _gapped_chain()
+    spans = build_track.bridge_spans(ts, 0.0)
+    assert len(spans) == 1
+    t0, t1 = spans[0]
+    assert t0 == pytest.approx(2.5, abs=0.01)
+    assert t1 == pytest.approx(4.0, abs=0.01)
+
+
+def test_bridge_spans_ignores_native_cadence():
+    # 0.2 s spacing throughout (well under BRIDGE_GAP_S) -> nothing to dash.
+    ts = np.linspace(0, 6, 31) * 1e6
+    assert build_track.bridge_spans(ts, 0.0) == []
+
+
+def test_bridge_spans_are_on_the_produced_clock():
+    # start_s offset must be subtracted so spans share the `t` timeline.
+    ts, _ = _gapped_chain()
+    spans = build_track.bridge_spans(ts + 10.0 * 1e6, 10.0)
+    assert spans[0][0] == pytest.approx(2.5, abs=0.01)
+
+
+def test_bridge_spans_degenerate_input():
+    assert build_track.bridge_spans(np.array([1.0e6]), 0.0) == []
+
+
+def test_build_payload_emits_bridged_only_when_gapped():
+    gapped = _gapped_chain()
+    cont_ts = np.linspace(0, 6, 61) * 1e6
+    cont = (cont_ts, np.column_stack([np.linspace(0, 6, 61), np.zeros(61)]))
+
+    with_gap = build_track.build_payload(
+        [gapped], np.eye(3), 0, _BRIDGE_DIAG, roster_n=1)
+    assert 'bridged' in with_gap['objects'][0]
+    assert with_gap['objects'][0]['bridged'][0][0] == pytest.approx(2.5, abs=0.05)
+
+    no_gap = build_track.build_payload(
+        [cont], np.eye(3), 0, _BRIDGE_DIAG, roster_n=1)
+    assert 'bridged' not in no_gap['objects'][0]

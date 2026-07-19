@@ -42,6 +42,12 @@ import cv2
 from mesh_rays import rayn_pan_tilt_deg
 
 SAMPLE_DT = 0.2  # 5 Hz
+# A gap in the ORIGINAL (pre-smooth) samples wider than this is INTERPOLATED,
+# not observed — smooth_and_resample lerps straight across it, so the client
+# must dash it (a wrong stitch bridge otherwise renders as a confident glide).
+# Native fragment sampling is 5 Hz (0.2s); the stitch ceiling is 2.5s, so any
+# gap > 0.5s is a bridge or an intra-fragment dropout — both are "inferred".
+BRIDGE_GAP_S = 0.5
 DEFAULT_CADENCE_US = 16_000_000
 # uuid seam continuity: measured seam gaps are one 5Hz step (0.2-0.25s);
 # anything past 1s means the tracker lost the object — don't trust the uuid.
@@ -888,6 +894,27 @@ def smooth_and_resample(ts: np.ndarray, xy: np.ndarray):
 
 # ── Payload ──────────────────────────────────────────────────────────────────
 
+def bridge_spans(ts: np.ndarray, start_s: float) -> list[list[float]]:
+    """Inferred (interpolated) spans of a chain, on the produced-video clock.
+
+    A gap between consecutive ORIGINAL samples wider than BRIDGE_GAP_S is not
+    observed data — smooth_and_resample lerps across it — so the client dashes
+    it. Endpoints are the last-observed and first-observed sample times (µs ->
+    produced-clock seconds), rounded to 2dp like the published `t`. Returns
+    ``[]`` for a gap-free chain (caller omits the field entirely)."""
+    if len(ts) < 2:
+        return []
+    t = ts / 1e6 - start_s
+    dt = np.diff(t)
+    out = []
+    for i in np.nonzero(dt > BRIDGE_GAP_S)[0]:
+        t0 = round(float(t[i]), 2)
+        t1 = round(float(t[i + 1]), 2)
+        if t1 > t0:  # survives 2dp rounding (a >0.5s gap always does)
+            out.append([t0, t1])
+    return out
+
+
 def build_payload(chains: list, H: np.ndarray, start_time_us: int,
                   diag: dict, roster_n: int | None = None) -> dict:
     """Chains + homography -> the public tracklets.json payload.
@@ -918,11 +945,16 @@ def build_payload(chains: list, H: np.ndarray, start_time_us: int,
         pan, tilt = rayn_pan_tilt_deg(rn.astype(np.float64))
         t_round = np.round(grid - start_s, 2)
         keep = np.concatenate([[True], np.diff(t_round) > 0])
+        # Bridged spans come from the ORIGINAL ts (the resampled grid is gap-free
+        # by construction); they're independent time ranges, so the decimation
+        # below leaves them untouched. Field omitted when there are no bridges.
+        bridged = bridge_spans(ts, start_s)
         objects.append({
             'id': f'o{i}',
             't': [float(v) for v in t_round[keep]],
             'pan': [round(float(v), 2) for v in pan[keep]],
             'tilt': [round(float(v), 2) for v in tilt[keep]],
+            **({'bridged': bridged} if bridged else {}),
         })
 
     # Motion-adaptive decimation, tightened until the CLIENT caps hold — an
