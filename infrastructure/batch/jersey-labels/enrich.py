@@ -90,11 +90,12 @@ def assert_caps(payload: dict) -> None:
 def stamp_meta(payload: dict, *, harvest_step_s: float, source_digest: str,
                kits: int, slots: int, labelled: int,
                split_accepted: int, split_refused: int,
-               gk_slots: int = 0) -> None:
+               gk_slots: int = 0, propagated_slots: int = 0) -> None:
     payload['meta']['jersey'] = {
         'version': 1,
         'slots': slots,
         'labeledObjects': labelled,
+        'propagatedSlots': propagated_slots,
         'kits': kits,
         'harvestStepS': harvest_step_s,
         'sourceDigest': source_digest,

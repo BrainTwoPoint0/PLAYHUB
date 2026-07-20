@@ -417,6 +417,93 @@ def test_assign_slots_gap_bridging():
     assert slot_of[0] == slot_of[1] == 'b7'
 
 
+# ── slot propagation (coverage: label a crossing successor that OVERLAPS an
+# already-slotted fragment; §3 empty-slot-over-guess stays sacred) ───────────
+
+def test_propagate_single_anchor_labels_unlabelled_fragment():
+    a10 = make_chain(0, 60, lambda t: (0.0, 0.0))     # slotted
+    frag = make_chain(30, 90, lambda t: (1.0, 0.0))   # 1m apart, overlaps 30-60
+    prop, diag = slots.propagate_slots({0: 'a10'}, [a10, frag])
+    assert prop == {1: 'a10'}
+    assert diag['propagatedChains'] == 1
+
+
+def test_propagate_refuses_conflicting_slots():
+    # an unlabelled bridge concurrent-close to TWO different slots (across a
+    # gap between them, so no geometric contradiction) -> pure label conflict
+    a10 = make_chain(0, 30, lambda t: (0.0, 0.0))     # slotted a10
+    b7 = make_chain(60, 90, lambda t: (0.0, 0.0))     # slotted b7
+    bridge = make_chain(0, 90, lambda t: (0.0, 0.0))  # overlaps both, 0m
+    prop, diag = slots.propagate_slots({0: 'a10', 1: 'b7'}, [a10, b7, bridge])
+    assert prop == {}
+    assert diag['conflictComponents'] == 1
+
+
+def test_propagate_refuses_transitive_two_body_component():
+    # 0-1 close, 1-2 close, but 0-2 concurrent 5m apart -> two bodies chained
+    # transitively; the whole component is refused (empty-slot over guess).
+    a10 = make_chain(0, 60, lambda t: (0.0, 0.0))     # slotted a10
+    u1 = make_chain(0, 60, lambda t: (2.5, 0.0))      # 2.5m from a10 (close)
+    u2 = make_chain(0, 60, lambda t: (5.0, 0.0))      # 2.5m from u1, 5m from a10
+    prop, diag = slots.propagate_slots({0: 'a10'}, [a10, u1, u2])
+    assert prop == {}
+    assert diag['contradictedComponents'] == 1
+
+
+def test_propagate_refuses_transitive_hop_through_unlabelled():
+    # A dies at a crossing; u1 overlaps A (same body); u2 overlaps ONLY u1 and
+    # never A -> no contradiction can fire, yet u2 may be a different player.
+    # A slot crosses the DIRECT A->u1 edge but NEVER the transitive u1->u2 hop.
+    a = make_chain(0, 12, lambda t: (0.0, 0.0))       # slotted a10, ends ~11.6s
+    u1 = make_chain(8, 20, lambda t: (0.0, 0.0))      # overlaps A [8,11.6], 0m
+    u2 = make_chain(14, 30, lambda t: (1.0, 0.0))     # overlaps u1 only, not A
+    prop, _ = slots.propagate_slots({0: 'a10'}, [a, u1, u2])
+    assert prop == {1: 'a10'}                 # direct edge to the anchor
+    assert 2 not in prop                      # transitive hop refused (stranger)
+
+
+def test_propagate_labels_fragment_that_starts_before_its_anchor():
+    # exercises the elif branch: the sweep yields (earlier, later), so when the
+    # unlabelled fragment starts first the anchor is the SECOND element.
+    frag = make_chain(0, 40, lambda t: (0.0, 0.0))    # unlabelled, starts first
+    anc = make_chain(20, 60, lambda t: (0.5, 0.0))    # slotted a10, overlaps [20,40]
+    prop, _ = slots.propagate_slots({1: 'a10'}, [frag, anc])
+    assert prop == {0: 'a10'}
+
+
+def test_propagate_refuses_sustained_stranger_beyond_prop_sep():
+    # a different player parallel at 2.5m for >2s while the anchor dies: passes
+    # SEP_M body-merge, no far pair -> no contradiction, but > PROP_SEP_M so the
+    # identity must NOT transfer (the wrong-body path CV built live).
+    a = make_chain(0, 12, lambda t: (0.0, 0.0))        # slotted a10, ends ~11.6
+    stranger = make_chain(8, 25, lambda t: (2.5, 0.0))  # 2.5m sustained, no contradiction
+    prop, _ = slots.propagate_slots({0: 'a10'}, [a, stranger])
+    assert prop == {}
+
+
+def test_propagate_keeps_true_same_body_within_prop_sep():
+    a = make_chain(0, 12, lambda t: (0.0, 0.0))
+    frag = make_chain(8, 25, lambda t: (0.8, 0.0))     # 0.8m = same body
+    prop, _ = slots.propagate_slots({0: 'a10'}, [a, frag])
+    assert prop == {1: 'a10'}
+
+
+def test_propagate_never_bridges_a_pure_gap():
+    a10 = make_chain(0, 30, lambda t: (0.0, 0.0))     # slotted
+    frag = make_chain(60, 90, lambda t: (40.0, 0.0))  # no temporal overlap
+    prop, _ = slots.propagate_slots({0: 'a10'}, [a10, frag])
+    assert prop == {}
+
+
+def test_propagate_leaves_slotted_chains_and_subslots_intact():
+    a10 = make_chain(0, 60, lambda t: (0.0, 0.0))     # slotted a10 (body 1)
+    a10b = make_chain(0, 60, lambda t: (20.0, 0.0))   # slotted a10-2 (body 2)
+    frag = make_chain(0, 60, lambda t: (1.0, 0.0))    # 1m from a10, 19m from a10-2
+    prop, _ = slots.propagate_slots({0: 'a10', 1: 'a10-2'}, [a10, a10b, frag])
+    assert prop == {2: 'a10'}                  # frag joins body 1 only
+    assert 0 not in prop and 1 not in prop     # slotted chains never re-emitted
+
+
 # ── enrich ──────────────────────────────────────────────────────────────────
 
 def _payload_chains():

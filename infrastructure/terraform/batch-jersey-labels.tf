@@ -120,7 +120,12 @@ resource "aws_batch_job_definition" "jersey_labels" {
       { name = "PARSEQ_SHA256", value = "c4fa39c4951edb0aa9d49a5c4cbd042761a421baccc23ae11afb1381be13f027" },
       { name = "LEGIBILITY_SHA256", value = "b9c61dabaea4a6ec99528c5ae394f5875aecb8207de38484eccb0f977a373e41" },
       { name = "YOLO_SHA256", value = "3df4ada6b4dad6d657868f2fdf7faecfb34dcfccf3a25c4b82079064718524c8" },
-      { name = "JERSEY_HARVEST_STEP_S", value = "4.0" },
+      # 2s (was 4s): ~2x play-anchored reads to raise slot coverage — the
+      # crossing successor is far more often labelled, and denser reads feed
+      # slot propagation more anchors. ~45min -> ~90min wall-clock, well under
+      # the 4h cap. Env-only: applied via a -target job-definition apply, no
+      # image rebuild.
+      { name = "JERSEY_HARVEST_STEP_S", value = "2.0" },
       { name = "SUPABASE_URL", value = var.supabase_url },
       { name = "SUPABASE_SERVICE_ROLE_KEY", value = var.supabase_service_key },
     ]

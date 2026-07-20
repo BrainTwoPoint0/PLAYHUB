@@ -492,6 +492,13 @@ def main():
     # ── labels + slots ──────────────────────────────────────────────────
     labels, label_diag = slots.build_labels(solo_records)
     slot_of, slot_diag = slots.assign_slots(labels, final_chains)
+    # Coverage lever: extend a slot to UNLABELLED same-body fragments (a
+    # crossing successor that OVERLAPS a slotted fragment) — concurrent-overlap
+    # evidence only, never across a gap (§3 empty-slot over guess). Distinct
+    # slot ids are unchanged (propagation reuses existing ids), so slot_diag
+    # ['slots'] stays correct.
+    prop_of, prop_diag = slots.propagate_slots(slot_of, final_chains)
+    slot_diag = {**slot_diag, **prop_diag}
     print(f'labels: {label_diag}; slots: {slot_diag}', flush=True)
 
     # ── synthetic GK zone-slots (2026-07-18) ────────────────────────────
@@ -525,7 +532,7 @@ def main():
                 else:
                     gk_slot_of, gk_diag = slots.assign_gk_slots(
                         final_chains, pmap, length_m, width_m, bounds,
-                        set(slot_of))
+                        set(slot_of) | set(prop_of))
                     print(f'gk slots ({src}): {gk_diag}', flush=True)
     except Exception as err:  # noqa: BLE001 — optional enrichment only
         print(f'gk slots skipped (non-fatal): '
@@ -542,13 +549,18 @@ def main():
     except RuntimeError as err:  # caps message — self-authored, safe
         raise JobError(str(err)) from err
     attached = enrich.attach_labels(payload, final_chains, labels, slot_of)
+    # propagated fragments carry a slot but NO jersey read -> slot-only attach
+    # (attach_slots skips objects that already have a slot, so it never
+    # clobbers a labelled one); GK slots fill whatever's still unslotted last.
+    prop_attached = enrich.attach_slots(payload, final_chains, prop_of)
     gk_attached = enrich.attach_slots(payload, final_chains, gk_slot_of)
     enrich.stamp_meta(
         payload, harvest_step_s=HARVEST_STEP_S, source_digest=source_digest,
         kits=int(k), slots=slot_diag['slots'], labelled=attached,
         split_accepted=len(accepted),
         split_refused=len(decisions) - len(accepted),
-        gk_slots=gk_diag.get('gkSlots', 0))
+        gk_slots=gk_diag.get('gkSlots', 0),
+        propagated_slots=prop_attached)
     try:
         enrich.assert_caps(payload)
     except RuntimeError as err:  # self-authored caps message

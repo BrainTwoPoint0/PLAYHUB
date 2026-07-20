@@ -35,6 +35,14 @@ LEG_GATE = 0.6
 PLAY_GATE_M = 25.0
 OVLP_S = 2.0
 SEP_M = 3.0
+# Propagation transfers a KNOWN identity onto an UNKNOWN body, so it demands a
+# tighter proximity than assign_slots' body-merge (which only ever merges two
+# chains that already share the (number, kit) label). A crossing stranger sits
+# 1.5-3m for >= OVLP_S; a true same-body fragment coincides within tracker
+# (sigma ~0.05-0.2m) + registration (corner <= ~1.15m) noise, comfortably under
+# 1.5m even at the corners. Only the propagation edge uses this; union +
+# contradiction stay at SEP_M so a 1.5-3m pair is still contradictable.
+PROP_SEP_M = 1.5
 KIT_CONSISTENCY_MIN = 0.8
 MIN_KIT_CROPS = 3
 
@@ -276,6 +284,113 @@ def assign_slots(labels: dict, chains: list) -> tuple:
             'labelledChains': len(slot_of),
             'duplicateNumberGroups': n_conflict_groups}
     return slot_of, diag
+
+
+def _overlapping_pairs(chains: list):
+    """Yield (i, j) for every pair whose time spans intersect, via a start-
+    ordered sweep (avoids the full O(n^2): ~26k chains at ~46 concurrency
+    would be 700M pairs). overlap_sep does the real >= OVLP_S / SEP_M test."""
+    order = sorted(range(len(chains)), key=lambda c: chains[c][0][0])
+    active: list = []
+    for c in order:
+        t0 = chains[c][0][0]
+        active = [a for a in active if chains[a][0][-1] >= t0]
+        for a in active:
+            yield a, c
+        active.append(c)
+
+
+def propagate_slots(slot_of: dict, chains: list) -> tuple:
+    """Extend an already-assigned slot to UNLABELLED same-body fragments —
+    the coverage lever: a crossing successor that OVERLAPS an already-slotted
+    fragment inherits its identity, so the client's slot hand-off has a target.
+
+    slot_of: {chain_idx: slot_id} from assign_slots — already-slotted chains
+    only. chains: ALL final_chains. Returns ({chain_idx: slot_id} for NEWLY
+    propagated (unlabelled) chains only, diagnostics). Does NOT mutate slot_of.
+
+    Same-body evidence is ONLY concurrent proximity (overlap >= OVLP_S within
+    SEP_M) — the identical relation assign_slots uses for duplicate fragments.
+    Chains are already stitched, so a pure temporal gap between two separate
+    chains is NOT bridgeable without a guess (§3: empty-slot over guess — that
+    gap case belongs to the client "watching for #N" layer, not here).
+
+    A slot only ever crosses a DIRECT, TIGHT (<= PROP_SEP_M) close-concurrent
+    edge from an already-slotted anchor to an unlabelled fragment — never a
+    transitive hop through another UNLABELLED fragment, and never a loose
+    1.5-3m edge (a sustained crossing stranger passes the SEP_M body-merge but
+    must not inherit the anchor's identity). assign_slots may hop transitively
+    because every member of its group already shares the (number, kit) label;
+    here the intermediate is unidentified, so A<->u1<->u2 (with A and u2 never
+    concurrent, so no contradiction fires) would relabel a STRANGER at a
+    crossing, where two bodies genuinely sit <= SEP_M for >= OVLP_S. Refusing
+    the transitive hop is that §3 cut.
+
+    Beyond the direct-edge rule, a component is refused WHOLE if it is
+    contradicted (any concurrent pair > SEP_M transitively merged into it — a
+    proven two-body cluster) or carries >= 2 distinct slot ids (conflict).
+    Both leave every unlabelled member honestly unslotted.
+    """
+    n = len(chains)
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    far_pairs = []
+    anchor_adjacent: set = set()  # unlabelled chains with a DIRECT edge to an anchor
+    for i, j in _overlapping_pairs(chains):
+        ov, sep = overlap_sep(chains[i], chains[j])
+        if ov < OVLP_S or sep is None:
+            continue
+        if sep <= SEP_M:
+            parent[find(i)] = find(j)   # union/contradiction topology at SEP_M
+            # A slot PROPAGATES only across a TIGHT (<= PROP_SEP_M) direct
+            # anchor->unlabelled edge — never a transitive hop between two
+            # UNLABELLED fragments, and never a loose 1.5-3m edge (a sustained
+            # crossing stranger). Both are wrong-body paths; §3: empty over guess.
+            if sep <= PROP_SEP_M:
+                i_anchor, j_anchor = i in slot_of, j in slot_of
+                if i_anchor and not j_anchor:
+                    anchor_adjacent.add(j)
+                elif j_anchor and not i_anchor:
+                    anchor_adjacent.add(i)
+        else:
+            far_pairs.append((i, j))
+
+    comps: dict = defaultdict(list)
+    for c in range(n):
+        comps[find(c)].append(c)
+    # a component is contradicted iff it contains a concurrent pair > SEP_M
+    # whose endpoints were transitively merged into it by close edges
+    contradicted = {find(a) for a, b in far_pairs if find(a) == find(b)}
+
+    prop_of: dict = {}
+    n_conflict = 0
+    n_contradicted = 0
+    for root, members in comps.items():
+        unlabelled = [c for c in members if c not in slot_of]
+        if not unlabelled:
+            continue
+        if root in contradicted:
+            n_contradicted += 1
+            continue
+        slot_ids = {slot_of[c] for c in members if c in slot_of}
+        if len(slot_ids) != 1:
+            if len(slot_ids) >= 2:
+                n_conflict += 1
+            continue  # zero slots = no anchor; skip silently
+        sid = next(iter(slot_ids))
+        for c in unlabelled:
+            if c in anchor_adjacent:   # direct edge to an anchor only
+                prop_of[c] = sid
+    diag = {'propagatedChains': len(prop_of),
+            'conflictComponents': n_conflict,
+            'contradictedComponents': n_contradicted}
+    return prop_of, diag
 
 
 # Plausibility floors for phase-event tagging noise (CV review): a bogus
