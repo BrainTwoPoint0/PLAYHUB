@@ -112,18 +112,16 @@ export function parseTracklets(raw: unknown): Tracklets | null {
       typeof e.jersey === 'string' && /^\d{1,2}$/.test(e.jersey)
         ? e.jersey
         : undefined
-    // Optional slot key — kit letter + number (+ body suffix), or a
-    // synthetic GK zone-slot ("g1".."g4"). Kit slots keep the jersey
-    // co-presence contract (they are minted FROM jerseys — one without is
-    // a buggy producer and gets dropped); only g-slots are valid alone
-    // (they carry no number by design, badge stays hidden).
-    const slotRaw =
+    // Optional slot key — kit letter + number (+ body suffix), or a synthetic
+    // GK zone-slot ("g1".."g4"). A valid slot is kept WITH OR WITHOUT a
+    // co-present jersey read: PROPAGATION is now a legitimate producer of
+    // slot-without-read (an unlabelled fragment inherits identity from a
+    // same-body labelled anchor), and GK zone slots were always jersey-less.
+    // The follow rides the slot; a propagated dot shows its number derived
+    // from the slot, so no jersey field is required to be useful.
+    const slot =
       typeof e.slot === 'string' && /^[a-z]\d{1,2}(-\d{1,2})?$/.test(e.slot)
         ? e.slot
-        : undefined
-    const slot =
-      slotRaw !== undefined && (jersey !== undefined || /^g\d$/.test(slotRaw))
-        ? slotRaw
         : undefined
     // Optional bridged spans — finite `[t0, t1]` pairs with t0 < t1. Malformed
     // pairs are dropped individually (same degrade contract as jersey/slot); an

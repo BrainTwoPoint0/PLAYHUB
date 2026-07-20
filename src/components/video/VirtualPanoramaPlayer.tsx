@@ -2345,20 +2345,37 @@ export function VirtualPanoramaPlayer({
               // Inferred position (interpolated across a bridged gap): a faded
               // "ghost" fill vs the solid tracked dot — same "less certain"
               // grammar as the ring's dash. Set every frame (pooled dots).
+              // Slotted (identity-backed) dots are tinted EMERALD — the ring's
+              // identity colour — so a viewer can SEE which players are numbered
+              // and Lock one for the #N-persistent follow (unlabelled players
+              // stay white). Bridged/interpolated positions fade, same
+              // "less certain" grammar as the ring's dash.
+              const idBacked = a.slot !== undefined
               c.setAttribute(
                 'fill',
-                a.bridged ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.8)'
+                idBacked
+                  ? a.bridged
+                    ? 'rgba(52,211,153,0.35)'
+                    : 'rgba(52,211,153,0.95)'
+                  : a.bridged
+                    ? 'rgba(255,255,255,0.3)'
+                    : 'rgba(255,255,255,0.8)'
               )
               // stand down once someone is selected — the ring is the story
               c.style.opacity = sel ? '0.35' : '1'
               c.style.display = ''
-              // Jersey badge (Tier 3): only strictly-identified fragments
-              // carry a number; everyone else stays an unlabelled dot.
-              const jersey = track.objects[a.index]?.jersey
+              // Number badge (Tier 3): a read jersey, else the number derived
+              // from a propagated/kit slot (so an inferred #10 still shows
+              // "10"). GK zone slots (g1..g4) carry no number → no badge, just
+              // the emerald dot. Unlabelled players stay a plain white dot.
+              const num =
+                track.objects[a.index]?.jersey ??
+                slotWatchNumber(a.slot ?? null) ??
+                undefined
               const b = badgePool[di]
-              if (jersey) {
+              if (num) {
                 const fs = clamp(11 * ts * zoomK, 9, 18)
-                b.textContent = jersey
+                b.textContent = num
                 b.setAttribute('font-size', fs.toFixed(1))
                 b.setAttribute('x', p.x.toFixed(1))
                 b.setAttribute('y', (p.y - fs * 0.82).toFixed(1))

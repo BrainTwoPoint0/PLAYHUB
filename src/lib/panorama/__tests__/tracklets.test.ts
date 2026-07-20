@@ -272,13 +272,16 @@ describe('slot field (Tier 3 / B3)', () => {
     expect(active.find((a) => a.index === 0)?.slot).toBe('g1')
   })
 
-  it('kit slots keep the jersey co-presence contract', () => {
-    // a kit-letter slot without a jersey is a buggy producer — dropped
+  it('keeps a kit slot WITHOUT a jersey (propagated fragment)', () => {
+    // Propagation attaches a slot to an unlabelled same-body fragment (no
+    // read jersey) — a legitimate producer now, so the slot is kept and the
+    // follow can ride it; the number is derived from the slot for display.
     const track = parseTracklets({
       ...VALID,
       objects: [{ ...OBJ_A, slot: 'a10' }],
     })
-    expect(track!.objects[0].slot).toBeUndefined()
+    expect(track!.objects[0].slot).toBe('a10')
+    expect(track!.objects[0].jersey).toBeUndefined()
   })
 
   it('still drops a malformed slot when no jersey is present', () => {
