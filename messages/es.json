@@ -1092,6 +1092,8 @@
     "spotlightFollowing": "Siguiendo — arrastra para mirar alrededor, toca otro jugador para cambiar",
     "spotlightLost": "Jugador perdido — tócalo para enfocarlo de nuevo",
     "spotlightSearching": "Buscándolo…",
+    "spotlightWatching": "Atento al #{n}…",
+    "spotlightWatchingGeneric": "Atento a este jugador…",
     "spotlightLocked": "Ampliado y siguiendo — toca Fijar para alejar",
     "lock": "Fijar",
     "lockToggle": "Fijar la cámara en el jugador",

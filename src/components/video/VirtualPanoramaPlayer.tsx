@@ -41,6 +41,11 @@ import {
 } from '@/lib/panorama/tracklets'
 import { computeFraming, searchFov } from '@/lib/panorama/framing'
 import {
+  geometryReacquireEnabled,
+  colocatedUpgradeAllowed,
+  slotWatchNumber,
+} from '@/lib/panorama/spotlight-reacquire'
+import {
   Play,
   Pause,
   Maximize,
@@ -1019,9 +1024,20 @@ export function VirtualPanoramaPlayer({
   // overlay update ('hint' armed+unselected, 'nodata' armed in an untracked
   // stretch, null otherwise); transient kinds override it briefly.
   type SpotNotice =
-    'hint' | 'nodata' | 'following' | 'locked' | 'searching' | 'lost' | null
+    | 'hint'
+    | 'nodata'
+    | 'following'
+    | 'locked'
+    | 'searching'
+    | 'watching' // a slotted Lock HOLDING for its jersey to reappear
+    | 'lost'
+    | null
   const [spotNotice, setSpotNotice] = useState<SpotNotice>(null)
   const spotNoticeRef = useRef<SpotNotice>(null)
+  // The jersey #N to caption while WATCHING (null = generic "watching"). Mirror
+  // of a ref so the RAF loop can set it without per-frame re-render churn.
+  const [spotWatchN, setSpotWatchN] = useState<string | null>(null)
+  const spotWatchNRef = useRef<string | null>(null)
   const spotNoticeOverride = useRef<{ kind: SpotNotice; until: number } | null>(
     null
   )
@@ -1832,7 +1848,14 @@ export function VirtualPanoramaPlayer({
             // runs inside the short loss window; past it the WATCHING state
             // below owns re-acquisition (co-located or slot-mate only).
             const cand =
-              slotAdopted || gap > SPOT_LOST_SEC
+              // A slotted Lock re-acquires ONLY via slotMate above — disable
+              // geometry entirely (any other pickup is a stranger), and skip it
+              // while slotDeferred so a stranger can't steal the Lock during the
+              // long-jump dwell wait. Unlabelled Locks keep geometry re-assoc.
+              slotAdopted ||
+              slotDeferred ||
+              !geometryReacquireEnabled(sel.slot) ||
+              gap > SPOT_LOST_SEC
                 ? null
                 : nearestObject(
                     track,
@@ -1899,7 +1922,8 @@ export function VirtualPanoramaPlayer({
                 // heuristic, and inheriting a slot from it would convert one
                 // wrong pickup into permanent confident wrong identity
                 // (CV + senior reviews, 2026-07-18).
-                if (coLocated && cand.slot !== undefined) sel.slot = cand.slot
+                if (colocatedUpgradeAllowed(sel.slot, cand.slot, coLocated))
+                  sel.slot = cand.slot ?? null // guard ensures defined; ?? satisfies the type
                 sel.lastPan = cand.panDeg
                 sel.lastTilt = cand.tiltDeg
                 sel.lostSince = null
@@ -1929,7 +1953,10 @@ export function VirtualPanoramaPlayer({
                 SPOT_WATCH_COLOCATED_DEG,
                 sel.index
               )
-              if (pickup) {
+              // A slotted Lock does NOT co-located-adopt here — slotMate owns
+              // its re-acquisition and slotExhausted its endgame; only an
+              // unlabelled Lock catches a body at the frozen circle.
+              if (pickup && geometryReacquireEnabled(sel.slot)) {
                 const d1 = Math.hypot(
                   pickup.panDeg - sel.lastPan,
                   pickup.tiltDeg - sel.lastTilt
@@ -1956,7 +1983,18 @@ export function VirtualPanoramaPlayer({
                     ) < Math.max(2 * d1, d1 + 0.8))
                 if (!ambiguous) {
                   sel.index = pickup.index
-                  if (pickup.slot !== undefined) sel.slot = pickup.slot
+                  // Only a CO-LOCATED (~0.5°, same-spot) labelled pickup may
+                  // upgrade the badge — a 0.5-1.0° WATCHING pickup is adopted to
+                  // keep following but must NOT flip an unlabelled Lock to a
+                  // stranger's number (scenario a: #10 -> #5).
+                  if (
+                    colocatedUpgradeAllowed(
+                      sel.slot,
+                      pickup.slot,
+                      d1 < SPOT_COLOCATED_DEG
+                    )
+                  )
+                    sel.slot = pickup.slot ?? null // guard ensures defined
                   sel.lastPan = pickup.panDeg
                   sel.lastTilt = pickup.tiltDeg
                   sel.lostSince = null
@@ -2189,6 +2227,12 @@ export function VirtualPanoramaPlayer({
           if (spotNoticeRef.current !== kind) {
             spotNoticeRef.current = kind
             setSpotNotice(kind)
+          }
+        }
+        const setWatchN = (n: string | null) => {
+          if (spotWatchNRef.current !== n) {
+            spotWatchNRef.current = n
+            setSpotWatchN(n)
           }
         }
         // Apparent-size factor from ground-plane geometry: a player at tilt θ
@@ -2427,8 +2471,14 @@ export function VirtualPanoramaPlayer({
             setNotice(ov.kind)
           } else {
             if (ov) spotNoticeOverride.current = null
-            if (sel && sel.lostSince !== null)
-              setNotice('searching') // coasting — caption the widening frame
+            if (sel && sel.lostSince !== null) {
+              // A slotted Lock is HOLDING for its jersey to reappear (slotMate
+              // owns re-acquisition), not blindly searching — caption it.
+              if (sel.slot !== null) {
+                setNotice('watching')
+                setWatchN(slotWatchNumber(sel.slot))
+              } else setNotice('searching') // unlabelled — caption the widening frame
+            }
             else if (!spotlightRef.current) setNotice(null)
             else if (active.length === 0)
               setNotice('nodata') // untracked stretch — taps CAN'T work here
@@ -3108,38 +3158,46 @@ export function VirtualPanoramaPlayer({
                     : 'text-emerald-400'
                 )}
               />{' '}
-              {t(
-                spotNotice === 'nodata'
-                  ? 'spotlightNoData'
-                  : spotNotice === 'following'
-                    ? 'spotlightFollowing'
-                    : spotNotice === 'locked'
-                      ? 'spotlightLocked'
-                      : spotNotice === 'searching'
-                        ? 'spotlightSearching'
-                        : spotNotice === 'lost'
-                          ? 'spotlightLost'
-                          : 'spotlightHint'
-              )}
+              {spotNotice === 'watching'
+                ? spotWatchN
+                  ? t('spotlightWatching', { n: spotWatchN })
+                  : t('spotlightWatchingGeneric')
+                : t(
+                    spotNotice === 'nodata'
+                      ? 'spotlightNoData'
+                      : spotNotice === 'following'
+                        ? 'spotlightFollowing'
+                        : spotNotice === 'locked'
+                          ? 'spotlightLocked'
+                          : spotNotice === 'searching'
+                            ? 'spotlightSearching'
+                            : spotNotice === 'lost'
+                              ? 'spotlightLost'
+                              : 'spotlightHint'
+                  )}
             </div>
           </div>
         )}
         {/* Screen-reader announcements for pointer-driven state changes. */}
         <span aria-live="polite" className="sr-only">
           {spotNotice
-            ? t(
-                spotNotice === 'nodata'
-                  ? 'spotlightNoData'
-                  : spotNotice === 'following'
-                    ? 'spotlightFollowing'
-                    : spotNotice === 'locked'
-                      ? 'spotlightLocked'
-                      : spotNotice === 'searching'
-                        ? 'spotlightSearching'
-                        : spotNotice === 'lost'
-                          ? 'spotlightLost'
-                          : 'spotlightHint'
-              )
+            ? spotNotice === 'watching'
+              ? spotWatchN
+                ? t('spotlightWatching', { n: spotWatchN })
+                : t('spotlightWatchingGeneric')
+              : t(
+                  spotNotice === 'nodata'
+                    ? 'spotlightNoData'
+                    : spotNotice === 'following'
+                      ? 'spotlightFollowing'
+                      : spotNotice === 'locked'
+                        ? 'spotlightLocked'
+                        : spotNotice === 'searching'
+                          ? 'spotlightSearching'
+                          : spotNotice === 'lost'
+                            ? 'spotlightLost'
+                            : 'spotlightHint'
+                )
             : ''}
         </span>
 

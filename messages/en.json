@@ -1092,6 +1092,8 @@
     "spotlightFollowing": "Following — drag to look around, tap another player to switch",
     "spotlightLost": "Lost the player — tap them to spotlight again",
     "spotlightSearching": "Finding them…",
+    "spotlightWatching": "Watching for #{n}…",
+    "spotlightWatchingGeneric": "Watching for this player…",
     "spotlightLocked": "Zoomed in and following — tap Lock to zoom back out",
     "lock": "Lock",
     "lockToggle": "Lock camera on player",

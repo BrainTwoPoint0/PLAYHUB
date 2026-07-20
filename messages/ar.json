@@ -754,6 +754,8 @@
     "spotlightFollowing": "جارٍ المتابعة — اسحب للتجول، واضغط على لاعب آخر للتبديل",
     "spotlightLost": "فُقد اللاعب — اضغط عليه لتسليط الضوء مجددًا",
     "spotlightSearching": "جارٍ العثور عليه…",
+    "spotlightWatching": "بانتظار اللاعب رقم {n}…",
+    "spotlightWatchingGeneric": "بانتظار هذا اللاعب…",
     "spotlightLocked": "تم التقريب والمتابعة — اضغط تثبيت للتصغير",
     "lock": "تثبيت",
     "lockToggle": "تثبيت الكاميرا على اللاعب",
