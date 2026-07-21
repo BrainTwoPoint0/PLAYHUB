@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: '12.2.3 (519615d)'
+    PostgrestVersion: "12.2.3 (519615d)"
   }
   graphql_public: {
     Tables: {
@@ -43,7 +43,7 @@ export type Database = {
         Row: {
           created_at: string | null
           device_metrics: Json | null
-          experience_level: Database['public']['Enums']['basketball_experience_level']
+          experience_level: Database["public"]["Enums"]["basketball_experience_level"]
           id: string
           metadata: Json | null
           preferred_hand: string | null
@@ -56,7 +56,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           device_metrics?: Json | null
-          experience_level: Database['public']['Enums']['basketball_experience_level']
+          experience_level: Database["public"]["Enums"]["basketball_experience_level"]
           id?: string
           metadata?: Json | null
           preferred_hand?: string | null
@@ -69,7 +69,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           device_metrics?: Json | null
-          experience_level?: Database['public']['Enums']['basketball_experience_level']
+          experience_level?: Database["public"]["Enums"]["basketball_experience_level"]
           id?: string
           metadata?: Json | null
           preferred_hand?: string | null
@@ -81,11 +81,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'basketball_player_profiles_profile_variant_id_fkey'
-            columns: ['profile_variant_id']
+            foreignKeyName: "basketball_player_profiles_profile_variant_id_fkey"
+            columns: ["profile_variant_id"]
             isOneToOne: true
-            referencedRelation: 'profile_variants'
-            referencedColumns: ['id']
+            referencedRelation: "profile_variants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -140,18 +140,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'career_history_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "career_history_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'career_history_profile_variant_id_fkey'
-            columns: ['profile_variant_id']
+            foreignKeyName: "career_history_profile_variant_id_fkey"
+            columns: ["profile_variant_id"]
             isOneToOne: false
-            referencedRelation: 'profile_variants'
-            referencedColumns: ['id']
+            referencedRelation: "profile_variants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -166,8 +166,8 @@ export type Database = {
           profile_id: string
           revocation_note: string | null
           revoked_at: string | null
-          revoked_by: Database['public']['Enums']['attribution_revoker'] | null
-          source: Database['public']['Enums']['attribution_source']
+          revoked_by: Database["public"]["Enums"]["attribution_revoker"] | null
+          source: Database["public"]["Enums"]["attribution_source"]
           updated_at: string
         }
         Insert: {
@@ -180,8 +180,8 @@ export type Database = {
           profile_id: string
           revocation_note?: string | null
           revoked_at?: string | null
-          revoked_by?: Database['public']['Enums']['attribution_revoker'] | null
-          source?: Database['public']['Enums']['attribution_source']
+          revoked_by?: Database["public"]["Enums"]["attribution_revoker"] | null
+          source?: Database["public"]["Enums"]["attribution_source"]
           updated_at?: string
         }
         Update: {
@@ -194,24 +194,24 @@ export type Database = {
           profile_id?: string
           revocation_note?: string | null
           revoked_at?: string | null
-          revoked_by?: Database['public']['Enums']['attribution_revoker'] | null
-          source?: Database['public']['Enums']['attribution_source']
+          revoked_by?: Database["public"]["Enums"]["attribution_revoker"] | null
+          source?: Database["public"]["Enums"]["attribution_source"]
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'clip_attributions_clip_id_fkey'
-            columns: ['clip_id']
+            foreignKeyName: "clip_attributions_clip_id_fkey"
+            columns: ["clip_id"]
             isOneToOne: false
-            referencedRelation: 'clips'
-            referencedColumns: ['id']
+            referencedRelation: "clips"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'clip_attributions_profile_id_fkey'
-            columns: ['profile_id']
+            foreignKeyName: "clip_attributions_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -228,7 +228,7 @@ export type Database = {
           owner_org_id: string
           recording_id: string
           title: string | null
-          type: Database['public']['Enums']['clip_type']
+          type: Database["public"]["Enums"]["clip_type"]
           updated_at: string
         }
         Insert: {
@@ -243,7 +243,7 @@ export type Database = {
           owner_org_id: string
           recording_id: string
           title?: string | null
-          type?: Database['public']['Enums']['clip_type']
+          type?: Database["public"]["Enums"]["clip_type"]
           updated_at?: string
         }
         Update: {
@@ -258,23 +258,23 @@ export type Database = {
           owner_org_id?: string
           recording_id?: string
           title?: string | null
-          type?: Database['public']['Enums']['clip_type']
+          type?: Database["public"]["Enums"]["clip_type"]
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'clips_owner_org_id_fkey'
-            columns: ['owner_org_id']
+            foreignKeyName: "clips_owner_org_id_fkey"
+            columns: ["owner_org_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'clips_recording_id_fkey'
-            columns: ['recording_id']
+            foreignKeyName: "clips_recording_id_fkey"
+            columns: ["recording_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_match_recordings'
-            referencedColumns: ['id']
+            referencedRelation: "playhub_match_recordings"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -311,11 +311,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'coach_modules_profile_variant_id_fkey'
-            columns: ['profile_variant_id']
+            foreignKeyName: "coach_modules_profile_variant_id_fkey"
+            columns: ["profile_variant_id"]
             isOneToOne: true
-            referencedRelation: 'profile_variants'
-            referencedColumns: ['id']
+            referencedRelation: "profile_variants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -349,18 +349,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'connections_recipient_id_fkey'
-            columns: ['recipient_id']
+            foreignKeyName: "connections_recipient_id_fkey"
+            columns: ["recipient_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'connections_requester_id_fkey'
-            columns: ['requester_id']
+            foreignKeyName: "connections_requester_id_fkey"
+            columns: ["requester_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -418,18 +418,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'education_profile_id_fkey'
-            columns: ['profile_id']
+            foreignKeyName: "education_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
       football_player_profiles: {
         Row: {
           created_at: string | null
-          experience_level: Database['public']['Enums']['football_experience_level']
+          experience_level: Database["public"]["Enums"]["football_experience_level"]
           id: string
           metadata: Json | null
           player_data_metrics: Json | null
@@ -442,7 +442,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          experience_level: Database['public']['Enums']['football_experience_level']
+          experience_level: Database["public"]["Enums"]["football_experience_level"]
           id?: string
           metadata?: Json | null
           player_data_metrics?: Json | null
@@ -455,7 +455,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
-          experience_level?: Database['public']['Enums']['football_experience_level']
+          experience_level?: Database["public"]["Enums"]["football_experience_level"]
           id?: string
           metadata?: Json | null
           player_data_metrics?: Json | null
@@ -468,11 +468,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'football_player_profiles_profile_variant_id_fkey'
-            columns: ['profile_variant_id']
+            foreignKeyName: "football_player_profiles_profile_variant_id_fkey"
+            columns: ["profile_variant_id"]
             isOneToOne: true
-            referencedRelation: 'profile_variants'
-            referencedColumns: ['id']
+            referencedRelation: "profile_variants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -533,25 +533,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'highlights_profile_id_fkey'
-            columns: ['profile_id']
+            foreignKeyName: "highlights_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'highlights_profile_variant_id_fkey'
-            columns: ['profile_variant_id']
+            foreignKeyName: "highlights_profile_variant_id_fkey"
+            columns: ["profile_variant_id"]
             isOneToOne: false
-            referencedRelation: 'profile_variants'
-            referencedColumns: ['id']
+            referencedRelation: "profile_variants"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'highlights_sport_id_fkey'
-            columns: ['sport_id']
+            foreignKeyName: "highlights_sport_id_fkey"
+            columns: ["sport_id"]
             isOneToOne: false
-            referencedRelation: 'sports'
-            referencedColumns: ['id']
+            referencedRelation: "sports"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -597,32 +597,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'match_jersey_maps_club_org_id_fkey'
-            columns: ['club_org_id']
+            foreignKeyName: "match_jersey_maps_club_org_id_fkey"
+            columns: ["club_org_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'match_jersey_maps_mapped_by_membership_id_fkey'
-            columns: ['mapped_by_membership_id']
+            foreignKeyName: "match_jersey_maps_mapped_by_membership_id_fkey"
+            columns: ["mapped_by_membership_id"]
             isOneToOne: false
-            referencedRelation: 'organization_members'
-            referencedColumns: ['id']
+            referencedRelation: "organization_members"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'match_jersey_maps_profile_id_fkey'
-            columns: ['profile_id']
+            foreignKeyName: "match_jersey_maps_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'match_jersey_maps_recording_id_fkey'
-            columns: ['recording_id']
+            foreignKeyName: "match_jersey_maps_recording_id_fkey"
+            columns: ["recording_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_match_recordings'
-            referencedColumns: ['id']
+            referencedRelation: "playhub_match_recordings"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -699,7 +699,7 @@ export type Database = {
           permissions: Json | null
           profile_id: string | null
           profile_variant_id: string | null
-          role: Database['public']['Enums']['profile_variant_type']
+          role: Database["public"]["Enums"]["profile_variant_type"]
           updated_at: string | null
         }
         Insert: {
@@ -714,7 +714,7 @@ export type Database = {
           permissions?: Json | null
           profile_id?: string | null
           profile_variant_id?: string | null
-          role: Database['public']['Enums']['profile_variant_type']
+          role: Database["public"]["Enums"]["profile_variant_type"]
           updated_at?: string | null
         }
         Update: {
@@ -729,30 +729,30 @@ export type Database = {
           permissions?: Json | null
           profile_id?: string | null
           profile_variant_id?: string | null
-          role?: Database['public']['Enums']['profile_variant_type']
+          role?: Database["public"]["Enums"]["profile_variant_type"]
           updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: 'organization_members_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'organization_members_profile_id_fkey'
-            columns: ['profile_id']
+            foreignKeyName: "organization_members_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'organization_members_profile_variant_id_fkey'
-            columns: ['profile_variant_id']
+            foreignKeyName: "organization_members_profile_variant_id_fkey"
+            columns: ["profile_variant_id"]
             isOneToOne: false
-            referencedRelation: 'profile_variants'
-            referencedColumns: ['id']
+            referencedRelation: "profile_variants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -810,25 +810,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'organization_venue_access_default_graphic_package_id_fkey'
-            columns: ['default_graphic_package_id']
+            foreignKeyName: "organization_venue_access_default_graphic_package_id_fkey"
+            columns: ["default_graphic_package_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_graphic_packages'
-            referencedColumns: ['id']
+            referencedRelation: "playhub_graphic_packages"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'organization_venue_access_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "organization_venue_access_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'organization_venue_access_venue_organization_id_fkey'
-            columns: ['venue_organization_id']
+            foreignKeyName: "organization_venue_access_venue_organization_id_fkey"
+            columns: ["venue_organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -928,18 +928,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'organizations_created_by_fkey'
-            columns: ['created_by']
+            foreignKeyName: "organizations_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'organizations_parent_organization_id_fkey'
-            columns: ['parent_organization_id']
+            foreignKeyName: "organizations_parent_organization_id_fkey"
+            columns: ["parent_organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1027,11 +1027,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_academy_config_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "playhub_academy_config_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1074,11 +1074,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_academy_subclubs_club_slug_fkey'
-            columns: ['club_slug']
+            foreignKeyName: "playhub_academy_subclubs_club_slug_fkey"
+            columns: ["club_slug"]
             isOneToOne: false
-            referencedRelation: 'playhub_academy_config'
-            referencedColumns: ['club_slug']
+            referencedRelation: "playhub_academy_config"
+            referencedColumns: ["club_slug"]
           },
         ]
       }
@@ -1151,11 +1151,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_academy_subscriptions_club_slug_fkey'
-            columns: ['club_slug']
+            foreignKeyName: "playhub_academy_subscriptions_club_slug_fkey"
+            columns: ["club_slug"]
             isOneToOne: false
-            referencedRelation: 'playhub_academy_config'
-            referencedColumns: ['club_slug']
+            referencedRelation: "playhub_academy_config"
+            referencedColumns: ["club_slug"]
           },
         ]
       }
@@ -1201,18 +1201,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_academy_teams_club_slug_fkey'
-            columns: ['club_slug']
+            foreignKeyName: "playhub_academy_teams_club_slug_fkey"
+            columns: ["club_slug"]
             isOneToOne: false
-            referencedRelation: 'playhub_academy_config'
-            referencedColumns: ['club_slug']
+            referencedRelation: "playhub_academy_config"
+            referencedColumns: ["club_slug"]
           },
           {
-            foreignKeyName: 'playhub_academy_teams_subclub_fk'
-            columns: ['club_slug', 'subclub_slug']
+            foreignKeyName: "playhub_academy_teams_subclub_fk"
+            columns: ["club_slug", "subclub_slug"]
             isOneToOne: false
-            referencedRelation: 'playhub_academy_subclubs'
-            referencedColumns: ['club_slug', 'subclub_slug']
+            referencedRelation: "playhub_academy_subclubs"
+            referencedColumns: ["club_slug", "subclub_slug"]
           },
         ]
       }
@@ -1267,25 +1267,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_access_rights_match_recording_id_fkey'
-            columns: ['match_recording_id']
+            foreignKeyName: "playhub_access_rights_match_recording_id_fkey"
+            columns: ["match_recording_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_match_recordings'
-            referencedColumns: ['id']
+            referencedRelation: "playhub_match_recordings"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'playhub_access_rights_profile_id_fkey'
-            columns: ['profile_id']
+            foreignKeyName: "playhub_access_rights_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'playhub_access_rights_purchase_id_fkey'
-            columns: ['purchase_id']
+            foreignKeyName: "playhub_access_rights_purchase_id_fkey"
+            columns: ["purchase_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_purchases'
-            referencedColumns: ['id']
+            referencedRelation: "playhub_purchases"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1328,11 +1328,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_audit_log_target_organization_id_fkey'
-            columns: ['target_organization_id']
+            foreignKeyName: "playhub_audit_log_target_organization_id_fkey"
+            columns: ["target_organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1366,11 +1366,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_clutch_player_labels_match_recording_id_fkey'
-            columns: ['match_recording_id']
+            foreignKeyName: "playhub_clutch_player_labels_match_recording_id_fkey"
+            columns: ["match_recording_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_match_recordings'
-            referencedColumns: ['id']
+            referencedRelation: "playhub_match_recordings"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1434,11 +1434,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_crop_feedback_job_id_fkey'
-            columns: ['job_id']
+            foreignKeyName: "playhub_crop_feedback_job_id_fkey"
+            columns: ["job_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_crop_jobs'
-            referencedColumns: ['id']
+            referencedRelation: "playhub_crop_jobs"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1493,11 +1493,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_crop_jobs_recording_id_fkey'
-            columns: ['recording_id']
+            foreignKeyName: "playhub_crop_jobs_recording_id_fkey"
+            columns: ["recording_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_match_recordings'
-            referencedColumns: ['id']
+            referencedRelation: "playhub_match_recordings"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1537,11 +1537,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_crop_keyframes_job_id_fkey'
-            columns: ['job_id']
+            foreignKeyName: "playhub_crop_keyframes_job_id_fkey"
+            columns: ["job_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_crop_jobs'
-            referencedColumns: ['id']
+            referencedRelation: "playhub_crop_jobs"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1647,11 +1647,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_graphic_packages_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "playhub_graphic_packages_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1682,11 +1682,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_group_tier_config_group_organization_id_fkey'
-            columns: ['group_organization_id']
+            foreignKeyName: "playhub_group_tier_config_group_organization_id_fkey"
+            columns: ["group_organization_id"]
             isOneToOne: true
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1756,18 +1756,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_invoice_line_items_invoice_id_fkey'
-            columns: ['invoice_id']
+            foreignKeyName: "playhub_invoice_line_items_invoice_id_fkey"
+            columns: ["invoice_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_venue_invoices'
-            referencedColumns: ['id']
+            referencedRelation: "playhub_venue_invoices"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'playhub_invoice_line_items_recording_id_fkey'
-            columns: ['recording_id']
+            foreignKeyName: "playhub_invoice_line_items_recording_id_fkey"
+            columns: ["recording_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_match_recordings'
-            referencedColumns: ['id']
+            referencedRelation: "playhub_match_recordings"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1897,18 +1897,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_live_streams_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "playhub_live_streams_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'playhub_live_streams_sport_id_fkey'
-            columns: ['sport_id']
+            foreignKeyName: "playhub_live_streams_sport_id_fkey"
+            columns: ["sport_id"]
             isOneToOne: false
-            referencedRelation: 'sports'
-            referencedColumns: ['id']
+            referencedRelation: "sports"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1941,6 +1941,10 @@ export type Database = {
           home_team: string
           id: string
           is_billable: boolean | null
+          jersey_attempts: number | null
+          jersey_error: string | null
+          jersey_started_at: string | null
+          jersey_status: string | null
           last_sync_error: string | null
           marketplace_enabled: boolean | null
           match_date: string
@@ -2007,6 +2011,10 @@ export type Database = {
           home_team: string
           id?: string
           is_billable?: boolean | null
+          jersey_attempts?: number | null
+          jersey_error?: string | null
+          jersey_started_at?: string | null
+          jersey_status?: string | null
           last_sync_error?: string | null
           marketplace_enabled?: boolean | null
           match_date: string
@@ -2073,6 +2081,10 @@ export type Database = {
           home_team?: string
           id?: string
           is_billable?: boolean | null
+          jersey_attempts?: number | null
+          jersey_error?: string | null
+          jersey_started_at?: string | null
+          jersey_status?: string | null
           last_sync_error?: string | null
           marketplace_enabled?: boolean | null
           match_date?: string
@@ -2113,32 +2125,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_match_recordings_graphic_package_id_fkey'
-            columns: ['graphic_package_id']
+            foreignKeyName: "playhub_match_recordings_graphic_package_id_fkey"
+            columns: ["graphic_package_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_graphic_packages'
-            referencedColumns: ['id']
+            referencedRelation: "playhub_graphic_packages"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'playhub_match_recordings_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "playhub_match_recordings_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'playhub_match_recordings_sport_id_fkey'
-            columns: ['sport_id']
+            foreignKeyName: "playhub_match_recordings_sport_id_fkey"
+            columns: ["sport_id"]
             isOneToOne: false
-            referencedRelation: 'sports'
-            referencedColumns: ['id']
+            referencedRelation: "sports"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'playhub_match_recordings_venue_organization_id_fkey'
-            columns: ['venue_organization_id']
+            foreignKeyName: "playhub_match_recordings_venue_organization_id_fkey"
+            columns: ["venue_organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2262,11 +2274,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_pending_academy_subscriptions_club_slug_fkey'
-            columns: ['club_slug']
+            foreignKeyName: "playhub_pending_academy_subscriptions_club_slug_fkey"
+            columns: ["club_slug"]
             isOneToOne: false
-            referencedRelation: 'playhub_academy_config'
-            referencedColumns: ['club_slug']
+            referencedRelation: "playhub_academy_config"
+            referencedColumns: ["club_slug"]
           },
         ]
       }
@@ -2297,11 +2309,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_pending_admin_invites_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "playhub_pending_admin_invites_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2377,27 +2389,74 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_pitch_calibrations_scene_id_fkey'
-            columns: ['scene_id']
+            foreignKeyName: "playhub_pitch_calibrations_superseded_by_fkey"
+            columns: ["superseded_by"]
             isOneToOne: false
-            referencedRelation: 'playhub_scene_venue_mapping'
-            referencedColumns: ['scene_id']
+            referencedRelation: "playhub_pitch_calibrations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'playhub_pitch_calibrations_superseded_by_fkey'
-            columns: ['superseded_by']
+            foreignKeyName: "playhub_pitch_calibrations_venue_organization_id_fkey"
+            columns: ["venue_organization_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_pitch_calibrations'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'playhub_pitch_calibrations_venue_organization_id_fkey'
-            columns: ['venue_organization_id']
-            isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
+      }
+      playhub_portrait_render_feedback: {
+        Row: {
+          action: string
+          baseline_origin: string
+          club_slug: string
+          created_at: string
+          diff: Json | null
+          id: string
+          keyframes_after: Json | null
+          keyframes_before: Json | null
+          note: string | null
+          provider_event_id: string
+          reason: string | null
+          render_id: string
+          scene_changes: Json | null
+          trim: Json | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          baseline_origin?: string
+          club_slug: string
+          created_at?: string
+          diff?: Json | null
+          id?: string
+          keyframes_after?: Json | null
+          keyframes_before?: Json | null
+          note?: string | null
+          provider_event_id: string
+          reason?: string | null
+          render_id: string
+          scene_changes?: Json | null
+          trim?: Json | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          baseline_origin?: string
+          club_slug?: string
+          created_at?: string
+          diff?: Json | null
+          id?: string
+          keyframes_after?: Json | null
+          keyframes_before?: Json | null
+          note?: string | null
+          provider_event_id?: string
+          reason?: string | null
+          render_id?: string
+          scene_changes?: Json | null
+          trim?: Json | null
+          user_id?: string
+        }
+        Relationships: []
       }
       playhub_portrait_renders: {
         Row: {
@@ -2406,12 +2465,14 @@ export type Database = {
           created_at: string
           error: string | null
           id: string
+          keyframes: Json | null
           provider_event_id: string
           provider_recording_id: string
           published_at: string | null
           published_by: string | null
           quality: Json | null
           recording_event_id: string
+          scene_changes: Json | null
           status: string
           storage_path: string
           updated_at: string
@@ -2422,12 +2483,14 @@ export type Database = {
           created_at?: string
           error?: string | null
           id?: string
+          keyframes?: Json | null
           provider_event_id: string
           provider_recording_id: string
           published_at?: string | null
           published_by?: string | null
           quality?: Json | null
           recording_event_id: string
+          scene_changes?: Json | null
           status?: string
           storage_path: string
           updated_at?: string
@@ -2438,12 +2501,14 @@ export type Database = {
           created_at?: string
           error?: string | null
           id?: string
+          keyframes?: Json | null
           provider_event_id?: string
           provider_recording_id?: string
           published_at?: string | null
           published_by?: string | null
           quality?: Json | null
           recording_event_id?: string
+          scene_changes?: Json | null
           status?: string
           storage_path?: string
           updated_at?: string
@@ -2501,11 +2566,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_products_match_recording_id_fkey'
-            columns: ['match_recording_id']
+            foreignKeyName: "playhub_products_match_recording_id_fkey"
+            columns: ["match_recording_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_match_recordings'
-            referencedColumns: ['id']
+            referencedRelation: "playhub_match_recordings"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2566,32 +2631,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_purchases_match_recording_id_fkey'
-            columns: ['match_recording_id']
+            foreignKeyName: "playhub_purchases_match_recording_id_fkey"
+            columns: ["match_recording_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_match_recordings'
-            referencedColumns: ['id']
+            referencedRelation: "playhub_match_recordings"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'playhub_purchases_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "playhub_purchases_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'playhub_purchases_product_id_fkey'
-            columns: ['product_id']
+            foreignKeyName: "playhub_purchases_product_id_fkey"
+            columns: ["product_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_products'
-            referencedColumns: ['id']
+            referencedRelation: "playhub_products"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'playhub_purchases_profile_id_fkey'
-            columns: ['profile_id']
+            foreignKeyName: "playhub_purchases_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2694,11 +2759,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_recording_assignments_league_club_slug_fkey'
-            columns: ['league_club_slug']
+            foreignKeyName: "playhub_recording_assignments_league_club_slug_fkey"
+            columns: ["league_club_slug"]
             isOneToOne: false
-            referencedRelation: 'playhub_academy_config'
-            referencedColumns: ['club_slug']
+            referencedRelation: "playhub_academy_config"
+            referencedColumns: ["club_slug"]
           },
         ]
       }
@@ -2756,11 +2821,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_recording_events_match_recording_id_fkey'
-            columns: ['match_recording_id']
+            foreignKeyName: "playhub_recording_events_match_recording_id_fkey"
+            columns: ["match_recording_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_match_recordings'
-            referencedColumns: ['id']
+            referencedRelation: "playhub_match_recordings"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2833,11 +2898,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_recording_sync_runs_league_club_slug_fkey'
-            columns: ['league_club_slug']
+            foreignKeyName: "playhub_recording_sync_runs_league_club_slug_fkey"
+            columns: ["league_club_slug"]
             isOneToOne: false
-            referencedRelation: 'playhub_academy_config'
-            referencedColumns: ['club_slug']
+            referencedRelation: "playhub_academy_config"
+            referencedColumns: ["club_slug"]
           },
         ]
       }
@@ -2865,11 +2930,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_scene_venue_mapping_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "playhub_scene_venue_mapping_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2936,11 +3001,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_spiideo_scene_health_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "playhub_spiideo_scene_health_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2980,11 +3045,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_stream_access_stream_id_fkey'
-            columns: ['stream_id']
+            foreignKeyName: "playhub_stream_access_stream_id_fkey"
+            columns: ["stream_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_live_streams'
-            referencedColumns: ['id']
+            referencedRelation: "playhub_live_streams"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3060,11 +3125,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_venue_billing_config_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "playhub_venue_billing_config_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: true
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3110,11 +3175,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_venue_invoices_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "playhub_venue_invoices_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3430,11 +3495,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_veo_teams_veo_club_slug_fkey'
-            columns: ['veo_club_slug']
+            foreignKeyName: "playhub_veo_teams_veo_club_slug_fkey"
+            columns: ["veo_club_slug"]
             isOneToOne: false
-            referencedRelation: 'playhub_veo_clubs'
-            referencedColumns: ['veo_club_slug']
+            referencedRelation: "playhub_veo_clubs"
+            referencedColumns: ["veo_club_slug"]
           },
         ]
       }
@@ -3483,11 +3548,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playhub_view_history_match_recording_id_fkey'
-            columns: ['match_recording_id']
+            foreignKeyName: "playhub_view_history_match_recording_id_fkey"
+            columns: ["match_recording_id"]
             isOneToOne: false
-            referencedRelation: 'playhub_match_recordings'
-            referencedColumns: ['id']
+            referencedRelation: "playhub_match_recordings"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3578,18 +3643,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playscanner_conversions_search_id_fkey'
-            columns: ['search_id']
+            foreignKeyName: "playscanner_conversions_search_id_fkey"
+            columns: ["search_id"]
             isOneToOne: false
-            referencedRelation: 'playscanner_searches'
-            referencedColumns: ['id']
+            referencedRelation: "playscanner_searches"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'playscanner_conversions_session_id_fkey'
-            columns: ['session_id']
+            foreignKeyName: "playscanner_conversions_session_id_fkey"
+            columns: ["session_id"]
             isOneToOne: false
-            referencedRelation: 'playscanner_sessions'
-            referencedColumns: ['session_id']
+            referencedRelation: "playscanner_sessions"
+            referencedColumns: ["session_id"]
           },
         ]
       }
@@ -3698,11 +3763,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playscanner_page_views_session_id_fkey'
-            columns: ['session_id']
+            foreignKeyName: "playscanner_page_views_session_id_fkey"
+            columns: ["session_id"]
             isOneToOne: false
-            referencedRelation: 'playscanner_sessions'
-            referencedColumns: ['session_id']
+            referencedRelation: "playscanner_sessions"
+            referencedColumns: ["session_id"]
           },
         ]
       }
@@ -3757,11 +3822,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'playscanner_searches_session_id_fkey'
-            columns: ['session_id']
+            foreignKeyName: "playscanner_searches_session_id_fkey"
+            columns: ["session_id"]
             isOneToOne: false
-            referencedRelation: 'playscanner_sessions'
-            referencedColumns: ['session_id']
+            referencedRelation: "playscanner_sessions"
+            referencedColumns: ["session_id"]
           },
         ]
       }
@@ -3912,29 +3977,29 @@ export type Database = {
           profile_variant_id: string
           public_to_org_ids: string[]
           updated_at: string
-          visibility: Database['public']['Enums']['profile_module_visibility']
+          visibility: Database["public"]["Enums"]["profile_module_visibility"]
         }
         Insert: {
           created_at?: string
           profile_variant_id: string
           public_to_org_ids?: string[]
           updated_at?: string
-          visibility?: Database['public']['Enums']['profile_module_visibility']
+          visibility?: Database["public"]["Enums"]["profile_module_visibility"]
         }
         Update: {
           created_at?: string
           profile_variant_id?: string
           public_to_org_ids?: string[]
           updated_at?: string
-          visibility?: Database['public']['Enums']['profile_module_visibility']
+          visibility?: Database["public"]["Enums"]["profile_module_visibility"]
         }
         Relationships: [
           {
-            foreignKeyName: 'profile_module_privacies_profile_variant_id_fkey'
-            columns: ['profile_variant_id']
+            foreignKeyName: "profile_module_privacies_profile_variant_id_fkey"
+            columns: ["profile_variant_id"]
             isOneToOne: true
-            referencedRelation: 'profile_variants'
-            referencedColumns: ['id']
+            referencedRelation: "profile_variants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3974,18 +4039,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'profile_variant_sports_profile_variant_id_fkey'
-            columns: ['profile_variant_id']
+            foreignKeyName: "profile_variant_sports_profile_variant_id_fkey"
+            columns: ["profile_variant_id"]
             isOneToOne: false
-            referencedRelation: 'profile_variants'
-            referencedColumns: ['id']
+            referencedRelation: "profile_variants"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'profile_variant_sports_sport_id_fkey'
-            columns: ['sport_id']
+            foreignKeyName: "profile_variant_sports_sport_id_fkey"
+            columns: ["sport_id"]
             isOneToOne: false
-            referencedRelation: 'sports'
-            referencedColumns: ['id']
+            referencedRelation: "sports"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4004,7 +4069,7 @@ export type Database = {
           tags: string[] | null
           updated_at: string | null
           variant_bio: string | null
-          variant_type: Database['public']['Enums']['profile_variant_type']
+          variant_type: Database["public"]["Enums"]["profile_variant_type"]
           verification_date: string | null
         }
         Insert: {
@@ -4021,7 +4086,7 @@ export type Database = {
           tags?: string[] | null
           updated_at?: string | null
           variant_bio?: string | null
-          variant_type: Database['public']['Enums']['profile_variant_type']
+          variant_type: Database["public"]["Enums"]["profile_variant_type"]
           verification_date?: string | null
         }
         Update: {
@@ -4038,23 +4103,23 @@ export type Database = {
           tags?: string[] | null
           updated_at?: string | null
           variant_bio?: string | null
-          variant_type?: Database['public']['Enums']['profile_variant_type']
+          variant_type?: Database["public"]["Enums"]["profile_variant_type"]
           verification_date?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: 'profile_variants_profile_id_fkey'
-            columns: ['profile_id']
+            foreignKeyName: "profile_variants_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'profile_variants_sport_id_fkey'
-            columns: ['sport_id']
+            foreignKeyName: "profile_variants_sport_id_fkey"
+            columns: ["sport_id"]
             isOneToOne: false
-            referencedRelation: 'sports'
-            referencedColumns: ['id']
+            referencedRelation: "sports"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4100,32 +4165,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'profile_verifications_profile_id_fkey'
-            columns: ['profile_id']
+            foreignKeyName: "profile_verifications_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'profile_verifications_profile_variant_id_fkey'
-            columns: ['profile_variant_id']
+            foreignKeyName: "profile_verifications_profile_variant_id_fkey"
+            columns: ["profile_variant_id"]
             isOneToOne: false
-            referencedRelation: 'profile_variants'
-            referencedColumns: ['id']
+            referencedRelation: "profile_variants"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'profile_verifications_verified_by_membership_id_fkey'
-            columns: ['verified_by_membership_id']
+            foreignKeyName: "profile_verifications_verified_by_membership_id_fkey"
+            columns: ["verified_by_membership_id"]
             isOneToOne: false
-            referencedRelation: 'organization_members'
-            referencedColumns: ['id']
+            referencedRelation: "organization_members"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'profile_verifications_verifying_org_id_fkey'
-            columns: ['verifying_org_id']
+            foreignKeyName: "profile_verifications_verifying_org_id_fkey"
+            columns: ["verifying_org_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4276,11 +4341,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'sports_parent_sport_id_fkey'
-            columns: ['parent_sport_id']
+            foreignKeyName: "sports_parent_sport_id_fkey"
+            columns: ["parent_sport_id"]
             isOneToOne: false
-            referencedRelation: 'sports'
-            referencedColumns: ['id']
+            referencedRelation: "sports"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4329,18 +4394,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'statistics_profile_variant_id_fkey'
-            columns: ['profile_variant_id']
+            foreignKeyName: "statistics_profile_variant_id_fkey"
+            columns: ["profile_variant_id"]
             isOneToOne: false
-            referencedRelation: 'profile_variants'
-            referencedColumns: ['id']
+            referencedRelation: "profile_variants"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'statistics_sport_id_fkey'
-            columns: ['sport_id']
+            foreignKeyName: "statistics_sport_id_fkey"
+            columns: ["sport_id"]
             isOneToOne: false
-            referencedRelation: 'sports'
-            referencedColumns: ['id']
+            referencedRelation: "sports"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4391,7 +4456,7 @@ export type Database = {
       }
       user_preferences: {
         Row: {
-          category: Database['public']['Enums']['preference_category']
+          category: Database["public"]["Enums"]["preference_category"]
           created_at: string | null
           id: string
           preferences: Json
@@ -4399,7 +4464,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          category: Database['public']['Enums']['preference_category']
+          category: Database["public"]["Enums"]["preference_category"]
           created_at?: string | null
           id?: string
           preferences?: Json
@@ -4407,7 +4472,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          category?: Database['public']['Enums']['preference_category']
+          category?: Database["public"]["Enums"]["preference_category"]
           created_at?: string | null
           id?: string
           preferences?: Json
@@ -4416,11 +4481,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'user_preferences_profile_id_fkey'
-            columns: ['profile_id']
+            foreignKeyName: "user_preferences_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4465,7 +4530,7 @@ export type Database = {
       get_cache_stats: { Args: never; Returns: Json }
       is_org_member: {
         Args: {
-          allowed_roles?: Database['public']['Enums']['profile_variant_type'][]
+          allowed_roles?: Database["public"]["Enums"]["profile_variant_type"][]
           org_id: string
         }
         Returns: boolean
@@ -4513,8 +4578,8 @@ export type Database = {
           venue_organization_id: string
         }
         SetofOptions: {
-          from: '*'
-          to: 'playhub_pitch_calibrations'
+          from: "*"
+          to: "playhub_pitch_calibrations"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -4562,54 +4627,57 @@ export type Database = {
       }
     }
     Enums: {
-      attribution_revoker: 'player' | 'club' | 'admin'
-      attribution_source: 'jersey_map' | 'manual'
+      attribution_revoker: "player" | "club" | "admin"
+      attribution_source: "jersey_map" | "manual"
       basketball_experience_level:
-        | 'recreational'
-        | 'amateur_club'
-        | 'school_youth'
-        | 'university'
-        | 'semi_professional'
-        | 'professional_domestic'
-        | 'professional_elite'
-        | 'former_professional'
-      clip_type: 'goal' | 'assist' | 'save' | 'tackle' | 'skill' | 'custom'
+        | "recreational"
+        | "amateur_club"
+        | "school_youth"
+        | "university"
+        | "semi_professional"
+        | "professional_domestic"
+        | "professional_elite"
+        | "former_professional"
+      clip_type: "goal" | "assist" | "save" | "tackle" | "skill" | "custom"
       football_experience_level:
-        | 'recreational'
-        | 'school_team'
-        | 'sunday_league'
-        | 'club_youth'
-        | 'academy'
-        | 'amateur_club'
-        | 'non_league'
-        | 'college_university'
-        | 'semi_professional'
-        | 'professional'
-        | 'former_professional'
+        | "recreational"
+        | "school_team"
+        | "sunday_league"
+        | "club_youth"
+        | "academy"
+        | "amateur_club"
+        | "non_league"
+        | "college_university"
+        | "semi_professional"
+        | "professional"
+        | "former_professional"
       preference_category:
-        | 'playscanner'
-        | 'notifications'
-        | 'privacy'
-        | 'display'
-        | 'communication'
-        | 'discovery'
-        | 'analytics'
+        | "playscanner"
+        | "notifications"
+        | "privacy"
+        | "display"
+        | "communication"
+        | "discovery"
+        | "analytics"
       profile_module_visibility:
-        'public' | 'authenticated' | 'club_only' | 'private'
+        | "public"
+        | "authenticated"
+        | "club_only"
+        | "private"
       profile_variant_type:
-        | 'player'
-        | 'coach'
-        | 'scout'
-        | 'agent'
-        | 'parent'
-        | 'fan'
-        | 'referee'
-        | 'trainer'
-        | 'physio'
-        | 'club_admin'
-        | 'league_admin'
-        | 'admin'
-        | 'manager'
+        | "player"
+        | "coach"
+        | "scout"
+        | "agent"
+        | "parent"
+        | "fan"
+        | "referee"
+        | "trainer"
+        | "physio"
+        | "club_admin"
+        | "league_admin"
+        | "admin"
+        | "manager"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -4617,33 +4685,33 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, 'public'>]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
-    : never) = never,
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema['Tables'] &
-        DefaultSchema['Views'])
-    ? (DefaultSchema['Tables'] &
-        DefaultSchema['Views'])[DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -4652,22 +4720,23 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never) = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
-    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -4676,22 +4745,23 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never) = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
-    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -4700,35 +4770,36 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    keyof DefaultSchema['Enums'] | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
-    : never) = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
-    ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema['CompositeTypes']
+    | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
-    : never) = never,
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
-    ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
 export const Constants = {
@@ -4737,61 +4808,61 @@ export const Constants = {
   },
   public: {
     Enums: {
-      attribution_revoker: ['player', 'club', 'admin'],
-      attribution_source: ['jersey_map', 'manual'],
+      attribution_revoker: ["player", "club", "admin"],
+      attribution_source: ["jersey_map", "manual"],
       basketball_experience_level: [
-        'recreational',
-        'amateur_club',
-        'school_youth',
-        'university',
-        'semi_professional',
-        'professional_domestic',
-        'professional_elite',
-        'former_professional',
+        "recreational",
+        "amateur_club",
+        "school_youth",
+        "university",
+        "semi_professional",
+        "professional_domestic",
+        "professional_elite",
+        "former_professional",
       ],
-      clip_type: ['goal', 'assist', 'save', 'tackle', 'skill', 'custom'],
+      clip_type: ["goal", "assist", "save", "tackle", "skill", "custom"],
       football_experience_level: [
-        'recreational',
-        'school_team',
-        'sunday_league',
-        'club_youth',
-        'academy',
-        'amateur_club',
-        'non_league',
-        'college_university',
-        'semi_professional',
-        'professional',
-        'former_professional',
+        "recreational",
+        "school_team",
+        "sunday_league",
+        "club_youth",
+        "academy",
+        "amateur_club",
+        "non_league",
+        "college_university",
+        "semi_professional",
+        "professional",
+        "former_professional",
       ],
       preference_category: [
-        'playscanner',
-        'notifications',
-        'privacy',
-        'display',
-        'communication',
-        'discovery',
-        'analytics',
+        "playscanner",
+        "notifications",
+        "privacy",
+        "display",
+        "communication",
+        "discovery",
+        "analytics",
       ],
       profile_module_visibility: [
-        'public',
-        'authenticated',
-        'club_only',
-        'private',
+        "public",
+        "authenticated",
+        "club_only",
+        "private",
       ],
       profile_variant_type: [
-        'player',
-        'coach',
-        'scout',
-        'agent',
-        'parent',
-        'fan',
-        'referee',
-        'trainer',
-        'physio',
-        'club_admin',
-        'league_admin',
-        'admin',
-        'manager',
+        "player",
+        "coach",
+        "scout",
+        "agent",
+        "parent",
+        "fan",
+        "referee",
+        "trainer",
+        "physio",
+        "club_admin",
+        "league_admin",
+        "admin",
+        "manager",
       ],
     },
   },

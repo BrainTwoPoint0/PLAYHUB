@@ -94,6 +94,13 @@ export default function EditorPage() {
   // recordingId is the stable anchor for save/load; when present the job
   // becomes a recording-linked row visible to org teammates (read-only).
   const recordingId = searchParams.get('recordingId')
+  // Academy draft identity. A club admin arriving via "fix in editor" is correcting a
+  // specific system-generated draft; carrying its id lets us record the correction as
+  // training signal. Label semantics: a draft marked "good enough" is UNEDITED by
+  // definition, so any edit here IS the negative label (auto-detection not good enough).
+  const academyRenderId = fromAcademy ? searchParams.get('renderId') : null
+  const academyClubSlug = fromAcademy ? searchParams.get('clubSlug') : null
+  const canReportCorrection = Boolean(academyRenderId && academyClubSlug)
   const [jobId, setJobId] = useState<string | null>(null)
   // null = still checking the kill-switch; false = banner + disable CTAs.
   const [portraitCropEnabled, setPortraitCropEnabled] = useState<
@@ -769,6 +776,63 @@ export default function EditorPage() {
   }, [keyframes, videoFilename])
 
   /* ───────── Render the portrait MP4 (the deliverable) ───────── */
+  /**
+   * Report a correction to a system-generated academy draft — the training signal.
+   *
+   * Fired on render success because rendering is the only act every academy correction
+   * actually performs (there is no Save button on this path), and it is the moment
+   * "after" is definitively what the human wanted. Strictly fire-and-forget: a lost
+   * training row must never break the admin's render.
+   */
+  const reportAcademyCorrection = useCallback(
+    async (keyframesAfter: CropKeyframe[]) => {
+      if (!canReportCorrection) return
+      // Any edit at all means the auto-detection was not good enough; untouched
+      // means it was. That is the whole label.
+      const action = sessionDirtyRef.current ? 'edited' : 'accepted'
+      // Must match handleRender's own trim condition. A head-only trim leaves trimEnd
+      // at 0; reporting trim:null there would record the trimmed-away keyframes as
+      // DELETIONS, i.e. "the crop was wrong here" when the truth is "that footage is
+      // not in the clip" — a fabricated diagnosis in the corpus.
+      const trimmedClip = trimStart > 0 || trimEnd > 0
+      try {
+        await fetch(
+          `/api/academy/${academyClubSlug}/portrait-renders/${academyRenderId}/feedback`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            // keepalive is what actually survives an unload; awaiting does not. The
+            // await here only sequences the call before the download click.
+            keepalive: true,
+            signal: AbortSignal.timeout(8000),
+            body: JSON.stringify({
+              action,
+              keyframesBefore: originallyDetectedRef.current,
+              // 'accepted' means unedited, so the server drops any "after" anyway.
+              keyframesAfter: action === 'edited' ? keyframesAfter : undefined,
+              sceneChanges,
+              trim: trimmedClip
+                ? { start: trimStart, end: trimEnd || duration }
+                : undefined,
+            }),
+          }
+        )
+      } catch {
+        // Non-fatal by design — the render already succeeded. A lost training row must
+        // never cost the admin their clip.
+      }
+    },
+    [
+      canReportCorrection,
+      academyClubSlug,
+      academyRenderId,
+      sceneChanges,
+      trimStart,
+      trimEnd,
+      duration,
+    ]
+  )
+
   const handleRender = useCallback(async () => {
     if (rendering || keyframes.length === 0) return
     const sourceUrl = searchParams.get('videoUrl')
@@ -812,6 +876,9 @@ export default function EditorPage() {
         setLastRenderPath(storagePath)
         setTiktokShareMsg(null)
       }
+      // Record the correction before the download click. keepalive (not the await) is
+      // what lets it survive an unload; the await just orders it first. Never throws.
+      await reportAcademyCorrection(trimmed)
       // Force-download the finished clip (the signed URL is Content-Disposition: attachment).
       const a = document.createElement('a')
       a.href = signedUrl
@@ -835,6 +902,7 @@ export default function EditorPage() {
     duration,
     sceneChanges,
     videoFilename,
+    reportAcademyCorrection,
   ])
 
   /* ───────── Share the rendered portrait clip to TikTok ───────── */
@@ -1148,6 +1216,10 @@ export default function EditorPage() {
     const exists = sceneChanges.some((t) => Math.abs(t - currentTime) < 0.1)
     if (exists) return
     setSceneChanges((prev) => [...prev, currentTime].sort((a, b) => a - b))
+    // Scene changes bypass updateKeyframes, so mark the session dirty here too —
+    // otherwise a correction that is purely "the AI missed a cut" would be reported
+    // as 'accepted' (auto-detection passed), the exact opposite of the truth.
+    sessionDirtyRef.current = true
   }, [currentTime, duration, sceneChanges])
 
   const trimReset = useCallback(() => {

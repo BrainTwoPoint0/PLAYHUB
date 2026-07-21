@@ -133,9 +133,14 @@ export function PortraitRendersStrip({
         autoDetect: '1',
       })
       if (source.id) params.set('highlightId', source.id)
+      // Carry the render identity so the editor can report the correction back as
+      // training signal. Without these the editor has no idea which draft it is
+      // fixing and the edit is silently discarded on tab close.
+      params.set('renderId', render.id)
+      params.set('clubSlug', clubSlug)
       router.push(`/editor?${params.toString()}`)
     },
-    [editorSources, router, t]
+    [clubSlug, editorSources, router, t]
   )
 
   if (!renders || renders.length === 0) return null
