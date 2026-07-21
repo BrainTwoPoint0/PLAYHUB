@@ -1587,6 +1587,77 @@ export type Database = {
         }
         Relationships: []
       }
+      playhub_goal_candidates: {
+        Row: {
+          anchor_s: number
+          approved_event_id: string | null
+          artifact_digest: string | null
+          clip_path: string | null
+          created_at: string
+          deadctx: number | null
+          detector_version: string
+          error: string | null
+          id: string
+          match_recording_id: string
+          p_period: number | null
+          pko: number | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          t0_s: number
+          t1_s: number
+          updated_at: string
+        }
+        Insert: {
+          anchor_s: number
+          approved_event_id?: string | null
+          artifact_digest?: string | null
+          clip_path?: string | null
+          created_at?: string
+          deadctx?: number | null
+          detector_version: string
+          error?: string | null
+          id?: string
+          match_recording_id: string
+          p_period?: number | null
+          pko?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          t0_s: number
+          t1_s: number
+          updated_at?: string
+        }
+        Update: {
+          anchor_s?: number
+          approved_event_id?: string | null
+          artifact_digest?: string | null
+          clip_path?: string | null
+          created_at?: string
+          deadctx?: number | null
+          detector_version?: string
+          error?: string | null
+          id?: string
+          match_recording_id?: string
+          p_period?: number | null
+          pko?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          t0_s?: number
+          t1_s?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playhub_goal_candidates_match_recording_id_fkey"
+            columns: ["match_recording_id"]
+            isOneToOne: false
+            referencedRelation: "playhub_match_recordings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       playhub_graphic_packages: {
         Row: {
           created_at: string | null
@@ -1937,6 +2008,10 @@ export type Database = {
           external_provider_id: string | null
           external_url: string | null
           file_size_bytes: number | null
+          goal_detect_attempts: number | null
+          goal_detect_error: string | null
+          goal_detect_started_at: string | null
+          goal_detect_status: string | null
           graphic_package_id: string | null
           home_team: string
           id: string
@@ -2007,6 +2082,10 @@ export type Database = {
           external_provider_id?: string | null
           external_url?: string | null
           file_size_bytes?: number | null
+          goal_detect_attempts?: number | null
+          goal_detect_error?: string | null
+          goal_detect_started_at?: string | null
+          goal_detect_status?: string | null
           graphic_package_id?: string | null
           home_team: string
           id?: string
@@ -2077,6 +2156,10 @@ export type Database = {
           external_provider_id?: string | null
           external_url?: string | null
           file_size_bytes?: number | null
+          goal_detect_attempts?: number | null
+          goal_detect_error?: string | null
+          goal_detect_started_at?: string | null
+          goal_detect_status?: string | null
           graphic_package_id?: string | null
           home_team?: string
           id?: string

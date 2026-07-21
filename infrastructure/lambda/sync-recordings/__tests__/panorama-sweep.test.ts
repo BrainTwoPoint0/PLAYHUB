@@ -22,10 +22,14 @@ import {
   isJerseyClaimable,
   sweepJerseyLabels,
   JERSEY_STUCK_MS,
+  isGoalDetectClaimable,
+  sweepGoalDetect,
+  GOAL_DETECT_STUCK_MS,
   type PanoramaCandidate,
   type AimTrackCandidate,
   type TrackletsCandidate,
   type JerseyCandidate,
+  type GoalDetectCandidate,
 } from '../panorama-sweep'
 
 const NOW = Date.parse('2026-07-07T12:00:00Z')
@@ -904,6 +908,195 @@ describe('sweepJerseyLabels', () => {
     const out = await sweepJerseyLabels(client, [], submit, NOW)
     expect(out).toEqual({ submitted: 0, candidates: 0 })
     expect(from).not.toHaveBeenCalled()
+    expect(submit).not.toHaveBeenCalled()
+  })
+})
+
+// ── Goal-detect sweep ────────────────────────────────────────────────────────
+
+const GOAL_DETECT_SCENES = new Set(['scene-1'])
+
+function goalRow(
+  overrides: Partial<GoalDetectCandidate> = {}
+): GoalDetectCandidate {
+  return {
+    id: 'rec-1',
+    spiideo_game_id: 'game-1',
+    spiideo_scene_id: 'scene-1',
+    s3_key: 'recordings/game-1/rec-1.mp4',
+    tracklets_status: 'ready',
+    goal_detect_status: null,
+    goal_detect_started_at: null,
+    goal_detect_attempts: null,
+    ...overrides,
+  }
+}
+
+describe('isGoalDetectClaimable', () => {
+  it('claims a never-attempted ready-tracklets row on an allowlisted scene', () => {
+    expect(isGoalDetectClaimable(goalRow(), GOAL_DETECT_SCENES, NOW)).toBe(true)
+  })
+
+  it('requires game id, allowlisted scene, ready tracklets, and a produced video', () => {
+    expect(
+      isGoalDetectClaimable(
+        goalRow({ spiideo_game_id: null }),
+        GOAL_DETECT_SCENES,
+        NOW
+      )
+    ).toBe(false)
+    expect(
+      isGoalDetectClaimable(
+        goalRow({ spiideo_scene_id: 'scene-2' }),
+        GOAL_DETECT_SCENES,
+        NOW
+      )
+    ).toBe(false)
+    expect(
+      isGoalDetectClaimable(
+        goalRow({ tracklets_status: 'pending' }),
+        GOAL_DETECT_SCENES,
+        NOW
+      )
+    ).toBe(false)
+    // s3_key gate: clips are cut from the produced mp4 — a missing video
+    // would claim-and-die three times.
+    expect(
+      isGoalDetectClaimable(goalRow({ s3_key: null }), GOAL_DETECT_SCENES, NOW)
+    ).toBe(false)
+  })
+
+  it('never reclaims ready, fresh pending, or attempts-capped rows', () => {
+    expect(
+      isGoalDetectClaimable(
+        goalRow({ goal_detect_status: 'ready' }),
+        GOAL_DETECT_SCENES,
+        NOW
+      )
+    ).toBe(false)
+    expect(
+      isGoalDetectClaimable(
+        goalRow({
+          goal_detect_status: 'pending',
+          goal_detect_started_at: new Date(NOW - 60_000).toISOString(),
+        }),
+        GOAL_DETECT_SCENES,
+        NOW
+      )
+    ).toBe(false)
+    expect(
+      isGoalDetectClaimable(
+        goalRow({
+          goal_detect_status: 'error',
+          goal_detect_attempts: MAX_ATTEMPTS,
+          goal_detect_started_at: new Date(
+            NOW - ERROR_COOLDOWN_MS * 10
+          ).toISOString(),
+        }),
+        GOAL_DETECT_SCENES,
+        NOW
+      )
+    ).toBe(false)
+  })
+
+  it('NULL status is claimable regardless of attempts (operator reset)', () => {
+    expect(
+      isGoalDetectClaimable(
+        goalRow({ goal_detect_status: null, goal_detect_attempts: 3 }),
+        GOAL_DETECT_SCENES,
+        NOW
+      )
+    ).toBe(true)
+  })
+
+  it('reclaims an error row only past the cooldown', () => {
+    expect(
+      isGoalDetectClaimable(
+        goalRow({
+          goal_detect_status: 'error',
+          goal_detect_attempts: 1,
+          goal_detect_started_at: new Date(
+            NOW - ERROR_COOLDOWN_MS + 5000
+          ).toISOString(),
+        }),
+        GOAL_DETECT_SCENES,
+        NOW
+      )
+    ).toBe(false)
+    expect(
+      isGoalDetectClaimable(
+        goalRow({
+          goal_detect_status: 'error',
+          goal_detect_attempts: 1,
+          goal_detect_started_at: new Date(
+            NOW - ERROR_COOLDOWN_MS - 5000
+          ).toISOString(),
+        }),
+        GOAL_DETECT_SCENES,
+        NOW
+      )
+    ).toBe(true)
+  })
+
+  it('reclaims a dead pending only past GOAL_DETECT_STUCK_MS (3h > job timeout)', () => {
+    expect(
+      isGoalDetectClaimable(
+        goalRow({
+          goal_detect_status: 'pending',
+          goal_detect_attempts: 1,
+          goal_detect_started_at: new Date(
+            NOW - GOAL_DETECT_STUCK_MS + 60_000
+          ).toISOString(),
+        }),
+        GOAL_DETECT_SCENES,
+        NOW
+      )
+    ).toBe(false)
+    expect(
+      isGoalDetectClaimable(
+        goalRow({
+          goal_detect_status: 'pending',
+          goal_detect_attempts: 1,
+          goal_detect_started_at: new Date(
+            NOW - GOAL_DETECT_STUCK_MS - 1000
+          ).toISOString(),
+        }),
+        GOAL_DETECT_SCENES,
+        NOW
+      )
+    ).toBe(true)
+  })
+})
+
+describe('sweepGoalDetect', () => {
+  it('is a no-op with an empty allowlist (feature disabled)', async () => {
+    const from = vi.fn()
+    const client = { from } as unknown as SupabaseClient
+    const submit = vi.fn(async () => 'job-1')
+    const out = await sweepGoalDetect(client, [], submit, NOW)
+    expect(out).toEqual({ submitted: 0, candidates: 0 })
+    expect(from).not.toHaveBeenCalled()
+    expect(submit).not.toHaveBeenCalled()
+  })
+
+  it('gates out scenes with no active calibration before touching recordings', async () => {
+    // The job hard-requires a calibration — without this gate an allowlisted
+    // scene missing one would claim-and-burn 3 attempts per recording.
+    const tables: string[] = []
+    const calBuilder = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      in: vi.fn(async () => ({ data: [], error: null })),
+    }
+    const from = vi.fn((table: string) => {
+      tables.push(table)
+      return calBuilder
+    })
+    const client = { from } as unknown as SupabaseClient
+    const submit = vi.fn(async () => 'job-1')
+    const out = await sweepGoalDetect(client, ['scene-1'], submit, NOW)
+    expect(out).toEqual({ submitted: 0, candidates: 0 })
+    expect(tables).toEqual(['playhub_pitch_calibrations'])
     expect(submit).not.toHaveBeenCalled()
   })
 })

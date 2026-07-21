@@ -1,0 +1,22 @@
+# CodeBuild spec: build the goal-detect container image and push to ECR.
+# Same pattern as jersey-labels: privileged CodeBuild container, source zip
+# root == infrastructure/batch/goal-detect/. All modules are vendored (no
+# staged shared files — build_track.py imports cv2 at module top, so the
+# calibration gate is a LOCKSTEP copy in calibration_gate.py instead).
+# Env: ECR_REPO_URL, AWS_REGION.
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "Logging in to ECR $ECR_REPO_URL"
+      - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REPO_URL"
+      - test -f entrypoint.py || { echo "entrypoint.py missing from zip"; exit 1; }
+      - test -f stoppage_features.py || { echo "stoppage_features.py missing from zip"; exit 1; }
+  build:
+    commands:
+      - docker build --pull -t "$ECR_REPO_URL:latest" .
+  post_build:
+    commands:
+      - docker push "$ECR_REPO_URL:latest"
+      - echo "Pushed $ECR_REPO_URL:latest"

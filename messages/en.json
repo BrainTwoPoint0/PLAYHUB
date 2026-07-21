@@ -679,6 +679,28 @@
       "venue": "Venue",
       "pitch": "Pitch",
       "description": "Description"
+    },
+    "goalCandidates": {
+      "title": "AI goal review",
+      "counts": "{open} to review · {approved} approved",
+      "hint": "Detected kickoff moments — the goal plays out in the clip before the kickoff. About 1 in 3 is a real goal; approving adds a public goal marker to the timeline.",
+      "preview": "Play review clip",
+      "approve": "Approve — add goal marker",
+      "approveRepair": "Approve again to finish",
+      "reject": "Not a goal",
+      "restore": "Restore for review",
+      "approvedNotice": "Goal marker added",
+      "actionFailed": "Action failed — try again",
+      "errorBadge": "Processing error",
+      "repair": "Finish approve",
+      "draft": "Review",
+      "approved": "Goal",
+      "rejected": "Not a goal",
+      "error": "Error",
+      "confidenceTitle": "Detector confidence: kickoff formation / dead-ball context",
+      "confidence": "KO {pko}% · dead {dead}%",
+      "approveRepairNotice": "Approved, but the goal marker didn't save — approve again to finish",
+      "staleNotice": "This candidate was updated elsewhere — list refreshed"
     }
   },
   "org": {

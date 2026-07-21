@@ -17,6 +17,7 @@ import {
 } from '@braintwopoint0/playback-commons/ui'
 import { createClient } from '@braintwopoint0/playback-commons/supabase'
 import { FadeIn } from '@/components/FadeIn'
+import { GoalCandidatesStrip } from '@/components/recordings/GoalCandidatesStrip'
 import {
   VideoPlayer,
   type MediaPack,
@@ -570,6 +571,14 @@ export default function RecordingPage() {
             </div>
           </div>
         </FadeIn>
+
+        {/* AI goal-candidate review (platform admins only — renders null
+            for everyone else via the API's 403; onApproved refreshes the
+            events list so the new marker appears immediately) */}
+        <GoalCandidatesStrip
+          recordingId={recordingId}
+          onApproved={fetchEvents}
+        />
 
         {/* Event Tags Section */}
         <FadeIn delay={100}>

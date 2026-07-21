@@ -125,6 +125,7 @@ locals {
     tracklets   = aws_batch_job_definition.player_tracklets
     veo_capture = aws_batch_job_definition.veo_capture
     jersey      = aws_batch_job_definition.jersey_labels
+    goal_detect = aws_batch_job_definition.goal_detect
   }
   # Queues the sweeps submit to. The job-def map above cannot cover queues,
   # and SubmitJob authorizes against BOTH — a job class on a NEW queue whose
@@ -133,6 +134,7 @@ locals {
   sweep_job_queues = [
     aws_batch_job_queue.vp_materialize.arn,
     aws_batch_job_queue.jersey_labels.arn,
+    aws_batch_job_queue.goal_detect.arn,
   ]
 }
 
@@ -239,6 +241,17 @@ resource "aws_lambda_function" "sync_recordings" {
       # Organized-kit venue allowlist (Spiideo scene ids) for the jersey
       # sweep; empty = disabled. Enable HCT only after the pilot E2E.
       JERSEY_VENUES = var.jersey_venues
+      # Goal-detect sweep (review-first goal candidates): scene-id allowlist,
+      # empty = disabled. Enable the Nazwa pilot scene after the E2E drill.
+      # ENABLE-ORDER INVARIANT: the job hard-requires a usable ACTIVE pitch
+      # calibration (band + mesh-epoch gated). The sweep pre-gates on "an
+      # active row exists", but a red-band or cross-epoch calibration passes
+      # that pre-gate and still settles every recording at error after 3
+      # attempts — allowlist a scene only once its calibration is green in
+      # the venue UI.
+      GOAL_DETECT_JOB_DEF   = aws_batch_job_definition.goal_detect.name
+      GOAL_DETECT_JOB_QUEUE = aws_batch_job_queue.goal_detect.name
+      GOAL_DETECT_SCENES    = var.goal_detect_scenes
     }
   }
 

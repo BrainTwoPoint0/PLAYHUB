@@ -168,6 +168,23 @@ resource "aws_iam_role_policy" "batch_job_s3" {
         Effect   = "Deny"
         Action   = "s3:*"
         Resource = "arn:aws:s3:::${var.s3_bucket}/keys/*"
+      },
+      {
+        # Frozen-model weights prefixes are WRITE-once by operator credentials.
+        # goal-detect unpickles from provenance/goal-detect/<date>/ in a task
+        # carrying the service-role key; its sha pins are the integrity gate,
+        # and this Deny removes the overwrite path from every job in the fleet
+        # (incl. veo-capture's unsandboxed browser — the same threat model as
+        # keys/* above). Jobs write their own provenance under
+        # provenance/<class>/<GAME_ID>/ (UUID paths — never a dated weights
+        # prefix), so nothing legitimate is blocked. (Security review
+        # 2026-07-22.)
+        Effect = "Deny"
+        Action = ["s3:PutObject", "s3:DeleteObject", "s3:AbortMultipartUpload"]
+        Resource = [
+          "arn:aws:s3:::${var.s3_bucket}/provenance/goal-detect/2026-*",
+          "arn:aws:s3:::${var.s3_bucket}/provenance/jersey-reader/2026-*",
+        ]
       }
     ]
   })

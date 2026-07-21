@@ -24,6 +24,7 @@ import {
   sweepPanoramaCaptures,
   sweepAimTracks,
   sweepJerseyLabels,
+  sweepGoalDetect,
   sweepPlayerTracklets,
   sweepVeoCaptures,
   sweepPortraitRenders,
@@ -60,6 +61,13 @@ const JERSEY_JOB_DEF = process.env.JERSEY_JOB_DEF || ''
 const JERSEY_JOB_QUEUE = process.env.JERSEY_JOB_QUEUE || ''
 // Organized-kit venue allowlist (Spiideo scene ids); empty = jersey disabled.
 const JERSEY_VENUES = (process.env.JERSEY_VENUES || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
+const GOAL_DETECT_JOB_DEF = process.env.GOAL_DETECT_JOB_DEF || ''
+const GOAL_DETECT_JOB_QUEUE = process.env.GOAL_DETECT_JOB_QUEUE || ''
+// Goal-detect scene allowlist (Spiideo scene ids); empty = disabled.
+const GOAL_DETECT_SCENES = (process.env.GOAL_DETECT_SCENES || '')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean)
@@ -1440,6 +1448,44 @@ export const handler = async (): Promise<{
         } catch (err) {
           console.error(
             'Jersey sweep failed (non-fatal):',
+            err instanceof Error ? err.message : err
+          )
+        }
+      }
+      if (
+        GOAL_DETECT_JOB_DEF &&
+        GOAL_DETECT_JOB_QUEUE &&
+        GOAL_DETECT_SCENES.length > 0
+      ) {
+        try {
+          const batch = new BatchClient({ region: S3_REGION })
+          const { submitted, candidates } = await sweepGoalDetect(
+            supabase,
+            GOAL_DETECT_SCENES,
+            async (recordingId, gameId) => {
+              const out = await batch.send(
+                new SubmitJobCommand({
+                  jobName: `goal-detect-${recordingId}`,
+                  jobQueue: GOAL_DETECT_JOB_QUEUE,
+                  jobDefinition: GOAL_DETECT_JOB_DEF,
+                  containerOverrides: {
+                    environment: [
+                      { name: 'RECORDING_ID', value: recordingId },
+                      { name: 'GAME_ID', value: gameId },
+                    ],
+                  },
+                })
+              )
+              return out.jobId
+            }
+          )
+          if (candidates > 0)
+            console.log(
+              `Goal-detect sweep: ${submitted} submitted, ${candidates} claimable`
+            )
+        } catch (err) {
+          console.error(
+            'Goal-detect sweep failed (non-fatal):',
             err instanceof Error ? err.message : err
           )
         }

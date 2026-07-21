@@ -1,0 +1,8 @@
+# Pins MUST match the environment that trained the frozen pkls
+# (verified 2026-07-21: sklearn 1.9.0 / numpy 2.4.5 / joblib 1.5.3).
+# A version drift makes joblib emit InconsistentVersionWarning and can
+# silently change predictions — treat any bump as a re-banking event.
+numpy==2.4.5
+scikit-learn==1.9.0
+joblib==1.5.3
+boto3==1.40.10

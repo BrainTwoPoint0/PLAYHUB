@@ -649,6 +649,199 @@ export async function sweepJerseyLabels(
   return { submitted, candidates: claimable.length }
 }
 
+// ── Goal-detect sweep ────────────────────────────────────────────────────────
+// Feed for the goal-detect Batch job (review-first Spiideo goal candidates):
+// once a scene-allowlisted recording has ready tracklets AND a produced video,
+// submit the goal-detect job (frozen chain -> playhub_goal_candidates + review
+// clips). The tracklets job deliberately does NOT reset goal_detect_status on
+// its own success — a silent re-detection would orphan reviewed candidates;
+// re-detection is a manual operator step for the pilot.
+// GOAL_DETECT_SCENES (scene ids) empty = feature disabled.
+
+export const GOAL_DETECT_SWEEP_MAX_PER_RUN = 1
+export const GOAL_DETECT_INFLIGHT_CAP = 1 // dedicated 2-vCPU CE fits exactly one
+// Jobs run ~35 min with a 2h Batch timeout; a QUEUED job has no heartbeat,
+// so reclaim only after the timeout has certainly fired.
+export const GOAL_DETECT_STUCK_MS = 10_800_000 // 3h > the 2h job timeout
+
+export interface GoalDetectCandidate {
+  id: string
+  spiideo_game_id: string | null
+  spiideo_scene_id: string | null
+  s3_key: string | null
+  tracklets_status: string | null
+  goal_detect_status: string | null
+  goal_detect_started_at: string | null
+  goal_detect_attempts: number | null
+}
+
+/** Same claimability contract as isJerseyClaimable, over goal_detect_*
+ *  columns, plus the upstream gates: tracklets ready + produced video present
+ *  (clips are cut from it — a missing s3_key would claim-and-die three times)
+ *  + scene allowlisted. */
+export function isGoalDetectClaimable(
+  row: GoalDetectCandidate,
+  goalDetectScenes: Set<string>,
+  nowMs: number
+): boolean {
+  if (!row.spiideo_game_id || !row.spiideo_scene_id) return false
+  if (!goalDetectScenes.has(row.spiideo_scene_id)) return false
+  if (row.tracklets_status !== 'ready') return false
+  if (!row.s3_key) return false
+  const status = row.goal_detect_status
+  if (status === 'ready') return false
+  const startedAt = row.goal_detect_started_at
+    ? Date.parse(row.goal_detect_started_at)
+    : 0
+  if (status === null) return true
+  if (status === 'error')
+    return (
+      (row.goal_detect_attempts ?? 0) < MAX_ATTEMPTS &&
+      nowMs - startedAt >= ERROR_COOLDOWN_MS
+    )
+  if (status === 'pending')
+    return (
+      (row.goal_detect_attempts ?? 0) < MAX_ATTEMPTS &&
+      nowMs - startedAt >= GOAL_DETECT_STUCK_MS
+    )
+  return false
+}
+
+export async function sweepGoalDetect(
+  supabase: SupabaseClient,
+  goalDetectScenes: string[],
+  submitJob: SubmitPanoramaJob,
+  nowMs = Date.now()
+): Promise<{ submitted: number; candidates: number }> {
+  if (goalDetectScenes.length === 0) return { submitted: 0, candidates: 0 }
+
+  // Calibration pre-gate (senior review #2): the job HARD-requires an active
+  // pitch calibration (projection is garbage without one) — a scene
+  // allowlisted before its calibration exists would claim-and-burn 3
+  // attempts per recording and settle them all at error. One round trip
+  // gates every candidate on that scene. (Band/epoch quality is still the
+  // job's own, stricter check — this only filters the no-calibration case.)
+  const { data: cals, error: calErr } = await supabase
+    .from('playhub_pitch_calibrations')
+    .select('scene_id')
+    .eq('status', 'active')
+    .in('scene_id', goalDetectScenes)
+  if (calErr)
+    throw new Error(`goal-detect sweep calibration gate: ${calErr.message}`)
+  const calibratedScenes = goalDetectScenes.filter((s) =>
+    (cals ?? []).some((c) => c.scene_id === s)
+  )
+  if (calibratedScenes.length === 0) return { submitted: 0, candidates: 0 }
+  const sceneSet = new Set(calibratedScenes)
+
+  const { data, error } = await supabase
+    .from('playhub_match_recordings')
+    .select(
+      'id, spiideo_game_id, spiideo_scene_id, s3_key, tracklets_status, goal_detect_status, goal_detect_started_at, goal_detect_attempts'
+    )
+    .eq('status', 'published')
+    .eq('tracklets_status', 'ready')
+    .not('spiideo_game_id', 'is', null)
+    .not('s3_key', 'is', null)
+    .in('spiideo_scene_id', calibratedScenes)
+    // NOT .neq(...,'ready') — three-valued logic drops NULL rows (the point).
+    .or(`goal_detect_status.is.null,goal_detect_status.neq.ready`)
+    // NULL status is claimable REGARDLESS of attempts (all three layers —
+    // query, isGoalDetectClaimable, CAS — agree), so an operator reset of the
+    // status alone is a real reset, not a silent no-op. Settled errors
+    // (status=error, attempts>=3) stay excluded so they can't starve the
+    // LIMIT window.
+    .or(
+      `goal_detect_status.is.null,goal_detect_attempts.is.null,goal_detect_attempts.lt.${MAX_ATTEMPTS}`
+    )
+    // Review queue, not a deadline race: newest content first is right here
+    // (fresh matches are what the reviewer opens).
+    .order('match_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
+    .limit(25)
+  if (error) throw new Error(`goal-detect sweep query: ${error.message}`)
+
+  const claimable = (data ?? []).filter((r) =>
+    isGoalDetectClaimable(r, sceneSet, nowMs)
+  )
+
+  const freshCutoff = new Date(nowMs - GOAL_DETECT_STUCK_MS).toISOString()
+  const { count: inFlight, error: inFlightErr } = await supabase
+    .from('playhub_match_recordings')
+    .select('id', { count: 'exact', head: true })
+    .eq('goal_detect_status', 'pending')
+    .gte('goal_detect_started_at', freshCutoff)
+  if (inFlightErr)
+    throw new Error(`goal-detect sweep in-flight count: ${inFlightErr.message}`)
+  const budget = Math.max(
+    0,
+    Math.min(
+      GOAL_DETECT_SWEEP_MAX_PER_RUN,
+      GOAL_DETECT_INFLIGHT_CAP - (inFlight ?? 0)
+    )
+  )
+
+  let submitted = 0
+  let attempted = 0
+  for (const row of claimable) {
+    if (attempted >= budget) break
+    const stuckCutoff = new Date(nowMs - GOAL_DETECT_STUCK_MS).toISOString()
+    const errorCutoff = new Date(nowMs - ERROR_COOLDOWN_MS).toISOString()
+    const { count, error: claimErr } = await supabase
+      .from('playhub_match_recordings')
+      .update(
+        {
+          goal_detect_status: 'pending',
+          goal_detect_started_at: new Date(nowMs).toISOString(),
+          goal_detect_error: null,
+          goal_detect_attempts: (row.goal_detect_attempts ?? 0) + 1,
+        },
+        { count: 'exact' }
+      )
+      .eq('id', row.id)
+      // The two .is.null arms close a lockstep drift the jersey/tracklets
+      // clones carry: a manually-reset row with status set but started_at
+      // NULL is claimable per the query+helper, but `lt.cutoff` is
+      // NULL-false — without these arms it CAS-misses forever and logs a
+      // permanent "0 submitted, N claimable" (the IAM-trap false positive).
+      .or(
+        `goal_detect_status.is.null,` +
+          `and(goal_detect_status.eq.error,goal_detect_attempts.lt.${MAX_ATTEMPTS},goal_detect_started_at.lt.${errorCutoff}),` +
+          `and(goal_detect_status.eq.error,goal_detect_attempts.lt.${MAX_ATTEMPTS},goal_detect_started_at.is.null),` +
+          `and(goal_detect_status.eq.pending,goal_detect_attempts.lt.${MAX_ATTEMPTS},goal_detect_started_at.lt.${stuckCutoff}),` +
+          `and(goal_detect_status.eq.pending,goal_detect_attempts.lt.${MAX_ATTEMPTS},goal_detect_started_at.is.null)`
+      )
+    if (claimErr) {
+      console.error(
+        `goal-detect sweep: claim failed for ${row.id}: ${claimErr.message}`
+      )
+      continue
+    }
+    if (!count) continue
+
+    attempted++
+    try {
+      const jobId = await submitJob(row.id, String(row.spiideo_game_id))
+      if (!jobId) throw new Error('no jobId returned')
+      console.log(`goal-detect sweep: submitted ${row.id} -> job ${jobId}`)
+      submitted++
+    } catch (err) {
+      console.error(
+        `goal-detect sweep: submit failed for ${row.id}: ${err instanceof Error ? err.message : err}`
+      )
+      await supabase
+        .from('playhub_match_recordings')
+        .update({
+          goal_detect_status: 'error',
+          goal_detect_error: 'sweep submit failed',
+          goal_detect_attempts: row.goal_detect_attempts ?? 0,
+        })
+        .eq('id', row.id)
+    }
+  }
+  return { submitted, candidates: claimable.length }
+}
+
 // ── Portrait-render sweep ────────────────────────────────────────────────────
 // Feed for the portrait-render Batch job (9:16 goal drafts, review-first):
 // club-allowlisted Veo matches with unrendered tagged goals, served by the

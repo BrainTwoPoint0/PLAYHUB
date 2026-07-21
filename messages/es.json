@@ -679,6 +679,28 @@
       "venue": "Club",
       "pitch": "Campo",
       "description": "Descripción"
+    },
+    "goalCandidates": {
+      "title": "Revisión de goles IA",
+      "counts": "{open} por revisar · {approved} aprobados",
+      "hint": "Momentos de saque detectados: el gol aparece en el clip antes del saque. Aproximadamente 1 de cada 3 es un gol real; al aprobar se añade un marcador de gol público a la línea de tiempo.",
+      "preview": "Reproducir clip de revisión",
+      "approve": "Aprobar — añadir marcador de gol",
+      "approveRepair": "Aprueba de nuevo para terminar",
+      "reject": "No es gol",
+      "restore": "Restaurar para revisar",
+      "approvedNotice": "Marcador de gol añadido",
+      "actionFailed": "La acción falló — inténtalo de nuevo",
+      "errorBadge": "Error de procesamiento",
+      "repair": "Terminar aprobación",
+      "draft": "Revisar",
+      "approved": "Gol",
+      "rejected": "No es gol",
+      "error": "Error",
+      "confidenceTitle": "Confianza del detector: formación de saque / contexto de balón parado",
+      "confidence": "Saque {pko}% · parado {dead}%",
+      "approveRepairNotice": "Aprobado, pero el marcador de gol no se guardó — aprueba de nuevo para terminar",
+      "staleNotice": "Este candidato se actualizó en otro lugar — lista actualizada"
     }
   },
   "org": {
