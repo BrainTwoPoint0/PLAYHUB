@@ -25,6 +25,7 @@ import supervision as sv
 from ultralytics import YOLO
 from norfair import Detection, Tracker
 from norfair.filter import OptimizedKalmanFilterFactory
+from transition_hold import bridge_and_hold
 
 SCENE_CHANGE_THRESHOLD = 0.4
 MAX_BALL_AREA = 3000
@@ -450,6 +451,10 @@ def detect_ball(video_path: str, output_fps: float = 25.0) -> dict:
     positions = bidirectional_interpolate(positions)
     frame_w = per_frame_data[0]["frame_w"] if per_frame_data else 1920
     positions = ballistic_fill(positions, frame_w)
+    # Non-causal transition-hold (P1 + spine): trust only the supported high-conf "spine",
+    # bridge SHORT gaps, hold last-x on longer ones (no recenter-to-centre). Runs LAST so it is the
+    # final authority on non-(confident-ball) runs. See docs / transition_hold.py.
+    positions = bridge_and_hold(positions)
 
     frame_clusters = [{"time": round(fd["time_sec"], 3), "cx": fd.get("cluster_x", -1), "cy": fd.get("cluster_y", -1)} for fd in per_frame_data]
     return {"positions": positions, "scene_changes": scene_changes, "all_candidates": all_cands, "frame_clusters": frame_clusters}

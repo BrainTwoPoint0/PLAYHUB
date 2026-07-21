@@ -72,6 +72,10 @@ image = (
         os.path.join(script_dir, "detect_ball.py"),
         "/app/detect_ball.py",
     )
+    .add_local_file(
+        os.path.join(script_dir, "transition_hold.py"),
+        "/app/transition_hold.py",
+    )
 )
 
 
