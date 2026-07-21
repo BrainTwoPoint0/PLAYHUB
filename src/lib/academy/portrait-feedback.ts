@@ -68,9 +68,25 @@ export async function insertPortraitFeedback(
   service: SupabaseClient<Database>,
   input: PortraitFeedbackInput
 ): Promise<{ ok: boolean; id: string | null; diff: KeyframeDiff | null }> {
-  const before = input.keyframesBefore ?? null
   const after = input.keyframesAfter ?? null
-  const diff = after && before ? diffKeyframes(before, after) : null
+  const beforeRaw = input.keyframesBefore ?? null
+  // Clip the baseline to the trim window BEFORE diffing. Without this, keyframes the
+  // human trimmed away are reported as deletions with a deletedSourceMix — i.e. "the
+  // crop was wrong here" when the truth is "that footage is not in the clip". Doing it
+  // here rather than leaving it to consumers is deliberate: every consumer would have
+  // to remember to filter by `trim`, and they won't.
+  const before =
+    beforeRaw && input.trim
+      ? beforeRaw.filter(
+          (k) => k.time >= input.trim!.start && k.time <= input.trim!.end
+        )
+      : beforeRaw
+  // NOTE: `[]` is truthy, so length is the real guard — an empty baseline must not be
+  // diffed (it would report every keyframe as "added" and fabricate a max correction).
+  const diff =
+    after && after.length > 0 && before && before.length > 0
+      ? diffKeyframes(before, after)
+      : null
 
   const { data, error } = await service
     .from('playhub_portrait_render_feedback')

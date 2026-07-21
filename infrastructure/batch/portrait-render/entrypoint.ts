@@ -183,6 +183,16 @@ async function writeRenderGuarded(row: {
   status: string
   error: string | null
   quality?: unknown
+  // The exact CropKeyframe[] this render used — the baseline human corrections are
+  // diffed against. MUST be the pre-rounding autoKeyframesFromDetection output, not
+  // the Modal {time_seconds,x_pixels} payload: the feedback route parses the former,
+  // and the latter would fail parsing and silently fall back to a re-derived baseline
+  // forever. MUST be written in the SAME statement as status/storage_path, and nulled
+  // on the error path — otherwise a re-render swaps the MP4 and leaves the previous
+  // run's geometry behind, which reads as `render_row` (a confident lie) rather than
+  // the honest null it replaced.
+  keyframes?: unknown
+  scene_changes?: unknown
   attempts: number
 }): Promise<boolean> {
   const now = new Date().toISOString()
@@ -193,6 +203,8 @@ async function writeRenderGuarded(row: {
         status: row.status,
         error: row.error,
         quality: row.quality ?? null,
+        keyframes: row.keyframes ?? null,
+        scene_changes: row.scene_changes ?? null,
         attempts: row.attempts,
         storage_path: row.storage_path,
         updated_at: now,
@@ -329,6 +341,9 @@ async function main() {
         status: 'draft',
         error: null,
         quality,
+        // Pre-rounding CropKeyframe[] — the shape the feedback route can parse.
+        keyframes,
+        scene_changes: sceneChanges,
         attempts,
       })
       if (wrote) ok++
@@ -345,6 +360,9 @@ async function main() {
           ...base,
           status: 'error',
           error: msg,
+          // Deliberately no keyframes: writeRenderGuarded nulls them, so a failed
+          // re-render cannot leave the previous run's geometry attached to a row
+          // whose video no longer exists. Do not "helpfully" pass them here.
           attempts,
         })
       } catch (rowErr) {
