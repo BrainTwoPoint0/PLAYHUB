@@ -1055,3 +1055,97 @@ verify-bit-for-bit-with-split-off discipline used here.
 `freeze_results_verify_nosplit.json` (equivalence proof) in scripts/event-tagging;
 `stoppage_veo_freeze.py --split` flag (default off, baseline-verified); Spiideo check script +
 locked bar in session scratchpad (`spiideo_split_check.py`, `split-adopt-bar.md`).
+
+## EVAL LAYERS + PROVIDER INDEPENDENCE (2026-07-22, settled framing)
+
+Karim asked whether we should build an eval that runs on Veo raw panoramas and scores vs Veo's
+goals — as a permanent "works like Veo" baseline while the big success is Spiideo / any 180° cam
+without Veo or Spiideo AI.
+
+**Veo's sensor (clarified):** Veo match-events / player-tracking almost certainly come from the
+wide/panoramic tracking world, **not** the autofollow Play mp4 (follow render is a product of that
+world; measured worst for jersey crops). Same *shape* as Spiideo: raw wide → tracks → events.
+
+**Our chain also never eats pixels.** Production goal-detect = Spiideo tracklets → kickoff/dead/
+envelope chain. The Veo freeze = Veo mes-derived sidecars → **same chain** vs Veo clean goals
+(236 matches). That *is* the decision-layer baseline ("does our model recover what Veo tagged,
+given Veo-quality tracks?"). Do not confuse it with a missing raw-`.ts` eval.
+
+| Layer | Spiideo prod | Veo freeze today | "Eval on Veo `.ts`" |
+|---|---|---|---|
+| Pixels | Spiideo raw VP | — | banked Veo `.ts` |
+| Tracks | Spiideo tracklets stream | Veo mes-derived sidecars | needs **our** tracker |
+| Decision | `chain.py` | same | same |
+| Labels | human review stamps | Veo goals | Veo goals |
+
+**Independence stack** (success = tag ANY 180° recording without Veo/Spiideo AI):
+
+1. Raw 180° video (any cam)
+2. **Our** tracker → tracklets ← the real gap today
+3. Our decision layer → events ← already ours; Veo freeze is its regression rail
+4. Our identity → jersey ← banked Veo `.ts` + tracking.json are the labeller corpus
+
+**Settled rules:**
+
+- Keep the **Veo freeze as permanent accept gate** for every chain change (hybrid, τ, retrain):
+  must not regress medium recall90 / precision / shortlist bar.
+- Add a **Spiideo-label freeze** once ~10 matches are fully reviewed (domain gate the Veo freeze
+  cannot see — small-sided geometry, contamination). Jul-18 + pilot labels are the start.
+- **Do not** build "run the kickoff chain on Veo raw panoramas" next unless the upstream is **our**
+  tracker on the `.ts`. Re-wrapping Veo mes tracks and calling it pano eval is still Veo AI
+  upstream — not an independence step. Banked Veo panoramas stay for jersey/identity until then.
+- When investing in an owned tracker, Veo `.ts` + Veo goals becomes the right end-to-end lab
+  (`our tracks → chain → vs Veo goals`); Spiideo raw VP + human stamps is the domain check.
+
+**Near-term order unchanged:** adopt/ship hybrid sub-anchors → Veo freeze as gate → grow Spiideo
+label set → owned tracker only when scheduled as the independence investment.
+
+## SUB-ANCHORS HYBRID ADOPTED + SHIPPED (2026-07-22 evening, Karim's call) — commits `50645fd6` / `b49fb306` / `e7895b4f`
+
+Split-at-emission stays rejected; the hybrid is production. **Additive only, verified at every layer:**
+the frozen decode is byte-identical (merge-unchanged pinned by `test_detect_merge_unchanged_by_dctx`;
+reconcile untouched; card counts, recall, precision unchanged by construction).
+
+**Chain (`b49fb306`):** `detect()` gains optional `dctx`; episodes carry `sub_anchors` = first peak of
+each dead→live cycle (`SPLIT_LIVE_THR=0.5` dip between consecutive peaks, NaN ≠ live evidence;
+endpoints excluded from the dip check — strictly interior slice). `DETECTOR_VERSION` →
+`freeze-2026-07-21-floor080-subanchors` (informational; nothing branches on it). Candidate rows gain
+nullable `sub_anchors_s numeric[]` (migration `20260722170000`, applied; `[0] = anchor_s`); provenance
+episodes carry `subAnchors`. Pre-hybrid rows stay NULL → no chips; drafts backfill on natural
+re-detection refreshes (no mass reset — the standing duplicate-drafts rule).
+
+**Review surface (`e7895b4f`):** cards with ≥2 cycles render "Possible goal moments" chips (amber
+dashed, distinct from stamped emerald markers); one click posts the EXISTING `add_goal` at
+`sub_anchor − 20` — the click IS the human decision, nothing auto-approves; single-cycle cards render
+byte-identical to before. Chips suppress within `HINT_SUPPRESS_S=10s` of an existing stamp and dedupe
+post-clamp. en/es/ar.
+
+**Review-driven invariants (4 specialists + 2 delta re-reviews; api + senior converged on the
+provenance one independently):**
+- **Chip stamps are NOT human labels.** They send strict-boolean `estimate: true` and record as
+  `stamp_source='anchor_offset'` — `human_scrub` remains a human-precise label (the timing corpus).
+  The repair-restamp branch writes the resolved source, so a later genuine scrub supersedes a chip
+  estimate, never the reverse; a scrub confirming a chip's exact second UPGRADES the link.
+- **Same-timestamp `add_goal` converges** (exact equality; deterministic earliest-link pick): adopts
+  the existing link and re-runs the idempotent `ensureGoalEvent`, so a retry after `goal_add_failed`
+  COMPLETES a link-without-marker state instead of minting a duplicate public marker. Safe because two
+  genuine goals never share a second and chips repost identical values. Dedupe-lookup failure = 502
+  fail-closed (proceeding would mint the exact duplicate the lookup prevents).
+- GET mapper drops NULL array elements (`Number(null)=0` would render a phantom actionable 0:00 chip);
+  `subAnchorHints` bounds to `[0, MAX_TIMESTAMP_S]`.
+
+**Gates:** 1158 vitest (41 across the three goal-candidate suites, 16 new) + 12 chain / 7 reconcile
+pytest, tsc clean, build OK. **Acceptance (new chain.py on both labeled matches, production models/H):**
+pilot 19/19 cards reproduce — the 1134 flurry card carries 15 chips incl. all three true goals'
+estimates (1114/1351/1608 vs stamps 1114/1333/1611); `017121fb` 17/17 — the 533/602 flurry card offers
+528/608 (−5/+6s from stamps), and the compressed 2321/2383 card honestly shows NO extra chip (single
+cycle — the measured structural residual, ~4% of collapse; no false promise). **Venue note:** Nazwa's
+saturated deadctx yields many cycles (pilot 13/19 cards ≥2 chips, max 15; `017121fb` 7/17) vs the
+freeze-corpus median of 1/card — the hint row is more present at this venue than the freeze numbers
+imply; watch the pilot's worst flurry card before drawing UX conclusions.
+
+**Follow-ups (deliberate, not done):** add `SPLIT_LIVE_THR` to the banked `constants.json` canary at
+the next re-bank (adding it now would fail every job against the current bank); pre-existing
+restamp-vs-ambiguously-committed-event timestamp divergence (api SHOULD — the 23505-converged event
+keeps its old ts while link+response report the new one; requires a mid-flight ambiguous failure);
+chip-count cap if the worst Nazwa flurry card reads as clutter in review.
