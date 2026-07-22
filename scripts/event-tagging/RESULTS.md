@@ -1149,3 +1149,14 @@ the next re-bank (adding it now would fail every job against the current bank); 
 restamp-vs-ambiguously-committed-event timestamp divergence (api SHOULD — the 23505-converged event
 keeps its old ts while link+response report the new one; requires a mid-flight ambiguous failure);
 chip-count cap if the worst Nazwa flurry card reads as clutter in review.
+
+**ROW HINT CAP ADDED PRE-PUSH (same evening, Karim's gate: "spot the worst flurry card before prod").**
+The pilot's 1134 card would have rendered 15 chips (12 false offers styled like real ones). Measured
+fix rather than eyeballed: **within-episode cycle ranking by per-cycle max P_ko separates** — unlike
+the dead cross-episode ranking — so `sub_anchors_s` (the ROW) now carries the anchor cycle + top-7
+rest by cycle P_ko (`SUB_ANCHORS_ROW_CAP=8` in chain.py; full list + per-cycle P_ko stay in
+provenance). **K chosen by measurement, and the per-case check earned its keep: K=5 (99.2% freeze
+retention) DROPPED the pilot 512-card's stamped-531 goal cycle; K=8 = 99.9% freeze retention
+(1233/1234 OOF) and ZERO stamped-goal-cycle losses across both labeled matches.** Worst card 15→8
+chips; med/p90 (1/3) untouched; ≤8-cycle cards pass through byte-identical. Do not lower the cap
+without re-running `cap_check.py` (session scratchpad) against the stamped corpus.

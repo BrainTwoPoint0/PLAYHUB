@@ -236,6 +236,48 @@ def test_sub_anchors_across_separate_episodes():
     assert eps[1]['sub_anchors'] == [400.0, 430.0]
 
 
+def test_sub_anchor_pko_is_per_cycle_max():
+    """Each cycle's pko = max over ITS peaks, not the episode max."""
+    grid, pko, ev, dctx = _series(
+        peaks=(100, 130, 160), dips=((135, 145),))
+    pko[100], pko[130], pko[160] = 0.6, 0.95, 0.7
+    eps = chain_mod.detect(grid, pko, ev, dctx=dctx)
+    assert len(eps) == 1
+    assert eps[0]['sub_anchors'] == [100.0, 160.0]
+    # cycle 1 holds peaks 100+130 (max 0.95), cycle 2 holds peak 160
+    assert eps[0]['sub_anchor_pko'] == [0.95, 0.7]
+    assert eps[0]['pko'] == 0.95
+
+
+def test_cap_sub_anchors_passthrough_and_selection():
+    """<=cap passes through untouched; beyond it the anchor cycle is ALWAYS
+    kept (even at the lowest pko) + top-(cap-1) of the rest, time order."""
+    subs = [100.0 + 50.0 * i for i in range(10)]
+    # anchor lowest; the two weakest of the rest are at 200 and 550
+    pkos = [0.51, 0.99, 0.52, 0.98, 0.97, 0.96, 0.95, 0.94, 0.93, 0.53]
+    assert chain_mod.cap_sub_anchors(
+        subs[:chain_mod.SUB_ANCHORS_ROW_CAP],
+        pkos[:chain_mod.SUB_ANCHORS_ROW_CAP]
+    ) == subs[:chain_mod.SUB_ANCHORS_ROW_CAP]
+    capped = chain_mod.cap_sub_anchors(subs, pkos)
+    assert len(capped) == chain_mod.SUB_ANCHORS_ROW_CAP
+    assert capped[0] == 100.0                    # anchor forced
+    assert capped == sorted(capped)              # time order
+    assert 200.0 not in capped and 550.0 not in capped  # two weakest rest
+
+
+def test_cap_sub_anchors_tie_stability_and_mismatch_degrade():
+    """P_ko ties resolve to EARLIER cycles (stable sort — an argsort rewrite
+    would silently change survivors); a length-mismatched pko list degrades
+    to the earliest `cap` cycles, never a zip-truncated [anchor]."""
+    subs = [float(100 + 10 * i) for i in range(10)]
+    pkos = [0.9] + [0.8] * 9                     # all rest tied
+    capped = chain_mod.cap_sub_anchors(subs, pkos)
+    assert capped == subs[:chain_mod.SUB_ANCHORS_ROW_CAP]
+    degraded = chain_mod.cap_sub_anchors(subs, [0.9])
+    assert degraded == subs[:chain_mod.SUB_ANCHORS_ROW_CAP]
+
+
 def test_run_chain_survivors_carry_sub_anchors():
     """End-to-end: every episode from run_chain has sub_anchors, the first
     equals the anchor, and all lie within [t0, t1]."""

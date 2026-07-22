@@ -47,6 +47,17 @@ SPLIT_LIVE_THR = 0.5        # dead->live cycle boundary for sub-anchors: the
                             # §"EPISODE SPLIT MEASURED". Sub-anchors are
                             # review HINTS; they never change episode
                             # boundaries, merge, or filtering.
+SUB_ANCHORS_ROW_CAP = 8     # candidate-row hint cap: anchor cycle + top-7
+                            # rest by per-cycle max P_ko (within-EPISODE
+                            # cycle ranking separates, unlike the
+                            # cross-episode ranking). K=8 measured: 99.9%
+                            # goal-cycle retention on the 236-match freeze
+                            # corpus AND zero stamped-goal-cycle losses on
+                            # both labeled Spiideo matches (K=5 dropped the
+                            # pilot 512-card's stamped-531 cycle — do not
+                            # lower without re-measuring); worst Nazwa
+                            # flurry card 15 -> 8 chips. Full list stays in
+                            # provenance.
 KICKOFF_VARIANT = "rolefree12"
 DETECTOR_VERSION = "freeze-2026-07-21-floor080-subanchors"
 
@@ -119,21 +130,45 @@ def earliest_confident_kickoff(grid, pko):
     return None
 
 
-def _sub_anchors(peaks, grid, dctx):
-    """First peak of each dead->live cycle within one episode's peak run: a
-    new cycle starts at peak t when dctx dipped below SPLIT_LIVE_THR between
-    the immediately preceding peak and t (NaN dctx is not live evidence).
-    Without a dctx series this degrades to [anchor] — the pre-hybrid shape."""
+def _sub_anchors(peaks, peak_pkos, grid, dctx):
+    """(cycle anchors, per-cycle max P_ko) for one episode's peak run: a new
+    cycle starts at peak t when dctx dipped below SPLIT_LIVE_THR between the
+    immediately preceding peak and t (NaN dctx is not live evidence); peaks
+    that don't start a cycle fold their P_ko into the current cycle's max.
+    Without a dctx series this degrades to one cycle — the pre-hybrid
+    shape."""
     subs = [peaks[0]]
-    if dctx is None:
-        return subs
-    for prev, t in zip(peaks, peaks[1:]):
-        i0 = int(np.searchsorted(grid, prev, side="right"))
-        i1 = int(np.searchsorted(grid, t, side="left"))
-        seg = dctx[i0:i1]
-        if bool((np.isfinite(seg) & (seg < SPLIT_LIVE_THR)).any()):
+    pks = [peak_pkos[0]]
+    for (prev, t), p in zip(zip(peaks, peaks[1:]), peak_pkos[1:]):
+        split = False
+        if dctx is not None:
+            i0 = int(np.searchsorted(grid, prev, side="right"))
+            i1 = int(np.searchsorted(grid, t, side="left"))
+            seg = dctx[i0:i1]
+            split = bool((np.isfinite(seg) & (seg < SPLIT_LIVE_THR)).any())
+        if split:
             subs.append(t)
-    return subs
+            pks.append(p)
+        else:
+            pks[-1] = max(pks[-1], p)
+    return subs, pks
+
+
+def cap_sub_anchors(subs, pkos, cap=SUB_ANCHORS_ROW_CAP):
+    """Row-write hint cap: the anchor cycle is ALWAYS kept (its estimate is
+    the approve default and `[0] = anchor_s` must hold) + the top-(cap-1)
+    remaining cycles by per-cycle max P_ko, returned in time order. See the
+    SUB_ANCHORS_ROW_CAP comment before changing the cap."""
+    if len(subs) <= cap:
+        return list(subs)
+    if len(pkos) != len(subs):
+        # Defensive degrade (unreachable from detect(), which always sets
+        # both in lockstep): a mismatched pko list must not silently zip-
+        # truncate the offers down to [anchor] — keep the earliest `cap`
+        # cycles instead. Hints-only surface, so degrade beats loud-fail.
+        return list(subs)[:cap]
+    rest = sorted(zip(subs[1:], pkos[1:]), key=lambda sp: -sp[1])[:cap - 1]
+    return sorted([subs[0]] + [s for s, _ in rest])
 
 
 def detect(grid, pko, ev, dctx=None):
@@ -155,15 +190,17 @@ def detect(grid, pko, ev, dctx=None):
         if eps and t - eps[-1]["ts"][-1] <= MERGE_S:
             e = eps[-1]
             e["ts"].append(t)
+            e["ps"].append(p)
             e["pko"] = max(e["pko"], p)
             e["ev"] = max(e["ev"], d)
         else:
-            eps.append(dict(ts=[t], pko=p, ev=d))
+            eps.append(dict(ts=[t], ps=[p], pko=p, ev=d))
     for e in eps:
         e["anchor"] = e["ts"][0]
         e["t0"] = e["ts"][0]
         e["t1"] = e["ts"][-1]
-        e["sub_anchors"] = _sub_anchors(e["ts"], grid, dctx)
+        e["sub_anchors"], e["sub_anchor_pko"] = _sub_anchors(
+            e["ts"], e["ps"], grid, dctx)
     return eps
 
 

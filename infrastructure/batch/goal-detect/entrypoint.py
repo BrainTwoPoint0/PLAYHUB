@@ -426,8 +426,14 @@ def main():
             anchor_s=round(e['anchor'], 2),
             pko=round(e['pko'], 3), deadctx=round(e['ev'], 3),
             p_period=round(e.get('p_period', 0.0), 3),
-            sub_anchors_s=[round(s, 2) for s in e.get('sub_anchors')
-                           or [e['anchor']]],
+            # Row carries the CAPPED hint list (anchor cycle + top-7 rest by
+            # per-cycle P_ko, K=8: 99.9% goal-cycle retention on freeze and
+            # zero stamped-goal losses on the labeled matches — see the
+            # SUB_ANCHORS_ROW_CAP comment before changing); the full list
+            # lives in provenance.
+            sub_anchors_s=[round(s, 2) for s in chain_mod.cap_sub_anchors(
+                e.get('sub_anchors') or [e['anchor']],
+                e.get('sub_anchor_pko') or [e.get('pko', 0.0)])],
             clip_path=clip_paths.get(e['anchor']),
             status='draft', error=None,
             detector_version=chain_mod.DETECTOR_VERSION,
@@ -465,6 +471,8 @@ def main():
             'episodes': [
                 {'t0': e['t0'], 't1': e['t1'], 'anchor': e['anchor'],
                  'subAnchors': e.get('sub_anchors') or [e['anchor']],
+                 'subAnchorPko': [round(p, 3) for p in
+                                  e.get('sub_anchor_pko') or []],
                  'pko': round(e['pko'], 3), 'ev': round(e['ev'], 3),
                  'pPeriod': round(e['p_period'], 3)
                  if 'p_period' in e else None,
