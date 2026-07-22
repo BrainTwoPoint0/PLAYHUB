@@ -643,7 +643,10 @@
         "approve": "Good enough",
         "unapprove": "Undo good enough",
         "approved": "Good enough",
-        "approvedNotice": "Marked good enough — nothing was posted."
+        "approvedNotice": "Marked good enough — nothing was posted.",
+        "corrected": "Corrected",
+        "correctedHint": "You fixed this framing in the editor. Still an unjudged draft — mark it good enough or reject it.",
+        "correctionsUnavailable": "Correction markers unavailable — some clips may already be fixed."
       }
     }
   },

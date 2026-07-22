@@ -90,10 +90,48 @@ export async function PATCH(
     )
   }
 
+  // "Good enough" means the auto-detection needed no fixing — that is the whole
+  // basis of the label ("as soon as I edit anything, the detection is NOT good
+  // enough"). But the editor never writes its result back to the render row, so
+  // approving a clip that was corrected would stamp `accepted` onto the ORIGINAL,
+  // uncorrected geometry: a positive training label on framing a human rejected.
+  // Refuse it. The clip is still rejectable, and re-correctable.
+  const service = createServiceClient()
+  if (transition.to === 'approved') {
+    const { data: corrected, error: corrErr } = await service
+      .from('playhub_portrait_render_feedback')
+      .select('created_at')
+      .eq('render_id', renderId)
+      .eq('club_slug', clubSlug)
+      .eq('action', 'edited')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (corrErr) {
+      // Fail CLOSED here, unlike the listing's advisory marker: a missed check
+      // writes a permanently wrong label into an append-only corpus.
+      console.error('[portrait-renders] correction check failed:', corrErr.message)
+      return NextResponse.json(
+        { error: 'Update failed', code: 'update_failed' },
+        { status: 500 }
+      )
+    }
+    if (corrected) {
+      return NextResponse.json(
+        {
+          error:
+            'This draft was corrected in the editor, so it cannot be marked good enough',
+          code: 'corrected',
+          details: { correctedAt: corrected.created_at },
+        },
+        { status: 409 }
+      )
+    }
+  }
+
   // Atomic guarded update: the club filter is the IDOR guard, the status
   // filter makes the transition race-safe (count-CAS, no .select() — the
   // PostgREST or=/representation 400 lesson).
-  const service = createServiceClient()
   const now = new Date().toISOString()
   const { count, error } = await service
     .from('playhub_portrait_renders')

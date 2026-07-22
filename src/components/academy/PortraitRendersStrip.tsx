@@ -15,6 +15,7 @@ import {
   Clapperboard,
   Loader2,
   Pencil,
+  PencilLine,
   RotateCcw,
   Undo2,
   X,
@@ -29,6 +30,8 @@ interface PortraitRender {
   error: string | null
   previewUrl: string | null
   approvedAt?: string | null
+  /** Set when this draft has been fixed in the editor. Not a verdict — see below. */
+  correctedAt?: string | null
 }
 
 interface EditorSource {
@@ -63,6 +66,9 @@ export function PortraitRendersStrip({
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  // The server could not read correction markers. Say so, rather than letting every
+  // clip render as "never corrected" — a silent lie is worse than a missing badge.
+  const [correctionsDown, setCorrectionsDown] = useState(false)
 
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
@@ -72,8 +78,14 @@ export function PortraitRendersStrip({
           { signal }
         )
         if (!res.ok) return // silent — the strip is an optional surface
-        const json = (await res.json()) as { renders?: PortraitRender[] }
-        if (!signal?.aborted) setRenders(json.renders ?? [])
+        const json = (await res.json()) as {
+          renders?: PortraitRender[]
+          partial?: string[]
+        }
+        if (!signal?.aborted) {
+          setRenders(json.renders ?? [])
+          setCorrectionsDown(json.partial?.includes('corrections') ?? false)
+        }
       } catch {
         // aborted or network hiccup — leave the current state
       }
@@ -161,6 +173,11 @@ export function PortraitRendersStrip({
         {notice && (
           <span className="text-[11px] text-muted-foreground/60">{notice}</span>
         )}
+        {correctionsDown && (
+          <span className="text-[11px] text-amber-300/70">
+            {t('portrait.correctionsUnavailable')}
+          </span>
+        )}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {renders.map((render) => {
@@ -175,7 +192,11 @@ export function PortraitRendersStrip({
               key={render.id}
               className={cn(
                 'group relative rounded-lg overflow-hidden bg-white/[0.02] border border-white/[0.04] transition-colors',
-                render.status === 'rejected' && 'opacity-50'
+                render.status === 'rejected' && 'opacity-50',
+                // Dimmed, not hidden: still reviewable, but visibly already worked on.
+                render.status === 'draft' &&
+                  render.correctedAt &&
+                  'opacity-70 border-sky-400/20'
               )}
             >
               <div className="relative aspect-[9/16] bg-black/30">
@@ -212,13 +233,28 @@ export function PortraitRendersStrip({
                 >
                   {t(`portrait.${render.status}`)}
                 </span>
+                {/* Corrected is NOT a verdict — it sits alongside the status badge
+                    rather than replacing it, because a fixed clip is still an
+                    unjudged draft. It exists so a 2k-clip backlog keeps your place. */}
+                {render.correctedAt && (
+                  <span
+                    className="absolute top-1.5 right-1.5 flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide bg-sky-500/15 text-sky-300"
+                    title={t('portrait.correctedHint')}
+                  >
+                    <PencilLine className="h-2.5 w-2.5" />
+                    {t('portrait.corrected')}
+                  </span>
+                )}
               </div>
               <div className="flex items-center justify-end gap-1 p-1.5">
                 {busy ? (
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground/50" />
                 ) : (
                   <>
-                    {render.status === 'draft' && (
+                    {/* Not offered once corrected: the route refuses it (the label
+                        would describe the uncorrected geometry), so showing it would
+                        be a button that always fails. */}
+                    {render.status === 'draft' && !render.correctedAt && (
                       <button
                         type="button"
                         onClick={() => act(render, 'approve')}

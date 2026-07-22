@@ -643,7 +643,10 @@
         "approve": "Suficientemente bueno",
         "unapprove": "Deshacer aprobación",
         "approved": "Suficientemente bueno",
-        "approvedNotice": "Marcado como suficientemente bueno: no se publicó nada."
+        "approvedNotice": "Marcado como suficientemente bueno: no se publicó nada.",
+        "corrected": "Corregido",
+        "correctedHint": "Corregiste este encuadre en el editor. Sigue siendo un borrador sin valorar: márcalo como suficientemente bueno o recházalo.",
+        "correctionsUnavailable": "Marcadores de corrección no disponibles: puede que algunos clips ya estén corregidos."
       }
     }
   },

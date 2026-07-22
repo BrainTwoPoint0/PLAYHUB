@@ -76,6 +76,57 @@ export async function GET(
   }
 
   const renders = rows ?? []
+
+  // "Corrected" marker. A fix-in-editor writes an `edited` feedback row but leaves
+  // the render at `draft` — deliberately, since correcting is not a verdict (approve
+  // means UNEDITED, reject means unusable). Without surfacing it, a clip you spent
+  // five minutes fixing is indistinguishable from one you have never opened, so on a
+  // 2k backlog you lose your place and re-fix the same clips. Only `edited` counts:
+  // accepted/rejected are already visible as status.
+  const correctedAt = new Map<string, string>()
+  let correctionsUnavailable = false
+  const ids = renders.map((r) => r.id)
+  // Chunked: `.in()` becomes a query-string filter, so enumerating every id in one
+  // request grows the URL ~40 bytes per render. A match has a handful of goals today,
+  // but the renders query has no explicit limit — at PostgREST's 1000-row ceiling this
+  // would be a ~40KB URL, a gateway 414, and (because the failure is swallowed) markers
+  // that vanish silently on exactly the biggest matches.
+  //
+  // The chunk size is also what keeps this UNDER PostgREST's 1000-row response cap:
+  // the feedback route allows up to MAX_ROWS_PER_RENDER (50) corrections per render,
+  // so 20 renders is a hard ceiling of 1000 rows per request. Ordering is DESCENDING
+  // and the first write per render wins — load-bearing, not style. Ascending +
+  // overwrite would rely on the NEWEST rows surviving, and truncation drops exactly
+  // those, silently serving a stale timestamp on the most-edited clips.
+  const ID_CHUNK = 20
+  for (let i = 0; i < ids.length; i += ID_CHUNK) {
+    const { data: corrections, error: corrErr } = await service
+      .from('playhub_portrait_render_feedback')
+      .select('render_id, created_at')
+      .eq('club_slug', clubSlug)
+      .eq('action', 'edited')
+      .in('render_id', ids.slice(i, i + ID_CHUNK))
+      .order('created_at', { ascending: false })
+    if (corrErr) {
+      // Non-fatal: the marker is an aid, not the data. Losing it must not blank the
+      // review surface (which is what a 500 here would do). But it must not lie
+      // either — an un-flagged failure renders every clip as never-corrected, which
+      // reads as "the feature doesn't work" rather than "this query is erroring".
+      console.error(
+        '[portrait-renders] corrections query failed:',
+        corrErr.message
+      )
+      correctionsUnavailable = true
+      break
+    }
+    // Descending order + first-write-wins leaves the LATEST correction per render.
+    for (const c of corrections ?? []) {
+      if (c.render_id && !correctedAt.has(c.render_id)) {
+        correctedAt.set(c.render_id, c.created_at as string)
+      }
+    }
+  }
+
   const paths = renders
     // 'approved' must be here or a clip loses its preview the moment it is marked
     // good enough — the exact rows the library is built from.
@@ -114,9 +165,15 @@ export async function GET(
         error: r.error,
         previewUrl: urlByPath.get(r.storage_path) ?? null,
         approvedAt: r.approved_at,
+        correctedAt: correctedAt.get(r.id) ?? null,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
       })),
+      // Explicit degradation: without this, a failed corrections query is
+      // indistinguishable from "nothing has been corrected", so the UI would
+      // confidently show every clip as untouched — the exact mistake the marker
+      // exists to prevent.
+      ...(correctionsUnavailable ? { partial: ['corrections'] } : {}),
     },
     { headers: { 'Cache-Control': 'no-store' } }
   )
