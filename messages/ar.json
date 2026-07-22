@@ -1145,7 +1145,11 @@
       "addFailedNotice": "لم يتم حفظ علامة الهدف — حاول مرة أخرى",
       "removeMarker": "إزالة علامة الهدف هذه",
       "stampHuman": "مثبّتة من المقطع",
-      "stampEstimate": "مقدّرة من ركلة البداية المكتشفة"
+      "stampEstimate": "مقدّرة من ركلة البداية المكتشفة",
+      "addAtTime": "إضافة علامة هدف عند وقت في المباراة",
+      "addAtTimePlaceholder": "دد:ثث",
+      "addAtTimeHint": "وقت المباراة، مثل 22:33",
+      "badTimeNotice": "أدخل وقتًا مثل 22:33"
     }
   },
   "org": {

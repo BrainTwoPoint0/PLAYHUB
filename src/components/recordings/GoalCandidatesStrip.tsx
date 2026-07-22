@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Check, Goal, Loader2, Plus, Undo2, X } from 'lucide-react'
 import { cn } from '@braintwopoint0/playback-commons/utils'
+import { parseClockInput } from '@/lib/goal-review/multi-goal'
 
 interface CandidateEvent {
   eventId: string
@@ -216,6 +217,24 @@ export function GoalCandidatesStrip({
       })
     },
     [act, playingId]
+  )
+
+  // Typed match-clock stamp ("22:33" off /watch): the review clip is capped
+  // at 5 minutes, so goals deep in a long merged episode sit past the clip's
+  // end and can't be reached by the playhead button.
+  const [timeInputs, setTimeInputs] = useState<Record<string, string>>({})
+  const addAtTime = useCallback(
+    (cand: GoalCandidate) => {
+      const raw = timeInputs[cand.id] ?? ''
+      const ts = parseClockInput(raw)
+      if (ts === null) {
+        setNotice(t('badTimeNotice'))
+        return
+      }
+      setTimeInputs((prev) => ({ ...prev, [cand.id]: '' }))
+      void act(cand, { action: 'add_goal', timestampSeconds: ts })
+    },
+    [act, timeInputs, t]
   )
 
   if (!candidates || candidates.length === 0) return null
@@ -428,6 +447,41 @@ export function GoalCandidatesStrip({
                       </button>
                     </span>
                   ))}
+                </div>
+              )}
+              {(cand.status === 'draft' || cand.status === 'approved') && (
+                <div className="flex items-center gap-1 px-2 pb-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={timeInputs[cand.id] ?? ''}
+                    onChange={(e) =>
+                      setTimeInputs((prev) => ({
+                        ...prev,
+                        [cand.id]: e.target.value,
+                      }))
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') addAtTime(cand)
+                    }}
+                    placeholder={t('addAtTimePlaceholder')}
+                    aria-label={t('addAtTime')}
+                    disabled={busy}
+                    className="w-16 rounded bg-white/[0.04] border border-white/[0.06] px-1.5 py-0.5 text-[11px] text-[var(--timberwolf)] placeholder:text-muted-foreground/40 tabular-nums focus:outline-none focus:border-emerald-500/40 disabled:opacity-50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => addAtTime(cand)}
+                    disabled={busy || !(timeInputs[cand.id] ?? '').trim()}
+                    title={t('addAtTime')}
+                    aria-label={t('addAtTime')}
+                    className="p-1 rounded text-muted-foreground/60 hover:text-emerald-300 hover:bg-white/[0.06] disabled:opacity-40"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </button>
+                  <span className="text-[10px] text-muted-foreground/40">
+                    {t('addAtTimeHint')}
+                  </span>
                 </div>
               )}
             </div>

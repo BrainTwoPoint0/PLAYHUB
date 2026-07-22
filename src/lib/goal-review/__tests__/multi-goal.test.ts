@@ -3,6 +3,7 @@ import {
   parseReviewBody,
   resolveEventStamp,
   nextPrimaryEventId,
+  parseClockInput,
   EVENT_OFFSET_S,
 } from '../multi-goal'
 
@@ -109,6 +110,35 @@ describe('resolveEventStamp', () => {
       timestampSeconds: 0,
       stampSource: 'human_scrub',
     })
+  })
+})
+
+describe('parseClockInput', () => {
+  it('parses mm:ss match clock', () => {
+    expect(parseClockInput('22:33')).toBe(22 * 60 + 33)
+    expect(parseClockInput(' 26:46 ')).toBe(26 * 60 + 46)
+    expect(parseClockInput('0:05')).toBe(5)
+    expect(parseClockInput('105:07')).toBe(105 * 60 + 7)
+  })
+
+  it('parses h:mm:ss and bare seconds', () => {
+    expect(parseClockInput('1:02:03')).toBe(3723)
+    expect(parseClockInput('1353')).toBe(1353)
+  })
+
+  it('rejects malformed or out-of-range input', () => {
+    for (const bad of [
+      '',
+      '22:73',
+      '1:2',
+      'abc',
+      '-5',
+      '12:',
+      ':30',
+      '999999',
+    ]) {
+      expect(parseClockInput(bad)).toBeNull()
+    }
   })
 })
 

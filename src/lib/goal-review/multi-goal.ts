@@ -107,6 +107,28 @@ export function resolveEventStamp(
   }
 }
 
+/**
+ * Parse a reviewer-typed match-clock time ("22:33", "1:02:03", or bare
+ * seconds) into seconds. Exists because the review clip is capped at 5
+ * minutes while merged episodes can span 9+ — goals past the clip's end can
+ * only be stamped by typing the time read off /watch. Returns null on
+ * malformed or out-of-range input.
+ */
+export function parseClockInput(input: string): number | null {
+  const s = input.trim()
+  let seconds: number | null = null
+  if (/^\d+$/.test(s)) {
+    seconds = Number(s)
+  } else {
+    const m = /^(\d+):([0-5]\d)$/.exec(s)
+    const h = /^(\d+):([0-5]\d):([0-5]\d)$/.exec(s)
+    if (m) seconds = Number(m[1]) * 60 + Number(m[2])
+    else if (h) seconds = Number(h[1]) * 3600 + Number(h[2]) * 60 + Number(h[3])
+  }
+  if (seconds === null || !Number.isFinite(seconds)) return null
+  return seconds >= 0 && seconds <= MAX_TIMESTAMP_S ? seconds : null
+}
+
 export interface CandidateEventLink {
   eventId: string
   createdAt: string

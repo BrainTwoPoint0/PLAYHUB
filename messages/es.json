@@ -714,7 +714,11 @@
       "addFailedNotice": "El marcador de gol no se guardó — inténtalo de nuevo",
       "removeMarker": "Eliminar este marcador de gol",
       "stampHuman": "Marcado desde el clip",
-      "stampEstimate": "Estimado a partir del saque detectado"
+      "stampEstimate": "Estimado a partir del saque detectado",
+      "addAtTime": "Añadir marcador de gol en un minuto del partido",
+      "addAtTimePlaceholder": "mm:ss",
+      "addAtTimeHint": "minuto del partido, p. ej. 22:33",
+      "badTimeNotice": "Introduce un tiempo como 22:33"
     }
   },
   "org": {

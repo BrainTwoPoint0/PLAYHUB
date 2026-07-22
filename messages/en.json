@@ -714,7 +714,11 @@
       "addFailedNotice": "The goal marker didn't save — try again",
       "removeMarker": "Remove this goal marker",
       "stampHuman": "Stamped from the clip",
-      "stampEstimate": "Estimated from the detected kickoff"
+      "stampEstimate": "Estimated from the detected kickoff",
+      "addAtTime": "Add goal marker at a match time",
+      "addAtTimePlaceholder": "mm:ss",
+      "addAtTimeHint": "match time, e.g. 22:33",
+      "badTimeNotice": "Enter a match time like 22:33"
     }
   },
   "org": {
