@@ -426,6 +426,8 @@ def main():
             anchor_s=round(e['anchor'], 2),
             pko=round(e['pko'], 3), deadctx=round(e['ev'], 3),
             p_period=round(e.get('p_period', 0.0), 3),
+            sub_anchors_s=[round(s, 2) for s in e.get('sub_anchors')
+                           or [e['anchor']]],
             clip_path=clip_paths.get(e['anchor']),
             status='draft', error=None,
             detector_version=chain_mod.DETECTOR_VERSION,
@@ -462,6 +464,7 @@ def main():
             'envelope': [env0, env1],
             'episodes': [
                 {'t0': e['t0'], 't1': e['t1'], 'anchor': e['anchor'],
+                 'subAnchors': e.get('sub_anchors') or [e['anchor']],
                  'pko': round(e['pko'], 3), 'ev': round(e['ev'], 3),
                  'pPeriod': round(e['p_period'], 3)
                  if 'p_period' in e else None,

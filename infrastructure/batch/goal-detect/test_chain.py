@@ -153,6 +153,108 @@ def test_chain_deterministic():
     assert outs[0] == outs[1]
 
 
+# ── sub-anchors (pure detect(), no pkls) ───────────────────────────────────
+#
+# The hybrid adopted from the episode-split measurement (RESULTS.md §"EPISODE
+# SPLIT MEASURED"): episode boundaries/merge NEVER change; each episode gains
+# sub_anchors — the first peak of each dead->live cycle (dctx dipping below
+# SPLIT_LIVE_THR between consecutive peaks). These are review HINTS only.
+
+def _series(n=600, peaks=(), dctx_fill=0.9, dips=()):
+    """1s grid with kickoff peaks at the given times; dctx is dctx_fill
+    everywhere except `dips` intervals (set to 0.2)."""
+    grid = np.arange(0.0, float(n), 1.0)
+    pko = np.zeros(n)
+    for t in peaks:
+        pko[int(t)] = 0.9
+    ev = np.full(n, 0.9)
+    dctx = np.full(n, dctx_fill)
+    for a, b in dips:
+        dctx[int(a):int(b)] = 0.2
+    return grid, pko, ev, dctx
+
+
+def test_detect_merge_unchanged_by_dctx():
+    """Episode boundaries are byte-identical with and without the dctx
+    argument — sub-anchors are additive metadata, never a re-merge."""
+    grid, pko, ev, dctx = _series(
+        peaks=(100, 130, 160), dips=((110, 120),))
+    with_d = chain_mod.detect(grid, pko, ev, dctx=dctx)
+    without = chain_mod.detect(grid, pko, ev)
+    key = [(e['t0'], e['t1'], e['anchor'], e['pko'], e['ev'])
+           for e in with_d]
+    assert key == [(e['t0'], e['t1'], e['anchor'], e['pko'], e['ev'])
+                   for e in without]
+    assert len(with_d) == 1          # 30s gaps still merge
+
+
+def test_sub_anchors_single_cycle():
+    """Continuous dead context across the run -> one cycle, sub_anchors is
+    exactly [anchor]."""
+    grid, pko, ev, dctx = _series(peaks=(100, 130, 160))
+    eps = chain_mod.detect(grid, pko, ev, dctx=dctx)
+    assert len(eps) == 1
+    assert eps[0]['sub_anchors'] == [eps[0]['anchor']]
+
+
+def test_sub_anchors_split_on_live_dip():
+    """A dctx<0.5 dip between two merged peaks starts a second cycle: same
+    single episode, two sub-anchors."""
+    grid, pko, ev, dctx = _series(
+        peaks=(100, 130, 160), dips=((135, 145),))
+    eps = chain_mod.detect(grid, pko, ev, dctx=dctx)
+    assert len(eps) == 1
+    assert eps[0]['sub_anchors'] == [100.0, 160.0]
+
+
+def test_sub_anchors_nan_dctx_never_splits():
+    """Unscored (NaN) dctx between peaks is not evidence of live play."""
+    grid, pko, ev, dctx = _series(peaks=(100, 140))
+    dctx[110:130] = np.nan
+    eps = chain_mod.detect(grid, pko, ev, dctx=dctx)
+    assert len(eps) == 1
+    assert eps[0]['sub_anchors'] == [100.0]
+
+
+def test_sub_anchors_without_dctx_degrade_to_anchor():
+    """Callers that don't pass dctx (or a future None) get the pre-hybrid
+    shape: one sub-anchor, the episode anchor."""
+    grid, pko, ev, _ = _series(peaks=(100, 130))
+    eps = chain_mod.detect(grid, pko, ev)
+    assert eps[0]['sub_anchors'] == [eps[0]['anchor']]
+
+
+def test_sub_anchors_across_separate_episodes():
+    """Peaks past MERGE_S stay separate episodes (unchanged), each carrying
+    its own [anchor] sub-anchor list; a dip inside one episode only splits
+    that episode."""
+    grid, pko, ev, dctx = _series(
+        n=900, peaks=(100, 130, 400, 430), dips=((405, 415),))
+    eps = chain_mod.detect(grid, pko, ev, dctx=dctx)
+    assert [e['anchor'] for e in eps] == [100.0, 400.0]
+    assert eps[0]['sub_anchors'] == [100.0]
+    assert eps[1]['sub_anchors'] == [400.0, 430.0]
+
+
+def test_run_chain_survivors_carry_sub_anchors():
+    """End-to-end: every episode from run_chain has sub_anchors, the first
+    equals the anchor, and all lie within [t0, t1]."""
+    import joblib
+    import kickoff as ko_mod
+    paths = _pkls()
+    stoppage = joblib.load(paths['stoppage'])
+    period = joblib.load(paths['period'])
+    kom = ko_mod.load_models(paths['kickoff'])
+    art = _synthetic_match()
+    shim = projection.load_pitch_frames(art, H_CAL, L, W)
+    eps, surv, _, _ = chain_mod.run_chain(shim, stoppage, kom, period)
+    for e in eps:
+        subs = e['sub_anchors']
+        assert subs[0] == e['anchor']
+        assert all(e['t0'] <= s <= e['t1'] for s in subs)
+        assert subs == sorted(subs)
+
+
 def test_pkl_smoke_pinned_versions():
     """Load + predict every frozen artifact with warnings-as-errors: an
     InconsistentVersionWarning (sklearn drift vs the training env) must fail

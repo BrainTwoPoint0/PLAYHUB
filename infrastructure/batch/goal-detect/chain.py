@@ -40,8 +40,15 @@ PERIOD_THR = 0.5            # period-gap filter threshold
 GRID_STEP = 1.0             # P_ko scoring grid
 MIN_PLAYERS = 6             # trackko n>=6 rule
 FRAME_TOL_S = 0.4           # nearest-frame tolerance on the P_ko grid
+SPLIT_LIVE_THR = 0.5        # dead->live cycle boundary for sub-anchors: the
+                            # stoppage model's probability midpoint (same
+                            # convention as TAU/PERIOD_THR). Adopted from the
+                            # episode-split measurement — RESULTS.md
+                            # §"EPISODE SPLIT MEASURED". Sub-anchors are
+                            # review HINTS; they never change episode
+                            # boundaries, merge, or filtering.
 KICKOFF_VARIANT = "rolefree12"
-DETECTOR_VERSION = "freeze-2026-07-21-floor080"
+DETECTOR_VERSION = "freeze-2026-07-21-floor080-subanchors"
 
 I_MED = CHANNELS.index("med_speed_r")
 I_N = CHANNELS.index("n")
@@ -112,8 +119,29 @@ def earliest_confident_kickoff(grid, pko):
     return None
 
 
-def detect(grid, pko, ev):
-    """trackko peaks + 45s merge -> episodes (dicts with ts/pko/ev/anchor)."""
+def _sub_anchors(peaks, grid, dctx):
+    """First peak of each dead->live cycle within one episode's peak run: a
+    new cycle starts at peak t when dctx dipped below SPLIT_LIVE_THR between
+    the immediately preceding peak and t (NaN dctx is not live evidence).
+    Without a dctx series this degrades to [anchor] — the pre-hybrid shape."""
+    subs = [peaks[0]]
+    if dctx is None:
+        return subs
+    for prev, t in zip(peaks, peaks[1:]):
+        i0 = int(np.searchsorted(grid, prev, side="right"))
+        i1 = int(np.searchsorted(grid, t, side="left"))
+        seg = dctx[i0:i1]
+        if bool((np.isfinite(seg) & (seg < SPLIT_LIVE_THR)).any()):
+            subs.append(t)
+    return subs
+
+
+def detect(grid, pko, ev, dctx=None):
+    """trackko peaks + 45s merge -> episodes (dicts with ts/pko/ev/anchor).
+
+    dctx (optional) only feeds the additive sub_anchors metadata — episode
+    boundaries, merge radius, and per-peak gating are byte-identical with or
+    without it."""
     cand = []
     for i in range(1, len(grid) - 1):
         if not np.isfinite(pko[i]) or pko[i] < TAU:
@@ -135,6 +163,7 @@ def detect(grid, pko, ev):
         e["anchor"] = e["ts"][0]
         e["t0"] = e["ts"][0]
         e["t1"] = e["ts"][-1]
+        e["sub_anchors"] = _sub_anchors(e["ts"], grid, dctx)
     return eps
 
 
@@ -143,7 +172,7 @@ def run_chain(shim, stoppage_art, ko_models, period_art):
     episodes carry drop annotations for provenance and survivors are the
     chronological candidate list."""
     grid, pko, dctx, ev, ts, X = series(shim, stoppage_art, ko_models)
-    eps = detect(grid, pko, ev)
+    eps = detect(grid, pko, ev, dctx=dctx)
 
     med = X[:, I_MED].astype(np.float64)
     nch = X[:, I_N].astype(np.float64)

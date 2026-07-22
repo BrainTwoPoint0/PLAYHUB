@@ -1639,6 +1639,7 @@ export type Database = {
           reviewed_at: string | null
           reviewed_by: string | null
           status: string
+          sub_anchors_s: number[] | null
           t0_s: number
           t1_s: number
           updated_at: string
@@ -1659,6 +1660,7 @@ export type Database = {
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
+          sub_anchors_s?: number[] | null
           t0_s: number
           t1_s: number
           updated_at?: string
@@ -1679,6 +1681,7 @@ export type Database = {
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
+          sub_anchors_s?: number[] | null
           t0_s?: number
           t1_s?: number
           updated_at?: string
