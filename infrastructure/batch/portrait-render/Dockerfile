@@ -3,7 +3,10 @@
 # storage upload). dist/entrypoint.mjs is built LOCALLY with esbuild (it
 # bundles src/lib/editor via relative imports) and shipped in the source zip —
 # the image build never needs the repo.
-FROM node:22-slim
+# ECR Public mirror, not Docker Hub: CodeBuild's egress IPs are shared and hit
+# Docker Hub's anonymous 429 rate limit (observed 2026-07-22, same failure the
+# tracklets/jersey/goal-detect images were moved off for on 2026-07-15).
+FROM public.ecr.aws/docker/library/node:22-slim
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates \
