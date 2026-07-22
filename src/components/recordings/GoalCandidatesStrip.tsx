@@ -13,7 +13,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Check, Goal, Loader2, Plus, Undo2, X } from 'lucide-react'
 import { cn } from '@braintwopoint0/playback-commons/utils'
-import { parseClockInput } from '@/lib/goal-review/multi-goal'
+import {
+  EVENT_OFFSET_S,
+  parseClockInput,
+  subAnchorHints,
+} from '@/lib/goal-review/multi-goal'
 
 interface CandidateEvent {
   eventId: string
@@ -26,6 +30,9 @@ interface GoalCandidate {
   t0S: number
   t1S: number
   anchorS: number
+  /** First kickoff peak per dead->live cycle ([0] = anchor); [] on
+   *  pre-hybrid rows. Feeds subAnchorHints — review hints, never auto. */
+  subAnchorsS: number[]
   pko: number | null
   deadctx: number | null
   status: 'draft' | 'approved' | 'rejected' | 'error'
@@ -37,7 +44,7 @@ interface GoalCandidate {
 
 type ReviewBody =
   | { action: 'approve' | 'unapprove' | 'reject' | 'restore' }
-  | { action: 'add_goal'; timestampSeconds: number }
+  | { action: 'add_goal'; timestampSeconds: number; estimate?: true }
   | { action: 'remove_event'; eventId: string }
 
 interface GoalCandidatesStripProps {
@@ -53,12 +60,10 @@ const STATUS_STYLES: Record<GoalCandidate['status'], string> = {
   error: 'bg-red-500/15 text-red-300',
 }
 
-// Mirror of the batch job's clip window + the producer's goal estimate:
-// clip starts at max(0, t0-90); the goal sits ~20s before the detected
-// kickoff anchor (Veo-measured median goal->kickoff latency — landed 1s
-// from the true goal on the pilot E2E).
+// Mirror of the batch job's clip window: clip starts at max(0, t0-90). The
+// goal-estimate offset (EVENT_OFFSET_S) is imported from the lib so the
+// cycle-hint chips and the card's own "goal ~m:ss" hint can never drift.
 const CLIP_PRE_S = 90
-const EVENT_OFFSET_S = 20
 const SEEK_LEAD_S = 10
 
 function clipStartS(cand: { t0S: number }): number {
@@ -109,7 +114,11 @@ export function GoalCandidatesStrip({
         // 0.32 on the freeze record — and stays the input for any future
         // auto-approve posture, which is PARKED pending a precision curve.)
         const sorted = (json.candidates ?? [])
-          .map((c) => ({ ...c, events: c.events ?? [] }))
+          .map((c) => ({
+            ...c,
+            events: c.events ?? [],
+            subAnchorsS: c.subAnchorsS ?? [],
+          }))
           .sort((a, b) => a.anchorS - b.anchorS)
         if (!signal?.aborted) {
           // Keep the PLAYING card's clip URL: every refresh mints fresh
@@ -262,6 +271,12 @@ export function GoalCandidatesStrip({
           const busy = busyId === cand.id
           const playable = cand.clipUrl && cand.status !== 'error'
           const repairing = cand.status === 'approved' && !cand.approvedEventId
+          // Per-cycle stamp offers (episode-split hybrid). Empty on
+          // single-cycle cards — the median card renders exactly as before.
+          const cycleHints =
+            cand.status === 'draft' || cand.status === 'approved'
+              ? subAnchorHints(cand.subAnchorsS, cand.events)
+              : []
           return (
             <div
               key={cand.id}
@@ -446,6 +461,36 @@ export function GoalCandidatesStrip({
                         <X className="h-2.5 w-2.5" />
                       </button>
                     </span>
+                  ))}
+                </div>
+              )}
+              {cycleHints.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1 px-2 pb-2">
+                  <span className="text-[10px] text-muted-foreground/40">
+                    {t('cycleHintsLabel')}
+                  </span>
+                  {cycleHints.map((est) => (
+                    <button
+                      key={est}
+                      type="button"
+                      onClick={() =>
+                        act(cand, {
+                          action: 'add_goal',
+                          timestampSeconds: est,
+                          // machine-derived stamp: records as an estimate
+                          // ('anchor_offset'), keeping human_scrub an honest
+                          // human-precise label a later scrub can supersede
+                          estimate: true,
+                        })
+                      }
+                      disabled={busy}
+                      title={t('cycleHintTitle', { mmss: mmss(est) })}
+                      aria-label={t('cycleHintTitle', { mmss: mmss(est) })}
+                      className="inline-flex items-center gap-1 rounded-full border border-dashed border-amber-500/30 bg-amber-500/5 px-2 py-0.5 text-[10px] text-amber-300/80 tabular-nums hover:bg-amber-500/15 hover:text-amber-300 disabled:opacity-50"
+                    >
+                      <Plus className="h-2.5 w-2.5" />
+                      {t('cycleHintChip', { mmss: mmss(est) })}
+                    </button>
                   ))}
                 </div>
               )}

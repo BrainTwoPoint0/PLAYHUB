@@ -1152,7 +1152,10 @@
       "addAtTime": "إضافة علامة هدف عند وقت في المباراة",
       "addAtTimePlaceholder": "دد:ثث",
       "addAtTimeHint": "وقت المباراة، مثل 22:33",
-      "badTimeNotice": "أدخل وقتًا مثل 22:33"
+      "badTimeNotice": "أدخل وقتًا مثل 22:33",
+      "cycleHintsLabel": "لحظات هدف محتملة",
+      "cycleHintChip": "≈ {mmss}",
+      "cycleHintTitle": "تحتوي هذه الحلقة على دورة انطلاق أخرى مُكتشَفة — انقر لإضافة علامة هدف عند ≈{mmss} (يمكنك إزالتها بعد التحقق)"
     }
   },
   "org": {

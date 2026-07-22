@@ -721,7 +721,10 @@
       "addAtTime": "Add goal marker at a match time",
       "addAtTimePlaceholder": "mm:ss",
       "addAtTimeHint": "match time, e.g. 22:33",
-      "badTimeNotice": "Enter a match time like 22:33"
+      "badTimeNotice": "Enter a match time like 22:33",
+      "cycleHintsLabel": "Possible goal moments",
+      "cycleHintChip": "≈ {mmss}",
+      "cycleHintTitle": "This episode contains another detected kickoff cycle — click to add a goal marker at ≈{mmss} (you can remove it after checking)"
     }
   },
   "org": {

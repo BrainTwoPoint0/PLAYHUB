@@ -48,7 +48,7 @@ export async function GET(
   const { data: rows, error } = await service
     .from('playhub_goal_candidates')
     .select(
-      'id, t0_s, t1_s, anchor_s, pko, deadctx, status, error, clip_path, approved_event_id, detector_version, reviewed_at, created_at, updated_at'
+      'id, t0_s, t1_s, anchor_s, sub_anchors_s, pko, deadctx, status, error, clip_path, approved_event_id, detector_version, reviewed_at, created_at, updated_at'
     )
     .eq('match_recording_id', id)
     .order('anchor_s', { ascending: true })
@@ -122,6 +122,14 @@ export async function GET(
         t0S: Number(r.t0_s),
         t1S: Number(r.t1_s),
         anchorS: Number(r.anchor_s),
+        // Hint substrate for the strip's per-cycle stamp offers; NULL on
+        // pre-hybrid rows -> empty (no hints, card renders like before).
+        // NULL *elements* (legal in numeric[], never job-written) are
+        // dropped — Number(null) is 0, which would render a phantom
+        // actionable "goal at 0:00" chip (API review).
+        subAnchorsS: (r.sub_anchors_s ?? [])
+          .filter((v) => v !== null)
+          .map(Number),
         pko: r.pko === null ? null : Number(r.pko),
         deadctx: r.deadctx === null ? null : Number(r.deadctx),
         status: r.status,

@@ -214,23 +214,84 @@ export async function PATCH(
           'goal_add_failed'
         )
       }
-      const eventId = randomUUID()
-      const { error: linkErr } = await service
+      // Same-timestamp convergence (API review): an identical-ts add_goal
+      // (stale-tab hint chip, double-submit, or a retry after
+      // goal_add_failed) adopts the existing link instead of minting a
+      // duplicate public marker — and re-ensures its event, so a retry
+      // COMPLETES a link-without-marker state rather than duplicating it.
+      // Exact equality only: two genuine goals never share a second, and
+      // chips post the same rounded value every time.
+      const { data: sameTs, error: sameTsErr } = await service
         .from('playhub_goal_candidate_events')
-        .insert({
-          candidate_id: candidateId,
-          event_id: eventId,
-          stamp_source: 'human_scrub' satisfies StampSource,
-          stamp_seconds: action.timestampSeconds,
-          created_by: user.id,
-        })
-      if (linkErr) {
-        console.error('[goal-candidates] link insert failed:', linkErr.message)
+        .select('event_id, stamp_source')
+        .eq('candidate_id', candidateId)
+        .eq('stamp_seconds', action.timestampSeconds)
+        // Deterministic adoption if pre-fix duplicate same-ts links exist:
+        // retries always converge on the same (earliest) marker.
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      if (sameTsErr) {
+        console.error(
+          '[goal-candidates] link dedupe lookup failed:',
+          sameTsErr.message
+        )
         return jsonError(
           502,
           'The goal marker failed to save — try again',
           'goal_add_failed'
         )
+      }
+      const stampSource: StampSource = action.estimate
+        ? 'anchor_offset'
+        : 'human_scrub'
+      let eventId: string
+      let achievedSource: StampSource = stampSource
+      if (sameTs) {
+        eventId = sameTs.event_id
+        achievedSource =
+          sameTs.stamp_source === 'human_scrub' ? 'human_scrub' : 'anchor_offset'
+        if (!action.estimate && achievedSource !== 'human_scrub') {
+          // A genuine scrub confirming the exact second of a prior chip
+          // estimate is the strongest human label there is — upgrade the
+          // link's provenance (API review). Best-effort: on failure keep
+          // reporting the stored source; the marker itself is unaffected.
+          const { error: upgradeErr } = await service
+            .from('playhub_goal_candidate_events')
+            .update({ stamp_source: 'human_scrub' satisfies StampSource })
+            .eq('candidate_id', candidateId)
+            .eq('event_id', eventId)
+          if (upgradeErr) {
+            console.error(
+              '[goal-candidates] provenance upgrade failed:',
+              upgradeErr.message
+            )
+          } else {
+            achievedSource = 'human_scrub'
+          }
+        }
+      } else {
+        eventId = randomUUID()
+        const { error: linkErr } = await service
+          .from('playhub_goal_candidate_events')
+          .insert({
+            candidate_id: candidateId,
+            event_id: eventId,
+            stamp_source: stampSource,
+            stamp_seconds: action.timestampSeconds,
+            created_by: user.id,
+          })
+        if (linkErr) {
+          console.error(
+            '[goal-candidates] link insert failed:',
+            linkErr.message
+          )
+          return jsonError(
+            502,
+            'The goal marker failed to save — try again',
+            'goal_add_failed'
+          )
+        }
       }
       const eventOk = await ensureGoalEvent(service, {
         recordingId: id,
@@ -255,7 +316,7 @@ export async function PATCH(
         status: 'approved',
         eventId,
         timestampSeconds: action.timestampSeconds,
-        stampSource: 'human_scrub' satisfies StampSource,
+        stampSource: achievedSource,
       })
     }
 
@@ -372,7 +433,8 @@ export async function PATCH(
       }
       const stamp = resolveEventStamp(
         Number(cand.anchor_s),
-        action.timestampSeconds
+        action.timestampSeconds,
+        action.action === 'add_goal' && action.estimate
       )
       if (pending) {
         eventId = pending.event_id
@@ -380,16 +442,21 @@ export async function PATCH(
           action.timestampSeconds !== null &&
           pending.stamp_source === 'anchor_offset'
         ) {
-          // An explicit human scrub beats a prior attempt's DEFAULT estimate
-          // (API review S3): the admin stamped a moment; silently keeping
-          // the stale anchor-20 would save a marker somewhere else while
-          // the notice says "added". A prior HUMAN stamp still wins
-          // (idempotency over a differing retry ts).
+          // An explicit stamp — human scrub OR a hint-chip estimate — beats
+          // a prior attempt's estimate (API review S3): the admin picked a
+          // moment; silently keeping the stale one would save a marker
+          // somewhere else while the notice says "added". A prior HUMAN
+          // stamp still wins (idempotency over a differing retry ts), and a
+          // chip estimate records as 'anchor_offset' so a later genuine
+          // scrub can still supersede it here.
           eventTs = stamp.timestampSeconds
-          eventStampSource = 'human_scrub'
+          eventStampSource = stamp.stampSource
           const { error: restampErr } = await service
             .from('playhub_goal_candidate_events')
-            .update({ stamp_source: 'human_scrub', stamp_seconds: eventTs })
+            .update({
+              stamp_source: stamp.stampSource,
+              stamp_seconds: eventTs,
+            })
             .eq('candidate_id', candidateId)
             .eq('event_id', eventId)
           if (restampErr) {

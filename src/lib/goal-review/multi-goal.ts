@@ -20,7 +20,7 @@ export type StampSource = 'anchor_offset' | 'human_scrub'
 
 export type ReviewAction =
   | { action: 'approve'; timestampSeconds: number | null }
-  | { action: 'add_goal'; timestampSeconds: number }
+  | { action: 'add_goal'; timestampSeconds: number; estimate: boolean }
   | { action: 'remove_event'; eventId: string }
   | { action: 'unapprove' }
   | { action: 'reject' }
@@ -69,7 +69,22 @@ export function parseReviewBody(body: unknown): ParsedReviewBody {
           'add_goal requires timestampSeconds (finite number >= 0)'
         )
       }
-      return { ok: true, parsed: { action: 'add_goal', timestampSeconds: ts } }
+      // estimate: true marks a machine-derived stamp (sub-anchor hint chip)
+      // so it records as 'anchor_offset', keeping 'human_scrub' an honest
+      // human-precise label (the timing corpus) and letting a later genuine
+      // scrub beat it in the repair-restamp path.
+      const est = record.estimate
+      if (est !== undefined && typeof est !== 'boolean') {
+        return invalid('estimate must be a boolean when present')
+      }
+      return {
+        ok: true,
+        parsed: {
+          action: 'add_goal',
+          timestampSeconds: ts,
+          estimate: est === true,
+        },
+      }
     }
     case 'remove_event': {
       const eventId = record.eventId
@@ -90,16 +105,23 @@ export function parseReviewBody(body: unknown): ParsedReviewBody {
 }
 
 /**
- * The event timestamp + provenance for a new goal marker: a human scrub
- * stamp is used verbatim; absent one, fall back to anchor - EVENT_OFFSET_S
- * (clamped at 0). A human stamp of 0 is a real stamp.
+ * The event timestamp + provenance for a new goal marker: an explicit stamp
+ * is used verbatim; absent one, fall back to anchor - EVENT_OFFSET_S
+ * (clamped at 0). A human stamp of 0 is a real stamp. `estimate` marks an
+ * explicit-but-machine-derived stamp (sub-anchor hint chip): it keeps the
+ * chip's timestamp but records as 'anchor_offset', so 'human_scrub' stays a
+ * human-precise label and a later genuine scrub can supersede it.
  */
 export function resolveEventStamp(
   anchorS: number,
-  timestampSeconds: number | null
+  timestampSeconds: number | null,
+  estimate = false
 ): { timestampSeconds: number; stampSource: StampSource } {
   if (timestampSeconds !== null) {
-    return { timestampSeconds, stampSource: 'human_scrub' }
+    return {
+      timestampSeconds,
+      stampSource: estimate ? 'anchor_offset' : 'human_scrub',
+    }
   }
   return {
     timestampSeconds: Math.max(0, anchorS - EVENT_OFFSET_S),
@@ -127,6 +149,43 @@ export function parseClockInput(input: string): number | null {
   }
   if (seconds === null || !Number.isFinite(seconds)) return null
   return seconds >= 0 && seconds <= MAX_TIMESTAMP_S ? seconds : null
+}
+
+// A sub-anchor hint is suppressed once a linked event is stamped within this
+// radius of its estimate — clicking a hint stamps exactly the estimate, so
+// the hint reads as "done" and the remaining cycles stay offered.
+// Deliberate v1 trade-offs at 10s (half of EVENT_OFFSET_S): a human scrub
+// landing >10s from the estimate leaves that hint offered (removable
+// duplicate if clicked), and two genuine goals stamped <10s apart would
+// mutually suppress — both acceptable; the reviewer always has the typed
+// time field.
+export const HINT_SUPPRESS_S = 10
+
+/**
+ * One-click stamp offers for a candidate's sub-anchors (the first kickoff
+ * peak of each dead->live cycle inside the merged episode — the hybrid from
+ * the episode-split measurement). HINTS ONLY: each value is a proposed
+ * add_goal timestamp (sub_anchor - EVENT_OFFSET_S, clamped at 0) that the
+ * reviewer explicitly clicks; nothing auto-approves.
+ *
+ * Single-cycle cards (the median) return [] so they look exactly like
+ * today — the card's existing "goal ~m:ss" hint already covers the anchor.
+ */
+export function subAnchorHints(
+  subAnchorsS: number[] | null | undefined,
+  events: { stampSeconds: number | null }[]
+): number[] {
+  const subs = (subAnchorsS ?? []).filter(
+    (s) => Number.isFinite(s) && s >= 0 && s <= MAX_TIMESTAMP_S
+  )
+  if (subs.length < 2) return []
+  const stamps = events
+    .map((e) => e.stampSeconds)
+    .filter((s): s is number => s !== null && Number.isFinite(s))
+  // Dedupe post-clamp: two early sub-anchors can both clamp to the same
+  // estimate; one chip (and one stable React key) per distinct offer.
+  return [...new Set(subs.map((s) => Math.max(0, s - EVENT_OFFSET_S)))]
+    .filter((est) => !stamps.some((st) => Math.abs(st - est) <= HINT_SUPPRESS_S))
 }
 
 export interface CandidateEventLink {

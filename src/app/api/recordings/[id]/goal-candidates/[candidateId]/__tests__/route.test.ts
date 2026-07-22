@@ -457,6 +457,7 @@ describe('add_goal', () => {
       [
         cand({ status: 'approved', approved_event_id: EV_A }),
         gameId,
+        none, // same-ts dedupe lookup: miss
         ok, // link insert
         ok, // event insert
       ]
@@ -480,6 +481,7 @@ describe('add_goal', () => {
       [
         cand({ status: 'approved', approved_event_id: EV_A }),
         gameId,
+        none, // same-ts dedupe lookup: miss
         ok, // link insert
         dbErr, // event insert fails (ambiguous)
       ]
@@ -487,6 +489,103 @@ describe('add_goal', () => {
     expect(res.status).toBe(502)
     expect(json.code).toBe('goal_add_failed')
     expect(indexOf(log, 'playhub_goal_candidate_events', 'delete')).toBe(-1)
+  })
+
+  it('same-timestamp append CONVERGES: adopts the existing link, re-ensures its event, inserts nothing new', async () => {
+    // stale-tab chip click / retry after goal_add_failed: the identical-ts
+    // link exists — no duplicate marker; the event insert is the idempotent
+    // ensure that completes a link-without-marker repair state.
+    const { res, log, json } = await run(
+      { action: 'add_goal', timestampSeconds: 1333, estimate: true },
+      [
+        cand({ status: 'approved', approved_event_id: EV_A }),
+        gameId,
+        {
+          data: { event_id: EV_B, stamp_source: 'anchor_offset' },
+          error: null,
+        }, // same-ts dedupe lookup: HIT
+        ok, // ensureGoalEvent (23505 or fresh — both achieved)
+      ]
+    )
+    expect(res.status).toBe(200)
+    expect(json.eventId).toBe(EV_B)
+    expect(json.stampSource).toBe('anchor_offset')
+    expect(indexOf(log, 'playhub_goal_candidate_events', 'insert')).toBe(-1)
+    const event = find(log, 'playhub_recording_events', 'insert')
+      .payload as Record<string, unknown>
+    expect(event.id).toBe(EV_B)
+  })
+
+  it('a genuine scrub at the exact second of a chip estimate upgrades the link to human_scrub', async () => {
+    const { res, log, json } = await run(
+      { action: 'add_goal', timestampSeconds: 1333 }, // no estimate = human
+      [
+        cand({ status: 'approved', approved_event_id: EV_A }),
+        gameId,
+        {
+          data: { event_id: EV_B, stamp_source: 'anchor_offset' },
+          error: null,
+        }, // same-ts dedupe lookup: HIT on a prior chip estimate
+        ok, // provenance upgrade update
+        ok, // ensureGoalEvent
+      ]
+    )
+    expect(res.status).toBe(200)
+    expect(json.eventId).toBe(EV_B)
+    expect(json.stampSource).toBe('human_scrub')
+    const upgrade = find(log, 'playhub_goal_candidate_events', 'update')
+      .payload as Record<string, unknown>
+    expect(upgrade.stamp_source).toBe('human_scrub')
+    expect(indexOf(log, 'playhub_goal_candidate_events', 'insert')).toBe(-1)
+  })
+
+  it('hint-chip append (estimate: true) records the link as anchor_offset', async () => {
+    const { res, log, json } = await run(
+      { action: 'add_goal', timestampSeconds: 1114, estimate: true },
+      [
+        cand({ status: 'approved', approved_event_id: EV_A }),
+        gameId,
+        none, // same-ts dedupe lookup: miss
+        ok, // link insert
+        ok, // event insert
+      ]
+    )
+    expect(res.status).toBe(200)
+    expect(json.stampSource).toBe('anchor_offset')
+    const link = find(log, 'playhub_goal_candidate_events', 'insert')
+      .payload as Record<string, unknown>
+    expect(link.stamp_source).toBe('anchor_offset')
+    expect(link.stamp_seconds).toBe(1114)
+  })
+
+  it('estimate restamp of a pending default stays anchor_offset — a later human scrub can still supersede it', async () => {
+    const { res, log, json } = await run(
+      { action: 'add_goal', timestampSeconds: 1351, estimate: true },
+      [
+        cand(), // draft
+        count1, // claim
+        gameId,
+        none, // legacy
+        {
+          data: {
+            event_id: EV_B,
+            stamp_source: 'anchor_offset',
+            stamp_seconds: '1114',
+          },
+          error: null,
+        }, // pending link from a prior attempt (default estimate)
+        ok, // restamp update
+        ok, // event
+        count1, // stamp
+      ]
+    )
+    expect(res.status).toBe(200)
+    expect(json.stampSource).toBe('anchor_offset')
+    expect(json.timestampSeconds).toBe(1351)
+    const restamp = find(log, 'playhub_goal_candidate_events', 'update')
+      .payload as Record<string, unknown>
+    expect(restamp.stamp_source).toBe('anchor_offset')
+    expect(restamp.stamp_seconds).toBe(1351)
   })
 
   it('from draft it takes the approve path (claims + stamps)', async () => {

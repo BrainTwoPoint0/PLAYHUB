@@ -5,6 +5,7 @@ import {
   nextPrimaryEventId,
   parseClockInput,
   EVENT_OFFSET_S,
+  subAnchorHints,
 } from '../multi-goal'
 
 const EVENT_A = '11111111-1111-4111-8111-111111111111'
@@ -41,14 +42,17 @@ describe('parseReviewBody', () => {
       parseReviewBody({ action: 'add_goal', timestampSeconds: 1353 })
     ).toEqual({
       ok: true,
-      parsed: { action: 'add_goal', timestampSeconds: 1353 },
+      parsed: { action: 'add_goal', timestampSeconds: 1353, estimate: false },
     })
   })
 
   it('accepts timestamp 0 (goal at the very start of the match)', () => {
     expect(
       parseReviewBody({ action: 'add_goal', timestampSeconds: 0 })
-    ).toEqual({ ok: true, parsed: { action: 'add_goal', timestampSeconds: 0 } })
+    ).toEqual({
+      ok: true,
+      parsed: { action: 'add_goal', timestampSeconds: 0, estimate: false },
+    })
   })
 
   it('requires a UUID eventId on remove_event', () => {
@@ -181,5 +185,113 @@ describe('nextPrimaryEventId', () => {
 
   it('handles a null current primary (legacy repair state)', () => {
     expect(nextPrimaryEventId(links(EVENT_B), null, EVENT_A)).toBe(EVENT_B)
+  })
+})
+
+describe('subAnchorHints', () => {
+  const hint = (s: number) => Math.max(0, s - EVENT_OFFSET_S)
+
+  it('returns no hints for null, empty, or single-cycle cards (single-goal cards look like today)', () => {
+    expect(subAnchorHints(null, [])).toEqual([])
+    expect(subAnchorHints(undefined, [])).toEqual([])
+    expect(subAnchorHints([], [])).toEqual([])
+    expect(subAnchorHints([1134], [])).toEqual([])
+  })
+
+  it('offers one estimate per sub-anchor on a flurry card, at sub_anchor - 20', () => {
+    expect(subAnchorHints([1134, 1371, 1628], [])).toEqual([
+      hint(1134),
+      hint(1371),
+      hint(1628),
+    ])
+  })
+
+  it('clamps early estimates at 0', () => {
+    expect(subAnchorHints([10, 100], [])).toEqual([0, hint(100)])
+  })
+
+  it('suppresses a hint once a linked event is stamped near it', () => {
+    // reviewer clicked the 1371 hint -> event at 1351; that hint disappears,
+    // the others stay offered
+    expect(
+      subAnchorHints([1134, 1371, 1628], [{ stampSeconds: 1351 }])
+    ).toEqual([hint(1134), hint(1628)])
+  })
+
+  it('suppresses on a human stamp near the estimate, not only exact matches', () => {
+    expect(
+      subAnchorHints([1134, 1371, 1628], [{ stampSeconds: 1345 }])
+    ).toEqual([hint(1134), hint(1628)])
+  })
+
+  it('ignores null event stamps and keeps all hints', () => {
+    expect(
+      subAnchorHints([1134, 1371], [{ stampSeconds: null }])
+    ).toEqual([hint(1134), hint(1371)])
+  })
+
+  it('dedupes estimates that clamp to the same value (one chip per offer)', () => {
+    expect(subAnchorHints([5, 12, 300], [])).toEqual([0, hint(300)])
+  })
+
+  it('suppresses at exactly the radius boundary and offers just past it', () => {
+    // estimate 1351; stamp at 1361 (=radius) suppresses, 1361.5 does not
+    expect(subAnchorHints([1134, 1371], [{ stampSeconds: 1361 }])).toEqual([
+      hint(1134),
+    ])
+    expect(subAnchorHints([1134, 1371], [{ stampSeconds: 1361.5 }])).toEqual([
+      hint(1134),
+      hint(1371),
+    ])
+  })
+
+  it('drops non-finite, negative, and beyond-match-clock sub-anchors defensively', () => {
+    expect(subAnchorHints([Number.NaN, -5, 1e12, 1134, 1371], [])).toEqual([
+      hint(1134),
+      hint(1371),
+    ])
+  })
+})
+
+describe('add_goal estimate flag', () => {
+  it('defaults estimate to false when absent', () => {
+    const r = parseReviewBody({ action: 'add_goal', timestampSeconds: 100 })
+    expect(r).toEqual({
+      ok: true,
+      parsed: { action: 'add_goal', timestampSeconds: 100, estimate: false },
+    })
+  })
+
+  it('accepts estimate: true (hint-chip stamps)', () => {
+    const r = parseReviewBody({
+      action: 'add_goal',
+      timestampSeconds: 100,
+      estimate: true,
+    })
+    expect(r).toEqual({
+      ok: true,
+      parsed: { action: 'add_goal', timestampSeconds: 100, estimate: true },
+    })
+  })
+
+  it('rejects a non-boolean estimate', () => {
+    const r = parseReviewBody({
+      action: 'add_goal',
+      timestampSeconds: 100,
+      estimate: 'yes',
+    })
+    expect(r.ok).toBe(false)
+  })
+
+  it('resolveEventStamp records an estimate stamp as anchor_offset with the given time', () => {
+    expect(resolveEventStamp(1134, 1351, true)).toEqual({
+      timestampSeconds: 1351,
+      stampSource: 'anchor_offset',
+    })
+    // human scrub unchanged
+    expect(resolveEventStamp(1134, 1351, false)).toEqual({
+      timestampSeconds: 1351,
+      stampSource: 'human_scrub',
+    })
   })
 })
