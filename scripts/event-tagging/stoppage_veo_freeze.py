@@ -142,18 +142,30 @@ def series(z, clf_dead, clf_ko):
     return pko, dctx, ev
 
 
-def earliest_confident_kickoff(grid, pko):
+def earliest_confident_kickoff(grid, pko, tau_open=None):
     """Envelope opening, v2/v3 semantics: earliest P_ko>=0.5 local max, NO
     dead-evidence floor (warm-up motion reads live, so the true opening
     kickoff rarely carries trailing dead evidence; the first port required
-    it and mislabeled later -- often post-goal -- kickoffs as the opening)."""
-    for i in range(1, len(grid) - 1):
-        if not np.isfinite(pko[i]) or pko[i] < TAU:
-            continue
-        w = pko[max(0, i - PEAK_HALF):i + PEAK_HALF + 1]
-        if pko[i] >= np.nanmax(w) - 1e-9:
-            return float(grid[i])
-    return None
+    it and mislabeled later -- often post-goal -- kickoffs as the opening).
+
+    tau_open (measured variant, opening-adopt-bar.md): require the opening
+    peak to clear a HIGHER bar first (weak warm-up blips like the 0.52 that
+    claimed 0f9c00fa's opening don't); if no peak clears it anywhere, fall
+    back to the frozen 0.5 rule -- never to activity blocks."""
+    def scan(thr):
+        for i in range(1, len(grid) - 1):
+            if not np.isfinite(pko[i]) or pko[i] < thr:
+                continue
+            w = pko[max(0, i - PEAK_HALF):i + PEAK_HALF + 1]
+            if pko[i] >= np.nanmax(w) - 1e-9:
+                return float(grid[i])
+        return None
+
+    if tau_open is not None:
+        e0 = scan(tau_open)
+        if e0 is not None:
+            return e0
+    return scan(TAU)
 
 
 SPLIT_LIVE_THR = 0.5        # dead->live boundary = stoppage-model midpoint
@@ -237,7 +249,7 @@ def trailing_lull(spells, t):
 
 
 def eval_match(name, z, clf_dead, clf_ko, clf_pg, floor=DCTX_FLOOR,
-               series_dir=None, split=None):
+               series_dir=None, split=None, tau_open=None, pre_env_cut=False):
     grid = z["grid_ts"].astype(np.float64)
     ts = z["ts"]
     sfp = os.path.join(series_dir, name + ".npz") if series_dir else None
@@ -255,7 +267,7 @@ def eval_match(name, z, clf_dead, clf_ko, clf_pg, floor=DCTX_FLOOR,
 
     blocks = blocks_from_activity(ts, z["med"].astype(np.float64))
     env1 = blocks[-1][1] if blocks else float(ts[-1])
-    e0 = earliest_confident_kickoff(grid, pko)
+    e0 = earliest_confident_kickoff(grid, pko, tau_open=tau_open)
     env0 = e0 if e0 is not None else (blocks[0][0] if blocks else 0.0)
 
     spells_med = activity_dead_spells(ts, z["med"].astype(np.float64))
@@ -266,6 +278,9 @@ def eval_match(name, z, clf_dead, clf_ko, clf_pg, floor=DCTX_FLOOR,
     survivors = []
     for e in eps:
         c = e["anchor"]
+        if pre_env_cut and c < env0 - OPEN_TOL_S:
+            e["drop"] = "pre_match"
+            continue
         if abs(c - env0) <= OPEN_TOL_S:
             e["drop"] = "opening"
             continue
@@ -419,7 +434,8 @@ def summarize(records, label=""):
 
 
 def main(cache_dir, fold=None, out="freeze_results.json",
-         floor=DCTX_FLOOR, series_dir=None, split=None):
+         floor=DCTX_FLOOR, series_dir=None, split=None, tau_open=None,
+         pre_env_cut=False):
     names = sorted(n[:-4] for n in os.listdir(cache_dir)
                    if n.endswith(".npz"))
     print(f"{len(names)} sidecars  dctx-floor={floor}")
@@ -448,7 +464,8 @@ def main(cache_dir, fold=None, out="freeze_results.json",
         for i in folds[fi]:
             z = cache(names[i])
             rec = eval_match(names[i], z, clf_dead, clf_ko, clf_pg,
-                             floor=floor, series_dir=series_dir, split=split)
+                             floor=floor, series_dir=series_dir, split=split,
+                             tau_open=tau_open, pre_env_cut=pre_env_cut)
             rec["fold"] = fi + 1
             records.append(rec)
             g_hit = sum(g["hit45"] for g in rec["goals"])
@@ -478,4 +495,9 @@ if __name__ == "__main__":
     if "--split" in sys.argv:
         split = sys.argv[sys.argv.index("--split") + 1]
         assert split in ("any", "5s"), f"unknown split variant {split!r}"
-    main(sys.argv[1], fold, out, floor, series_dir, split)
+    tau_open = None
+    if "--opening-tau" in sys.argv:
+        tau_open = float(sys.argv[sys.argv.index("--opening-tau") + 1])
+    pre_env_cut = "--pre-env-cut" in sys.argv
+    main(sys.argv[1], fold, out, floor, series_dir, split, tau_open,
+         pre_env_cut)

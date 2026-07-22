@@ -1160,3 +1160,42 @@ retention) DROPPED the pilot 512-card's stamped-531 goal cycle; K=8 = 99.9% free
 (1233/1234 OOF) and ZERO stamped-goal-cycle losses across both labeled matches.** Worst card 15→8
 chips; med/p90 (1/3) untouched; ≤8-cycle cards pass through byte-identical. Do not lower the cap
 without re-running `cap_check.py` (session scratchpad) against the stamped corpus.
+
+## ENVELOPE-OPENING ROBUSTNESS — MEASURED NO (2026-07-22 night; roadmap item 1)
+
+Target: warm-up P_ko blips claiming the envelope opening (0f9c00fa: 0.52 blip at t=22 → env0≈4 →
+three warm-up cards leaked past the ±60s opening drop). Rule + bar locked BEFORE decoding
+(scratchpad `opening-adopt-bar.md`): variants = higher opening bar TAU_OPEN∈{0.7,0.8} (fallback to
+the frozen 0.5 rule, never to activity blocks; no dead-evidence — fold-1 stands) ± a pre-env0
+hard-cut (`drop='pre_match'` for anchors < env0−60). Harness gained default-off `--opening-tau` /
+`--pre-env-cut` (baseline reproduced bit-for-bit before any variant ran).
+
+**Structural finding first: the Veo freeze corpus has ZERO warm-up-class survivors** (0/4183 cards
+sit before period-1 start − 45s across all 236 matches — Veo recordings are match-trimmed). So
+freeze can only gate the RISK axes; the benefit exists only on Spiideo (3 labeled matches, 3
+warm-up cards total).
+
+**Every variant fails the locked bar, on exactly the fold-1-sensitive axes:**
+
+| | recall90 (med) | early-goal r90 (P1+300s, n=162) | opening ≤45s | pre_match drops |
+|---|---|---|---|---|
+| baseline | 0.812 | 0.667 | 49.6% | 0 |
+| τ_open 0.7 | 0.804 | 0.611 | 42.8% | 0 |
+| τ_open 0.8 | 0.797 | 0.562 | 37.7% | 0 |
+| 0.7 + cut | 0.804 | 0.599 | 42.8% | 26 |
+| 0.8 + cut | 0.793 | 0.531 | 37.7% | 66 |
+
+Mechanism: true opening kickoffs are often WEAK peaks; a raised bar skips them and latches onto a
+later strong (often post-goal) kickoff → env0 moves late → the opening drop + pre-env cut eat real
+early goals. The v2/v3 "no dead-evidence on the opening" lesson generalizes: the opening peak is
+structurally low-confidence, and ANY strictness there trades warm-up noise for early-goal recall at
+a terrible rate (3 junk cards/worst-case Spiideo match vs −5 to −14pp early-goal recall on Veo).
+
+**Verdict: report and stop (locked-bar discipline).** The warm-up leak stays priced into review
+(reject-on-sight; the period filter and geometry already kill most of it — 3/30 cards on the worst
+observed match). Future attempts need a DIFFERENT signal — pre-declared candidates for a future
+session: sustained-live corroboration AFTER the candidate opening (match started = play persists),
+or an activity-level match-start detector — measured against this same bar, especially early-goal
+recall 0.667. The `--opening-tau`/`--pre-env-cut` flags stay in the harness (default off,
+baseline-verified) as instrumentation. Artifacts: `freeze_results_open{07,08}{,preenvcut}.json` +
+`freeze_results_verify_noopen.json`.
