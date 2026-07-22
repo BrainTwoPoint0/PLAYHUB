@@ -705,9 +705,16 @@
       "staleNotice": "This candidate was updated elsewhere — list refreshed",
       "goalHint": "watch from {mmss}",
       "goalHintTitle": "Playback starts here — the goal follows within the episode (exact when the detected kickoff is the goal's own; later in merged multi-stoppage episodes)",
-      "unapprove": "Unapprove — remove goal marker",
+      "unapprove": "Unapprove — remove all goal markers",
       "unapprovedNotice": "Goal marker removed",
-      "unapproveRepairNotice": "The goal marker is still live — unapprove again to remove it"
+      "unapproveRepairNotice": "The goal marker is still live — unapprove again to remove it",
+      "addGoalAtMoment": "Add goal at this moment",
+      "markerAddedNotice": "Goal marker added",
+      "markerRemovedNotice": "Goal marker removed",
+      "addFailedNotice": "The goal marker didn't save — try again",
+      "removeMarker": "Remove this goal marker",
+      "stampHuman": "Stamped from the clip",
+      "stampEstimate": "Estimated from the detected kickoff"
     }
   },
   "org": {

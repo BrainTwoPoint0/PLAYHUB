@@ -1587,6 +1587,41 @@ export type Database = {
         }
         Relationships: []
       }
+      playhub_goal_candidate_events: {
+        Row: {
+          candidate_id: string
+          created_at: string
+          created_by: string | null
+          event_id: string
+          stamp_seconds: number | null
+          stamp_source: string
+        }
+        Insert: {
+          candidate_id: string
+          created_at?: string
+          created_by?: string | null
+          event_id: string
+          stamp_seconds?: number | null
+          stamp_source: string
+        }
+        Update: {
+          candidate_id?: string
+          created_at?: string
+          created_by?: string | null
+          event_id?: string
+          stamp_seconds?: number | null
+          stamp_source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playhub_goal_candidate_events_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "playhub_goal_candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       playhub_goal_candidates: {
         Row: {
           anchor_s: number

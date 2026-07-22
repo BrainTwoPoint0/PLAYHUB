@@ -61,6 +61,41 @@ export async function GET(
   }
 
   const candidates = rows ?? []
+
+  // Linked goal events (multi-goal: one candidate can carry N markers).
+  // Chips render from these; ordered by stamp for a stable mm:ss row.
+  const eventsByCandidate = new Map<
+    string,
+    { eventId: string; stampSource: string; stampSeconds: number | null }[]
+  >()
+  if (candidates.length > 0) {
+    const { data: links, error: linksErr } = await service
+      .from('playhub_goal_candidate_events')
+      .select('candidate_id, event_id, stamp_source, stamp_seconds')
+      .in(
+        'candidate_id',
+        candidates.map((r) => r.id)
+      )
+      .order('stamp_seconds', { ascending: true, nullsFirst: false })
+    if (linksErr) {
+      console.error('[goal-candidates] links query failed:', linksErr.message)
+      return NextResponse.json(
+        { error: 'Query failed', code: 'query_failed' },
+        { status: 500 }
+      )
+    }
+    for (const l of links ?? []) {
+      const entry = {
+        eventId: l.event_id,
+        stampSource: l.stamp_source,
+        stampSeconds: l.stamp_seconds === null ? null : Number(l.stamp_seconds),
+      }
+      const list = eventsByCandidate.get(l.candidate_id)
+      if (list) list.push(entry)
+      else eventsByCandidate.set(l.candidate_id, [entry])
+    }
+  }
+
   const paths = candidates
     .filter((r) => r.clip_path && r.status !== 'error')
     .map((r) => r.clip_path as string)
@@ -93,6 +128,7 @@ export async function GET(
         error: r.error,
         clipUrl: r.clip_path ? (urlByPath.get(r.clip_path) ?? null) : null,
         approvedEventId: r.approved_event_id,
+        events: eventsByCandidate.get(r.id) ?? [],
         detectorVersion: r.detector_version,
         reviewedAt: r.reviewed_at,
         createdAt: r.created_at,

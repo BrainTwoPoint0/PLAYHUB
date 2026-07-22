@@ -9,10 +9,16 @@
 // Approve writes a public `goal` event that appears immediately as a
 // timeline marker (onApproved lets the page refresh its events list).
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Check, Goal, Loader2, Undo2, X } from 'lucide-react'
+import { Check, Goal, Loader2, Plus, Undo2, X } from 'lucide-react'
 import { cn } from '@braintwopoint0/playback-commons/utils'
+
+interface CandidateEvent {
+  eventId: string
+  stampSource: 'anchor_offset' | 'human_scrub'
+  stampSeconds: number | null
+}
 
 interface GoalCandidate {
   id: string
@@ -25,7 +31,13 @@ interface GoalCandidate {
   error: string | null
   clipUrl: string | null
   approvedEventId: string | null
+  events: CandidateEvent[]
 }
+
+type ReviewBody =
+  | { action: 'approve' | 'unapprove' | 'reject' | 'restore' }
+  | { action: 'add_goal'; timestampSeconds: number }
+  | { action: 'remove_event'; eventId: string }
 
 interface GoalCandidatesStripProps {
   recordingId: string
@@ -71,6 +83,14 @@ export function GoalCandidatesStrip({
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  // Only one clip plays at a time; the ref tracks its <video> so "Add goal
+  // at this moment" can read the playhead.
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  // Mirror of playingId for use inside refresh() without rebinding it.
+  const playingIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    playingIdRef.current = playingId
+  }, [playingId])
 
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
@@ -88,9 +108,24 @@ export function GoalCandidatesStrip({
         // PARKED until a precision curve exists over more reviewed matches
         // (long span also covers injuries/delays/multi-goal bags).
         const sorted = (json.candidates ?? [])
-          .slice()
+          .map((c) => ({ ...c, events: c.events ?? [] }))
           .sort((a, b) => b.t1S - b.t0S - (a.t1S - a.t0S))
-        if (!signal?.aborted) setCandidates(sorted)
+        if (!signal?.aborted) {
+          // Keep the PLAYING card's clip URL: every refresh mints fresh
+          // signed URLs, and swapping src reloads the video + resets the
+          // playhead — killing the scrub position mid multi-goal review
+          // (senior review H3). The old signed URL stays valid for an hour.
+          setCandidates((prev) => {
+            const pid = playingIdRef.current
+            const prevUrl = pid
+              ? (prev?.find((c) => c.id === pid)?.clipUrl ?? null)
+              : null
+            if (!pid || !prevUrl) return sorted
+            return sorted.map((c) =>
+              c.id === pid ? { ...c, clipUrl: prevUrl } : c
+            )
+          })
+        }
       } catch {
         // aborted or network hiccup — leave the current state
       }
@@ -107,10 +142,7 @@ export function GoalCandidatesStrip({
   }, [refresh])
 
   const act = useCallback(
-    async (
-      cand: GoalCandidate,
-      action: 'approve' | 'unapprove' | 'reject' | 'restore'
-    ) => {
+    async (cand: GoalCandidate, body: ReviewBody) => {
       setBusyId(cand.id)
       setNotice(null)
       try {
@@ -119,35 +151,46 @@ export function GoalCandidatesStrip({
           {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action }),
+            body: JSON.stringify(body),
           }
         )
         if (!res.ok) {
-          const body = (await res.json().catch(() => null)) as {
+          const resBody = (await res.json().catch(() => null)) as {
             error?: string
             code?: string
           } | null
           // Localize the actionable codes; fall back to the server string
           // (English) only for unexpected ones.
           setNotice(
-            body?.code === 'event_write_failed'
+            resBody?.code === 'event_write_failed'
               ? t('approveRepairNotice')
-              : body?.code === 'event_delete_failed'
+              : resBody?.code === 'event_delete_failed'
                 ? t('unapproveRepairNotice')
-                : body?.code === 'invalid_state'
-                  ? t('staleNotice')
-                  : (body?.error ?? t('actionFailed'))
+                : resBody?.code === 'goal_add_failed'
+                  ? t('addFailedNotice')
+                  : resBody?.code === 'invalid_state'
+                    ? t('staleNotice')
+                    : (resBody?.error ?? t('actionFailed'))
           )
           // event_write_failed leaves the repair state visible on refresh
           await refresh()
           return
         }
-        if (action === 'approve') {
-          setNotice(t('approvedNotice'))
+        // Every marker mutation changes the /watch timeline — let the page
+        // refresh its events list.
+        if (body.action === 'approve' || body.action === 'add_goal') {
+          setNotice(
+            t(
+              body.action === 'approve' ? 'approvedNotice' : 'markerAddedNotice'
+            )
+          )
           onApproved?.()
-        } else if (action === 'unapprove') {
+        } else if (body.action === 'unapprove') {
           setNotice(t('unapprovedNotice'))
-          onApproved?.()   // refreshes the page's events — the marker is gone
+          onApproved?.()
+        } else if (body.action === 'remove_event') {
+          setNotice(t('markerRemovedNotice'))
+          onApproved?.()
         }
         await refresh()
       } catch {
@@ -157,6 +200,22 @@ export function GoalCandidatesStrip({
       }
     },
     [recordingId, refresh, onApproved, t]
+  )
+
+  // Stamp the goal at the playhead of the playing clip (produced-video
+  // clock = clip start + playhead). From draft the server treats it as the
+  // approve path; while approved it appends another marker.
+  const addAtMoment = useCallback(
+    (cand: GoalCandidate) => {
+      const video = videoRef.current
+      if (!video || playingId !== cand.id) return
+      const ts = clipStartS(cand) + video.currentTime
+      void act(cand, {
+        action: 'add_goal',
+        timestampSeconds: Math.round(ts * 10) / 10,
+      })
+    },
+    [act, playingId]
   )
 
   if (!candidates || candidates.length === 0) return null
@@ -183,8 +242,7 @@ export function GoalCandidatesStrip({
         {candidates.map((cand) => {
           const busy = busyId === cand.id
           const playable = cand.clipUrl && cand.status !== 'error'
-          const repairing =
-            cand.status === 'approved' && !cand.approvedEventId
+          const repairing = cand.status === 'approved' && !cand.approvedEventId
           return (
             <div
               key={cand.id}
@@ -196,6 +254,7 @@ export function GoalCandidatesStrip({
               <div className="relative aspect-video bg-black/30">
                 {playable && playingId === cand.id ? (
                   <video
+                    ref={videoRef}
                     src={cand.clipUrl as string}
                     controls
                     autoPlay
@@ -239,6 +298,19 @@ export function GoalCandidatesStrip({
                   {repairing ? t('repair') : t(cand.status)}
                 </span>
               </div>
+              {playingId === cand.id &&
+                playable &&
+                cand.status !== 'rejected' && (
+                  <button
+                    type="button"
+                    onClick={() => addAtMoment(cand)}
+                    disabled={busy}
+                    className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] text-emerald-300/80 hover:text-emerald-300 hover:bg-emerald-500/10 border-b border-white/[0.04] disabled:opacity-50"
+                  >
+                    <Plus className="h-3 w-3" />
+                    {t('addGoalAtMoment')}
+                  </button>
+                )}
               <div className="flex items-center justify-between gap-1 p-2">
                 <div className="flex items-baseline gap-2 min-w-0">
                   <span className="text-sm font-medium text-[var(--timberwolf)] tabular-nums">
@@ -275,7 +347,7 @@ export function GoalCandidatesStrip({
                       {(cand.status === 'draft' || repairing) && (
                         <button
                           type="button"
-                          onClick={() => act(cand, 'approve')}
+                          onClick={() => act(cand, { action: 'approve' })}
                           title={repairing ? t('approveRepair') : t('approve')}
                           aria-label={
                             repairing ? t('approveRepair') : t('approve')
@@ -288,7 +360,7 @@ export function GoalCandidatesStrip({
                       {cand.status === 'draft' && (
                         <button
                           type="button"
-                          onClick={() => act(cand, 'reject')}
+                          onClick={() => act(cand, { action: 'reject' })}
                           title={t('reject')}
                           aria-label={t('reject')}
                           className="p-1.5 rounded text-muted-foreground/60 hover:text-red-300 hover:bg-white/[0.06]"
@@ -299,7 +371,7 @@ export function GoalCandidatesStrip({
                       {cand.status === 'rejected' && (
                         <button
                           type="button"
-                          onClick={() => act(cand, 'restore')}
+                          onClick={() => act(cand, { action: 'restore' })}
                           title={t('restore')}
                           aria-label={t('restore')}
                           className="p-1.5 rounded text-muted-foreground/60 hover:text-[var(--timberwolf)] hover:bg-white/[0.06]"
@@ -310,7 +382,7 @@ export function GoalCandidatesStrip({
                       {cand.status === 'approved' && (
                         <button
                           type="button"
-                          onClick={() => act(cand, 'unapprove')}
+                          onClick={() => act(cand, { action: 'unapprove' })}
                           title={t('unapprove')}
                           aria-label={t('unapprove')}
                           className="p-1.5 rounded text-muted-foreground/60 hover:text-amber-300 hover:bg-white/[0.06]"
@@ -322,6 +394,42 @@ export function GoalCandidatesStrip({
                   )}
                 </div>
               </div>
+              {cand.status === 'approved' && cand.events.length > 0 && (
+                <div className="flex flex-wrap gap-1 px-2 pb-2">
+                  {cand.events.map((ev) => (
+                    <span
+                      key={ev.eventId}
+                      className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 pl-2 pr-1 py-0.5 text-[10px] text-emerald-300 tabular-nums"
+                      title={
+                        ev.stampSource === 'human_scrub'
+                          ? t('stampHuman')
+                          : t('stampEstimate')
+                      }
+                    >
+                      <Goal className="h-2.5 w-2.5" />
+                      {mmss(
+                        ev.stampSeconds ??
+                          Math.max(0, cand.anchorS - EVENT_OFFSET_S)
+                      )}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          act(cand, {
+                            action: 'remove_event',
+                            eventId: ev.eventId,
+                          })
+                        }
+                        disabled={busy}
+                        title={t('removeMarker')}
+                        aria-label={t('removeMarker')}
+                        className="p-0.5 rounded-full text-emerald-300/60 hover:text-red-300 hover:bg-white/[0.06] disabled:opacity-50"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )
         })}

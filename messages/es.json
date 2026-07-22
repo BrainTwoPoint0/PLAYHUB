@@ -705,9 +705,16 @@
       "staleNotice": "Este candidato se actualizó en otro lugar — lista actualizada",
       "goalHint": "mira desde {mmss}",
       "goalHintTitle": "La reproducción empieza aquí — el gol llega dentro del episodio (exacto cuando el saque detectado es el del gol; más tarde en episodios fusionados)",
-      "unapprove": "Anular aprobación — quitar marcador de gol",
+      "unapprove": "Anular aprobación — quitar todos los marcadores de gol",
       "unapprovedNotice": "Marcador de gol eliminado",
-      "unapproveRepairNotice": "El marcador de gol sigue activo — anula la aprobación de nuevo para quitarlo"
+      "unapproveRepairNotice": "El marcador de gol sigue activo — anula la aprobación de nuevo para quitarlo",
+      "addGoalAtMoment": "Añadir gol en este momento",
+      "markerAddedNotice": "Marcador de gol añadido",
+      "markerRemovedNotice": "Marcador de gol eliminado",
+      "addFailedNotice": "El marcador de gol no se guardó — inténtalo de nuevo",
+      "removeMarker": "Eliminar este marcador de gol",
+      "stampHuman": "Marcado desde el clip",
+      "stampEstimate": "Estimado a partir del saque detectado"
     }
   },
   "org": {
