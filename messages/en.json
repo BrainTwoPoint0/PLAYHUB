@@ -703,8 +703,8 @@
       "confidence": "KO {pko}% · dead {dead}%",
       "approveRepairNotice": "Approved, but the goal marker didn't save — approve again to finish",
       "staleNotice": "This candidate was updated elsewhere — list refreshed",
-      "goalHint": "goal ≈ {mmss} in clip",
-      "goalHintTitle": "Estimated goal moment inside the review clip (playback starts just before it)",
+      "goalHint": "watch from {mmss}",
+      "goalHintTitle": "Playback starts here — the goal follows within the episode (exact when the detected kickoff is the goal's own; later in merged multi-stoppage episodes)",
       "unapprove": "Unapprove — remove goal marker",
       "unapprovedNotice": "Goal marker removed",
       "unapproveRepairNotice": "The goal marker is still live — unapprove again to remove it"
