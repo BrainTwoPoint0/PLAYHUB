@@ -631,8 +631,6 @@
       "portrait": {
         "title": "Portrait highlights",
         "preview": "Preview portrait clip",
-        "publish": "Publish to TikTok",
-        "publishedNotice": "Sent to your TikTok inbox — finish the post in the TikTok app.",
         "reject": "Reject draft",
         "restore": "Restore draft",
         "fixInEditor": "Fix framing in editor",
@@ -641,7 +639,11 @@
         "rejected": "Rejected",
         "error": "Failed",
         "errorBadge": "Render failed",
-        "actionFailed": "Something went wrong — try again."
+        "actionFailed": "Something went wrong — try again.",
+        "approve": "Good enough",
+        "unapprove": "Undo good enough",
+        "approved": "Good enough",
+        "approvedNotice": "Marked good enough — nothing was posted."
       }
     }
   },

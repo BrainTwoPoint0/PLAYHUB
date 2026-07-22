@@ -283,7 +283,14 @@ async function main() {
     // write enforces this too). Successful drafts regenerate only on
     // explicit RERENDER; error rows retry automatically while under the
     // attempt cap (transient Modal/CDN failures must not be permanent).
-    if (status === 'published' || status === 'rejected') {
+    // 'approved' included deliberately: the guarded write already refuses to
+    // overwrite it, but without this the job would still detect+render+upload first
+    // and throw the result away — a full GPU cycle per approved clip, every sweep.
+    if (
+      status === 'published' ||
+      status === 'rejected' ||
+      status === 'approved'
+    ) {
       skipped++
       continue
     }

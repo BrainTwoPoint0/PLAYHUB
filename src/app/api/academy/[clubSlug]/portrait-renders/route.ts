@@ -62,7 +62,7 @@ export async function GET(
   const { data: rows, error } = await service
     .from('playhub_portrait_renders')
     .select(
-      'id, recording_event_id, provider_event_id, status, quality, error, storage_path, published_at, created_at, updated_at'
+      'id, recording_event_id, provider_event_id, status, quality, error, storage_path, approved_at, created_at, updated_at'
     )
     .eq('club_slug', clubSlug)
     .eq('provider_recording_id', matchSlug)
@@ -77,7 +77,14 @@ export async function GET(
 
   const renders = rows ?? []
   const paths = renders
-    .filter((r) => r.status === 'draft' || r.status === 'published')
+    // 'approved' must be here or a clip loses its preview the moment it is marked
+    // good enough — the exact rows the library is built from.
+    .filter(
+      (r) =>
+        r.status === 'draft' ||
+        r.status === 'approved' ||
+        r.status === 'published'
+    )
     .map((r) => r.storage_path)
   const urlByPath = new Map<string, string>()
   if (paths.length > 0) {
@@ -106,7 +113,7 @@ export async function GET(
         quality: r.quality,
         error: r.error,
         previewUrl: urlByPath.get(r.storage_path) ?? null,
-        publishedAt: r.published_at,
+        approvedAt: r.approved_at,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
       })),

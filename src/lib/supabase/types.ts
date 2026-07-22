@@ -2543,6 +2543,8 @@ export type Database = {
       }
       playhub_portrait_renders: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           attempts: number
           club_slug: string
           created_at: string
@@ -2561,6 +2563,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           attempts?: number
           club_slug: string
           created_at?: string
@@ -2579,6 +2583,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           attempts?: number
           club_slug?: string
           created_at?: string

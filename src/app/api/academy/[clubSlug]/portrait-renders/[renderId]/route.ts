@@ -1,10 +1,11 @@
 // PATCH /api/academy/[clubSlug]/portrait-renders/[renderId]
 //
-// Review actions on a system-generated portrait render: reject a draft, or
-// restore a rejected one back to draft. Published rows are immutable here
-// (publishing is owned by /api/tiktok/publish; there is no unpublish).
-// Same two-tier club gate as the listing route; the render's own club_slug
-// must match the URL club (IDOR guard).
+// Review actions on a system-generated portrait render: mark a draft "good enough"
+// (approve), undo that, reject, or restore a rejected one. Approving judges QUALITY
+// only — it does not distribute anything. Same two-tier club gate as the listing
+// route; the render's own club_slug must match the URL club (IDOR guard).
+//
+// approve/reject also write a training label (see LABEL_FOR).
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
@@ -12,19 +13,17 @@ import { isPlatformAdmin } from '@/lib/admin/auth'
 import { isVenueAdmin } from '@/lib/recordings/access-control'
 import { getClubBySlug } from '@/lib/academy/config'
 import { isSameOrigin } from '@/lib/tiktok/route-helpers'
+import { insertPortraitFeedback } from '@/lib/academy/portrait-feedback'
+import {
+  resolveTransition,
+  labelForAction,
+} from '@/lib/academy/portrait-transitions'
+import type { CropKeyframe } from '@/lib/editor/types'
 
 export const dynamic = 'force-dynamic'
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-// Error rows are already terminal (the sweep owns their retry budget), so
-// only drafts are rejectable — this keeps restore's target unambiguous (a
-// restored row always has a storage object behind it).
-const TRANSITIONS: Record<string, { from: string[]; to: string }> = {
-  reject: { from: ['draft'], to: 'rejected' },
-  restore: { from: ['rejected'], to: 'draft' },
-}
 
 export async function PATCH(
   request: NextRequest,
@@ -63,10 +62,13 @@ export async function PATCH(
       { status: 400 }
     )
   }
-  const transition = TRANSITIONS[String(action)]
+  const transition = resolveTransition(action)
   if (!transition) {
     return NextResponse.json(
-      { error: 'action must be reject or restore', code: 'bad_request' },
+      {
+        error: 'action must be approve, unapprove, reject or restore',
+        code: 'bad_request',
+      },
       { status: 400 }
     )
   }
@@ -92,10 +94,17 @@ export async function PATCH(
   // filter makes the transition race-safe (count-CAS, no .select() — the
   // PostgREST or=/representation 400 lesson).
   const service = createServiceClient()
+  const now = new Date().toISOString()
   const { count, error } = await service
     .from('playhub_portrait_renders')
     .update(
-      { status: transition.to, updated_at: new Date().toISOString() },
+      {
+        // Per-transition fields FIRST so the fixed keys below can never be
+        // overwritten by a future `extra` that happens to name one of them.
+        ...(transition.extra?.(user.id, now) ?? {}),
+        status: transition.to,
+        updated_at: now,
+      },
       { count: 'exact' }
     )
     .eq('id', renderId)
@@ -115,10 +124,20 @@ export async function PATCH(
     // still collapses to a uniform 404.
     const { data: current } = await service
       .from('playhub_portrait_renders')
-      .select('status')
+      .select('status, approved_at')
       .eq('id', renderId)
       .eq('club_slug', clubSlug)
       .maybeSingle()
+    if (current?.status === transition.to) {
+      // Already in the requested state — a double-click, not a conflict. 409 here
+      // would show a red "not in a state that allows this action" for an action
+      // that actually succeeded. No label is written (that is gated on the CAS),
+      // so this stays a true no-op.
+      return NextResponse.json({
+        status: current.status,
+        approvedAt: current.approved_at ?? null,
+      })
+    }
     if (current) {
       return NextResponse.json(
         {
@@ -134,5 +153,53 @@ export async function PATCH(
       { status: 404 }
     )
   }
-  return NextResponse.json({ status: transition.to })
+  // The verdict IS a label: approve = the auto-detection passed (a "good enough" draft
+  // is unedited by definition), reject = it failed. Best-effort — a lost training row
+  // must never fail an admin's decision, so this is logged and swallowed.
+  const label = labelForAction(action)
+  if (label) {
+    try {
+      const { data: row } = await service
+        .from('playhub_portrait_renders')
+        .select('provider_event_id, keyframes')
+        .eq('id', renderId)
+        .eq('club_slug', clubSlug)
+        .maybeSingle()
+      // One verdict per (render, reviewer, verdict). The transition itself is
+      // toggleable (approve → unapprove → approve), and this table is append-only
+      // with no DELETE path, so without this guard a few clicks skew the label
+      // distribution for a single clip arbitrarily. The sibling feedback route
+      // caps rows for the same reason; this path had no cap at all. Deliberately
+      // fails OPEN (a broken count writes the label): a duplicate is removable at
+      // read time, a dropped first verdict is gone for good.
+      const { count: existing } = await service
+        .from('playhub_portrait_render_feedback')
+        .select('id', { count: 'exact', head: true })
+        .eq('render_id', renderId)
+        .eq('user_id', user.id)
+        .eq('action', label)
+      if (row && !existing) {
+        const baseline = (row.keyframes ?? null) as CropKeyframe[] | null
+        await insertPortraitFeedback(service, {
+          renderId,
+          providerEventId: row.provider_event_id as string,
+          clubSlug,
+          userId: user.id,
+          action: label,
+          keyframesBefore: baseline,
+          keyframesAfter: null,
+          baselineOrigin: baseline ? 'render_row' : 'none',
+        })
+      }
+    } catch (err) {
+      console.error('[portrait-renders] label write failed:', err)
+    }
+  }
+
+  // Return the row the caller just mutated, so the client can patch local state
+  // instead of refetching the list (which re-signs every preview URL in the match).
+  return NextResponse.json({
+    status: transition.to,
+    approvedAt: transition.to === 'approved' ? now : null,
+  })
 }

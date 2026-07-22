@@ -2,24 +2,33 @@
 
 // Review strip for system-generated 9:16 portrait goal renders (CFA pilot).
 // Renders nothing when the match has no renders, so non-pilot clubs see no
-// change. Draft-first flow: preview inline, Publish → TikTok inbox,
-// Reject/Restore, or fix the framing in the editor (which uses the shared
-// detection cache, so it opens instantly with the same keyframes).
+// change. Draft-first flow: preview inline, mark "Good enough" (a quality
+// verdict — it distributes nothing), Reject/Restore, or fix the framing in the
+// editor (which uses the shared detection cache, so it opens instantly with the
+// same keyframes). `published` is a legacy status with no writer left.
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { Clapperboard, Loader2, Pencil, Send, Undo2, X } from 'lucide-react'
+import {
+  Check,
+  Clapperboard,
+  Loader2,
+  Pencil,
+  RotateCcw,
+  Undo2,
+  X,
+} from 'lucide-react'
 import { cn } from '@braintwopoint0/playback-commons/utils'
 
 interface PortraitRender {
   id: string
   providerEventId: string
-  status: 'draft' | 'published' | 'rejected' | 'error'
+  status: 'draft' | 'approved' | 'published' | 'rejected' | 'error'
   quality: { ball_fraction?: number } | null
   error: string | null
   previewUrl: string | null
-  publishedAt: string | null
+  approvedAt?: string | null
 }
 
 interface EditorSource {
@@ -37,6 +46,7 @@ interface PortraitRendersStripProps {
 
 const STATUS_STYLES: Record<PortraitRender['status'], string> = {
   draft: 'bg-amber-500/15 text-amber-300',
+  approved: 'bg-emerald-500/15 text-emerald-300',
   published: 'bg-emerald-500/15 text-emerald-300',
   rejected: 'bg-white/[0.06] text-muted-foreground/60',
   error: 'bg-red-500/15 text-red-300',
@@ -84,26 +94,22 @@ export function PortraitRendersStrip({
   const act = useCallback(
     async (
       render: PortraitRender,
-      action: 'publish' | 'reject' | 'restore'
+      action: 'approve' | 'unapprove' | 'reject' | 'restore'
     ) => {
       setBusyId(render.id)
       setNotice(null)
       try {
-        const res =
-          action === 'publish'
-            ? await fetch('/api/tiktok/publish', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ renderId: render.id }),
-              })
-            : await fetch(
-                `/api/academy/${clubSlug}/portrait-renders/${render.id}`,
-                {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ action }),
-                }
-              )
+        // Every review action is a status transition now — nothing here
+        // distributes. The /api/tiktok/publish branch was deleted with the
+        // endpoint's renderId path (2026-07-22).
+        const res = await fetch(
+          `/api/academy/${clubSlug}/portrait-renders/${render.id}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action }),
+          }
+        )
         if (!res.ok) {
           const body = (await res.json().catch(() => null)) as {
             error?: string
@@ -111,7 +117,7 @@ export function PortraitRendersStrip({
           setNotice(body?.error ?? t('portrait.actionFailed'))
           return
         }
-        if (action === 'publish') setNotice(t('portrait.publishedNotice'))
+        if (action === 'approve') setNotice(t('portrait.approvedNotice'))
         await refresh()
       } catch {
         setNotice(t('portrait.actionFailed'))
@@ -161,7 +167,9 @@ export function PortraitRendersStrip({
           const busy = busyId === render.id
           const playable =
             render.previewUrl &&
-            (render.status === 'draft' || render.status === 'published')
+            (render.status === 'draft' ||
+              render.status === 'approved' ||
+              render.status === 'published')
           return (
             <div
               key={render.id}
@@ -210,20 +218,35 @@ export function PortraitRendersStrip({
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground/50" />
                 ) : (
                   <>
-                    {(render.status === 'draft' ||
-                      render.status === 'published') && (
+                    {render.status === 'draft' && (
                       <button
                         type="button"
-                        onClick={() => act(render, 'publish')}
-                        title={t('portrait.publish')}
-                        aria-label={t('portrait.publish')}
+                        onClick={() => act(render, 'approve')}
+                        title={t('portrait.approve')}
+                        aria-label={t('portrait.approve')}
                         className="p-1.5 rounded text-muted-foreground/60 hover:text-emerald-300 hover:bg-white/[0.06]"
                       >
-                        <Send className="h-3.5 w-3.5" />
+                        <Check className="h-3.5 w-3.5" />
                       </button>
                     )}
+                    {render.status === 'approved' && (
+                      <button
+                        type="button"
+                        onClick={() => act(render, 'unapprove')}
+                        title={t('portrait.unapprove')}
+                        aria-label={t('portrait.unapprove')}
+                        className="p-1.5 rounded text-muted-foreground/60 hover:text-[var(--timberwolf)] hover:bg-white/[0.06]"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {/* Not offered on approved rows: "good enough" means unedited,
+                        and the editor never writes back to the render — an edit here
+                        would leave an approved badge over geometry nobody approved.
+                        Unapprove first. */}
                     {editorSources.has(render.providerEventId) &&
-                      render.status !== 'rejected' && (
+                      render.status !== 'rejected' &&
+                      render.status !== 'approved' && (
                         <button
                           type="button"
                           onClick={() => fixInEditor(render)}
@@ -234,8 +257,11 @@ export function PortraitRendersStrip({
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                       )}
+                    {/* Error rows are terminal — the sweep owns their retry budget
+                        and the route refuses the transition, so offering Reject
+                        there is a button that always fails. */}
                     {(render.status === 'draft' ||
-                      render.status === 'error') && (
+                      render.status === 'approved') && (
                       <button
                         type="button"
                         onClick={() => act(render, 'reject')}

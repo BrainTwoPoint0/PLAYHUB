@@ -631,8 +631,6 @@
       "portrait": {
         "title": "Momentos en vertical",
         "preview": "Vista previa del clip vertical",
-        "publish": "Publicar en TikTok",
-        "publishedNotice": "Enviado a tu bandeja de TikTok: termina la publicación en la app.",
         "reject": "Rechazar borrador",
         "restore": "Restaurar borrador",
         "fixInEditor": "Ajustar encuadre en el editor",
@@ -641,7 +639,11 @@
         "rejected": "Rechazado",
         "error": "Fallido",
         "errorBadge": "Falló el renderizado",
-        "actionFailed": "Algo salió mal. Inténtalo de nuevo."
+        "actionFailed": "Algo salió mal. Inténtalo de nuevo.",
+        "approve": "Suficientemente bueno",
+        "unapprove": "Deshacer aprobación",
+        "approved": "Suficientemente bueno",
+        "approvedNotice": "Marcado como suficientemente bueno: no se publicó nada."
       }
     }
   },
