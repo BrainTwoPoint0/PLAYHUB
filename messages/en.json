@@ -685,7 +685,7 @@
     "goalCandidates": {
       "title": "AI goal review",
       "counts": "{open} to review · {approved} approved",
-      "hint": "Detected kickoff moments — the goal plays out in the clip before the kickoff. About 1 in 3 is a real goal; approving adds a public goal marker to the timeline.",
+      "hint": "Detected kickoff moments, most-likely goals first — the goal plays out in the clip before the kickoff. About 1 in 3 is a real goal; approving adds a public goal marker to the timeline.",
       "preview": "Play review clip",
       "approve": "Approve — add goal marker",
       "approveRepair": "Approve again to finish",

@@ -81,7 +81,16 @@ export function GoalCandidatesStrip({
         )
         if (!res.ok) return // silent — non-admins simply see nothing
         const json = (await res.json()) as { candidates?: GoalCandidate[] }
-        if (!signal?.aborted) setCandidates(json.candidates ?? [])
+        // Review order = episode span DESC (Karim's call, 2026-07-22):
+        // long stoppage chains are goal-rich — measured OOF on the 236-match
+        // freeze record, span-alone ranking beat the old composite (P@4
+        // 0.49 vs base 0.32). Ranking only — auto-approve on span stays
+        // PARKED until a precision curve exists over more reviewed matches
+        // (long span also covers injuries/delays/multi-goal bags).
+        const sorted = (json.candidates ?? [])
+          .slice()
+          .sort((a, b) => b.t1S - b.t0S - (a.t1S - a.t0S))
+        if (!signal?.aborted) setCandidates(sorted)
       } catch {
         // aborted or network hiccup — leave the current state
       }
