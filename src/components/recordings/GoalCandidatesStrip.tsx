@@ -102,15 +102,15 @@ export function GoalCandidatesStrip({
         )
         if (!res.ok) return // silent — non-admins simply see nothing
         const json = (await res.json()) as { candidates?: GoalCandidate[] }
-        // Review order = episode span DESC (Karim's call, 2026-07-22):
-        // long stoppage chains are goal-rich — measured OOF on the 236-match
-        // freeze record, span-alone ranking beat the old composite (P@4
-        // 0.49 vs base 0.32). Ranking only — auto-approve on span stays
-        // PARKED until a precision curve exists over more reviewed matches
-        // (long span also covers injuries/delays/multi-goal bags).
+        // Review order = MATCH ORDER (Karim, 2026-07-22, superseding his
+        // earlier span-desc ranking): the workflow is a complete pass over
+        // every card, so chronological scanning beats goal-rich-first.
+        // (Span remains the measured ranking signal — P@4 0.49 vs base
+        // 0.32 on the freeze record — and stays the input for any future
+        // auto-approve posture, which is PARKED pending a precision curve.)
         const sorted = (json.candidates ?? [])
           .map((c) => ({ ...c, events: c.events ?? [] }))
-          .sort((a, b) => b.t1S - b.t0S - (a.t1S - a.t0S))
+          .sort((a, b) => a.anchorS - b.anchorS)
         if (!signal?.aborted) {
           // Keep the PLAYING card's clip URL: every refresh mints fresh
           // signed URLs, and swapping src reloads the video + resets the

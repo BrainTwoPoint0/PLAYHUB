@@ -685,7 +685,7 @@
     "goalCandidates": {
       "title": "Revisión de goles IA",
       "counts": "{open} por revisar · {approved} aprobados",
-      "hint": "Momentos de saque detectados, primero los goles más probables — el gol aparece en el clip antes del saque. Aproximadamente 1 de cada 3 es un gol real; al aprobar se añade un marcador de gol público a la línea de tiempo.",
+      "hint": "Momentos de saque detectados en orden de partido — la hora mostrada es el saque detectado; el gol aparece en el clip antes. Aproximadamente 1 de cada 3 es un gol real; al aprobar se añade un marcador de gol público a la línea de tiempo.",
       "preview": "Reproducir clip de revisión",
       "approve": "Aprobar — añadir marcador de gol",
       "approveRepair": "Aprueba de nuevo para terminar",
