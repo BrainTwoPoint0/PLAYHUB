@@ -61,6 +61,16 @@ CLIP_PRE_S = 90.0    # freeze finding: 45s pre-roll cuts a quarter of caught
 CLIP_POST_S = 8.0    # goals out of their own clip; 90s covers the measured
                      # goal->kickoff latency envelope (p90 37s + detection lag)
 CLIP_WIDTH = 1280
+# The Supabase project's global storage upload cap is 50MB (measured
+# 2026-07-22: a 60MB POST returns HTTP 400 wrapping a 413 body — this
+# killed the first pilot job on a 550s-span episode's 648s clip). Bound the
+# encode deterministically: duration cap + bitrate ceiling => worst case
+# ~300s x 1000kbps ≈ 38MB. The cap can truncate the TAIL of a rare
+# long-span episode (>1/19 on the pilot); the goal itself sits within 90s
+# BEFORE the anchor, which the window always keeps.
+CLIP_MAX_S = 300.0
+CLIP_MAXRATE = '1000k'
+CLIP_BUFSIZE = '2000k'
 RECONCILE_S = chain_mod.MERGE_S   # episode-identity radius for re-run matching
 
 # The presign must be REGIONAL (eu-west-2) + s3v4: a region-less client
@@ -199,12 +209,13 @@ def presign_video(s3_key: str) -> str:
 
 def cut_clip(url: str, t0: float, t1: float, dest: str):
     start = max(0.0, t0 - CLIP_PRE_S)
-    dur = (t1 - start) + CLIP_POST_S
+    dur = min((t1 - start) + CLIP_POST_S, CLIP_MAX_S)
     subprocess.run(
         ['ffmpeg', '-y', '-nostdin', '-loglevel', 'error',
          '-ss', f'{start:.2f}', '-i', url, '-t', f'{dur:.1f}',
          '-vf', f'scale={CLIP_WIDTH}:-2', '-an',
-         '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '27', dest],
+         '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '27',
+         '-maxrate', CLIP_MAXRATE, '-bufsize', CLIP_BUFSIZE, dest],
         check=True, timeout=1800)
 
 
@@ -236,8 +247,15 @@ def upload_clip(path: str, storage_path: str):
     req.add_header('Authorization', f'Bearer {SERVICE_KEY}')
     req.add_header('Content-Type', 'video/mp4')
     req.add_header('x-upsert', 'true')
-    with urllib.request.urlopen(req, timeout=300) as resp:
-        resp.read()
+    try:
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            resp.read()
+    except urllib.error.HTTPError as err:
+        # Storage wraps its 413 in an HTTP 400; surface the size so the
+        # error column says what actually happened (first-pilot lesson).
+        raise JobError(
+            f'clip upload rejected ({err.code}) for {storage_path} '
+            f'at {len(body) / 1e6:.0f}MB') from err
     return len(body)
 
 
