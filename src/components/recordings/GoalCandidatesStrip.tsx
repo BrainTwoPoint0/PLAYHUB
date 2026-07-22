@@ -40,6 +40,22 @@ const STATUS_STYLES: Record<GoalCandidate['status'], string> = {
   error: 'bg-red-500/15 text-red-300',
 }
 
+// Mirror of the batch job's clip window + the producer's goal estimate:
+// clip starts at max(0, t0-90); the goal sits ~20s before the detected
+// kickoff anchor (Veo-measured median goal->kickoff latency — landed 1s
+// from the true goal on the pilot E2E).
+const CLIP_PRE_S = 90
+const EVENT_OFFSET_S = 20
+const SEEK_LEAD_S = 10
+
+function clipStartS(cand: { t0S: number }): number {
+  return Math.max(0, cand.t0S - CLIP_PRE_S)
+}
+
+function goalOffsetS(cand: { t0S: number; anchorS: number }): number {
+  return Math.max(0, cand.anchorS - EVENT_OFFSET_S - clipStartS(cand))
+}
+
 function mmss(s: number): string {
   const m = Math.floor(s / 60)
   const r = Math.floor(s % 60)
@@ -82,7 +98,10 @@ export function GoalCandidatesStrip({
   }, [refresh])
 
   const act = useCallback(
-    async (cand: GoalCandidate, action: 'approve' | 'reject' | 'restore') => {
+    async (
+      cand: GoalCandidate,
+      action: 'approve' | 'unapprove' | 'reject' | 'restore'
+    ) => {
       setBusyId(cand.id)
       setNotice(null)
       try {
@@ -104,9 +123,11 @@ export function GoalCandidatesStrip({
           setNotice(
             body?.code === 'event_write_failed'
               ? t('approveRepairNotice')
-              : body?.code === 'invalid_state'
-                ? t('staleNotice')
-                : (body?.error ?? t('actionFailed'))
+              : body?.code === 'event_delete_failed'
+                ? t('unapproveRepairNotice')
+                : body?.code === 'invalid_state'
+                  ? t('staleNotice')
+                  : (body?.error ?? t('actionFailed'))
           )
           // event_write_failed leaves the repair state visible on refresh
           await refresh()
@@ -115,6 +136,9 @@ export function GoalCandidatesStrip({
         if (action === 'approve') {
           setNotice(t('approvedNotice'))
           onApproved?.()
+        } else if (action === 'unapprove') {
+          setNotice(t('unapprovedNotice'))
+          onApproved?.()   // refreshes the page's events — the marker is gone
         }
         await refresh()
       } catch {
@@ -167,6 +191,17 @@ export function GoalCandidatesStrip({
                     controls
                     autoPlay
                     playsInline
+                    // Land the reviewer just before the estimated goal
+                    // moment instead of the top of a multi-minute clip —
+                    // the E2E's false "not a goal" was a goal sitting 71s
+                    // into an unhinted clip.
+                    onLoadedMetadata={(e) => {
+                      const v = e.currentTarget
+                      const seek = Math.max(0, goalOffsetS(cand) - SEEK_LEAD_S)
+                      if (Number.isFinite(v.duration) && seek < v.duration) {
+                        v.currentTime = seek
+                      }
+                    }}
                     className="w-full h-full object-contain bg-black"
                   />
                 ) : (
@@ -200,6 +235,14 @@ export function GoalCandidatesStrip({
                   <span className="text-sm font-medium text-[var(--timberwolf)] tabular-nums">
                     {mmss(cand.anchorS)}
                   </span>
+                  {cand.status !== 'error' && (
+                    <span
+                      className="text-[10px] text-emerald-300/60 tabular-nums"
+                      title={t('goalHintTitle')}
+                    >
+                      {t('goalHint', { mmss: mmss(goalOffsetS(cand)) })}
+                    </span>
+                  )}
                   {cand.pko !== null && (
                     <span
                       className="text-[10px] text-muted-foreground/50 tabular-nums"
@@ -251,6 +294,17 @@ export function GoalCandidatesStrip({
                           title={t('restore')}
                           aria-label={t('restore')}
                           className="p-1.5 rounded text-muted-foreground/60 hover:text-[var(--timberwolf)] hover:bg-white/[0.06]"
+                        >
+                          <Undo2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {cand.status === 'approved' && (
+                        <button
+                          type="button"
+                          onClick={() => act(cand, 'unapprove')}
+                          title={t('unapprove')}
+                          aria-label={t('unapprove')}
+                          className="p-1.5 rounded text-muted-foreground/60 hover:text-amber-300 hover:bg-white/[0.06]"
                         >
                           <Undo2 className="h-3.5 w-3.5" />
                         </button>

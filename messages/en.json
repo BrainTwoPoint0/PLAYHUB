@@ -702,7 +702,12 @@
       "confidenceTitle": "Detector confidence: kickoff formation / dead-ball context",
       "confidence": "KO {pko}% · dead {dead}%",
       "approveRepairNotice": "Approved, but the goal marker didn't save — approve again to finish",
-      "staleNotice": "This candidate was updated elsewhere — list refreshed"
+      "staleNotice": "This candidate was updated elsewhere — list refreshed",
+      "goalHint": "goal ≈ {mmss} in clip",
+      "goalHintTitle": "Estimated goal moment inside the review clip (playback starts just before it)",
+      "unapprove": "Unapprove — remove goal marker",
+      "unapprovedNotice": "Goal marker removed",
+      "unapproveRepairNotice": "The goal marker is still live — unapprove again to remove it"
     }
   },
   "org": {

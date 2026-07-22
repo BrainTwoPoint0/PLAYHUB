@@ -1,10 +1,16 @@
 // PATCH /api/recordings/[id]/goal-candidates/[candidateId]
 //
 // Review actions on a goal-detect candidate (platform admin only, pilot):
-//   approve: draft -> approved, then insert the goal event into
-//            playhub_recording_events (source='ai_detected',
-//            provider='spiideo', provider_event_id = candidate id) and stamp
-//            approved_event_id.
+//   approve:   draft -> approved, then insert the goal event into
+//              playhub_recording_events (source='ai_detected',
+//              provider='spiideo', provider_event_id = candidate id) and
+//              stamp approved_event_id.
+//   unapprove: approved -> draft, deleting the goal event FIRST (the
+//              inverse ordering of approve: a public /watch marker must
+//              never outlive an approved candidate). The event delete is
+//              guarded by provider='spiideo' AND provider_event_id =
+//              candidate id, so it can only ever remove this candidate's
+//              own AI event — never a manual or Veo event.
 //   reject:  draft -> rejected
 //   restore: rejected -> draft
 //
@@ -15,7 +21,6 @@
 // event insert is idempotent via the exact (provider='spiideo',
 // provider_event_id=candidate.id) lookup, backed by the table's unique
 // (provider, provider_recording_id, provider_event_id) constraint.
-// There is no unapprove in the pilot (it would require event deletion).
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, createServiceClient } from '@/lib/supabase/server'
@@ -34,6 +39,7 @@ const EVENT_OFFSET_S = 20
 
 const TRANSITIONS: Record<string, { from: string[]; to: string }> = {
   approve: { from: ['draft'], to: 'approved' },
+  unapprove: { from: ['approved'], to: 'draft' },
   reject: { from: ['draft'], to: 'rejected' },
   restore: { from: ['rejected'], to: 'draft' },
 }
@@ -77,7 +83,10 @@ export async function PATCH(
     : undefined
   if (!transition) {
     return NextResponse.json(
-      { error: 'action must be approve, reject, or restore', code: 'bad_request' },
+      {
+        error: 'action must be approve, unapprove, reject, or restore',
+        code: 'bad_request',
+      },
       { status: 400 }
     )
   }
@@ -289,6 +298,112 @@ export async function PATCH(
       )
     }
     return NextResponse.json({ status: 'approved', eventId })
+  }
+
+  if (actionKey === 'unapprove') {
+    const { data: cand, error: candErr } = await service
+      .from('playhub_goal_candidates')
+      .select('id, status, approved_event_id')
+      .eq('id', candidateId)
+      .eq('match_recording_id', id)   // IDOR guard
+      .maybeSingle()
+    if (candErr) {
+      console.error(
+        '[goal-candidates] candidate fetch failed:',
+        candErr.message
+      )
+      return NextResponse.json(
+        { error: 'Query failed', code: 'query_failed' },
+        { status: 500 }
+      )
+    }
+    if (!cand) {
+      return NextResponse.json(
+        { error: 'Not found', code: 'not_found' },
+        { status: 404 }
+      )
+    }
+    // Idempotent double-unapprove (mirror of approve's short-circuit): a
+    // retry that finds the target state gets the outcome, not a 409 the
+    // strip would render as an error for the admin's own action.
+    if (cand.status === 'draft') {
+      return NextResponse.json({ status: 'draft' })
+    }
+    if (cand.status !== 'approved') {
+      return NextResponse.json(
+        {
+          error: 'Candidate is not in a state that allows unapprove',
+          code: 'invalid_state',
+          details: { status: cand.status },
+        },
+        { status: 409 }
+      )
+    }
+
+    // 1. Delete the event FIRST — a public /watch marker must never outlive
+    //    an approved candidate. Keyed on the PAIR (provider='spiideo',
+    //    provider_event_id=candidateId) + recording + source — the same
+    //    identity approve trusts — and deliberately NOT gated on
+    //    approved_event_id: the stamp-failure repair state has a live event
+    //    with a NULL stamp, and gating on the stamp would orphan its public
+    //    marker (API review H1). Idempotent: 0 rows when no event exists.
+    const { error: delErr } = await service
+      .from('playhub_recording_events')
+      .delete()
+      .eq('match_recording_id', id)
+      .eq('provider', 'spiideo')
+      .eq('provider_event_id', candidateId)
+      .eq('source', 'ai_detected')
+    if (delErr) {
+      // Candidate stays approved; unapprove again retries the delete.
+      console.error('[goal-candidates] event delete failed:', delErr.message)
+      return NextResponse.json(
+        {
+          error:
+            'The goal marker failed to remove — unapprove again to finish',
+          code: 'event_delete_failed',
+        },
+        { status: 502 }
+      )
+    }
+
+    // 2. Flip back to draft, clearing approved_event_id in the same atomic
+    //    row update (a dangling id would make a concurrent approve
+    //    short-circuit onto a deleted event; the single UPDATE closes that
+    //    to a sub-ms window, acceptable for the single-admin pilot).
+    const { count, error } = await service
+      .from('playhub_goal_candidates')
+      .update(
+        {
+          status: 'draft',
+          approved_event_id: null,
+          reviewed_by: user.id,
+          reviewed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        { count: 'exact' }
+      )
+      .eq('id', candidateId)
+      .eq('match_recording_id', id)
+      .in('status', ['approved'])
+    if (error) {
+      console.error('[goal-candidates] unapprove flip failed:', error.message)
+      return NextResponse.json(
+        { error: 'Update failed', code: 'update_failed' },
+        { status: 500 }
+      )
+    }
+    if (!count) {
+      return NextResponse.json(
+        {
+          error: 'Candidate was reviewed concurrently',
+          code: 'invalid_state',
+          details: { status: 'unknown' },
+        },
+        { status: 409 }
+      )
+    }
+    return NextResponse.json({ status: 'draft' })
   }
 
   // reject / restore: single count-CAS (no .select() — the PostgREST
