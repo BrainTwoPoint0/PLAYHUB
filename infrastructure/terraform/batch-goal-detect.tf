@@ -112,14 +112,14 @@ resource "aws_batch_job_definition" "goal_detect" {
       # Explicit region: the presign guard (SigV2/global-endpoint pilot
       # lesson) must be structural, not a lucky fallback default.
       { name = "AWS_REGION", value = var.aws_region },
-      { name = "GOAL_WEIGHTS_S3_PREFIX", value = "provenance/goal-detect/2026-07-21" },
+      { name = "GOAL_WEIGHTS_S3_PREFIX", value = "provenance/goal-detect/2026-07-23" },
       # sha256 pins for the frozen sklearn artifacts + constants the job
       # downloads — computed from the banked originals (integrity; the
       # unpickle surface is our own service-role-written S3 prefix).
       { name = "STOPPAGE_SHA256", value = "c97f6bc97fd742da23a4ef8ce579abdbdc1ab2a3638a35527c4b05c38e810aea" },
       { name = "KICKOFF_SHA256", value = "f799a53e73e24bfbdbd092bae7e1dc15983656078617c427b38a521b2dfde4d3" },
       { name = "PERIOD_GAP_SHA256", value = "f8fd7a84cffe29a938ed8c85a9ea9c2c8bc844161e0a22949e91749ff969be8f" },
-      { name = "CONSTANTS_SHA256", value = "11b49062a9edd0c759076b4781667819d0688623ff6e959c3a6daed8b8ee1347" },
+      { name = "CONSTANTS_SHA256", value = "270cb9c3299902732aa9b94a6754bba40123e276811c54585a13f8d0875e63f0" },
       { name = "SUPABASE_URL", value = var.supabase_url },
       { name = "SUPABASE_SERVICE_ROLE_KEY", value = var.supabase_service_key },
     ]

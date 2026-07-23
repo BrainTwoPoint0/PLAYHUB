@@ -28,7 +28,17 @@ from period_gap import activity_dead_spells, kickoff_features
 from stoppage_features import CHANNELS, context_matrix, frame_channels
 
 # ── frozen constants (stoppage_veo_freeze.py) ──────────────────────────────
-TAU = 0.5                   # kickoff peak threshold
+TAU = 0.5                   # opening-scan + diagnosis threshold (unchanged —
+                            # the 07-22 opening measurement: any strictness
+                            # change on the opening eats early goals)
+TAU_PEAK = 0.45             # candidate-peak gate (freeze-adopted 2026-07-23:
+                            # +2.5pp medium recall90 @ precision 0.302,
+                            # +1 card/match; 0.40/0.35 breach the 0.30
+                            # precision floor — locked bar, do not lower
+                            # without a new freeze round. Spiideo spot-check:
+                            # 0 stamped goals lose coverage; lower τ also
+                            # BRIDGES adjacent episodes — sub-anchor chips
+                            # absorb the longer spans.)
 DCTX_FLOOR = 0.80           # trailing dead-evidence floor (adopted 07-21)
 MERGE_S = 45.0              # episode merge radius
 PRE_WIN = (6.0, 1.0)        # deadctx window [t-6, t-1]
@@ -59,7 +69,7 @@ SUB_ANCHORS_ROW_CAP = 8     # candidate-row hint cap: anchor cycle + top-7
                             # flurry card 15 -> 8 chips. Full list stays in
                             # provenance.
 KICKOFF_VARIANT = "rolefree12"
-DETECTOR_VERSION = "freeze-2026-07-21-floor080-subanchors"
+DETECTOR_VERSION = "freeze-2026-07-23-tau045"
 
 I_MED = CHANNELS.index("med_speed_r")
 I_N = CHANNELS.index("n")
@@ -179,7 +189,7 @@ def detect(grid, pko, ev, dctx=None):
     without it."""
     cand = []
     for i in range(1, len(grid) - 1):
-        if not np.isfinite(pko[i]) or pko[i] < TAU:
+        if not np.isfinite(pko[i]) or pko[i] < TAU_PEAK:
             continue
         w = pko[max(0, i - PEAK_HALF):i + PEAK_HALF + 1]
         if pko[i] >= np.nanmax(w) - 1e-9 and np.isfinite(ev[i]) \

@@ -52,7 +52,7 @@ SERVICE_KEY = os.environ['SUPABASE_SERVICE_ROLE_KEY']
 BUCKET = os.environ['S3_RECORDINGS_BUCKET']
 AWS_REGION = os.environ.get('AWS_REGION', 'eu-west-2')
 WEIGHTS_S3_PREFIX = os.environ.get(
-    'GOAL_WEIGHTS_S3_PREFIX', 'provenance/goal-detect/2026-07-21')
+    'GOAL_WEIGHTS_S3_PREFIX', 'provenance/goal-detect/2026-07-23')
 MESH_BUCKET = 'panorama-meshes'
 CLIPS_BUCKET = 'goal-review-clips'
 WORK = os.environ.get('GOAL_DETECT_WORKDIR', '/tmp/goal-detect')
@@ -354,6 +354,8 @@ def main():
     # fail loudly against the bank, not silently ship a different detector.
     banked = json.load(open(models['constants.json']))['chain']
     for key, val in (('TAU', chain_mod.TAU),
+                     ('TAU_PEAK', chain_mod.TAU_PEAK),
+                     ('SPLIT_LIVE_THR', chain_mod.SPLIT_LIVE_THR),
                      ('DCTX_FLOOR', chain_mod.DCTX_FLOOR),
                      ('MERGE_S', chain_mod.MERGE_S),
                      ('PERIOD_THR', chain_mod.PERIOD_THR),

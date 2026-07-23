@@ -236,6 +236,21 @@ def test_sub_anchors_across_separate_episodes():
     assert eps[1]['sub_anchors'] == [400.0, 430.0]
 
 
+def test_tau_peak_gates_candidates_but_not_opening():
+    """The candidate gate runs at TAU_PEAK=0.45 (freeze-adopted 2026-07-23);
+    the envelope opening scan stays at TAU=0.5 — the 07-22 opening
+    measurement showed ANY opening strictness change eats early goals, so
+    the two thresholds are deliberately decoupled."""
+    assert chain_mod.TAU == 0.5
+    assert chain_mod.TAU_PEAK == 0.45
+    grid, pko, ev, dctx = _series(peaks=(100, 300))
+    pko[100], pko[300] = 0.47, 0.9   # 0.47: below TAU, above TAU_PEAK
+    eps = chain_mod.detect(grid, pko, ev, dctx=dctx)
+    assert [e['anchor'] for e in eps] == [100.0, 300.0]
+    # opening scan must NOT see the 0.47 peak
+    assert chain_mod.earliest_confident_kickoff(grid, pko) == 300.0
+
+
 def test_sub_anchor_pko_is_per_cycle_max():
     """Each cycle's pko = max over ITS peaks, not the episode max."""
     grid, pko, ev, dctx = _series(
