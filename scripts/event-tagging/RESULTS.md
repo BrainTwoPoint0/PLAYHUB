@@ -1199,3 +1199,39 @@ or an activity-level match-start detector — measured against this same bar, es
 recall 0.667. The `--opening-tau`/`--pre-env-cut` flags stay in the harness (default off,
 baseline-verified) as instrumentation. Artifacts: `freeze_results_open{07,08}{,preenvcut}.json` +
 `freeze_results_verify_noopen.json`.
+
+## TIMING OFFSET KEPT + τ_PEAK 0.45 PASSES THE BAR (2026-07-23; bars locked before numbers)
+
+**Timing offset (marker estimate, not a decode change): KEEP 20.** Against Veo goal GT (1,497
+goal/cycle pairs, floor-080 survivors + split-any cycles), raw goal→kickoff-cycle latency median is
+EXACTLY 20.0s — the original constant is empirically optimal to within noise. The |err|-minimizing
+offset is 17 but buys only 0.8s median (< the locked 2s adopt threshold) and worsens p90. No change.
+
+**τ_peak probe (decode change, full freeze bar): 0.45 ADOPTS; 0.40/0.35 fail.** Variants lower ONLY
+the candidate-peak gate; the opening scan stays at 0.5 (the 07-22 opening measurement stands — the
+warm-up surface must not move). Default-off `--tau-peak` flag, baseline bit-for-bit verified.
+
+| medium | baseline | **0.45** | 0.40 | 0.35 |
+|---|---|---|---|---|
+| recall45 / recall90 | 0.754 / 0.812 | **0.772 / 0.837** | 0.796 / 0.848 | 0.814 / 0.869 |
+| precision | 0.309 | **0.302** | 0.298 ✗ | 0.295 ✗ |
+| shortlist med / leak | 18 / 0.09% | **19 / 0.21%** | 19 / 0.21% | 19 / 0.24% |
+
+0.45 = +2.5pp recall90 (~+31 medium goals) for −0.7pp precision and +1 card/match; per-match p10
+holds at 0.50. 0.40/0.35 breach the 0.30 precision floor — out, per the locked rule.
+
+**Spiideo spot-check at 0.45 (2 labeled matches, chain-series decode): PASS.** Zero stamped-goal
+coverage lost (14/14 on polygon 017121fb, 11/11 on the rect pilot). Candidate delta modest and
+two-signed: +5 pre-filter episodes on 017121fb, −3 on the pilot — **lower τ also BRIDGES episodes**
+(new intermediate peaks fuse neighbors under the 45s merge), which the sub-anchor chips absorb by
+design. Note for the ship: episode shapes move, so re-runs on reviewed matches would mint some
+duplicate drafts past the reconcile radius — τ_peak applies to FUTURE detects, no backlog reset
+(standing rule).
+
+**SHIP PLAN (awaiting Karim's go — touches terraform):** (1) chain.py `TAU_PEAK=0.45` on the
+candidate gate only (TAU=0.5 keeps the opening + diagnosis semantics), DETECTOR_VERSION bump;
+(2) re-bank constants.json to a NEW dated weights prefix with TAU_PEAK — and fold in the standing
+SPLIT_LIVE_THR canary item — models unchanged, new CONSTANTS_SHA256; (3) `-target` apply the job-def
+env (prefix + sha) — the deliberate canary friction working as designed; (4) CodeBuild image
+rebuild + invalid-UUID smoke. Freeze artifacts: `freeze_results_tau{045,040,035}.json` +
+`freeze_results_verify_notau.json`.

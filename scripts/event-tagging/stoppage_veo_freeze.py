@@ -172,7 +172,8 @@ SPLIT_LIVE_THR = 0.5        # dead->live boundary = stoppage-model midpoint
 SPLIT_5S_RUN = 5            # variant "5s": consecutive live grid points
 
 
-def detect(grid, pko, ev, floor=DCTX_FLOOR, split=None, dctx=None):
+def detect(grid, pko, ev, floor=DCTX_FLOOR, split=None, dctx=None,
+           tau_peak=None):
     """trackko peaks + 45s merge -> episodes.
 
     split (None | "any" | "5s"): measured episode-split variants (adopt bar
@@ -181,9 +182,10 @@ def detect(grid, pko, ev, floor=DCTX_FLOOR, split=None, dctx=None):
     consecutive peaks) separates it from the run — "any" = any single live
     grid point, "5s" = a run of >= SPLIT_5S_RUN consecutive live points.
     Default None is the frozen 45s transitive merge, byte-identical."""
+    thr = TAU if tau_peak is None else tau_peak
     cand = []
     for i in range(1, len(grid) - 1):
-        if not np.isfinite(pko[i]) or pko[i] < TAU:
+        if not np.isfinite(pko[i]) or pko[i] < thr:
             continue
         w = pko[max(0, i - PEAK_HALF):i + PEAK_HALF + 1]
         if pko[i] >= np.nanmax(w) - 1e-9 and np.isfinite(ev[i]) \
@@ -249,7 +251,8 @@ def trailing_lull(spells, t):
 
 
 def eval_match(name, z, clf_dead, clf_ko, clf_pg, floor=DCTX_FLOOR,
-               series_dir=None, split=None, tau_open=None, pre_env_cut=False):
+               series_dir=None, split=None, tau_open=None, pre_env_cut=False,
+               tau_peak=None):
     grid = z["grid_ts"].astype(np.float64)
     ts = z["ts"]
     sfp = os.path.join(series_dir, name + ".npz") if series_dir else None
@@ -263,7 +266,8 @@ def eval_match(name, z, clf_dead, clf_ko, clf_pg, floor=DCTX_FLOOR,
         pko, dctx, ev = series(z, clf_dead, clf_ko)
         if sfp:
             np.savez_compressed(sfp, pko=pko, dctx=dctx, ev=ev)
-    eps = detect(grid, pko, ev, floor, split=split, dctx=dctx)
+    eps = detect(grid, pko, ev, floor, split=split, dctx=dctx,
+                 tau_peak=tau_peak)
 
     blocks = blocks_from_activity(ts, z["med"].astype(np.float64))
     env1 = blocks[-1][1] if blocks else float(ts[-1])
@@ -435,7 +439,7 @@ def summarize(records, label=""):
 
 def main(cache_dir, fold=None, out="freeze_results.json",
          floor=DCTX_FLOOR, series_dir=None, split=None, tau_open=None,
-         pre_env_cut=False):
+         pre_env_cut=False, tau_peak=None):
     names = sorted(n[:-4] for n in os.listdir(cache_dir)
                    if n.endswith(".npz"))
     print(f"{len(names)} sidecars  dctx-floor={floor}")
@@ -465,7 +469,8 @@ def main(cache_dir, fold=None, out="freeze_results.json",
             z = cache(names[i])
             rec = eval_match(names[i], z, clf_dead, clf_ko, clf_pg,
                              floor=floor, series_dir=series_dir, split=split,
-                             tau_open=tau_open, pre_env_cut=pre_env_cut)
+                             tau_open=tau_open, pre_env_cut=pre_env_cut,
+                             tau_peak=tau_peak)
             rec["fold"] = fi + 1
             records.append(rec)
             g_hit = sum(g["hit45"] for g in rec["goals"])
@@ -499,5 +504,8 @@ if __name__ == "__main__":
     if "--opening-tau" in sys.argv:
         tau_open = float(sys.argv[sys.argv.index("--opening-tau") + 1])
     pre_env_cut = "--pre-env-cut" in sys.argv
+    tau_peak = None
+    if "--tau-peak" in sys.argv:
+        tau_peak = float(sys.argv[sys.argv.index("--tau-peak") + 1])
     main(sys.argv[1], fold, out, floor, series_dir, split, tau_open,
-         pre_env_cut)
+         pre_env_cut, tau_peak)
