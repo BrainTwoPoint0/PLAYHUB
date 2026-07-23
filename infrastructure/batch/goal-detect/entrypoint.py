@@ -40,6 +40,7 @@ import boto3
 import joblib
 
 import chain as chain_mod
+import clip_plan
 import kickoff
 import projection
 import reconcile
@@ -57,20 +58,10 @@ MESH_BUCKET = 'panorama-meshes'
 CLIPS_BUCKET = 'goal-review-clips'
 WORK = os.environ.get('GOAL_DETECT_WORKDIR', '/tmp/goal-detect')
 
-CLIP_PRE_S = 90.0    # freeze finding: 45s pre-roll cuts a quarter of caught
-CLIP_POST_S = 8.0    # goals out of their own clip; 90s covers the measured
-                     # goal->kickoff latency envelope (p90 37s + detection lag)
-CLIP_WIDTH = 1280
-# The Supabase project's global storage upload cap is 50MB (measured
-# 2026-07-22: a 60MB POST returns HTTP 400 wrapping a 413 body — this
-# killed the first pilot job on a 550s-span episode's 648s clip). Bound the
-# encode deterministically: duration cap + bitrate ceiling => worst case
-# ~300s x 1000kbps ≈ 38MB. The cap can truncate the TAIL of a rare
-# long-span episode (>1/19 on the pilot); the goal itself sits within 90s
-# BEFORE the anchor, which the window always keeps.
-CLIP_MAX_S = 300.0
-CLIP_MAXRATE = '1000k'
-CLIP_BUFSIZE = '2000k'
+# Clip window + encode settings live in clip_plan (pure, unit-tested):
+# standard tier is byte-identical to the original fixed settings; episodes
+# whose full window exceeds 300s get the extended 480s @ 700kbps tier so a
+# flurry's later goals stay inside the clip (AGREED PLAN item 1c).
 RECONCILE_S = chain_mod.MERGE_S   # episode-identity radius for re-run matching
 
 # The presign must be REGIONAL (eu-west-2) + s3v4: a region-less client
@@ -207,15 +198,13 @@ def presign_video(s3_key: str) -> str:
     return url
 
 
-def cut_clip(url: str, t0: float, t1: float, dest: str):
-    start = max(0.0, t0 - CLIP_PRE_S)
-    dur = min((t1 - start) + CLIP_POST_S, CLIP_MAX_S)
+def cut_clip(url: str, p: clip_plan.ClipPlan, dest: str):
     subprocess.run(
         ['ffmpeg', '-y', '-nostdin', '-loglevel', 'error',
-         '-ss', f'{start:.2f}', '-i', url, '-t', f'{dur:.1f}',
-         '-vf', f'scale={CLIP_WIDTH}:-2', '-an',
+         '-ss', f'{p.start:.2f}', '-i', url, '-t', f'{p.dur:.1f}',
+         '-vf', f'scale={clip_plan.CLIP_WIDTH}:-2', '-an',
          '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '27',
-         '-maxrate', CLIP_MAXRATE, '-bufsize', CLIP_BUFSIZE, dest],
+         '-maxrate', p.maxrate, '-bufsize', p.bufsize, dest],
         check=True, timeout=1800)
 
 
@@ -396,22 +385,32 @@ def main():
     # ── clips (keyed by artifact digest + anchor: a retry resumes its own
     # work, but clips from a DIFFERENT artifact epoch can never be adopted) ─
     clip_paths: dict[float, str] = {}
+    clip_spans: dict[float, float] = {}
     if survivors:
         url = presign_video(row['s3_key'])
         for e in survivors:
+            # The plan is deterministic from (t0, t1) + frozen constants, so
+            # a resume-adopted clip's span is recomputed exactly; extended
+            # plans key differently (storage_suffix) so a legacy 300s-capped
+            # clip can never be adopted as a 480s one.
+            p = clip_plan.plan(e['t0'], e['t1'])
             storage_path = (f'{RECORDING_ID}/'
-                            f'{art_digest[:8]}-{int(e["anchor"])}.mp4')
+                            f'{art_digest[:8]}-{int(e["anchor"])}'
+                            f'{clip_plan.storage_suffix(p)}.mp4')
             if clip_exists(storage_path):
                 clip_paths[e['anchor']] = storage_path
+                clip_spans[e['anchor']] = round(p.dur, 1)
                 print(f'clip {storage_path} already banked — skipped',
                       flush=True)
                 continue
             dest = os.path.join(WORK, f'{int(e["anchor"])}.mp4')
-            cut_clip(url, e['t0'], e['t1'], dest)
+            cut_clip(url, p, dest)
             size = upload_clip(dest, storage_path)
             clip_paths[e['anchor']] = storage_path
+            clip_spans[e['anchor']] = round(p.dur, 1)
             os.remove(dest)
-            print(f'clip {storage_path} ({size / 1e6:.1f}MB)', flush=True)
+            print(f'clip {storage_path} ({size / 1e6:.1f}MB, '
+                  f'{p.dur:.0f}s @ {p.maxrate})', flush=True)
 
     # ── re-check + guarded writes (plan is pure + unit-tested) ──────────
     assert_fresh()
@@ -437,6 +436,10 @@ def main():
                 e.get('sub_anchors') or [e['anchor']],
                 e.get('sub_anchor_pko') or [e.get('pko', 0.0)])],
             clip_path=clip_paths.get(e['anchor']),
+            # Clip-truncation badge substrate: the strip compares the
+            # episode span against exactly where this clip ends (NULL rows
+            # fall back to the legacy fixed 300s cap client-side).
+            clip_span_s=clip_spans.get(e['anchor']),
             status='draft', error=None,
             detector_version=chain_mod.DETECTOR_VERSION,
             artifact_digest=art_digest,

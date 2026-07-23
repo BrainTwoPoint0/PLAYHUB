@@ -1628,6 +1628,7 @@ export type Database = {
           approved_event_id: string | null
           artifact_digest: string | null
           clip_path: string | null
+          clip_span_s: number | null
           created_at: string
           deadctx: number | null
           detector_version: string
@@ -1649,6 +1650,7 @@ export type Database = {
           approved_event_id?: string | null
           artifact_digest?: string | null
           clip_path?: string | null
+          clip_span_s?: number | null
           created_at?: string
           deadctx?: number | null
           detector_version: string
@@ -1670,6 +1672,7 @@ export type Database = {
           approved_event_id?: string | null
           artifact_digest?: string | null
           clip_path?: string | null
+          clip_span_s?: number | null
           created_at?: string
           deadctx?: number | null
           detector_version?: string
@@ -1692,6 +1695,47 @@ export type Database = {
             columns: ["match_recording_id"]
             isOneToOne: false
             referencedRelation: "playhub_match_recordings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playhub_goal_cycle_reviews: {
+        Row: {
+          artifact_digest: string | null
+          candidate_id: string
+          created_at: string
+          cycle_anchor_s: number
+          detector_version: string | null
+          reviewed_by: string | null
+          updated_at: string
+          verdict: string
+        }
+        Insert: {
+          artifact_digest?: string | null
+          candidate_id: string
+          created_at?: string
+          cycle_anchor_s: number
+          detector_version?: string | null
+          reviewed_by?: string | null
+          updated_at?: string
+          verdict: string
+        }
+        Update: {
+          artifact_digest?: string | null
+          candidate_id?: string
+          created_at?: string
+          cycle_anchor_s?: number
+          detector_version?: string | null
+          reviewed_by?: string | null
+          updated_at?: string
+          verdict?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playhub_goal_cycle_reviews_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "playhub_goal_candidates"
             referencedColumns: ["id"]
           },
         ]

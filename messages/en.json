@@ -724,7 +724,14 @@
       "badTimeNotice": "Enter a match time like 22:33",
       "cycleHintsLabel": "Possible goal moments",
       "cycleHintChip": "≈ {mmss}",
-      "cycleHintTitle": "This episode contains another detected kickoff cycle — click to add a goal marker at ≈{mmss} (you can remove it after checking)"
+      "cycleHintTitle": "This episode contains another detected kickoff cycle — click to add a goal marker at ≈{mmss} (you can remove it after checking)",
+      "dupeWarnNotice": "A goal marker already exists at {existing} — likely the same goal seen from an overlapping card. Click again to add one at {target} anyway.",
+      "clipTruncated": "clip ends {mmss}",
+      "clipTruncatedTitle": "The review clip ends at {end} but the episode continues to {episodeEnd} — stamp goals after the cut with the match-time field",
+      "cycleCheckLabel": "Cycle check",
+      "cycleSeekTitle": "Jump the clip to the cycle at ≈{mmss}",
+      "cycleYes": "Goal in this cycle",
+      "cycleNo": "No goal in this cycle"
     }
   },
   "org": {

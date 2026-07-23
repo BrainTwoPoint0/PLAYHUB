@@ -13,6 +13,10 @@
 //   unapprove:    approved -> draft, deleting ALL linked goal events FIRST.
 //   reject:       draft -> rejected
 //   restore:      rejected -> draft
+//   cycle_verdict: goal/no_goal/null label on ONE dead->live cycle (keyed
+//                 by the stored sub-anchor). Writes only the lightweight
+//                 playhub_goal_cycle_reviews store — candidate status,
+//                 events, and links are untouched; allowed in any state.
 //
 // Ordering invariants (public /watch markers are the stakes):
 //
@@ -50,6 +54,7 @@ import {
   parseReviewBody,
   resolveEventStamp,
   nextPrimaryEventId,
+  matchCycleAnchor,
   type StampSource,
 } from '@/lib/goal-review/multi-goal'
 
@@ -173,6 +178,107 @@ export async function PATCH(
 
   const service = createServiceClient()
 
+  // ---- cycle_verdict -----------------------------------------------------
+  // Per-cycle yes/no label (refiner pilot). Writes ONLY the lightweight
+  // playhub_goal_cycle_reviews store — episode review state (candidate
+  // status / events / links) is untouched by design, so it is allowed in
+  // ANY candidate state (a rejected card's explicit no_goal labels are
+  // exactly the scarce negative class the refiner needs).
+
+  if (action.action === 'cycle_verdict') {
+    const { data: cand, error: candErr } = await service
+      .from('playhub_goal_candidates')
+      .select('id, status, sub_anchors_s, detector_version, artifact_digest')
+      .eq('id', candidateId)
+      .eq('match_recording_id', id) // IDOR guard
+      .maybeSingle()
+    if (candErr) {
+      console.error(
+        '[goal-candidates] candidate fetch failed:',
+        candErr.message
+      )
+      return jsonError(500, 'Query failed', 'query_failed')
+    }
+    if (!cand) {
+      return jsonError(404, 'Not found', 'not_found')
+    }
+    // Cycle identity = a stored sub-anchor value (the canonical key). An
+    // unmatched anchor is a stale client (row re-detected underneath the
+    // strip) — refuse rather than mint an orphan label.
+    const subAnchors = (cand.sub_anchors_s ?? [])
+      .filter((v) => v !== null)
+      .map(Number)
+    const anchor = matchCycleAnchor(subAnchors, action.cycleAnchorS)
+    if (anchor === null) {
+      // details echo the row's current cycles for clients that want to
+      // resync without a refetch (API review S4). The strip itself shows
+      // the stale notice and does a full refresh.
+      return jsonError(
+        422,
+        'cycleAnchorS is not one of this candidate’s cycles — refresh the list',
+        'bad_cycle',
+        { subAnchorsS: subAnchors }
+      )
+    }
+    if (action.verdict === null) {
+      const { error: delErr } = await service
+        .from('playhub_goal_cycle_reviews')
+        .delete()
+        .eq('candidate_id', candidateId)
+        .eq('cycle_anchor_s', anchor)
+      if (delErr) {
+        console.error(
+          '[goal-candidates] cycle verdict clear failed:',
+          delErr.message
+        )
+        return jsonError(
+          502,
+          'The cycle verdict failed to save — try again',
+          'cycle_write_failed'
+        )
+      }
+      return NextResponse.json({
+        status: cand.status,
+        cycleAnchorS: anchor,
+        verdict: null,
+      })
+    }
+    const { error: upErr } = await service
+      .from('playhub_goal_cycle_reviews')
+      .upsert(
+        {
+          candidate_id: candidateId,
+          cycle_anchor_s: anchor,
+          verdict: action.verdict,
+          reviewed_by: user.id,
+          // Epoch provenance (security review M1): a batch re-detection
+          // rewrites the candidate's sub_anchors_s/detector_version in
+          // place; the stamp lets the refiner export tell which artifact
+          // epoch each label was judged against.
+          detector_version: cand.detector_version ?? null,
+          artifact_digest: cand.artifact_digest ?? null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'candidate_id,cycle_anchor_s' }
+      )
+    if (upErr) {
+      console.error(
+        '[goal-candidates] cycle verdict upsert failed:',
+        upErr.message
+      )
+      return jsonError(
+        502,
+        'The cycle verdict failed to save — try again',
+        'cycle_write_failed'
+      )
+    }
+    return NextResponse.json({
+      status: cand.status,
+      cycleAnchorS: anchor,
+      verdict: action.verdict,
+    })
+  }
+
   // ---- approve / add_goal ------------------------------------------------
 
   if (action.action === 'approve' || action.action === 'add_goal') {
@@ -250,7 +356,9 @@ export async function PATCH(
       if (sameTs) {
         eventId = sameTs.event_id
         achievedSource =
-          sameTs.stamp_source === 'human_scrub' ? 'human_scrub' : 'anchor_offset'
+          sameTs.stamp_source === 'human_scrub'
+            ? 'human_scrub'
+            : 'anchor_offset'
         if (!action.estimate && achievedSource !== 'human_scrub') {
           // A genuine scrub confirming the exact second of a prior chip
           // estimate is the strongest human label there is — upgrade the

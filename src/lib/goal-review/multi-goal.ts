@@ -18,6 +18,8 @@ const UUID_RE =
 
 export type StampSource = 'anchor_offset' | 'human_scrub'
 
+export type CycleVerdict = 'goal' | 'no_goal'
+
 export type ReviewAction =
   | { action: 'approve'; timestampSeconds: number | null }
   | { action: 'add_goal'; timestampSeconds: number; estimate: boolean }
@@ -25,6 +27,11 @@ export type ReviewAction =
   | { action: 'unapprove' }
   | { action: 'reject' }
   | { action: 'restore' }
+  | {
+      action: 'cycle_verdict'
+      cycleAnchorS: number
+      verdict: CycleVerdict | null
+    }
 
 export type ParsedReviewBody =
   { ok: true; parsed: ReviewAction } | { ok: false; error: string }
@@ -93,13 +100,32 @@ export function parseReviewBody(body: unknown): ParsedReviewBody {
       }
       return { ok: true, parsed: { action: 'remove_event', eventId } }
     }
+    case 'cycle_verdict': {
+      // Per-cycle yes/no review pilot: a verdict LABEL on one dead->live
+      // cycle of the episode (refiner corpus). null clears a prior verdict.
+      // Never touches episode review state.
+      const anchor = record.cycleAnchorS
+      if (!validTimestamp(anchor)) {
+        return invalid(
+          'cycle_verdict requires cycleAnchorS (finite number >= 0)'
+        )
+      }
+      const verdict = record.verdict
+      if (verdict !== 'goal' && verdict !== 'no_goal' && verdict !== null) {
+        return invalid('verdict must be goal, no_goal, or null')
+      }
+      return {
+        ok: true,
+        parsed: { action: 'cycle_verdict', cycleAnchorS: anchor, verdict },
+      }
+    }
     case 'unapprove':
     case 'reject':
     case 'restore':
       return { ok: true, parsed: { action } }
     default:
       return invalid(
-        'action must be approve, add_goal, remove_event, unapprove, reject, or restore'
+        'action must be approve, add_goal, remove_event, cycle_verdict, unapprove, reject, or restore'
       )
   }
 }
@@ -173,7 +199,11 @@ export const HINT_SUPPRESS_S = 10
  */
 export function subAnchorHints(
   subAnchorsS: number[] | null | undefined,
-  events: { stampSeconds: number | null }[]
+  events: { stampSeconds: number | null }[],
+  // Stamps from the recording's OTHER cards: overlapping 90s pre-rolls put
+  // the same goal on adjacent cards (measured 8/40 duplicate markers), so a
+  // marker stamped on a neighbour suppresses this card's hint too.
+  crossCardStampsS: number[] = []
 ): number[] {
   const subs = (subAnchorsS ?? []).filter(
     (s) => Number.isFinite(s) && s >= 0 && s <= MAX_TIMESTAMP_S
@@ -181,11 +211,128 @@ export function subAnchorHints(
   if (subs.length < 2) return []
   const stamps = events
     .map((e) => e.stampSeconds)
+    .concat(crossCardStampsS)
     .filter((s): s is number => s !== null && Number.isFinite(s))
   // Dedupe post-clamp: two early sub-anchors can both clamp to the same
   // estimate; one chip (and one stable React key) per distinct offer.
-  return [...new Set(subs.map((s) => Math.max(0, s - EVENT_OFFSET_S)))]
-    .filter((est) => !stamps.some((st) => Math.abs(st - est) <= HINT_SUPPRESS_S))
+  return [...new Set(subs.map((s) => Math.max(0, s - EVENT_OFFSET_S)))].filter(
+    (est) => !stamps.some((st) => Math.abs(st - est) <= HINT_SUPPRESS_S)
+  )
+}
+
+/**
+ * Cross-card ±10s stamp guard (add_goal duplicate warning): the nearest
+ * existing stamp within HINT_SUPPRESS_S of the proposed timestamp, or null.
+ * The strip warns (confirm-to-proceed) instead of blocking — two genuine
+ * goals <10s apart exist (measured flurries down to ~7s) and the reviewer
+ * decides. Callers exclude exact own-card equality first: that retry
+ * converges idempotently server-side and must stay silent.
+ */
+export function findNearbyStamp(
+  stampsS: number[],
+  timestampS: number,
+  radiusS: number = HINT_SUPPRESS_S
+): number | null {
+  let best: number | null = null
+  for (const s of stampsS) {
+    if (!Number.isFinite(s)) continue
+    const d = Math.abs(s - timestampS)
+    if (d <= radiusS && (best === null || d < Math.abs(best - timestampS))) {
+      best = s
+    }
+  }
+  return best
+}
+
+export interface RecordingStamp {
+  candId: string
+  ts: number
+}
+
+export type AddGoalGuardDecision =
+  | { kind: 'proceed' }
+  | { kind: 'warn'; conflictTs: number }
+
+/**
+ * Warn-then-confirm decision for an add_goal (the full cross-card ±10s
+ * guard state machine, pure so the staleness rules are unit-testable):
+ *
+ * - exact own-card equality proceeds silently (the server converges that
+ *   retry idempotently — no duplicate risk);
+ * - any other stamp within the radius warns, UNLESS a pending warn for the
+ *   SAME card within the radius exists — that repeat is the confirmation
+ *   (matching is by card + radius, not exact ts, because the playhead keeps
+ *   moving between the warn click and the confirm click).
+ *
+ * The caller owns pending-state lifetime: it must CLEAR pending on any
+ * other action or refresh, so a stale armed confirm can never bypass a
+ * warning about a conflict that did not exist when the warn fired
+ * (senior review H1).
+ */
+export function resolveAddGoalGuard(
+  stamps: RecordingStamp[],
+  pending: { candId: string; ts: number } | null,
+  candId: string,
+  ts: number,
+  radiusS: number = HINT_SUPPRESS_S
+): AddGoalGuardDecision {
+  const guardStamps = stamps
+    .filter((s) => !(s.candId === candId && s.ts === ts))
+    .map((s) => s.ts)
+  const conflict = findNearbyStamp(guardStamps, ts, radiusS)
+  if (conflict === null) return { kind: 'proceed' }
+  const confirmed =
+    pending !== null &&
+    pending.candId === candId &&
+    Math.abs(pending.ts - ts) <= radiusS
+  return confirmed
+    ? { kind: 'proceed' }
+    : { kind: 'warn', conflictTs: conflict }
+}
+
+/**
+ * Resolve a client-sent cycle anchor against the row's stored sub-anchor
+ * list (cycle identity for the per-cycle verdict store). Returns the STORED
+ * value (the canonical key) or null. Tolerance covers numeric->JS float
+ * round-tripping only (the job writes 2dp) — anything looser would let two
+ * distinct cycles alias.
+ */
+export function matchCycleAnchor(
+  subAnchorsS: number[] | null | undefined,
+  value: number
+): number | null {
+  for (const s of subAnchorsS ?? []) {
+    if (Number.isFinite(s) && Math.abs(s - value) <= 0.005) return s
+  }
+  return null
+}
+
+// Clip-window mirror of the batch producer (clip_plan.py) — keep in
+// lockstep. LEGACY_CLIP_MAX_S is the fixed cap every pre-adaptive clip was
+// cut at; rows carrying clip_span_s know their exact span.
+export const CLIP_PRE_S = 90
+export const CLIP_POST_S = 8
+export const LEGACY_CLIP_MAX_S = 300
+
+/**
+ * Whether the review clip ends before the episode does (the 300s cap once
+ * ended 1.6s before a mega-episode's 3rd goal — the reviewer needs to know
+ * the tail is cut and stamp later goals by typed match time). Returns the
+ * clip's end on the match clock, or null when the clip covers the episode.
+ * clipSpanS null = pre-adaptive row: its clip was cut at the legacy fixed
+ * cap, so the legacy formula reproduces its span exactly. 0.5s tolerance
+ * absorbs the producer's 0.1s duration rounding.
+ */
+export function clipTruncation(cand: {
+  t0S: number
+  t1S: number
+  clipSpanS: number | null
+}): { clipEndS: number } | null {
+  const start = Math.max(0, cand.t0S - CLIP_PRE_S)
+  const windowS = cand.t1S - start + CLIP_POST_S
+  const span = cand.clipSpanS ?? Math.min(windowS, LEGACY_CLIP_MAX_S)
+  if (span + 0.5 >= windowS) return null
+  return { clipEndS: start + span }
 }
 
 export interface CandidateEventLink {

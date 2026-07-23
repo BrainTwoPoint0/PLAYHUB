@@ -48,7 +48,7 @@ export async function GET(
   const { data: rows, error } = await service
     .from('playhub_goal_candidates')
     .select(
-      'id, t0_s, t1_s, anchor_s, sub_anchors_s, pko, deadctx, status, error, clip_path, approved_event_id, detector_version, reviewed_at, created_at, updated_at'
+      'id, t0_s, t1_s, anchor_s, sub_anchors_s, pko, deadctx, status, error, clip_path, clip_span_s, approved_event_id, detector_version, reviewed_at, created_at, updated_at'
     )
     .eq('match_recording_id', id)
     .order('anchor_s', { ascending: true })
@@ -96,6 +96,45 @@ export async function GET(
     }
   }
 
+  // Per-cycle yes/no verdicts (refiner-label pilot) — keyed by the stored
+  // sub-anchor value; the strip renders them on the cycle row. Never part
+  // of the candidate's review state. Entries whose anchor is no longer in
+  // sub_anchors_s (labels made before a re-detection) pass through
+  // deliberately — the strip's per-cycle lookup simply never matches them,
+  // and the refiner export wants them (epoch-stamped).
+  const cyclesByCandidate = new Map<
+    string,
+    { cycleAnchorS: number; verdict: string }[]
+  >()
+  if (candidates.length > 0) {
+    const { data: cycles, error: cyclesErr } = await service
+      .from('playhub_goal_cycle_reviews')
+      .select('candidate_id, cycle_anchor_s, verdict')
+      .in(
+        'candidate_id',
+        candidates.map((r) => r.id)
+      )
+    if (cyclesErr) {
+      console.error(
+        '[goal-candidates] cycle reviews query failed:',
+        cyclesErr.message
+      )
+      return NextResponse.json(
+        { error: 'Query failed', code: 'query_failed' },
+        { status: 500 }
+      )
+    }
+    for (const c of cycles ?? []) {
+      const entry = {
+        cycleAnchorS: Number(c.cycle_anchor_s),
+        verdict: c.verdict,
+      }
+      const list = cyclesByCandidate.get(c.candidate_id)
+      if (list) list.push(entry)
+      else cyclesByCandidate.set(c.candidate_id, [entry])
+    }
+  }
+
   const paths = candidates
     .filter((r) => r.clip_path && r.status !== 'error')
     .map((r) => r.clip_path as string)
@@ -135,8 +174,13 @@ export async function GET(
         status: r.status,
         error: r.error,
         clipUrl: r.clip_path ? (urlByPath.get(r.clip_path) ?? null) : null,
+        // Encoded clip duration (adaptive tier); NULL = pre-adaptive row —
+        // the strip falls back to the legacy fixed 300s cap for the
+        // truncation badge.
+        clipSpanS: r.clip_span_s === null ? null : Number(r.clip_span_s),
         approvedEventId: r.approved_event_id,
         events: eventsByCandidate.get(r.id) ?? [],
+        cycleReviews: cyclesByCandidate.get(r.id) ?? [],
         detectorVersion: r.detector_version,
         reviewedAt: r.reviewed_at,
         createdAt: r.created_at,

@@ -817,6 +817,113 @@ describe('reject / restore', () => {
   })
 })
 
+describe('cycle_verdict (per-cycle label pilot)', () => {
+  const cycCand = (over: Record<string, unknown> = {}) => ({
+    data: {
+      id: CAND,
+      status: 'draft',
+      sub_anchors_s: [1134, 1371.02, 1628],
+      detector_version: 'freeze-2026-07-23-tau045',
+      artifact_digest: 'abcd1234abcd1234',
+      ...over,
+    },
+    error: null,
+  })
+  const body = (verdict: unknown, cycleAnchorS = 1371.02) => ({
+    action: 'cycle_verdict',
+    cycleAnchorS,
+    verdict,
+  })
+
+  it('upserts a verdict into the cycle store and NEVER touches the candidate row', async () => {
+    const { res, json, log } = await run(body('no_goal'), [cycCand(), ok])
+    expect(res.status).toBe(200)
+    expect(json).toEqual({
+      status: 'draft',
+      cycleAnchorS: 1371.02,
+      verdict: 'no_goal',
+    })
+    expect(log[1].table).toBe('playhub_goal_cycle_reviews')
+    expect(log[1].op).toBe('upsert')
+    // epoch provenance: the label carries the artifact epoch it was judged
+    // against (a batch refresh rewrites sub_anchors_s in place — security
+    // review M1)
+    const payload = log[1].payload as Record<string, unknown>
+    expect(payload.detector_version).toBe('freeze-2026-07-23-tau045')
+    expect(payload.artifact_digest).toBe('abcd1234abcd1234')
+    // episode review state untouched by design: no candidate writes, no
+    // event writes, no link writes
+    expect(
+      log.filter(
+        (l) => l.table === 'playhub_goal_candidates' && l.op !== 'select'
+      )
+    ).toEqual([])
+    expect(log.some((l) => l.table === 'playhub_recording_events')).toBe(false)
+  })
+
+  it('clearing (verdict null) deletes the stored row', async () => {
+    const { res, json, log } = await run(body(null), [cycCand(), ok])
+    expect(res.status).toBe(200)
+    expect(json.verdict).toBeNull()
+    expect(log[1].table).toBe('playhub_goal_cycle_reviews')
+    expect(log[1].op).toBe('delete')
+  })
+
+  it('canonicalizes the anchor to the STORED sub-anchor value', async () => {
+    // client float noise within 5ms resolves to the stored 2dp key
+    const { json } = await run(body('goal', 1371.0201), [cycCand(), ok])
+    expect(json.cycleAnchorS).toBe(1371.02)
+  })
+
+  it('422 bad_cycle on an anchor that is not one of the row’s cycles (stale client)', async () => {
+    const { res, json, log } = await run(body('goal', 999), [cycCand()])
+    expect(res.status).toBe(422)
+    expect(json.code).toBe('bad_cycle')
+    expect(log.length).toBe(1) // fetch only — nothing written
+  })
+
+  it('422 on pre-hybrid rows (NULL sub_anchors_s)', async () => {
+    const { res } = await run(body('goal'), [cycCand({ sub_anchors_s: null })])
+    expect(res.status).toBe(422)
+  })
+
+  it('allowed in any candidate state (rejected cards mint the scarce negatives)', async () => {
+    const { res } = await run(body('no_goal'), [
+      cycCand({ status: 'rejected' }),
+      ok,
+    ])
+    expect(res.status).toBe(200)
+  })
+
+  it('502 cycle_write_failed when the store write fails', async () => {
+    const { res, json } = await run(body('goal'), [
+      cycCand(),
+      { error: { message: 'boom' } },
+    ])
+    expect(res.status).toBe(502)
+    expect(json.code).toBe('cycle_write_failed')
+  })
+
+  it('502 cycle_write_failed when the CLEAR delete fails (API review S3)', async () => {
+    const { res, json } = await run(body(null), [
+      cycCand(),
+      { error: { message: 'boom' } },
+    ])
+    expect(res.status).toBe(502)
+    expect(json.code).toBe('cycle_write_failed')
+  })
+
+  it('bad_cycle 422 echoes the row’s current cycles for client resync', async () => {
+    const { json } = await run(body('goal', 999), [cycCand()])
+    expect(json.details).toEqual({ subAnchorsS: [1134, 1371.02, 1628] })
+  })
+
+  it('404 when the candidate does not belong to this recording (IDOR guard)', async () => {
+    const { res } = await run(body('goal'), [{ data: null, error: null }])
+    expect(res.status).toBe(404)
+  })
+})
+
 describe('gates', () => {
   it('403 for non-admins before any DB write', async () => {
     mockAdmin.mockResolvedValue(false)

@@ -6,6 +6,11 @@ import {
   parseClockInput,
   EVENT_OFFSET_S,
   subAnchorHints,
+  findNearbyStamp,
+  matchCycleAnchor,
+  clipTruncation,
+  resolveAddGoalGuard,
+  HINT_SUPPRESS_S,
 } from '../multi-goal'
 
 const EVENT_A = '11111111-1111-4111-8111-111111111111'
@@ -225,9 +230,10 @@ describe('subAnchorHints', () => {
   })
 
   it('ignores null event stamps and keeps all hints', () => {
-    expect(
-      subAnchorHints([1134, 1371], [{ stampSeconds: null }])
-    ).toEqual([hint(1134), hint(1371)])
+    expect(subAnchorHints([1134, 1371], [{ stampSeconds: null }])).toEqual([
+      hint(1134),
+      hint(1371),
+    ])
   })
 
   it('dedupes estimates that clamp to the same value (one chip per offer)', () => {
@@ -250,6 +256,190 @@ describe('subAnchorHints', () => {
       hint(1134),
       hint(1371),
     ])
+  })
+
+  it('suppresses a hint stamped from ANOTHER card of the recording (cross-card duplicate pattern)', () => {
+    // Overlapping 90s pre-rolls put the same goal on adjacent cards: a
+    // marker stamped on the neighbour must suppress this card's hint too.
+    expect(subAnchorHints([1134, 1371, 1628], [], [1351])).toEqual([
+      hint(1134),
+      hint(1628),
+    ])
+  })
+
+  it('cross-card stamps just past the radius do not suppress', () => {
+    expect(
+      subAnchorHints([1134, 1371], [], [1351 + HINT_SUPPRESS_S + 0.5])
+    ).toEqual([hint(1134), hint(1371)])
+  })
+
+  it('own-card and cross-card stamps combine', () => {
+    expect(
+      subAnchorHints([1134, 1371, 1628], [{ stampSeconds: 1114 }], [1608])
+    ).toEqual([hint(1371)])
+  })
+})
+
+describe('findNearbyStamp (cross-card ±10s guard)', () => {
+  it('returns null when no stamp is within the radius', () => {
+    expect(findNearbyStamp([], 1000)).toBeNull()
+    expect(findNearbyStamp([1011, 989], 1000.5)).toBeNull()
+  })
+
+  it('returns the nearest stamp within the radius', () => {
+    expect(findNearbyStamp([980, 1004, 1009], 1000)).toBe(1004)
+  })
+
+  it('includes the radius boundary itself', () => {
+    expect(findNearbyStamp([1010], 1000)).toBe(1010)
+    expect(findNearbyStamp([1010.5], 1000)).toBeNull()
+  })
+
+  it('ignores non-finite stamps defensively', () => {
+    expect(findNearbyStamp([Number.NaN, Infinity], 1000)).toBeNull()
+  })
+})
+
+describe('resolveAddGoalGuard (warn-then-confirm state machine)', () => {
+  const stamps = [
+    { candId: 'A', ts: 1000 },
+    { candId: 'B', ts: 2000 },
+  ]
+
+  it('proceeds when nothing is within the radius', () => {
+    expect(resolveAddGoalGuard(stamps, null, 'A', 1500)).toEqual({
+      kind: 'proceed',
+    })
+  })
+
+  it('warns on a cross-card conflict with the conflicting stamp', () => {
+    expect(resolveAddGoalGuard(stamps, null, 'A', 2005)).toEqual({
+      kind: 'warn',
+      conflictTs: 2000,
+    })
+  })
+
+  it('warns on a near-but-not-equal OWN-card conflict', () => {
+    expect(resolveAddGoalGuard(stamps, null, 'A', 1004)).toEqual({
+      kind: 'warn',
+      conflictTs: 1000,
+    })
+  })
+
+  it('exact own-card equality proceeds silently (server converges it)', () => {
+    expect(resolveAddGoalGuard(stamps, null, 'A', 1000)).toEqual({
+      kind: 'proceed',
+    })
+  })
+
+  it('a pending warn for the same card within the radius confirms', () => {
+    expect(
+      resolveAddGoalGuard(stamps, { candId: 'A', ts: 2005 }, 'A', 2008)
+    ).toEqual({ kind: 'proceed' })
+  })
+
+  it('a pending warn for a DIFFERENT card does not confirm', () => {
+    expect(
+      resolveAddGoalGuard(stamps, { candId: 'B', ts: 2005 }, 'A', 2005)
+    ).toEqual({ kind: 'warn', conflictTs: 2000 })
+  })
+
+  it('a pending warn beyond the radius re-warns instead of confirming', () => {
+    expect(
+      resolveAddGoalGuard(stamps, { candId: 'A', ts: 1950 }, 'A', 2005)
+    ).toEqual({ kind: 'warn', conflictTs: 2000 })
+  })
+})
+
+describe('matchCycleAnchor', () => {
+  it('matches the stored sub-anchor for a round-tripped client value', () => {
+    expect(matchCycleAnchor([1134.56, 1371.02], 1134.56)).toBe(1134.56)
+  })
+
+  it('tolerates sub-centisecond float noise but nothing more', () => {
+    expect(matchCycleAnchor([1134.56], 1134.5601)).toBe(1134.56)
+    expect(matchCycleAnchor([1134.56], 1134.6)).toBeNull()
+  })
+
+  it('returns null on null/empty lists and non-members', () => {
+    expect(matchCycleAnchor(null, 1134.56)).toBeNull()
+    expect(matchCycleAnchor([], 1134.56)).toBeNull()
+    expect(matchCycleAnchor([100, 200], 150)).toBeNull()
+  })
+})
+
+describe('clipTruncation', () => {
+  it('legacy row (null span), short episode: not truncated', () => {
+    // window = 90 + (t1-t0) + 8 <= 300 — the legacy producer covered it all
+    expect(clipTruncation({ t0S: 1000, t1S: 1100, clipSpanS: null })).toBeNull()
+  })
+
+  it('legacy row (null span), long episode: truncated at the fixed 300s cap', () => {
+    const r = clipTruncation({ t0S: 1000, t1S: 1400, clipSpanS: null })
+    // clip start 910, legacy cap 300 -> clip ends at 1210, episode runs on
+    expect(r).toEqual({ clipEndS: 1210 })
+  })
+
+  it('adaptive row whose span covers the full window: not truncated', () => {
+    // window = 90 + 252 + 8 = 350, extended tier covers it
+    expect(clipTruncation({ t0S: 1000, t1S: 1252, clipSpanS: 350 })).toBeNull()
+  })
+
+  it('adaptive row capped at 480 on a mega-episode: truncated with the exact end', () => {
+    const r = clipTruncation({ t0S: 1000, t1S: 1700, clipSpanS: 480 })
+    expect(r).toEqual({ clipEndS: 910 + 480 })
+  })
+
+  it('clamps the clip start at 0 near kickoff', () => {
+    // start clamps to 0 -> window = t1 + 8
+    expect(clipTruncation({ t0S: 30, t1S: 290, clipSpanS: 298 })).toBeNull()
+    const r = clipTruncation({ t0S: 30, t1S: 600, clipSpanS: 300 })
+    expect(r).toEqual({ clipEndS: 300 })
+  })
+
+  it('tolerates sub-0.5s encode rounding without flagging', () => {
+    // producer rounds dur to 0.1s — a 0.4s shortfall is rounding, not a cut
+    expect(
+      clipTruncation({ t0S: 1000, t1S: 1252, clipSpanS: 349.6 })
+    ).toBeNull()
+  })
+})
+
+describe('cycle_verdict parsing', () => {
+  it('accepts goal / no_goal / null (clear) verdicts', () => {
+    for (const verdict of ['goal', 'no_goal', null] as const) {
+      expect(
+        parseReviewBody({
+          action: 'cycle_verdict',
+          cycleAnchorS: 1134.56,
+          verdict,
+        })
+      ).toEqual({
+        ok: true,
+        parsed: { action: 'cycle_verdict', cycleAnchorS: 1134.56, verdict },
+      })
+    }
+  })
+
+  it('rejects bad anchors and unknown verdicts', () => {
+    for (const bad of [NaN, Infinity, -1, 1e300, '1134', undefined]) {
+      expect(
+        parseReviewBody({
+          action: 'cycle_verdict',
+          cycleAnchorS: bad,
+          verdict: 'goal',
+        }).ok
+      ).toBe(false)
+    }
+    for (const bad of ['yes', true, 1, {}, undefined]) {
+      expect(
+        parseReviewBody({
+          action: 'cycle_verdict',
+          cycleAnchorS: 1134.56,
+          verdict: bad,
+        }).ok
+      ).toBe(false)
+    }
   })
 })
 

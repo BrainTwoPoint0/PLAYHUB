@@ -9,20 +9,29 @@
 // Approve writes a public `goal` event that appears immediately as a
 // timeline marker (onApproved lets the page refresh its events list).
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Check, Goal, Loader2, Plus, Undo2, X } from 'lucide-react'
+import { Check, Goal, Loader2, Plus, Scissors, Undo2, X } from 'lucide-react'
 import { cn } from '@braintwopoint0/playback-commons/utils'
 import {
+  CLIP_PRE_S,
   EVENT_OFFSET_S,
+  clipTruncation,
   parseClockInput,
+  resolveAddGoalGuard,
   subAnchorHints,
+  type CycleVerdict,
 } from '@/lib/goal-review/multi-goal'
 
 interface CandidateEvent {
   eventId: string
   stampSource: 'anchor_offset' | 'human_scrub'
   stampSeconds: number | null
+}
+
+interface CycleReview {
+  cycleAnchorS: number
+  verdict: CycleVerdict
 }
 
 interface GoalCandidate {
@@ -38,14 +47,24 @@ interface GoalCandidate {
   status: 'draft' | 'approved' | 'rejected' | 'error'
   error: string | null
   clipUrl: string | null
+  /** Encoded clip duration (s); null = pre-adaptive row (legacy 300s cap). */
+  clipSpanS: number | null
   approvedEventId: string | null
   events: CandidateEvent[]
+  /** Per-cycle yes/no labels (refiner pilot) — separate store, never part
+   *  of the candidate's review state. */
+  cycleReviews: CycleReview[]
 }
 
 type ReviewBody =
   | { action: 'approve' | 'unapprove' | 'reject' | 'restore' }
   | { action: 'add_goal'; timestampSeconds: number; estimate?: true }
   | { action: 'remove_event'; eventId: string }
+  | {
+      action: 'cycle_verdict'
+      cycleAnchorS: number
+      verdict: CycleVerdict | null
+    }
 
 interface GoalCandidatesStripProps {
   recordingId: string
@@ -60,10 +79,10 @@ const STATUS_STYLES: Record<GoalCandidate['status'], string> = {
   error: 'bg-red-500/15 text-red-300',
 }
 
-// Mirror of the batch job's clip window: clip starts at max(0, t0-90). The
-// goal-estimate offset (EVENT_OFFSET_S) is imported from the lib so the
-// cycle-hint chips and the card's own "goal ~m:ss" hint can never drift.
-const CLIP_PRE_S = 90
+// The clip window mirror (CLIP_PRE_S) and the goal-estimate offset
+// (EVENT_OFFSET_S) are imported from the lib so the cycle-hint chips, the
+// truncation badge, and the card's own "goal ~m:ss" hint can never drift
+// from the batch producer's clip_plan.py.
 const SEEK_LEAD_S = 10
 
 function clipStartS(cand: { t0S: number }): number {
@@ -89,6 +108,14 @@ export function GoalCandidatesStrip({
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  // Armed duplicate-confirm for the ±10s add_goal guard. First conflicting
+  // add warns; repeating it (same card, within the radius — the playhead
+  // keeps moving between clicks) confirms. Cleared by ANY action (act()),
+  // so a stale armed confirm can never bypass a fresh warning.
+  const [dupePending, setDupePending] = useState<{
+    candId: string
+    ts: number
+  } | null>(null)
   // Only one clip plays at a time; the ref tracks its <video> so "Add goal
   // at this moment" can read the playhead.
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -118,6 +145,8 @@ export function GoalCandidatesStrip({
             ...c,
             events: c.events ?? [],
             subAnchorsS: c.subAnchorsS ?? [],
+            cycleReviews: c.cycleReviews ?? [],
+            clipSpanS: c.clipSpanS ?? null,
           }))
           .sort((a, b) => a.anchorS - b.anchorS)
         if (!signal?.aborted) {
@@ -155,6 +184,10 @@ export function GoalCandidatesStrip({
     async (cand: GoalCandidate, body: ReviewBody) => {
       setBusyId(cand.id)
       setNotice(null)
+      // Any action disarms a pending duplicate-confirm: a stale armed
+      // confirm must never silently bypass a warning about a conflict that
+      // did not exist when the warn fired (senior review H1).
+      setDupePending(null)
       try {
         const res = await fetch(
           `/api/recordings/${recordingId}/goal-candidates/${cand.id}`,
@@ -178,7 +211,8 @@ export function GoalCandidatesStrip({
                 ? t('unapproveRepairNotice')
                 : resBody?.code === 'goal_add_failed'
                   ? t('addFailedNotice')
-                  : resBody?.code === 'invalid_state'
+                  : resBody?.code === 'invalid_state' ||
+                      resBody?.code === 'bad_cycle'
                     ? t('staleNotice')
                     : (resBody?.error ?? t('actionFailed'))
           )
@@ -212,6 +246,48 @@ export function GoalCandidatesStrip({
     [recordingId, refresh, onApproved, t]
   )
 
+  // Every stamped marker on the recording, card-attributed: substrate for
+  // the cross-card ±10s duplicate guard and cross-card hint suppression
+  // (overlapping 90s pre-rolls put the same goal on adjacent cards —
+  // measured 8/40 duplicate markers before this guard). Legacy null-stamp
+  // events fall back to the card's anchor-20 estimate — the same value the
+  // chip row displays for them (senior review M1). Scope: candidate-linked
+  // markers only — goals added directly on /watch are invisible to the
+  // guard (accepted pilot posture).
+  const allStamps = useMemo(
+    () =>
+      (candidates ?? []).flatMap((c) =>
+        c.events.map((e) => ({
+          candId: c.id,
+          ts: e.stampSeconds ?? Math.max(0, c.anchorS - EVENT_OFFSET_S),
+        }))
+      ),
+    [candidates]
+  )
+
+  const guardedAddGoal = useCallback(
+    (cand: GoalCandidate, ts: number, estimate = false) => {
+      const decision = resolveAddGoalGuard(allStamps, dupePending, cand.id, ts)
+      if (decision.kind === 'warn') {
+        setDupePending({ candId: cand.id, ts })
+        setNotice(
+          t('dupeWarnNotice', {
+            existing: mmss(decision.conflictTs),
+            target: mmss(ts),
+          })
+        )
+        return
+      }
+      void act(
+        cand,
+        estimate
+          ? { action: 'add_goal', timestampSeconds: ts, estimate: true }
+          : { action: 'add_goal', timestampSeconds: ts }
+      )
+    },
+    [allStamps, dupePending, act, t]
+  )
+
   // Stamp the goal at the playhead of the playing clip (produced-video
   // clock = clip start + playhead). From draft the server treats it as the
   // approve path; while approved it appends another marker.
@@ -220,12 +296,39 @@ export function GoalCandidatesStrip({
       const video = videoRef.current
       if (!video || playingId !== cand.id) return
       const ts = clipStartS(cand) + video.currentTime
+      guardedAddGoal(cand, Math.round(ts * 10) / 10)
+    },
+    [guardedAddGoal, playingId]
+  )
+
+  // Per-cycle yes/no pilot: park the playhead just before a cycle's
+  // estimated goal moment, then record a verdict label in the separate
+  // cycle store (episode review state untouched).
+  const seekToCycle = useCallback((cand: GoalCandidate, subAnchorS: number) => {
+    const video = videoRef.current
+    if (!video) return
+    const target = Math.max(
+      0,
+      subAnchorS - EVENT_OFFSET_S - clipStartS(cand) - SEEK_LEAD_S
+    )
+    video.currentTime = Number.isFinite(video.duration)
+      ? Math.min(target, Math.max(0, video.duration - 1))
+      : target
+  }, [])
+
+  const setCycleVerdict = useCallback(
+    (cand: GoalCandidate, subAnchorS: number, verdict: CycleVerdict) => {
+      const current =
+        cand.cycleReviews.find((r) => Math.abs(r.cycleAnchorS - subAnchorS) <= 0.005)
+          ?.verdict ?? null
       void act(cand, {
-        action: 'add_goal',
-        timestampSeconds: Math.round(ts * 10) / 10,
+        action: 'cycle_verdict',
+        cycleAnchorS: subAnchorS,
+        // clicking the active verdict clears it
+        verdict: current === verdict ? null : verdict,
       })
     },
-    [act, playingId]
+    [act]
   )
 
   // Typed match-clock stamp ("22:33" off /watch): the review clip is capped
@@ -241,9 +344,9 @@ export function GoalCandidatesStrip({
         return
       }
       setTimeInputs((prev) => ({ ...prev, [cand.id]: '' }))
-      void act(cand, { action: 'add_goal', timestampSeconds: ts })
+      guardedAddGoal(cand, ts)
     },
-    [act, timeInputs, t]
+    [guardedAddGoal, timeInputs, t]
   )
 
   if (!candidates || candidates.length === 0) return null
@@ -273,16 +376,31 @@ export function GoalCandidatesStrip({
           const repairing = cand.status === 'approved' && !cand.approvedEventId
           // Per-cycle stamp offers (episode-split hybrid). Empty on
           // single-cycle cards — the median card renders exactly as before.
+          // Stamps on OTHER cards suppress too (cross-card duplicates).
+          const crossStamps = allStamps
+            .filter((s) => s.candId !== cand.id)
+            .map((s) => s.ts)
           const cycleHints =
             cand.status === 'draft' || cand.status === 'approved'
-              ? subAnchorHints(cand.subAnchorsS, cand.events)
+              ? subAnchorHints(cand.subAnchorsS, cand.events, crossStamps)
               : []
+          // The review clip ends before the episode does (mega-episodes hit
+          // the encode cap): tell the reviewer where coverage stops.
+          const trunc =
+            cand.status !== 'error' && cand.clipUrl
+              ? clipTruncation(cand)
+              : null
           return (
             <div
               key={cand.id}
               className={cn(
                 'group relative rounded-lg overflow-hidden bg-white/[0.02] border border-white/[0.04]',
-                cand.status === 'rejected' && 'opacity-50'
+                cand.status === 'rejected' && 'opacity-50',
+                // Armed duplicate-confirm: mark the card the warning is
+                // about (the notice itself lives in the strip header,
+                // possibly cards away — senior review M2).
+                dupePending?.candId === cand.id &&
+                  'ring-1 ring-amber-500/40'
               )}
             >
               <div className="relative aspect-video bg-black/30">
@@ -356,6 +474,18 @@ export function GoalCandidatesStrip({
                       title={t('goalHintTitle')}
                     >
                       {t('goalHint', { mmss: mmss(goalOffsetS(cand)) })}
+                    </span>
+                  )}
+                  {trunc && (
+                    <span
+                      className="inline-flex items-center gap-0.5 text-[10px] text-amber-300/70 tabular-nums"
+                      title={t('clipTruncatedTitle', {
+                        end: mmss(trunc.clipEndS),
+                        episodeEnd: mmss(cand.t1S),
+                      })}
+                    >
+                      <Scissors className="h-2.5 w-2.5" />
+                      {t('clipTruncated', { mmss: mmss(trunc.clipEndS) })}
                     </span>
                   )}
                   {cand.pko !== null && (
@@ -473,16 +603,13 @@ export function GoalCandidatesStrip({
                     <button
                       key={est}
                       type="button"
-                      onClick={() =>
-                        act(cand, {
-                          action: 'add_goal',
-                          timestampSeconds: est,
-                          // machine-derived stamp: records as an estimate
-                          // ('anchor_offset'), keeping human_scrub an honest
-                          // human-precise label a later scrub can supersede
-                          estimate: true,
-                        })
-                      }
+                      // machine-derived stamp: records as an estimate
+                      // ('anchor_offset'), keeping human_scrub an honest
+                      // human-precise label a later scrub can supersede.
+                      // Routed through the ±10s guard: visible chips have no
+                      // nearby stamp at render time, but one may have landed
+                      // since the last refresh.
+                      onClick={() => guardedAddGoal(cand, est, true)}
                       disabled={busy}
                       title={t('cycleHintTitle', { mmss: mmss(est) })}
                       aria-label={t('cycleHintTitle', { mmss: mmss(est) })}
@@ -494,6 +621,86 @@ export function GoalCandidatesStrip({
                   ))}
                 </div>
               )}
+              {playingId === cand.id &&
+                playable &&
+                cand.subAnchorsS.length >= 2 && (
+                  // Per-cycle yes/no pilot: each dead->live cycle gets a
+                  // seek chip + a goal / no-goal verdict pair. Verdicts land
+                  // in the separate cycle store — they never approve,
+                  // reject, or stamp anything (the chips above do that).
+                  <div className="flex flex-wrap items-center gap-1 px-2 pb-2">
+                    <span className="text-[10px] text-muted-foreground/40">
+                      {t('cycleCheckLabel')}
+                    </span>
+                    {cand.subAnchorsS.map((sub) => {
+                      const verdict =
+                        cand.cycleReviews.find(
+                          (r) => Math.abs(r.cycleAnchorS - sub) <= 0.005
+                        )?.verdict ?? null
+                      const est = Math.max(0, sub - EVENT_OFFSET_S)
+                      return (
+                        <span
+                          key={sub}
+                          className={cn(
+                            'inline-flex items-center gap-0.5 rounded-full border px-1 py-0.5',
+                            verdict === 'goal' &&
+                              'border-emerald-500/30 bg-emerald-500/5',
+                            verdict === 'no_goal' &&
+                              'border-white/[0.06] bg-white/[0.02] opacity-60',
+                            verdict === null &&
+                              'border-white/[0.06] bg-white/[0.03]'
+                          )}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => seekToCycle(cand, sub)}
+                            title={t('cycleSeekTitle', { mmss: mmss(est) })}
+                            aria-label={t('cycleSeekTitle', {
+                              mmss: mmss(est),
+                            })}
+                            className="px-0.5 text-[10px] text-muted-foreground/70 hover:text-[var(--timberwolf)] tabular-nums"
+                          >
+                            {mmss(est)}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCycleVerdict(cand, sub, 'goal')}
+                            disabled={busy}
+                            title={t('cycleYes')}
+                            aria-label={t('cycleYes')}
+                            aria-pressed={verdict === 'goal'}
+                            className={cn(
+                              'p-0.5 rounded-full hover:bg-white/[0.06] disabled:opacity-50',
+                              verdict === 'goal'
+                                ? 'text-emerald-300'
+                                : 'text-muted-foreground/50 hover:text-emerald-300'
+                            )}
+                          >
+                            <Check className="h-2.5 w-2.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCycleVerdict(cand, sub, 'no_goal')
+                            }
+                            disabled={busy}
+                            title={t('cycleNo')}
+                            aria-label={t('cycleNo')}
+                            aria-pressed={verdict === 'no_goal'}
+                            className={cn(
+                              'p-0.5 rounded-full hover:bg-white/[0.06] disabled:opacity-50',
+                              verdict === 'no_goal'
+                                ? 'text-red-300'
+                                : 'text-muted-foreground/50 hover:text-red-300'
+                            )}
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
               {(cand.status === 'draft' || cand.status === 'approved') && (
                 <div className="flex items-center gap-1 px-2 pb-2">
                   <input
