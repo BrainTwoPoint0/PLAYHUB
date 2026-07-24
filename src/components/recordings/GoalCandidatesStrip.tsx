@@ -11,7 +11,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Check, Goal, Loader2, Plus, Scissors, Undo2, X } from 'lucide-react'
+import {
+  Check,
+  Goal,
+  Loader2,
+  Plus,
+  Scissors,
+  TriangleAlert,
+  Undo2,
+  X,
+} from 'lucide-react'
 import { cn } from '@braintwopoint0/playback-commons/utils'
 import {
   CLIP_PRE_S,
@@ -19,6 +28,7 @@ import {
   clipTruncation,
   parseClockInput,
   resolveAddGoalGuard,
+  resolveApproveGuard,
   subAnchorHints,
   type CycleVerdict,
 } from '@/lib/goal-review/multi-goal'
@@ -116,9 +126,13 @@ export function GoalCandidatesStrip({
   // add warns; repeating it (same card, within the radius — the playhead
   // keeps moving between clicks) confirms. Cleared by ANY action (act()),
   // so a stale armed confirm can never bypass a fresh warning.
+  // conflictTs feeds the in-card warning banner: the header notice alone
+  // proved invisible at review speed (9bc707e5 — three confirmed-through
+  // duplicates, zero warnings seen; the reviewer's eyes are in the card).
   const [dupePending, setDupePending] = useState<{
     candId: string
     ts: number
+    conflictTs: number
   } | null>(null)
   // Only one clip plays at a time; the ref tracks its <video> so "Add goal
   // at this moment" can read the playhead.
@@ -274,7 +288,7 @@ export function GoalCandidatesStrip({
     (cand: GoalCandidate, ts: number, estimate = false) => {
       const decision = resolveAddGoalGuard(allStamps, dupePending, cand.id, ts)
       if (decision.kind === 'warn') {
-        setDupePending({ candId: cand.id, ts })
+        setDupePending({ candId: cand.id, ts, conflictTs: decision.conflictTs })
         setNotice(
           t('dupeWarnNotice', {
             existing: mmss(decision.conflictTs),
@@ -289,6 +303,39 @@ export function GoalCandidatesStrip({
           ? { action: 'add_goal', timestampSeconds: ts, estimate: true }
           : { action: 'add_goal', timestampSeconds: ts }
       )
+    },
+    [allStamps, dupePending, act, t]
+  )
+
+  // Bare approve mints the card's DEFAULT marker (anchor−20) server-side —
+  // the one stamp-minting path that used to bypass the ±10s guard (an
+  // overlap card's default can duplicate a neighbouring card's stamp on
+  // the same kickoff cycle). Same warn-then-confirm mechanics: a second
+  // Approve click on the same card confirms. Repair retries stay
+  // unguarded — they adopt the pending link, not a fresh default.
+  const guardedApprove = useCallback(
+    (cand: GoalCandidate) => {
+      const { decision, defaultTs } = resolveApproveGuard(
+        allStamps,
+        dupePending,
+        cand.id,
+        cand.anchorS
+      )
+      if (decision.kind === 'warn') {
+        setDupePending({
+          candId: cand.id,
+          ts: defaultTs,
+          conflictTs: decision.conflictTs,
+        })
+        setNotice(
+          t('dupeWarnNotice', {
+            existing: mmss(decision.conflictTs),
+            target: mmss(defaultTs),
+          })
+        )
+        return
+      }
+      void act(cand, { action: 'approve' })
     },
     [allStamps, dupePending, act, t]
   )
@@ -468,6 +515,24 @@ export function GoalCandidatesStrip({
                     {t('addGoalAtMoment')}
                   </button>
                 )}
+              {dupePending?.candId === cand.id && (
+                // Duplicate warning AT the point of interaction: the header
+                // notice + faint ring were confirmed invisible at review
+                // speed (9bc707e5 — three confirmed-through duplicates,
+                // zero warnings seen), turning "click again confirms" into
+                // a silent dupe path.
+                <div
+                  role="alert"
+                  className="flex items-center gap-1.5 px-2 py-1.5 text-[11px] text-amber-300 bg-amber-500/10 border-b border-amber-500/20"
+                >
+                  <TriangleAlert className="h-3 w-3 shrink-0" />
+                  <span>
+                    {t('dupeWarnInline', {
+                      existing: mmss(dupePending.conflictTs),
+                    })}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between gap-1 p-2">
                 <div className="flex items-baseline gap-2 min-w-0">
                   <span className="text-sm font-medium text-[var(--timberwolf)] tabular-nums">
@@ -527,7 +592,11 @@ export function GoalCandidatesStrip({
                       {(cand.status === 'draft' || repairing) && (
                         <button
                           type="button"
-                          onClick={() => act(cand, { action: 'approve' })}
+                          onClick={() =>
+                            repairing
+                              ? void act(cand, { action: 'approve' })
+                              : guardedApprove(cand)
+                          }
                           title={repairing ? t('approveRepair') : t('approve')}
                           aria-label={
                             repairing ? t('approveRepair') : t('approve')

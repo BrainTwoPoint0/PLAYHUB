@@ -10,6 +10,7 @@ import {
   matchCycleAnchor,
   clipTruncation,
   resolveAddGoalGuard,
+  resolveApproveGuard,
   HINT_SUPPRESS_S,
 } from '../multi-goal'
 
@@ -348,6 +349,53 @@ describe('resolveAddGoalGuard (warn-then-confirm state machine)', () => {
     expect(
       resolveAddGoalGuard(stamps, { candId: 'A', ts: 1950 }, 'A', 2005)
     ).toEqual({ kind: 'warn', conflictTs: 2000 })
+  })
+})
+
+describe('resolveApproveGuard (bare-approve default marker guard)', () => {
+  // Bare approve mints anchor − EVENT_OFFSET_S server-side; the guard must
+  // see THAT ts, not the anchor (the measured duplicates were an overlap
+  // card's default landing 0.3–1.0s from a neighbouring card's stamp).
+  const stamps = [{ candId: 'A', ts: 1000 }]
+
+  it('proceeds when the default stamp is clear of every marker', () => {
+    const r = resolveApproveGuard(stamps, null, 'B', 2020)
+    expect(r).toEqual({ decision: { kind: 'proceed' }, defaultTs: 2000 })
+  })
+
+  it('warns when the DEFAULT (anchor−20), not the anchor, hits a cross-card stamp', () => {
+    // anchor 1020.5 → default 1000.5, 0.5s from A's marker; the anchor
+    // itself is 20.5s away and would sail past an anchor-based check.
+    const r = resolveApproveGuard(stamps, null, 'B', 1020.5)
+    expect(r).toEqual({
+      decision: { kind: 'warn', conflictTs: 1000 },
+      defaultTs: 1000.5,
+    })
+  })
+
+  it('a second Approve on the same card confirms (pending at the default ts)', () => {
+    const r = resolveApproveGuard(
+      stamps,
+      { candId: 'B', ts: 1000.5 },
+      'B',
+      1020.5
+    )
+    expect(r.decision).toEqual({ kind: 'proceed' })
+  })
+
+  it('a pending warn for a different card does not confirm', () => {
+    const r = resolveApproveGuard(
+      stamps,
+      { candId: 'C', ts: 1000.5 },
+      'B',
+      1020.5
+    )
+    expect(r.decision).toEqual({ kind: 'warn', conflictTs: 1000 })
+  })
+
+  it('clamps an early anchor to a non-negative default', () => {
+    const r = resolveApproveGuard([], null, 'B', 5)
+    expect(r).toEqual({ decision: { kind: 'proceed' }, defaultTs: 0 })
   })
 })
 

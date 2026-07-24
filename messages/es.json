@@ -726,6 +726,7 @@
       "cycleHintChip": "≈ {mmss}",
       "cycleHintTitle": "Este episodio contiene otro ciclo de saque detectado — haz clic para añadir un marcador de gol en ≈{mmss} (puedes quitarlo tras comprobarlo)",
       "dupeWarnNotice": "Ya existe un marcador de gol en {existing} — probablemente el mismo gol visto desde una tarjeta superpuesta. Haz clic de nuevo para añadir uno en {target} de todos modos.",
+      "dupeWarnInline": "Ya existe un marcador en {existing} — probablemente este mismo gol desde una tarjeta superpuesta. Haz clic de nuevo para añadirlo de todos modos.",
       "clipTruncated": "el clip termina en {mmss}",
       "clipTruncatedTitle": "El clip de revisión termina en {end} pero el episodio continúa hasta {episodeEnd} — marca los goles posteriores al corte con el campo de tiempo de partido",
       "cycleCheckLabel": "Revisión por ciclo",

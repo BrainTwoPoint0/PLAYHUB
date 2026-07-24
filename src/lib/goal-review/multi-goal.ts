@@ -250,8 +250,7 @@ export interface RecordingStamp {
 }
 
 export type AddGoalGuardDecision =
-  | { kind: 'proceed' }
-  | { kind: 'warn'; conflictTs: number }
+  { kind: 'proceed' } | { kind: 'warn'; conflictTs: number }
 
 /**
  * Warn-then-confirm decision for an add_goal (the full cross-card ±10s
@@ -288,6 +287,32 @@ export function resolveAddGoalGuard(
   return confirmed
     ? { kind: 'proceed' }
     : { kind: 'warn', conflictTs: conflict }
+}
+
+/**
+ * Warn-then-confirm decision for a BARE approve (no explicit stamp). The
+ * server mints the card's DEFAULT marker at anchor − EVENT_OFFSET_S, so an
+ * unguarded Approve was the one stamp-minting path that could land a
+ * cross-card duplicate silently (measured: 3 pairs at 0.3–1.0s gaps on one
+ * match — an overlap card's default agreeing with the neighbouring card's
+ * stamp on the same kickoff cycle). Same pending mechanics as add_goal:
+ * the caller arms `defaultTs` as pending, so a second Approve click on the
+ * same card is the confirmation. Repair retries must NOT go through this —
+ * they complete an already-decided approval by adopting the pending link,
+ * not minting a fresh default.
+ */
+export function resolveApproveGuard(
+  stamps: RecordingStamp[],
+  pending: { candId: string; ts: number } | null,
+  candId: string,
+  anchorS: number,
+  radiusS: number = HINT_SUPPRESS_S
+): { decision: AddGoalGuardDecision; defaultTs: number } {
+  const defaultTs = resolveEventStamp(anchorS, null).timestampSeconds
+  return {
+    decision: resolveAddGoalGuard(stamps, pending, candId, defaultTs, radiusS),
+    defaultTs,
+  }
 }
 
 /**
