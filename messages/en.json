@@ -731,6 +731,8 @@
       "clipTruncatedTitle": "The review clip ends at {end} but the episode continues to {episodeEnd} — stamp goals after the cut with the match-time field",
       "cycleCheckLabel": "Cycle check",
       "cycleSeekTitle": "Jump the clip to the cycle at ≈{mmss}",
+      "pastClipHintTitle": "This cycle is past the clip's end ({end}) — review ≈{mmss} in the match player above; clicking still adds a marker at ≈{mmss}",
+      "pastClipSeekTitle": "≈{mmss} is past the clip's end ({end}) — review this moment in the match player above",
       "cycleYes": "Goal in this cycle",
       "cycleNo": "No goal in this cycle",
       "likelyGoal": "Likely goal",

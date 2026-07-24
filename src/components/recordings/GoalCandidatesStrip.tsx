@@ -684,26 +684,48 @@ export function GoalCandidatesStrip({
                   <span className="text-[10px] text-muted-foreground/40">
                     {t('cycleHintsLabel')}
                   </span>
-                  {cycleHints.map((est) => (
-                    <button
-                      key={est}
-                      type="button"
-                      // machine-derived stamp: records as an estimate
-                      // ('anchor_offset'), keeping human_scrub an honest
-                      // human-precise label a later scrub can supersede.
-                      // Routed through the ±10s guard: visible chips have no
-                      // nearby stamp at render time, but one may have landed
-                      // since the last refresh.
-                      onClick={() => guardedAddGoal(cand, est, true)}
-                      disabled={busy}
-                      title={t('cycleHintTitle', { mmss: mmss(est) })}
-                      aria-label={t('cycleHintTitle', { mmss: mmss(est) })}
-                      className="inline-flex items-center gap-1 rounded-full border border-dashed border-amber-500/30 bg-amber-500/5 px-2 py-0.5 text-[10px] text-amber-300/80 tabular-nums hover:bg-amber-500/15 hover:text-amber-300 disabled:opacity-50"
-                    >
-                      <Plus className="h-2.5 w-2.5" />
-                      {t('cycleHintChip', { mmss: mmss(est) })}
-                    </button>
-                  ))}
+                  {cycleHints.map((est) => {
+                    // A hint past the clip's cut can't be verified in this
+                    // clip — gray it and point at the match player (the
+                    // Scissors ties it to the "clip ends" badge), so a
+                    // dead-looking amber chip never reads as seekable.
+                    const pastClip = trunc !== null && est > trunc.clipEndS
+                    const hintTitle = pastClip
+                      ? t('pastClipHintTitle', {
+                          mmss: mmss(est),
+                          end: mmss(trunc.clipEndS),
+                        })
+                      : t('cycleHintTitle', { mmss: mmss(est) })
+                    return (
+                      <button
+                        key={est}
+                        type="button"
+                        // machine-derived stamp: records as an estimate
+                        // ('anchor_offset'), keeping human_scrub an honest
+                        // human-precise label a later scrub can supersede.
+                        // Routed through the ±10s guard: visible chips have
+                        // no nearby stamp at render time, but one may have
+                        // landed since the last refresh.
+                        onClick={() => guardedAddGoal(cand, est, true)}
+                        disabled={busy}
+                        title={hintTitle}
+                        aria-label={hintTitle}
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5 text-[10px] tabular-nums disabled:opacity-50',
+                          pastClip
+                            ? 'border-white/[0.08] bg-white/[0.02] text-muted-foreground/60 hover:bg-white/[0.06] hover:text-muted-foreground'
+                            : 'border-amber-500/30 bg-amber-500/5 text-amber-300/80 hover:bg-amber-500/15 hover:text-amber-300'
+                        )}
+                      >
+                        {pastClip ? (
+                          <Scissors className="h-2.5 w-2.5" />
+                        ) : (
+                          <Plus className="h-2.5 w-2.5" />
+                        )}
+                        {t('cycleHintChip', { mmss: mmss(est) })}
+                      </button>
+                    )
+                  })}
                 </div>
               )}
               {playingId === cand.id &&
@@ -723,6 +745,17 @@ export function GoalCandidatesStrip({
                           (r) => Math.abs(r.cycleAnchorS - sub) <= 0.005
                         )?.verdict ?? null
                       const est = Math.max(0, sub - EVENT_OFFSET_S)
+                      // Cycles past the clip's cut aren't seekable in this
+                      // clip — mark them (Scissors, matching the "clip
+                      // ends" badge) and point at the match player instead
+                      // of offering a dead seek.
+                      const pastClip = trunc !== null && est > trunc.clipEndS
+                      const seekTitle = pastClip
+                        ? t('pastClipSeekTitle', {
+                            mmss: mmss(est),
+                            end: mmss(trunc.clipEndS),
+                          })
+                        : t('cycleSeekTitle', { mmss: mmss(est) })
                       return (
                         <span
                           key={sub}
@@ -739,12 +772,16 @@ export function GoalCandidatesStrip({
                           <button
                             type="button"
                             onClick={() => seekToCycle(cand, sub)}
-                            title={t('cycleSeekTitle', { mmss: mmss(est) })}
-                            aria-label={t('cycleSeekTitle', {
-                              mmss: mmss(est),
-                            })}
-                            className="px-0.5 text-[10px] text-muted-foreground/70 hover:text-[var(--timberwolf)] tabular-nums"
+                            title={seekTitle}
+                            aria-label={seekTitle}
+                            className={cn(
+                              'inline-flex items-center gap-0.5 px-0.5 text-[10px] tabular-nums',
+                              pastClip
+                                ? 'text-amber-300/50 hover:text-amber-300/80'
+                                : 'text-muted-foreground/70 hover:text-[var(--timberwolf)]'
+                            )}
                           >
+                            {pastClip && <Scissors className="h-2.5 w-2.5" />}
                             {mmss(est)}
                           </button>
                           <button

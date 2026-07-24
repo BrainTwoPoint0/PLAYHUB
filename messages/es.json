@@ -731,6 +731,8 @@
       "clipTruncatedTitle": "El clip de revisión termina en {end} pero el episodio continúa hasta {episodeEnd} — marca los goles posteriores al corte con el campo de tiempo de partido",
       "cycleCheckLabel": "Revisión por ciclo",
       "cycleSeekTitle": "Saltar el clip al ciclo en ≈{mmss}",
+      "pastClipHintTitle": "Este ciclo está después del final del clip ({end}) — revisa ≈{mmss} en el reproductor del partido arriba; el clic añade igualmente un marcador en ≈{mmss}",
+      "pastClipSeekTitle": "≈{mmss} está después del final del clip ({end}) — revisa este momento en el reproductor del partido arriba",
       "cycleYes": "Gol en este ciclo",
       "cycleNo": "Sin gol en este ciclo",
       "likelyGoal": "Gol probable",
