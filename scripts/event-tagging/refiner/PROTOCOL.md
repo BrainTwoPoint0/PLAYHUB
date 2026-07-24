@@ -109,3 +109,59 @@ The v1 feature set uses absolute dctx/ev levels. Mitigation decided now:
 - Spiideo decode reproduction: 9/9 matches EXACT (every latest-epoch DB candidate anchor
   reproduced ±2s under the rows' own detector version).
 - The stamp eval (stamp_eval.py) runs ONCE after this block is written. No edits after.
+
+## Kit-arm addendum — PRECISION HALF (2026-07-24, written BEFORE any kit number was computed)
+
+Post-freeze handoff (Spiideo label freeze `cad1615d`, 12 matches / 201 goals; holdout = live
+review queue). This section locks the kit-arm precision gate before the first run.
+
+**What this measures.** The CEILING of team-identity uplift on confidence re-ranking: on Veo,
+team comes from Veo roles (exact), so `hs_grid` is perfect-team half_separation. A Spiideo
+deployment gets team from kit clustering (per-match silhouette ≥ 0.35 gate, byte-identical
+team-free fallback when the gate fails) — strictly noisier. Therefore: a FAIL here kills kit
+productization for confidence outright (the ceiling didn't clear); a PASS authorizes the
+realistic kit-clustered measurement, not production wiring (that stays Karim's call).
+
+**Arm definition.** Feature set = team-free NORM_ONLY columns (the shipped variant) + the
+HS keys below, computed from the sidecars' `hs_grid` (1s grid, role-teams-as-kits) aligned to
+the stored `veo_matches.json` survivors (episode bounds verified against the stored record
+before any feature is used; the recomputed team-free numbers must reproduce P@4 ALL 0.6734
+exactly or the run aborts).
+
+- Episode: `hs_anchor` (hs at anchor), `hs_ko_max` (max over [anchor−10, anchor+12] — the v3
+  kickoff-scan window), `hs_mean_ep` ([t0, t1]), `hs_pre` ([t0−90, t0−45]),
+  `hs_post` ([t1+5, t1+35]), `hs_rel` (hs_anchor − match median hs), `hs_q` (quantile of
+  hs_anchor within the match's finite hs distribution).
+- Cycle (computed + saved for the future timing half; NOT gated or interpreted this session):
+  `hs_at_s`, `hs_ko_max_s` ([s−10, s+12]), `hs_pre30` ([s−35, s−5]), `hs_rel_s`, `hs_q_s`.
+
+hs is a bounded fraction in [0.5, 1] by construction (majority-half share), not a model
+calibration channel — abs levels are admitted; the `_rel`/`_q` forms cover residual per-match
+drift. Same HGB params, same folds, same rank_eval semantics as the locked run.
+
+**Gate (locked).** PASS iff BOTH:
+
+1. kit-arm confidence P@4 ALL (236 matches, freeze OOF, same decode) **> team-free NORM_ONLY
+   P@4 ALL (0.6734)** recomputed on the identical dataset, AND
+2. fold-level P@4 (computed over each fold's matches, all bands pooled) improves in **≥ 3/5
+   folds**.
+
+Per-band P@4/R@8 and Δ magnitude reported for the productize decision; the two arms are never
+averaged. Veo OOF remains the dev side (iteration permitted, reported transparently); no stamp
+and no holdout-queue label is touched by this measurement.
+
+## Localizer v2 — pre-registered gate (2026-07-24, no v2 number exists)
+
+The 141-stamp corpus is SPENT (v1's one look, 2026-07-24). v2's one look runs ONLY on
+`human_scrub` stamps from matches fully reviewed AFTER freeze commit `cad1615d` (the holdout
+queue; the 12 frozen matches are excluded), with:
+
+- Minimum evidence before the look: **≥ 80 stamps across ≥ 4 matches** (below that, the look
+  is not spent and must not be taken).
+- Gate: identical to v1 — median |err| **< 5s** AND beats the shipped sub-anchor−20 estimator
+  under the v1 bootstrap spec (paired percentile, B=10,000, rng(7), CI lower bound > 0),
+  stamp→card matching identical for both arms.
+- Development iterates on Veo only; the Veo-side model + constants + hash are recorded here
+  before the look, exactly as v1 did.
+- Machine-minted markers (`anchor_offset` / `estimate`) are NEVER eval stamps — human_scrub
+  only (the timing-corpus poisoning invariant).

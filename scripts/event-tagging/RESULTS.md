@@ -1374,3 +1374,31 @@ Bar from EVAL LAYERS (~10 fully reviewed matches) is **met**. Locked regression 
 **Eval rule (mirror Veo freeze):** any chain / confidence / localizer change that claims not to hurt Spiideo recall or timing must report against this fixed manifest — never a live `playhub_goal_candidates` query. The 141-stamp localizer corpus from the refiner spike remains **spent**; localizer v2 / kit-timing one-looks evaluate only on **post-freeze held-out** stamps.
 
 **Next (ordered, not physics):** kit-arm precision half on freeze OOF → localizer v2 one look on holdout → optional Phase-0 ball-timing spike for 7s→&lt;5s.
+
+## KIT-ARM PRECISION HALF — CEILING PASS (2026-07-24; gate locked in refiner/PROTOCOL.md before the run)
+
+Post-freeze handoff item 1. Measures the CEILING of team-identity uplift on confidence
+re-ranking: `hs_grid` = perfect-team half_separation (Veo roles) from the freeze sidecars,
+appended to the team-free NORM_ONLY columns on the STORED refiner dataset (the exact rows
+behind the locked 0.6734; team-free reproduction asserted exact before the kit number ran).
+Harness: `refiner/kit_arm.py` → `refiner/kit_arm_results.json`. `features.py` untouched
+(parity-pinned against the production job's vendored copy); measure-only, nothing wired.
+
+| arm (freeze OOF, 236 matches) | P@4 ALL    | medium | full   | small  | R@8 ALL |
+| ----------------------------- | ---------- | ------ | ------ | ------ | ------- |
+| team-free NORM_ONLY (locked)  | 0.6734     | 0.6336 | 0.7083 | 0.7143 | 0.585   |
+| + HS episode features         | **0.7596** | 0.7091 | 0.8155 | 0.8052 | 0.622   |
+
+Fold-level P@4: **5/5 folds improve** (0.708→0.745, 0.692→0.793, 0.702→0.825, 0.609→0.701,
+0.654→0.734). Gate (P@4 ALL beats 0.6734 AND ≥3/5 folds): **PASS** on both, decisively.
+
+**What this does and does not authorize.** This is the perfect-team ceiling — +8.6pp P@4 with
+exact team labels. A Spiideo deployment gets team from per-match kit clustering (silhouette
+≥ 0.35 gate; Nazwa passed at 0.564, HCT both-dark failed), so the realistic uplift is bounded
+above by this. PASS authorizes the next measurement — the realistic kit-clustered arm — NOT
+production wiring. Production design when it comes: byte-identical team-free fallback whenever
+the silhouette gate fails; per-match silhouette into provenance; arms never averaged.
+
+Cycle-level HS columns are computed and cached (`data/hs_columns.npz`) for the future
+localizer/kit-timing half but deliberately NOT interpreted this session (protocol lock); the
+timing one-look waits for ≥80 post-freeze holdout stamps per the localizer-v2 pre-registration.
