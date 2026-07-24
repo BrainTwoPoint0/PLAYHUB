@@ -1,0 +1,290 @@
+{
+  "ALL": [
+    {
+      "thr": 0.5,
+      "cards": 1078,
+      "cards_per_match": 4.57,
+      "precision": 0.735,
+      "fold_min": 0.692,
+      "fold_max": 0.778,
+      "coverage90": 0.516,
+      "coverage45": 0.478
+    },
+    {
+      "thr": 0.6,
+      "cards": 896,
+      "cards_per_match": 3.8,
+      "precision": 0.77,
+      "fold_min": 0.742,
+      "fold_max": 0.817,
+      "coverage90": 0.46,
+      "coverage45": 0.423
+    },
+    {
+      "thr": 0.7,
+      "cards": 726,
+      "cards_per_match": 3.08,
+      "precision": 0.795,
+      "fold_min": 0.752,
+      "fold_max": 0.833,
+      "coverage90": 0.389,
+      "coverage45": 0.353
+    },
+    {
+      "thr": 0.8,
+      "cards": 546,
+      "cards_per_match": 2.31,
+      "precision": 0.844,
+      "fold_min": 0.789,
+      "fold_max": 0.869,
+      "coverage90": 0.309,
+      "coverage45": 0.281
+    },
+    {
+      "thr": 0.85,
+      "cards": 442,
+      "cards_per_match": 1.87,
+      "precision": 0.86,
+      "fold_min": 0.808,
+      "fold_max": 0.886,
+      "coverage90": 0.259,
+      "coverage45": 0.236
+    },
+    {
+      "thr": 0.9,
+      "cards": 314,
+      "cards_per_match": 1.33,
+      "precision": 0.889,
+      "fold_min": 0.821,
+      "fold_max": 0.962,
+      "coverage90": 0.19,
+      "coverage45": 0.171
+    },
+    {
+      "thr": 0.95,
+      "cards": 179,
+      "cards_per_match": 0.76,
+      "precision": 0.916,
+      "fold_min": 0.87,
+      "fold_max": 1.0,
+      "coverage90": 0.113,
+      "coverage45": 0.098
+    }
+  ],
+  "medium": [
+    {
+      "thr": 0.5,
+      "cards": 565,
+      "cards_per_match": 4.83,
+      "precision": 0.703,
+      "fold_min": 0.674,
+      "fold_max": 0.727,
+      "coverage90": 0.514,
+      "coverage45": 0.494
+    },
+    {
+      "thr": 0.6,
+      "cards": 467,
+      "cards_per_match": 3.99,
+      "precision": 0.728,
+      "fold_min": 0.707,
+      "fold_max": 0.744,
+      "coverage90": 0.452,
+      "coverage45": 0.432
+    },
+    {
+      "thr": 0.7,
+      "cards": 367,
+      "cards_per_match": 3.14,
+      "precision": 0.755,
+      "fold_min": 0.719,
+      "fold_max": 0.825,
+      "coverage90": 0.373,
+      "coverage45": 0.353
+    },
+    {
+      "thr": 0.8,
+      "cards": 265,
+      "cards_per_match": 2.26,
+      "precision": 0.826,
+      "fold_min": 0.8,
+      "fold_max": 0.848,
+      "coverage90": 0.292,
+      "coverage45": 0.28
+    },
+    {
+      "thr": 0.85,
+      "cards": 207,
+      "cards_per_match": 1.77,
+      "precision": 0.855,
+      "fold_min": 0.826,
+      "fold_max": 0.893,
+      "coverage90": 0.239,
+      "coverage45": 0.229
+    },
+    {
+      "thr": 0.9,
+      "cards": 137,
+      "cards_per_match": 1.17,
+      "precision": 0.891,
+      "fold_min": 0.839,
+      "fold_max": 1.0,
+      "coverage90": 0.165,
+      "coverage45": 0.16
+    },
+    {
+      "thr": 0.95,
+      "cards": 69,
+      "cards_per_match": 0.59,
+      "precision": 0.942,
+      "fold_min": 0.917,
+      "fold_max": 1.0,
+      "coverage90": 0.089,
+      "coverage45": 0.087
+    }
+  ],
+  "full": [
+    {
+      "thr": 0.5,
+      "cards": 181,
+      "cards_per_match": 4.31,
+      "precision": 0.757,
+      "fold_min": 0.593,
+      "fold_max": 0.909,
+      "coverage90": 0.511,
+      "coverage45": 0.411
+    },
+    {
+      "thr": 0.6,
+      "cards": 151,
+      "cards_per_match": 3.6,
+      "precision": 0.795,
+      "fold_min": 0.652,
+      "fold_max": 0.906,
+      "coverage90": 0.452,
+      "coverage45": 0.359
+    },
+    {
+      "thr": 0.7,
+      "cards": 126,
+      "cards_per_match": 3.0,
+      "precision": 0.802,
+      "fold_min": 0.625,
+      "fold_max": 0.889,
+      "coverage90": 0.381,
+      "coverage45": 0.293
+    },
+    {
+      "thr": 0.8,
+      "cards": 105,
+      "cards_per_match": 2.5,
+      "precision": 0.848,
+      "fold_min": 0.667,
+      "fold_max": 0.947,
+      "coverage90": 0.337,
+      "coverage45": 0.248
+    },
+    {
+      "thr": 0.85,
+      "cards": 93,
+      "cards_per_match": 2.21,
+      "precision": 0.86,
+      "fold_min": 0.583,
+      "fold_max": 0.957,
+      "coverage90": 0.304,
+      "coverage45": 0.219
+    },
+    {
+      "thr": 0.9,
+      "cards": 79,
+      "cards_per_match": 1.88,
+      "precision": 0.886,
+      "fold_min": 0.636,
+      "fold_max": 1.0,
+      "coverage90": 0.267,
+      "coverage45": 0.181
+    },
+    {
+      "thr": 0.95,
+      "cards": 56,
+      "cards_per_match": 1.33,
+      "precision": 0.893,
+      "fold_min": 0.75,
+      "fold_max": 1.0,
+      "coverage90": 0.193,
+      "coverage45": 0.119
+    }
+  ],
+  "small": [
+    {
+      "thr": 0.5,
+      "cards": 332,
+      "cards_per_match": 4.31,
+      "precision": 0.777,
+      "fold_min": 0.609,
+      "fold_max": 0.849,
+      "coverage90": 0.522,
+      "coverage45": 0.488
+    },
+    {
+      "thr": 0.6,
+      "cards": 278,
+      "cards_per_match": 3.61,
+      "precision": 0.827,
+      "fold_min": 0.757,
+      "fold_max": 0.889,
+      "coverage90": 0.476,
+      "coverage45": 0.441
+    },
+    {
+      "thr": 0.7,
+      "cards": 233,
+      "cards_per_match": 3.03,
+      "precision": 0.854,
+      "fold_min": 0.8,
+      "fold_max": 0.897,
+      "coverage90": 0.418,
+      "coverage45": 0.384
+    },
+    {
+      "thr": 0.8,
+      "cards": 176,
+      "cards_per_match": 2.29,
+      "precision": 0.869,
+      "fold_min": 0.821,
+      "fold_max": 0.912,
+      "coverage90": 0.322,
+      "coverage45": 0.301
+    },
+    {
+      "thr": 0.85,
+      "cards": 142,
+      "cards_per_match": 1.84,
+      "precision": 0.866,
+      "fold_min": 0.789,
+      "fold_max": 0.926,
+      "coverage90": 0.269,
+      "coverage45": 0.256
+    },
+    {
+      "thr": 0.9,
+      "cards": 98,
+      "cards_per_match": 1.27,
+      "precision": 0.888,
+      "fold_min": 0.833,
+      "fold_max": 0.947,
+      "coverage90": 0.192,
+      "coverage45": 0.185
+    },
+    {
+      "thr": 0.95,
+      "cards": 54,
+      "cards_per_match": 0.7,
+      "precision": 0.907,
+      "fold_min": 0.778,
+      "fold_max": 1.0,
+      "coverage90": 0.111,
+      "coverage45": 0.105
+    }
+  ]
+}

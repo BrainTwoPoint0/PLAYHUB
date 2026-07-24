@@ -1243,3 +1243,95 @@ SPLIT_LIVE_THR canary item — models unchanged, new CONSTANTS_SHA256; (3) `-tar
 env (prefix + sha) — the deliberate canary friction working as designed; (4) CodeBuild image
 rebuild + invalid-UUID smoke. Freeze artifacts: `freeze_results_tau{045,040,035}.json` +
 `freeze_results_verify_notau.json`.
+
+## GOAL-MOMENT REFINER SPIKE — TEAM-FREE ARM (2026-07-24; AGREED PLAN item 2, gates locked 07-23)
+
+**Scope:** re-rank + re-time ONLY (v1 never adds/drops/merges an episode — recall structurally
+untouched; suppression stays a later separately-freeze-gated change). Full pre-registration in
+`refiner/PROTOCOL.md` (gates restated + bootstrap spec + covariate rule, all written BEFORE the
+corresponding numbers existed). Code: `refiner/` (features.py shared extractor, dataset.py,
+train_eval.py, spiideo_decode.py, covariate_check.py, stamp_eval.py). Team-free throughout —
+half_sep/hs_grid/roles BANNED; kickoff geometry = rolefree12.
+
+**Data.** Veo dev corpus = the 236 freeze sidecars + cached OOF series, decoded at CURRENT
+production config (TAU_PEAK 0.45, floor 0.80, sub-anchors): reproduction vs
+freeze_results_tau045.json = 0/236 drift. 4,393 survivor episodes (1,371 TP90), 7,849 cycles;
+freeze fold assignment reused (refiner strictly OOF). Spiideo = the 9 reviewed Nazwa matches:
+production decode reproduced locally (chain.py + banked models + live cal 30×15) — **9/9 EXACT**
+(every latest-epoch DB candidate anchor ±2s under the rows' own detector version; DB unions span
+epochs so subset-containment is the honest check).
+
+**Transfer hazard handled by pre-declared rule.** Absolute dctx features are known not to
+transfer (Nazwa saturation). Added per-match quantile-normalized dctx/ev variants; label-free
+covariate check: episode `dctx_mean_ep` medians sit ABOVE the Veo q95 band on 7/9 Spiideo
+matches → NORM_ONLY variant locked (drops absolute dctx/ev levels). Cost on Veo ≈ zero
+(P@4 0.6734 vs 0.6702 full; localizer 1.85s vs 1.77s med).
+
+**GATE VERDICTS (team-free arm):**
+
+1. **Precision (confidence re-rank): PASS.** HGB P(TP90) per episode, 39 team-free features,
+   match-grouped 5-fold OOF, freeze P@K semantics. **P@4 ALL 0.6734 vs span-alone 0.4968
+   same-decode / 0.492 locked bar** (+18pp); R@8 0.585 vs 0.473; per-band P@4 medium 0.634 /
+   full 0.708 / small 0.714; per-fold P@4 0.61–0.71 (every fold clears). Span-alone bar
+   reproduced exactly (0.492 on the floor-080 record) before any refiner number existed.
+2. **Timing (localizer): FAIL — one look spent, no re-tuning.** Per-cycle offset regression
+   (δ = sub_anchor − goal; abs-error HGB; clip [−30,90]). Veo OOF: med 1.85s / p90 13.7s vs
+   sub-anchor−20 med 5.16s / p90 22.7s. **131 human_scrub stamps (primary; n=130 scored, 1 stamp
+   had no covering survivor card, excluded from both arms): refiner med 6.45s vs baseline 8.00s —
+   paired bootstrap ΔMedian 95% CI [0.16, 3.30] (excludes 0; by-match cluster CI [−0.16, 2.80]),
+   but the absolute bar med<5s is NOT met → FAIL.** Sensitivity (all 141 stamps, 9 matches):
+   6.29s vs 8.00s, CI [0.48, 3.20], same verdict. The improvement is real but transfer-shrunk
+   (3.3s gain on Veo → 1.5s on Spiideo) and the Spiideo baseline itself is worse than Veo's
+   (8.0s vs 5.2s) — the dead-onset/dctx-shape signal the localizer leans on is exactly what
+   saturates on Nazwa.
+3. **Recall: unchanged by construction** (nothing suppressed; estimates only).
+4. **Kit-uplift arm: NOT RUN (day-one = team-free per plan).** When run: silhouette-gated subset
+   only, per-match silhouette logged into provenance, verdicts reported per condition, arms never
+   averaged. NOTE the timing corpus is now SPENT for this refiner — any localizer v2 (kit or
+   team-free) must take its one look on stamps from FUTURE reviewed matches, never these 141.
+
+**NOTHING WIRED.** The passing confidence model is a candidate input for the PARKED auto-approve
+posture / future ranking surfaces (span stays the shipped review-side signal; review strip stays
+chronological per Karim's ruling) — a product decision for Karim, not this spike. Artifacts:
+`refiner/veo_oof_results.json`, `refiner/stamp_eval_results.json`, `refiner/models_final.pkl`
+(sha256 ccee6a35…, norm_only, trained on all 236).
+
+**Ops gotcha for reruns:** chain.series' per-grid-point single-row sklearn predicts thrash OpenMP
+when parallelized (9 procs × N threads = barrier storm, 30min+/match); `OMP_NUM_THREADS=1` makes
+the full 9-match reproduction run in minutes.
+
+### Auto-approve precision curve (same session, freeze OOF, norm_only confidence — Karim's ask)
+
+"At confidence >= X, precision is Y" — the number the span ruling said auto-approve needed
+(P@4 is ranking; a floor needs a curve). Veo OOF only, no stamps. `refiner/auto_approve_curve.py`
+-> `auto_approve_curve.json`. Precision = TP90 fraction of qualifying cards (agreement-with-Veo,
+a LOWER bound; unique-goal dedup not applied — duplicate-TP cards were ~4% at baseline and shrink
+at high floors). Coverage = clean goals covered by a qualifying card (90s window).
+
+Medium band (the product regime), cards/match in parens:
+
+| conf floor | precision   | fold spread | goal coverage90 |
+| ---------- | ----------- | ----------- | --------------- |
+| 0.50       | 0.703 (4.8) | 0.674–0.727 | 0.514           |
+| 0.80       | 0.826 (2.3) | 0.800–0.848 | 0.292           |
+| 0.85       | 0.855 (1.8) | 0.826–0.893 | 0.239           |
+| 0.90       | 0.891 (1.2) | 0.839–1.0   | 0.165           |
+| 0.95       | 0.942 (0.6) | 0.917–1.0   | 0.089           |
+
+ALL bands: 0.90 -> P0.889/cov 0.190; 0.95 -> P0.916/cov 0.113. Reading: an auto-approve floor at
+0.90-0.95 would mint ~0.6-1.3 markers/match at review-grade precision while the remaining ~85-90%
+of goals keep flowing through human review — auto-approve as a REVIEW ACCELERATOR (pre-approved
+top slice), not a review replacement. Any wiring decision is Karim's, via the freeze-harness
+discipline, and the confidence signal BADGES/TIERS cards — it must not reorder the strip out of
+chronology (complete-pass ruling stands).
+
+### Standing decisions recorded (2026-07-24, post-spike review)
+
+- **Localizer-as-hints: DEFERRED, not decided.** The failed <5s gate keeps it unwired as a timing
+  SOURCE. Using it as the seek-point behind the chips (hints-only, click = human decision) would
+  beat the shipped anchor−20 estimate (6.45s vs 8.00s med, CI excludes 0) but means wiring a
+  failed-gate model — Karim must explicitly green-light it with its own stated bar. Do NOT
+  re-litigate the <5s gate itself.
+- **Kit-uplift arm scope:** the PRECISION half can run now (Veo team labels, freeze OOF,
+  silhouette-gated subset, per-match silhouette in provenance, arms never averaged). The TIMING
+  one-look must WAIT for stamps from future reviewed matches — the 141-stamp corpus is spent.
