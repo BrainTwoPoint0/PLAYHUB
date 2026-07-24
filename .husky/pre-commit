@@ -1,10 +1,23 @@
-# Pre-commit: lint only. Fast (~5-10s) so it doesn't slow normal commits.
-# Catches the ESLint error class that has cost us multiple wasted Netlify
-# builds (the most recent: an unescaped apostrophe inside JSX text on
-# 2026-05-18 that failed `next build` after 60s of remote CI).
+# Pre-commit: lint + prettier-check. Fast (~5-10s) so it doesn't slow
+# normal commits. Catches the ESLint error class that has cost us multiple
+# wasted Netlify builds (the most recent: an unescaped apostrophe inside
+# JSX text on 2026-05-18 that failed `next build` after 60s of remote CI).
 #
 # Heavier checks (type-check, build, tests) live in pre-push so they
 # don't block every commit but DO catch the issues before they leave
 # the laptop. To bypass in an emergency: `git commit --no-verify` —
 # but the next push will still run pre-push and may bounce.
 npm run lint
+
+# Block unformatted commits from ANY tool (2026-07-24: a 58-file formatting
+# sweep was needed because several sessions committed without the format
+# step, and every later `npm run format` regenerated the churn in the
+# working tree). Checks the working-tree version of the staged set; ~1-2s.
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+if [ -n "$staged" ]; then
+  printf '%s\n' "$staged" | tr '\n' '\0' | xargs -0 npx prettier --check --ignore-unknown || {
+    echo ""
+    echo "Unformatted staged files — run 'npm run format' (or npx prettier --write <files>), re-stage, and commit again."
+    exit 1
+  }
+fi
