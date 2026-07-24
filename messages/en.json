@@ -731,7 +731,9 @@
       "cycleCheckLabel": "Cycle check",
       "cycleSeekTitle": "Jump the clip to the cycle at ≈{mmss}",
       "cycleYes": "Goal in this cycle",
-      "cycleNo": "No goal in this cycle"
+      "cycleNo": "No goal in this cycle",
+      "likelyGoal": "Likely goal",
+      "likelyGoalTitle": "Refiner confidence {pct}% — recorded signal only; review as usual"
     }
   },
   "org": {

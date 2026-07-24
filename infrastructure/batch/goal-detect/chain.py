@@ -214,10 +214,16 @@ def detect(grid, pko, ev, dctx=None):
     return eps
 
 
-def run_chain(shim, stoppage_art, ko_models, period_art):
+def run_chain(shim, stoppage_art, ko_models, period_art,
+              return_series=False):
     """Full frozen decode. Returns (episodes, survivors, env0, env1) where
     episodes carry drop annotations for provenance and survivors are the
-    chronological candidate list."""
+    chronological candidate list.
+
+    return_series=True appends the computed series tuple
+    (grid, pko, dctx, ev, ts, X) as a 5th element so downstream
+    hint-scoring (refiner confidence) reuses it instead of recomputing —
+    the decode itself is byte-identical either way."""
     grid, pko, dctx, ev, ts, X = series(shim, stoppage_art, ko_models)
     eps = detect(grid, pko, ev, dctx=dctx)
 
@@ -248,4 +254,7 @@ def run_chain(shim, stoppage_art, ko_models, period_art):
             continue
         survivors.append(e)
     survivors.sort(key=lambda e: e["anchor"])
+    if return_series:
+        return (eps, survivors, float(env0), float(env1),
+                (grid, pko, dctx, ev, ts, X))
     return eps, survivors, float(env0), float(env1)

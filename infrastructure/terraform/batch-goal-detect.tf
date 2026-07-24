@@ -112,7 +112,11 @@ resource "aws_batch_job_definition" "goal_detect" {
       # Explicit region: the presign guard (SigV2/global-endpoint pilot
       # lesson) must be structural, not a lucky fallback default.
       { name = "AWS_REGION", value = var.aws_region },
-      { name = "GOAL_WEIGHTS_S3_PREFIX", value = "provenance/goal-detect/2026-07-23" },
+      # 2026-07-24 prefix = byte-copies of the 2026-07-23 artifacts (pins
+      # unchanged) + refiner_confidence.pkl (recorded-signal badge; from
+      # the locked refiner spike models, scripts/event-tagging/refiner/
+      # PROTOCOL.md).
+      { name = "GOAL_WEIGHTS_S3_PREFIX", value = "provenance/goal-detect/2026-07-24" },
       # sha256 pins for the frozen sklearn artifacts + constants the job
       # downloads — computed from the banked originals (integrity; the
       # unpickle surface is our own service-role-written S3 prefix).
@@ -120,6 +124,7 @@ resource "aws_batch_job_definition" "goal_detect" {
       { name = "KICKOFF_SHA256", value = "f799a53e73e24bfbdbd092bae7e1dc15983656078617c427b38a521b2dfde4d3" },
       { name = "PERIOD_GAP_SHA256", value = "f8fd7a84cffe29a938ed8c85a9ea9c2c8bc844161e0a22949e91749ff969be8f" },
       { name = "CONSTANTS_SHA256", value = "270cb9c3299902732aa9b94a6754bba40123e276811c54585a13f8d0875e63f0" },
+      { name = "REFINER_SHA256", value = "096bdc991773e3d6ac09233b538d4f8c7a62caeaafac9deb76398e830829c3bb" },
       { name = "SUPABASE_URL", value = var.supabase_url },
       { name = "SUPABASE_SERVICE_ROLE_KEY", value = var.supabase_service_key },
     ]

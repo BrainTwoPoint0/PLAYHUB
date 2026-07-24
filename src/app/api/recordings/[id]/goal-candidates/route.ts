@@ -48,7 +48,7 @@ export async function GET(
   const { data: rows, error } = await service
     .from('playhub_goal_candidates')
     .select(
-      'id, t0_s, t1_s, anchor_s, sub_anchors_s, pko, deadctx, status, error, clip_path, clip_span_s, approved_event_id, detector_version, reviewed_at, created_at, updated_at'
+      'id, t0_s, t1_s, anchor_s, sub_anchors_s, pko, deadctx, confidence, status, error, clip_path, clip_span_s, approved_event_id, detector_version, reviewed_at, created_at, updated_at'
     )
     .eq('match_recording_id', id)
     .order('anchor_s', { ascending: true })
@@ -171,6 +171,9 @@ export async function GET(
           .map(Number),
         pko: r.pko === null ? null : Number(r.pko),
         deadctx: r.deadctx === null ? null : Number(r.deadctx),
+        // Refiner confidence (recorded signal — "likely goal" badge);
+        // NULL = row predates the refiner.
+        confidence: r.confidence === null ? null : Number(r.confidence),
         status: r.status,
         error: r.error,
         clipUrl: r.clip_path ? (urlByPath.get(r.clip_path) ?? null) : null,

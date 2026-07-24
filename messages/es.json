@@ -731,7 +731,9 @@
       "cycleCheckLabel": "Revisión por ciclo",
       "cycleSeekTitle": "Saltar el clip al ciclo en ≈{mmss}",
       "cycleYes": "Gol en este ciclo",
-      "cycleNo": "Sin gol en este ciclo"
+      "cycleNo": "Sin gol en este ciclo",
+      "likelyGoal": "Gol probable",
+      "likelyGoalTitle": "Confianza del refinador {pct}% — solo una señal registrada; revisa como siempre"
     }
   },
   "org": {

@@ -44,6 +44,7 @@ import clip_plan
 import kickoff
 import projection
 import reconcile
+import refiner_score
 from calibration_gate import calibration_unusable_reason
 
 RECORDING_ID = str(_uuid.UUID(os.environ['RECORDING_ID']))
@@ -53,7 +54,7 @@ SERVICE_KEY = os.environ['SUPABASE_SERVICE_ROLE_KEY']
 BUCKET = os.environ['S3_RECORDINGS_BUCKET']
 AWS_REGION = os.environ.get('AWS_REGION', 'eu-west-2')
 WEIGHTS_S3_PREFIX = os.environ.get(
-    'GOAL_WEIGHTS_S3_PREFIX', 'provenance/goal-detect/2026-07-23')
+    'GOAL_WEIGHTS_S3_PREFIX', 'provenance/goal-detect/2026-07-24')
 MESH_BUCKET = 'panorama-meshes'
 CLIPS_BUCKET = 'goal-review-clips'
 WORK = os.environ.get('GOAL_DETECT_WORKDIR', '/tmp/goal-detect')
@@ -324,7 +325,8 @@ def main():
     for name, env in (('stoppage_clf_full.pkl', 'STOPPAGE_SHA256'),
                       ('kickoff_clf.pkl', 'KICKOFF_SHA256'),
                       ('period_gap_clf.pkl', 'PERIOD_GAP_SHA256'),
-                      ('constants.json', 'CONSTANTS_SHA256')):
+                      ('constants.json', 'CONSTANTS_SHA256'),
+                      ('refiner_confidence.pkl', 'REFINER_SHA256')):
         pin = os.environ.get(env)
         if not pin:
             # FAIL CLOSED (security review 2026-07-22): the next step is an
@@ -338,6 +340,14 @@ def main():
     stoppage_art = joblib.load(models['stoppage_clf_full.pkl'])
     period_art = joblib.load(models['period_gap_clf.pkl'])
     ko_models = kickoff.load_models(models['kickoff_clf.pkl'])
+    try:
+        refiner_art = refiner_score.load_model(
+            models['refiner_confidence.pkl'])
+    except refiner_score.SkewError as err:
+        # image/pickle deploy skew — fail loud, never silently NULL every
+        # row forever. SkewError only: pickle-internal errors degrade to
+        # their type name like the other four artifacts (security L1).
+        raise JobError(str(err)) from err
     # Frozen-constant drift canary (senior review): the banked constants.json
     # records the freeze; a future "tune one constant" edit to chain.py must
     # fail loudly against the bank, not silently ship a different detector.
@@ -358,13 +368,22 @@ def main():
     try:
         shim = projection.load_pitch_frames(
             artifact, cal['homography'], L, W)
-        episodes, survivors, env0, env1 = chain_mod.run_chain(
-            shim, stoppage_art, ko_models, period_art)
+        episodes, survivors, env0, env1, series_t = chain_mod.run_chain(
+            shim, stoppage_art, ko_models, period_art, return_series=True)
     except (projection.ProjectionError, chain_mod.ChainError) as err:
         raise JobError(str(err)) from err
     print(f'chain: {len(episodes)} episodes detected, '
           f'{len(survivors)} candidates after envelope+period filters '
           f'(envelope {env0:.0f}..{env1:.0f}s)', flush=True)
+
+    # ── refiner confidence (recorded signal — badge + provenance; approve
+    # stays human, chronology untouched, per-episode failures -> NULL) ────
+    confidences = refiner_score.score_episodes(
+        refiner_art, survivors, episodes, env0, env1, series_t,
+        refiner_score.geom12_from_shim(shim))
+    n_scored = sum(1 for v in confidences.values() if v is not None)
+    print(f'refiner confidence: {n_scored}/{len(survivors)} scored '
+          f'({refiner_art["variant"]})', flush=True)
 
     # ── staleness gate BEFORE any publish work (senior review #1: the
     # jersey template's ordering — a run computed from a superseded artifact
@@ -435,6 +454,10 @@ def main():
             sub_anchors_s=[round(s, 2) for s in chain_mod.cap_sub_anchors(
                 e.get('sub_anchors') or [e['anchor']],
                 e.get('sub_anchor_pko') or [e.get('pko', 0.0)])],
+            # Recorded signal only ("likely goal" badge + agreement corpus)
+            # — never a filter, never reorders review, approve stays human.
+            confidence=(None if confidences.get(e['anchor']) is None
+                        else round(confidences[e['anchor']], 3)),
             clip_path=clip_paths.get(e['anchor']),
             # Clip-truncation badge substrate: the strip compares the
             # episode span against exactly where this clip ends (NULL rows
@@ -481,8 +504,14 @@ def main():
                  'pko': round(e['pko'], 3), 'ev': round(e['ev'], 3),
                  'pPeriod': round(e['p_period'], 3)
                  if 'p_period' in e else None,
+                 'confidence': (None
+                                if confidences.get(e['anchor']) is None
+                                else round(confidences[e['anchor']], 3)),
                  'drop': e.get('drop')}
                 for e in episodes],
+            'refiner': {'sha256': os.environ.get('REFINER_SHA256'),
+                        'variant': refiner_art['variant'],
+                        'sourceSha': refiner_art.get('source_sha')},
             'writes': {'inserted': n_ins, 'refreshed': n_upd,
                        'reviewedKept': n_kept, 'superseded': n_sup},
         }, indent=1).encode(),

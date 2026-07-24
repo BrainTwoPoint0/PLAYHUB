@@ -22,6 +22,7 @@ import {
   subAnchorHints,
   type CycleVerdict,
 } from '@/lib/goal-review/multi-goal'
+import { showLikelyGoal } from '@/lib/goal-review/confidence'
 
 interface CandidateEvent {
   eventId: string
@@ -44,6 +45,9 @@ interface GoalCandidate {
   subAnchorsS: number[]
   pko: number | null
   deadctx: number | null
+  /** Refiner confidence (recorded signal — "likely goal" badge only,
+   *  never filtering/ordering); null = row predates the refiner. */
+  confidence: number | null
   status: 'draft' | 'approved' | 'rejected' | 'error'
   error: string | null
   clipUrl: string | null
@@ -147,6 +151,7 @@ export function GoalCandidatesStrip({
             subAnchorsS: c.subAnchorsS ?? [],
             cycleReviews: c.cycleReviews ?? [],
             clipSpanS: c.clipSpanS ?? null,
+            confidence: c.confidence ?? null,
           }))
           .sort((a, b) => a.anchorS - b.anchorS)
         if (!signal?.aborted) {
@@ -319,8 +324,9 @@ export function GoalCandidatesStrip({
   const setCycleVerdict = useCallback(
     (cand: GoalCandidate, subAnchorS: number, verdict: CycleVerdict) => {
       const current =
-        cand.cycleReviews.find((r) => Math.abs(r.cycleAnchorS - subAnchorS) <= 0.005)
-          ?.verdict ?? null
+        cand.cycleReviews.find(
+          (r) => Math.abs(r.cycleAnchorS - subAnchorS) <= 0.005
+        )?.verdict ?? null
       void act(cand, {
         action: 'cycle_verdict',
         cycleAnchorS: subAnchorS,
@@ -399,8 +405,7 @@ export function GoalCandidatesStrip({
                 // Armed duplicate-confirm: mark the card the warning is
                 // about (the notice itself lives in the strip header,
                 // possibly cards away — senior review M2).
-                dupePending?.candId === cand.id &&
-                  'ring-1 ring-amber-500/40'
+                dupePending?.candId === cand.id && 'ring-1 ring-amber-500/40'
               )}
             >
               <div className="relative aspect-video bg-black/30">
@@ -502,6 +507,17 @@ export function GoalCandidatesStrip({
                       })}
                     </span>
                   )}
+                  {cand.status !== 'error' &&
+                    showLikelyGoal(cand.confidence) && (
+                      <span
+                        className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-px text-[10px] text-emerald-300 tabular-nums"
+                        title={t('likelyGoalTitle', {
+                          pct: Math.round((cand.confidence ?? 0) * 100),
+                        })}
+                      >
+                        {t('likelyGoal')}
+                      </span>
+                    )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   {busy ? (

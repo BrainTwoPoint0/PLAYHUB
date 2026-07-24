@@ -31,6 +31,7 @@ const baseRow = {
   sub_anchors_s: null as (number | null)[] | null,
   pko: '0.9',
   deadctx: '0.99',
+  confidence: null as string | number | null,
   status: 'draft',
   error: null,
   clip_path: null,
@@ -89,6 +90,7 @@ async function runGet(rows: unknown[], cycleRows: unknown[] = []) {
       subAnchorsS: number[]
       anchorS: number
       clipSpanS: number | null
+      confidence: number | null
       cycleReviews: { cycleAnchorS: number; verdict: string }[]
     }[]
   }
@@ -131,6 +133,13 @@ describe('GET goal-candidates — subAnchorsS mapping', () => {
     expect(json.candidates[0].clipSpanS).toBe(480)
     const legacy = await runGet([{ ...baseRow, clip_span_s: null }])
     expect(legacy.json.candidates[0].clipSpanS).toBeNull()
+  })
+
+  it('passes confidence through as a number and NULL as null (pre-refiner rows)', async () => {
+    const { json } = await runGet([{ ...baseRow, confidence: '0.91' }])
+    expect(json.candidates[0].confidence).toBe(0.91)
+    const legacy = await runGet([{ ...baseRow, confidence: null }])
+    expect(legacy.json.candidates[0].confidence).toBeNull()
   })
 
   it('maps cycle verdicts onto their candidate and defaults to []', async () => {
