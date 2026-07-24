@@ -1335,3 +1335,42 @@ chronology (complete-pass ruling stands).
 - **Kit-uplift arm scope:** the PRECISION half can run now (Veo team labels, freeze OOF,
   silhouette-gated subset, per-match silhouette in provenance, arms never averaged). The TIMING
   one-look must WAIT for stamps from future reviewed matches — the 141-stamp corpus is spent.
+
+### CONFIDENCE SIGNAL WIRED TO PRODUCTION (2026-07-24, commit `68c8d522`) — recorded signal, deployed
+
+Karim's ruling executed: the PASSED confidence model ships as a signal (portrait posture), never an
+action. Batch goal-detect scores every candidate episode (vendored `refiner_score.py`, parity-
+pinned to the research source; 5th sha-pinned artifact `refiner_confidence.pkl`, REFINER_SHA256
+`096bdc99…`, weights prefix → `provenance/goal-detect/2026-07-24` with byte-copy-verified
+siblings); `playhub_goal_candidates.confidence` (nullable, applied); GET passthrough; strip
+"Likely goal" chip at `LIKELY_GOAL_MIN=0.85` (`src/lib/goal-review/confidence.ts`, from the curve:
+medium P0.855). Chronology untouched; approve stays human; reviewer-vs-confidence agreement now
+accumulates for free on every review.
+
+Hard invariants: SkewError is the ONLY refiner exception surfaced verbatim (pickle-internal errors
+degrade to type name); per-episode scoring failures AND non-finite outputs degrade that episode to
+NULL — the hint never aborts the detection money path; image/pickle key-order skew fails LOUD at
+load (JobError), never silent-NULL-forever; error-status cards never wear the badge.
+
+Deploy verified end-to-end: migration applied → 5/5 banked shas match pins → Netlify ready on
+`68c8d522` → job-def rev 3 (`-target`, plan showed exactly 1 change) → CodeBuild image SUCCEEDED →
+invalid-UUID smoke died at the UUID parse (imports healthy). 38 pytest + 11 vitest + full release
+gate green; 5 specialist reviews, all findings fixed. OPEN: first natural sweep detect writes the
+first live confidence — eyes on that row's value + provenance `refiner` block + the badge.
+
+### SPIIDEO-LABEL FREEZE DECLARED (2026-07-24) — `spiideo_label_freeze_2026_07_24.json`
+
+Bar from EVAL LAYERS (~10 fully reviewed matches) is **met**. Locked regression set:
+
+|             |                                                                                                                                                     |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Matches     | **12** (zero live drafts; error rows = superseded-by-re-detection tombstones only)                                                                  |
+| Stamp links | 203 (201 unique goals @ ±1s dedupe; 201 `human_scrub` + 2 `anchor_offset` on the pilot)                                                             |
+| Artifact    | [`spiideo_label_freeze_2026_07_24.json`](spiideo_label_freeze_2026_07_24.json) (+ slim [`.index.json`](spiideo_label_freeze_2026_07_24.index.json)) |
+| Holdout     | Live review queue at declare time (~8 matches) and everything reviewed after — **do not drain into this freeze**                                    |
+
+**Tails:** original 8 verified 2026-07-23 (Karim eyes-on). New 4 (`f34c0dfa`, `9bc707e5`, `7c1e40fc`, `a61a9321`) audited 2026-07-24 via the same past-clip cycle flag class: 5 flags total, all resolved (3 stamp-covered ±45s, 2 explicit `cycle_verdict=no_goal` on the f34c0dfa mega-episode 24:13/25:03 chips). **0 unresolved → tails PASS.**
+
+**Eval rule (mirror Veo freeze):** any chain / confidence / localizer change that claims not to hurt Spiideo recall or timing must report against this fixed manifest — never a live `playhub_goal_candidates` query. The 141-stamp localizer corpus from the refiner spike remains **spent**; localizer v2 / kit-timing one-looks evaluate only on **post-freeze held-out** stamps.
+
+**Next (ordered, not physics):** kit-arm precision half on freeze OOF → localizer v2 one look on holdout → optional Phase-0 ball-timing spike for 7s→&lt;5s.

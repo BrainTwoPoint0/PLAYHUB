@@ -1,0 +1,120 @@
+{
+  "freeze_id": "spiideo-label-freeze-2026-07-24",
+  "declared_at": "2026-07-24T18:15:40Z",
+  "n_matches": 12,
+  "n_unique_goals_1s": 201,
+  "n_stamp_links": 203,
+  "tails_pass": true,
+  "recording_ids": [
+    "00b57031-f5a7-4841-b239-27596c1358eb",
+    "017121fb-901c-4a70-a3b9-e066c840c1db",
+    "0f9c00fa-55a7-44cd-8561-a15ec9c1b11b",
+    "29db2c00-a5da-415f-98f3-8f9007c08bf5",
+    "3b8e3b80-271a-4580-b5fe-26f91ed4f658",
+    "3f238a12-32a9-40da-ad6a-fe5afea6d5e6",
+    "435be371-3a89-4e5e-b17a-7287639b65f8",
+    "5e730e39-86e2-4cf5-9af4-d4f0c35f1f2b",
+    "7c1e40fc-2f01-4125-9afc-caae7f3121e6",
+    "9bc707e5-9406-4c65-bd5d-ba64e48096d3",
+    "a61a9321-e654-4bec-8822-9be954f2c274",
+    "f34c0dfa-1bfa-4f06-8906-e0f520e2fca4"
+  ],
+  "per_match": [
+    {
+      "recording_id": "00b57031",
+      "unique_goals": 13,
+      "approved": 9,
+      "rejected": 3,
+      "cohort": "original8_2026_07_23",
+      "detector_versions": ["freeze-2026-07-21-floor080-subanchors"]
+    },
+    {
+      "recording_id": "017121fb",
+      "unique_goals": 14,
+      "approved": 12,
+      "rejected": 9,
+      "cohort": "original8_2026_07_23",
+      "detector_versions": ["freeze-2026-07-21-floor080"]
+    },
+    {
+      "recording_id": "0f9c00fa",
+      "unique_goals": 9,
+      "approved": 8,
+      "rejected": 22,
+      "cohort": "original8_2026_07_23",
+      "detector_versions": ["freeze-2026-07-21-floor080-subanchors"]
+    },
+    {
+      "recording_id": "29db2c00",
+      "unique_goals": 11,
+      "approved": 9,
+      "rejected": 10,
+      "cohort": "original8_2026_07_23",
+      "detector_versions": ["freeze-2026-07-21-floor080"]
+    },
+    {
+      "recording_id": "3b8e3b80",
+      "unique_goals": 15,
+      "approved": 10,
+      "rejected": 18,
+      "cohort": "original8_2026_07_23",
+      "detector_versions": ["freeze-2026-07-21-floor080-subanchors"]
+    },
+    {
+      "recording_id": "3f238a12",
+      "unique_goals": 22,
+      "approved": 11,
+      "rejected": 3,
+      "cohort": "original8_2026_07_23",
+      "detector_versions": ["freeze-2026-07-21-floor080-subanchors"]
+    },
+    {
+      "recording_id": "435be371",
+      "unique_goals": 32,
+      "approved": 21,
+      "rejected": 8,
+      "cohort": "original8_2026_07_23",
+      "detector_versions": ["freeze-2026-07-21-floor080-subanchors"]
+    },
+    {
+      "recording_id": "5e730e39",
+      "unique_goals": 17,
+      "approved": 12,
+      "rejected": 10,
+      "cohort": "original8_2026_07_23",
+      "detector_versions": ["freeze-2026-07-21-floor080-subanchors"]
+    },
+    {
+      "recording_id": "7c1e40fc",
+      "unique_goals": 15,
+      "approved": 8,
+      "rejected": 6,
+      "cohort": "new4_2026_07_24",
+      "detector_versions": ["freeze-2026-07-21-floor080"]
+    },
+    {
+      "recording_id": "9bc707e5",
+      "unique_goals": 16,
+      "approved": 14,
+      "rejected": 7,
+      "cohort": "new4_2026_07_24",
+      "detector_versions": ["freeze-2026-07-23-tau045"]
+    },
+    {
+      "recording_id": "a61a9321",
+      "unique_goals": 10,
+      "approved": 9,
+      "rejected": 9,
+      "cohort": "new4_2026_07_24",
+      "detector_versions": ["freeze-2026-07-21-floor080"]
+    },
+    {
+      "recording_id": "f34c0dfa",
+      "unique_goals": 27,
+      "approved": 10,
+      "rejected": 7,
+      "cohort": "new4_2026_07_24",
+      "detector_versions": ["freeze-2026-07-23-tau045"]
+    }
+  ]
+}
