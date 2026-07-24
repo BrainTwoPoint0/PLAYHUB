@@ -4,6 +4,33 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import Hls from 'hls.js'
 import { refreshDelayMs, isExpiryError } from '@/lib/video/signed-url-refresh'
 
+// Keys the de-warp surface (VirtualPanoramaPlayer's role="application" host)
+// implements itself — camera pan/zoom/reset plus its selection verbs. While it
+// has focus these belong to it and the transport must not double-fire them
+// (arrows would seek AND pan; l/L would seek AND toggle Lock).
+//
+// MUST stay in lockstep with VirtualPanoramaPlayer's onKeyDown switch. Adding a
+// key there without adding it here makes it fire twice; the reverse silently
+// disables a transport shortcut on the de-warp. Everything NOT listed here —
+// space/k, ','/'.', 't', 'j', 'm', 'f' — deliberately reaches the transport,
+// because those are the stamping tools.
+const PANORAMA_OWNED_KEYS = new Set([
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'ArrowDown',
+  '+',
+  '=',
+  '-',
+  '_',
+  '0',
+  'Home',
+  'Enter',
+  'l',
+  'L',
+  'Escape',
+])
+
 // The HTML5 <video> + hls.js transport, extracted verbatim from VideoPlayer so
 // BOTH the flat marketplace player and the unified WatchPlayer drive one master
 // <video> through identical logic. Owns: the video/hls/container refs, all state
@@ -369,10 +396,19 @@ export function useVideoTransport({
         t &&
         (t.tagName === 'INPUT' ||
           t.tagName === 'TEXTAREA' ||
-          t.isContentEditable ||
-          // The de-warp canvas host (role="application") owns arrow/zoom/0 keys
-          // for panning while it's focused — don't double-fire master seek/volume.
-          t.closest?.('[role="application"]'))
+          t.isContentEditable)
+      )
+        return
+      // The de-warp canvas host (role="application") owns the CAMERA keys while
+      // focused. It must NOT swallow the transport keys: any click or drag on
+      // the canvas focuses it, and this used to kill play/pause, frame-step and
+      // tag for the rest of the session — silently, with only a focus ring as a
+      // clue. On a stamping surface that is the wrong-stamp path (press '.',
+      // nothing happens, playback runs on, the clock you then read is late).
+      // Bail on exactly the keys the panorama implements, nothing more.
+      if (
+        t?.closest?.('[role="application"]') &&
+        PANORAMA_OWNED_KEYS.has(e.key)
       )
         return
       const v = videoRef.current

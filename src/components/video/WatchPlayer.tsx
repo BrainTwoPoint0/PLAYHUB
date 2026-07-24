@@ -18,6 +18,7 @@ import {
   VirtualPanoramaPlayer,
   type DewarpSurfaceApi,
 } from './VirtualPanoramaPlayer'
+import type { ExploreState } from './usePanoramaSource'
 
 // Capabilities per surface. In de-warp, quality + PiP act on the hidden flat
 // master and would confuse (PiP would pop out the flat feed) — hide them. Volume
@@ -34,9 +35,6 @@ const DEWARP_CAPS: PlayerCapabilities = {
   pip: false,
   stepFrame: true,
 }
-
-type ExploreState =
-  'idle' | 'loading' | 'pending' | 'unavailable' | 'timeout' | 'error'
 
 interface WatchPlayerProps {
   // The flat production (Spiideo Play) — the MASTER clock/audio + default view.
@@ -68,6 +66,14 @@ interface WatchPlayerProps {
   panoramaSrc?: string | null
   exploreState?: ExploreState
   onExplore?: () => void
+  // Which surface to OPEN on. 'dewarp' expresses an INTENT, not a guarantee:
+  // it seeds the same "want de-warp" state a toggle click would, so the flip
+  // happens when (and only when) the raw VP is ready, and the existing failure
+  // path drops the intent back to the flat production. Callers should only ask
+  // for it when the capture is already banked (see panoramaDefaults).
+  defaultSurface?: 'flat' | 'dewarp'
+  // Open the de-warp with Auto-follow engaged, if an aim track loads.
+  autoFollowDefault?: boolean
 }
 
 export function WatchPlayer({
@@ -91,6 +97,8 @@ export function WatchPlayer({
   panoramaSrc,
   exploreState = 'idle',
   onExplore,
+  defaultSurface = 'flat',
+  autoFollowDefault = false,
 }: WatchPlayerProps) {
   const t = useVideoTransport({
     src,
@@ -108,8 +116,23 @@ export function WatchPlayer({
 
   const [surface, setSurface] = useState<'flat' | 'dewarp'>('flat')
   // Intent to switch once the capture is ready (the toggle can be clicked before
-  // the raw VP finishes materializing).
-  const [wantDewarp, setWantDewarp] = useState(false)
+  // the raw VP finishes materializing). `defaultSurface: 'dewarp'` seeds exactly
+  // this intent rather than the surface itself, so opening on the de-warp goes
+  // through the same readiness + failure paths as a click — never a state where
+  // the de-warp is "active" with no source.
+  const [wantDewarp, setWantDewarp] = useState(defaultSurface === 'dewarp')
+  // ...and the seed is a LATCH, not a mount-time read. Callers typically learn
+  // `defaultSurface` from an async fetch, so the first render is 'flat'. A
+  // useState initializer would only work while the caller happens to set the
+  // player's other props in the same React batch — true today on /recordings,
+  // but it would break silently (no error, no type change) if anyone split that
+  // fetch or introduced an await between the setState calls.
+  const defaultSeedRef = useRef(defaultSurface === 'dewarp')
+  useEffect(() => {
+    if (defaultSurface !== 'dewarp' || defaultSeedRef.current) return
+    defaultSeedRef.current = true
+    setWantDewarp(true)
+  }, [defaultSurface])
   const dewarpApiRef = useRef<DewarpSurfaceApi | null>(null)
   // Auto-follow availability + live state, reported by the de-warp surface so
   // the shared bar's DewarpControls can render/reflect the toggle.
@@ -124,7 +147,12 @@ export function WatchPlayer({
 
   const dewarpReady = Boolean(meshBaseUrl && panoramaSrc)
   const capturing = exploreState === 'loading' || exploreState === 'pending'
-  const showToggle = Boolean(meshBaseUrl) && exploreState !== 'unavailable'
+  // Never strand the user ON the de-warp with no way back to the production:
+  // if anything drove exploreState terminal while the surface is active, the
+  // toggle must stay.
+  const showToggle =
+    Boolean(meshBaseUrl) &&
+    (surface === 'dewarp' || exploreState !== 'unavailable')
 
   // Flip to the de-warp surface as soon as the capture is ready, if the user
   // asked for it while it was still materializing.
@@ -243,6 +271,7 @@ export function WatchPlayer({
             src={panoramaSrc as string}
             meshBaseUrl={meshBaseUrl as string}
             panWindow={panWindow ?? undefined}
+            autoFollowDefault={autoFollowDefault}
             masterVideoRef={t.videoRef}
             hideChrome
             apiRef={dewarpApiRef}

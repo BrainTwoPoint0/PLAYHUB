@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { useFormatter, useTranslations } from 'next-intl'
 import { useRouter } from '@/i18n/navigation'
@@ -19,10 +19,12 @@ import { createClient } from '@braintwopoint0/playback-commons/supabase'
 import { FadeIn } from '@/components/FadeIn'
 import { GoalCandidatesStrip } from '@/components/recordings/GoalCandidatesStrip'
 import {
-  VideoPlayer,
   type MediaPack,
   type GraphicPackageOverlay,
 } from '@/components/video/VideoPlayer'
+import { WatchPlayer } from '@/components/video/WatchPlayer'
+import { usePanoramaSource } from '@/components/video/usePanoramaSource'
+import { panoramaDefaults } from '@/lib/panorama/surface'
 import {
   ArrowLeft,
   Lock,
@@ -255,6 +257,15 @@ export default function RecordingPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // De-warp ("Explore") availability, resolved server-side alongside the
+  // recording. Null until the fetch lands → the page renders exactly as before
+  // for the first paint and forever for non-panorama recordings.
+  const [panorama, setPanorama] = useState<{
+    meshBaseUrl: string | null
+    panWindow: { minRad: number; maxRad: number } | null
+    captureReady: boolean
+  } | null>(null)
+
   // Events state
   const [events, setEvents] = useState<RecordingEvent[]>([])
   const [userId, setUserId] = useState<string | null>(null)
@@ -267,7 +278,33 @@ export default function RecordingPage() {
   const [addFormTimestamp, setAddFormTimestamp] = useState(0)
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
 
+  // Raw-VP source for the de-warp surface. No share token here: /recordings is
+  // grant-gated, so the viewer is always an authenticated grant-holder.
+  const { panoramaSrc, exploreState, onExplore } = usePanoramaSource(
+    recordingId,
+    null
+  )
+  const surfaceDefaults = panoramaDefaults({
+    meshBaseUrl: panorama?.meshBaseUrl ?? null,
+    captureReady: !!panorama?.captureReady,
+  })
+  // Karim's review default: when the raw VP is already banked, open straight on
+  // the de-warp instead of clicking Explore on every match. Safe to fire
+  // unprompted precisely BECAUSE the capture is ready — the route takes its
+  // fast path and just re-signs the existing object, never submitting a job.
+  const autoExploredRef = useRef(false)
   useEffect(() => {
+    if (surfaceDefaults.defaultSurface !== 'dewarp' || autoExploredRef.current)
+      return
+    autoExploredRef.current = true
+    onExplore({ auto: true })
+  }, [surfaceDefaults.defaultSurface, onExplore])
+
+  useEffect(() => {
+    // Re-arm the one-shot auto-open: this component survives a dynamic-param
+    // navigation, so a stale latch would leave the next recording opening flat.
+    autoExploredRef.current = false
+    setPanorama(null)
     fetchRecording()
     fetchCurrentUser()
   }, [recordingId])
@@ -299,6 +336,7 @@ export default function RecordingPage() {
       setVideoUrl(data.videoUrl)
       if (data.graphicPackage) setGraphicPackage(data.graphicPackage)
       if (data.mediaPack) setMediaPack(data.mediaPack)
+      if (data.panorama) setPanorama(data.panorama)
 
       // Fetch events after recording loads successfully
       fetchEvents()
@@ -539,14 +577,31 @@ export default function RecordingPage() {
               {/* Video Player */}
               {videoUrl ? (
                 <div className="-mx-4 md:mx-0">
-                  <VideoPlayer
+                  {/* The produced video is the MASTER clock/audio (and stays
+                      the Share/Download source). When this recording has a
+                      published mesh + a banked raw VP, the player opens on the
+                      de-warp SURFACE with Auto-follow engaged — a drag takes
+                      manual control and the in-bar toggle returns to the
+                      produced video. Recordings without a mesh render exactly
+                      as before. */}
+                  <WatchPlayer
                     src={videoUrl}
+                    recordingId={recordingId}
                     events={events}
                     canEdit={canEdit}
                     onAddTag={handleAddTag}
                     graphicPackage={graphicPackage}
                     mediaPack={mediaPack}
                     className="w-full aspect-video md:rounded-lg"
+                    meshBaseUrl={panorama?.meshBaseUrl}
+                    panWindow={panorama?.panWindow}
+                    panoramaSrc={panoramaSrc}
+                    exploreState={exploreState}
+                    onExplore={onExplore}
+                    defaultSurface={surfaceDefaults.defaultSurface}
+                    autoFollowDefault={
+                      surfaceDefaults.defaultSurface === 'dewarp'
+                    }
                   />
                 </div>
               ) : (

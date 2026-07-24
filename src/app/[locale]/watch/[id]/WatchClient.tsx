@@ -2,8 +2,7 @@
 
 import { Link } from '@/i18n/navigation'
 import { useFormatter, useTranslations } from 'next-intl'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { refreshDelayMs } from '@/lib/video/signed-url-refresh'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
@@ -34,6 +33,7 @@ import {
 } from '@/components/video/VideoPlayer'
 import { FlatZoomPlayer } from '@/components/video/FlatZoomPlayer'
 import { WatchPlayer } from '@/components/video/WatchPlayer'
+import { usePanoramaSource } from '@/components/video/usePanoramaSource'
 import {
   EVENT_TYPE_COLORS,
   formatTimestamp,
@@ -226,143 +226,13 @@ export default function WatchClient({
   // De-warp free-look ("Explore the pitch"): the default surface is the Auto
   // production (FlatZoomPlayer on videoUrl). Clicking Explore asks the server for
   // the raw VP (POST /panorama-source — access-gated, may trigger a capture and
-  // return pending); once ready we lazy-mount the pannable VirtualPanoramaPlayer
-  // with the Auto production as its autoSrc. Available only when a mesh exists.
-  const [panoramaSrc, setPanoramaSrc] = useState<string | null>(null)
-  const [exploreState, setExploreState] = useState<
-    'idle' | 'loading' | 'pending' | 'unavailable' | 'timeout' | 'error'
-  >('idle')
-  const explorePollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const exploreDeadlineRef = useRef<number>(0)
-  const explorePollsRef = useRef<number>(0)
-  // One-shot retry timer for a failed raw-VP proactive re-sign; `used` bounds it
-  // to a single retry per proactive cycle.
-  const panoramaResignRetryRef = useRef<{
-    timer: ReturnType<typeof setTimeout> | null
-    used: boolean
-  }>({ timer: null, used: false })
-  useEffect(
-    () => () => {
-      if (explorePollRef.current) clearTimeout(explorePollRef.current)
-      if (panoramaResignRetryRef.current.timer)
-        clearTimeout(panoramaResignRetryRef.current.timer)
-    },
-    []
+  // return pending); once ready WatchPlayer flips to the pannable
+  // VirtualPanoramaPlayer. Available only when a mesh exists. The poll +
+  // signed-URL re-sign state machine lives in the shared hook.
+  const { panoramaSrc, exploreState, onExplore } = usePanoramaSource(
+    recording.id,
+    token
   )
-
-  // Stop polling before the server's 10-min stuck-window would re-trigger a
-  // DUPLICATE multi-GB capture; surface a retryable 'timeout' instead.
-  const scheduleExplorePoll = () => {
-    if (Date.now() > exploreDeadlineRef.current) {
-      setExploreState('timeout')
-      return
-    }
-    explorePollsRef.current += 1
-    const delay = explorePollsRef.current < 10 ? 6000 : 10000 // gentle backoff after ~1 min
-    explorePollRef.current = setTimeout(requestPanorama, delay)
-  }
-
-  const requestPanorama = async (): Promise<void> => {
-    if (Date.now() > exploreDeadlineRef.current) {
-      setExploreState('timeout')
-      return
-    }
-    let data: { status?: string; url?: string } = {}
-    try {
-      const res = await fetch(
-        `/api/recordings/${recording.id}/panorama-source${token ? `?token=${encodeURIComponent(token)}` : ''}`,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: '{}',
-        }
-      )
-      // fetch doesn't throw on 4xx/5xx. 5xx is transient → retry; 4xx (403/404) →
-      // not available to this viewer → stop (keeps the Auto production).
-      if (!res.ok) {
-        if (res.status >= 500) return scheduleExplorePoll()
-        setExploreState('unavailable')
-        return
-      }
-      data = await res.json().catch(() => ({}))
-    } catch {
-      // network blip → retry within the deadline
-      return scheduleExplorePoll()
-    }
-    if (data.status === 'ready' && data.url) {
-      // WatchPlayer flips to the de-warp surface once panoramaSrc is set (if the
-      // user asked for it). We just publish the ready URL + clear the poll state.
-      setPanoramaSrc(data.url)
-      setExploreState('idle')
-    } else if (data.status === 'pending') {
-      setExploreState('pending')
-      scheduleExplorePoll()
-    } else {
-      // 'unavailable' — not a panorama / no game / anonymous-can't-trigger.
-      setExploreState('unavailable')
-    }
-  }
-
-  const onExplore = () => {
-    if (exploreState === 'loading' || exploreState === 'pending') return
-    exploreDeadlineRef.current = Date.now() + 5 * 60_000
-    explorePollsRef.current = 0
-    setExploreState('loading')
-    void requestPanorama()
-  }
-
-  // Raw-VP re-sign: the de-warp's signed URL expires like the master's, but the
-  // capture poll stops at 'ready' and never refreshes it. Re-call panorama-source
-  // (which re-signs on every hit) and publish the fresh URL — VirtualPanoramaPlayer
-  // rebuilds its texture and the slave re-seeks to the master. Quiet on failure;
-  // no deadline/state churn (unlike requestPanorama, which drives the capture).
-  const resignPanorama = useCallback(async () => {
-    let ok = false
-    try {
-      const res = await fetch(
-        `/api/recordings/${recording.id}/panorama-source${token ? `?token=${encodeURIComponent(token)}` : ''}`,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: '{}',
-          cache: 'no-store',
-        }
-      )
-      if (res.ok) {
-        const data = (await res.json().catch(() => ({}))) as {
-          status?: string
-          url?: string
-        }
-        if (data.status === 'ready' && data.url) {
-          panoramaResignRetryRef.current.used = false // success → fresh budget
-          setPanoramaSrc(data.url) // re-arms the proactive effect
-          ok = true
-        }
-      }
-    } catch {
-      // fall through to the bounded retry below
-    }
-    // One bounded retry per cycle — a single blip shouldn't leave the de-warp to
-    // 403 at expiry. After that the player's own error path is the fallback.
-    if (!ok && !panoramaResignRetryRef.current.used) {
-      panoramaResignRetryRef.current.used = true
-      panoramaResignRetryRef.current.timer = setTimeout(() => {
-        void resignPanorama()
-      }, 30_000)
-    }
-  }, [recording.id, token])
-
-  // Proactive: re-arm at ~80% of the current panorama URL's TTL. Re-runs each
-  // time panoramaSrc changes (initial ready + each resign).
-  useEffect(() => {
-    if (!panoramaSrc) return
-    const delay = refreshDelayMs(panoramaSrc, Date.now())
-    if (delay === null) return
-    const id = setTimeout(() => {
-      void resignPanorama()
-    }, delay)
-    return () => clearTimeout(id)
-  }, [panoramaSrc, resignPanorama])
 
   // View-progress persistence: skip duplicate writes when the user is
   // paused (player still pings every 5s). Use sendBeacon when the page is

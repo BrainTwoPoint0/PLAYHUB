@@ -39,14 +39,25 @@ export function meshBaseUrl(gameId: string | null | undefined): string | null {
  * Cheap public HEAD — no auth. Lets the watch page offer "Explore the pitch"
  * only when a mesh actually exists, so users never hit a broken de-warp.
  * Any absence (404) or error → false (degrade to Auto-only), never throws.
+ *
+ * TIMEOUT IS LOAD-BEARING: this runs inside request handlers that also carry
+ * the page's primary payload (title, signed video URL, access result). A catch
+ * handles an ERROR, but a HANG is not an error — without the abort a slow
+ * Storage bucket would hold the whole response until the platform's function
+ * cap. The de-warp is an enhancement; it must never be able to break the read.
  */
+const MESH_HEAD_TIMEOUT_MS = 2000
+
 export async function meshExists(
   gameId: string | null | undefined
 ): Promise<boolean> {
   const base = meshBaseUrl(gameId)
   if (!base) return false
   try {
-    const res = await fetch(`${base}/scene.json`, { method: 'HEAD' })
+    const res = await fetch(`${base}/scene.json`, {
+      method: 'HEAD',
+      signal: AbortSignal.timeout(MESH_HEAD_TIMEOUT_MS),
+    })
     return res.ok
   } catch {
     return false

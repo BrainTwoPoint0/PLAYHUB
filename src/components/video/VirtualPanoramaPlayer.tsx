@@ -58,6 +58,7 @@ import {
   Crosshair,
   UserSearch,
   Focus,
+  LocateFixed,
 } from 'lucide-react'
 import { cn } from '@braintwopoint0/playback-commons/utils'
 import {
@@ -184,6 +185,19 @@ interface VirtualPanoramaPlayerProps {
    * disjoint windows are ignored. The opening view centres in the window.
    */
   panWindow?: { minRad: number; maxRad: number }
+  /**
+   * Open with Auto-follow already engaged, IF a reg-SIFT aim track loads for
+   * this recording (no track → nothing happens and the motion driver stays the
+   * fallback, exactly as when this is off). Used by the /recordings review
+   * surface, where the aim track IS the intended default view and a drag is
+   * how the reviewer takes over.
+   *
+   * Engages ONCE PER MOUNT, not once per artifact load: the mesh-load effect
+   * lists `src` in its deps and `src` changes on every proactive re-sign of the
+   * raw-VP URL, so keying off the prop alone would silently re-engage
+   * auto-follow over a manual pan hours into a session.
+   */
+  autoFollowDefault?: boolean
 }
 
 /** Imperative surface controls, surfaced so DewarpControls can drive them from the shared bar. */
@@ -936,6 +950,7 @@ export function VirtualPanoramaPlayer({
   blendFovDownHi = BLEND_FOV_DOWN_HI,
   keystone = 0,
   panWindow,
+  autoFollowDefault = false,
 }: VirtualPanoramaPlayerProps) {
   const t = useTranslations('player')
   const containerRef = useRef<HTMLDivElement>(null)
@@ -977,6 +992,17 @@ export function VirtualPanoramaPlayer({
   // present it replaces the motion-follow driver for Auto mode.
   const aimTrackRef = useRef<AimTrack | null>(null)
   const [hasAimTrack, setHasAimTrack] = useState(false)
+  // `autoFollowDefault` seeding, held in a ref so the mesh-load effect can read
+  // it WITHOUT taking it as a dependency — and, more importantly, so `done`
+  // survives that effect re-running (it re-runs on every raw-VP re-sign, which
+  // must not re-engage Auto over the user's manual pan).
+  const autoFollowSeedRef = useRef({ want: autoFollowDefault, done: false })
+  useEffect(() => {
+    autoFollowSeedRef.current.want = autoFollowDefault
+  }, [autoFollowDefault])
+  // Set on the first pointer-down: the artifact load can take up to 15s, and a
+  // user who started panning in that window has already taken control.
+  const userTookControlRef = useRef(false)
   useEffect(() => {
     autoFollowRef.current = autoFollow
   }, [autoFollow])
@@ -1031,6 +1057,7 @@ export function VirtualPanoramaPlayer({
     | 'searching'
     | 'watching' // a slotted Lock HOLDING for its jersey to reappear
     | 'lost'
+    | 'autooff' // Auto-follow handed control back because the user touched the view
     | null
   const [spotNotice, setSpotNotice] = useState<SpotNotice>(null)
   const spotNoticeRef = useRef<SpotNotice>(null)
@@ -1251,6 +1278,29 @@ export function VirtualPanoramaPlayer({
         if (disposed) return
         aimTrackRef.current = aimTrack
         setHasAimTrack(aimTrack !== null)
+        // Open with Auto engaged when the caller asked for it AND a track
+        // actually loaded — once per mount (see `autoFollowDefault`). No track
+        // → nothing happens: the motion driver stays the fallback and
+        // DewarpControls keeps the Auto button hidden.
+        //
+        // The latch is on the DECISION, not the outcome. aim-track.json is a
+        // best-effort fetch (10s timeout, .catch → null), so latching only when
+        // a track loaded would leave `done` false after a first-load miss — and
+        // the next re-sign of `src` (a dep of this effect, ~3.2h) would then
+        // engage Auto on top of the user's manual pan, which is the exact bug
+        // this flag exists to prevent. A total load failure throws to the catch
+        // below and never reaches here, so reload() still seeds.
+        //
+        // `disposed` is checked above: StrictMode's mount→cleanup→mount eats
+        // the first pass before it can burn the latch. Do NOT hoist this above
+        // that guard.
+        if (autoFollowSeedRef.current.want && !autoFollowSeedRef.current.done) {
+          autoFollowSeedRef.current.done = true
+          // A drag during the (up to 15s) artifact load is the user taking
+          // control before we ever offered it — don't yank the camera back.
+          if (aimTrack !== null && !userTookControlRef.current)
+            setAutoFollow(true)
+        }
         trackletsRef.current = tracklets
         // A selection indexes into the PREVIOUS artifact — stale indices
         // into a refetched object list would ring the wrong body (and a
@@ -1464,6 +1514,21 @@ export function VirtualPanoramaPlayer({
         })
 
         onWheel = (e: WheelEvent) => {
+          // ZOOM IS MODIFIER-GATED; a bare wheel scrolls the PAGE.
+          //
+          // This surface fills most of the viewport on a review page, and the
+          // reviewer's highest-frequency gesture is scrolling between the
+          // player and the candidate grid below it. Capturing every wheel event
+          // made the player a scroll dead zone (measured: scrollY 0 over the
+          // canvas vs 600 for the identical gesture beside it) — and with
+          // Auto-follow engaged the zoom it applied was re-driven away on the
+          // next frame anyway, so the gesture read as "the page is frozen".
+          //
+          // ctrl/meta is the Maps/Figma convention AND is what a trackpad
+          // pinch already emits (ctrlKey), so pinch-to-zoom keeps working while
+          // two-finger scroll reaches the page. Zoom also stays available on
+          // the +/− buttons and the +/-/0 keys.
+          if (!e.ctrlKey && !e.metaKey) return
           e.preventDefault()
           const v = viewRef.current
           const next = clampView({
@@ -2269,7 +2334,16 @@ export function VirtualPanoramaPlayer({
           }
           if (!track || (!spotlightRef.current && !sel)) {
             svg.style.display = 'none'
-            setNotice(null)
+            // A live transient override still wins here. This branch is the
+            // NORMAL state for Auto-follow (spotlight disarmed, no selection,
+            // often no tracklets at all), so force-clearing would make the
+            // auto-off caption unreachable on exactly the path that needs it.
+            const ovIdle = spotNoticeOverride.current
+            if (ovIdle && Date.now() < ovIdle.until) setNotice(ovIdle.kind)
+            else {
+              if (ovIdle) spotNoticeOverride.current = null
+              setNotice(null)
+            }
             return
           }
           svg.style.display = ''
@@ -2702,7 +2776,19 @@ export function VirtualPanoramaPlayer({
   // this many px between pointerdown and pointerup counts as a click.
   const clickRef = useRef<{ x: number; y: number; moved: boolean } | null>(null)
   const onPointerDown = (e: React.PointerEvent) => {
-    if (autoFollow) setAutoFollow(false) // taking manual control stops auto-follow
+    userTookControlRef.current = true
+    if (autoFollow) {
+      setAutoFollow(false) // taking manual control stops auto-follow
+      // Say so. The Auto button's emerald tint is the only other indicator and
+      // it lives in a control bar that is hidden during playback, so this
+      // handover was previously silent — the camera simply stopped tracking
+      // and the reviewer scrubbed on believing it was still following. This
+      // notice also feeds the aria-live region below.
+      spotNoticeOverride.current = {
+        kind: 'autooff',
+        until: Date.now() + 2600,
+      }
+    }
     // NOTE: spotlight camera-follow is NOT disengaged here — only a real DRAG
     // does that (in onPointerMove). A tap that misses a player must not
     // silently stop the follow the user deliberately started.
@@ -3049,7 +3135,19 @@ export function VirtualPanoramaPlayer({
       align()
       void v.play().catch(() => {})
     }
-    const onPause = () => videoRef.current?.pause()
+    const onPause = () => {
+      const v = videoRef.current
+      if (!v) return
+      v.pause()
+      // FORCE RE-ALIGN ON PAUSE. During playback the drift guard below
+      // deliberately tolerates up to 1.5s so normal playback is never
+      // interrupted — but that means the frame on screen when the user stops
+      // to look can be up to 1.5s away from the master time they read off the
+      // control bar and stamp. Stamps are ground truth for the timing corpus,
+      // so the moment playback stops the pixels must agree with the clock.
+      // (A seek already aligns via onSeeked; this closes the pause path.)
+      v.currentTime = master.currentTime
+    }
     const onSeeked = () => {
       const v = videoRef.current
       if (v) v.currentTime = master.currentTime
@@ -3163,16 +3261,23 @@ export function VirtualPanoramaPlayer({
               key={spotNotice}
               className="flex items-center gap-2 rounded-full bg-black/60 px-4 py-2 text-sm text-[var(--timberwolf)] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2"
             >
-              <UserSearch
-                className={cn(
-                  'h-4 w-4',
-                  spotNotice === 'nodata' ||
-                    spotNotice === 'lost' ||
-                    spotNotice === 'searching'
-                    ? 'text-[var(--ash-grey)]'
-                    : 'text-emerald-400'
-                )}
-              />{' '}
+              {spotNotice === 'autooff' ? (
+                // The handover is about Auto-follow, not the spotlight — use
+                // the Auto control's own icon so the pill points at the button
+                // the reviewer presses to resume.
+                <LocateFixed className="h-4 w-4 text-[var(--ash-grey)]" />
+              ) : (
+                <UserSearch
+                  className={cn(
+                    'h-4 w-4',
+                    spotNotice === 'nodata' ||
+                      spotNotice === 'lost' ||
+                      spotNotice === 'searching'
+                      ? 'text-[var(--ash-grey)]'
+                      : 'text-emerald-400'
+                  )}
+                />
+              )}{' '}
               {spotNotice === 'watching'
                 ? spotWatchN
                   ? t('spotlightWatching', { n: spotWatchN })
@@ -3188,7 +3293,9 @@ export function VirtualPanoramaPlayer({
                             ? 'spotlightSearching'
                             : spotNotice === 'lost'
                               ? 'spotlightLost'
-                              : 'spotlightHint'
+                              : spotNotice === 'autooff'
+                                ? 'autoFollowHandback'
+                                : 'spotlightHint'
                   )}
             </div>
           </div>
@@ -3211,7 +3318,9 @@ export function VirtualPanoramaPlayer({
                           ? 'spotlightSearching'
                           : spotNotice === 'lost'
                             ? 'spotlightLost'
-                            : 'spotlightHint'
+                            : spotNotice === 'autooff'
+                              ? 'autoFollowHandback'
+                              : 'spotlightHint'
                 )
             : ''}
         </span>

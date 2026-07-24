@@ -39,8 +39,17 @@ describe('meshExists', () => {
     await expect(meshExists('g1')).resolves.toBe(true)
     expect(fetchMock).toHaveBeenCalledWith(
       'https://proj.supabase.co/storage/v1/object/public/panorama-meshes/g1/scene.json',
-      { method: 'HEAD' }
+      expect.objectContaining({ method: 'HEAD' })
     )
+  })
+  it('aborts rather than hanging — this runs inside request handlers', async () => {
+    // The catch below handles an ERROR; a HANG is not an error. Without the
+    // signal a slow Storage bucket holds the whole API response (title, signed
+    // video URL, access result) until the platform's function cap.
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal('fetch', fetchMock)
+    await meshExists('g1')
+    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal)
   })
   it('false on a 404 (mesh not generated yet)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))

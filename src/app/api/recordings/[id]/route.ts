@@ -6,6 +6,7 @@ import {
   isVenueAdmin,
 } from '@/lib/recordings/access-control'
 import { getPlaybackUrl } from '@/lib/s3/client'
+import { isPanoramaBanked, resolveWatchPanorama } from '@/lib/panorama/surface'
 import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3'
 
 // GET embeds a per-viewer signed video URL — never statically cache it.
@@ -53,6 +54,19 @@ export async function GET(
       console.error('Failed to generate signed URL:', err)
     }
   }
+
+  // Kick the de-warp resolution off HERE (awaited at the bottom) so its network
+  // work overlaps the graphic-package chain below instead of serializing behind
+  // it. Nothing between here and the await depends on it.
+  // The catch makes the degrade-to-null contract total (meshBaseUrl throws if
+  // the Supabase URL env is missing) and, because this is started eagerly,
+  // stops a rejection from becoming an unhandled one before the await.
+  const panoramaPromise = resolveWatchPanorama(serviceClient, recording).catch(
+    (err) => {
+      console.error('panorama resolution failed:', err)
+      return { meshBaseUrl: null, panWindow: null }
+    }
+  )
 
   // Fetch graphic package: recording's package → org default → venue media_pack
   let graphicPackage = null
@@ -111,6 +125,22 @@ export async function GET(
     }
   }
 
+  // De-warp availability for the detail page's Explore surface. Same
+  // derivation as /watch/[id] (shared helper — the two must not drift):
+  // published mesh + the half-framing pan window from the scene's CURRENT
+  // active calibration. All of it is public, non-PII geometry — no signed URLs
+  // are added here.
+  //
+  // `captureReady` means "the raw VP is already banked, so opening the de-warp
+  // will not actuate a multi-GB capture" — NOT "capture progress". A client
+  // that wants progress polls POST /panorama-source, which owns the retry,
+  // cooldown and attempt-cap policy; exposing the raw lifecycle enum here would
+  // just invite a second, drifting copy of it.
+  const panorama = {
+    ...(await panoramaPromise),
+    captureReady: isPanoramaBanked(recording),
+  }
+
   return NextResponse.json(
     {
       recording: {
@@ -129,6 +159,7 @@ export async function GET(
       access: accessResult,
       graphicPackage,
       mediaPack,
+      panorama,
     },
     // Carries a per-viewer signed video URL — no proxy/browser caching.
     { headers: { 'Cache-Control': 'no-store' } }

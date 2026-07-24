@@ -18,10 +18,7 @@ import {
   isVenueAdmin,
 } from '@/lib/recordings/access-control'
 import { timingSafeStrEqual } from '@/lib/recordings/route-guards'
-import { meshBaseUrl, meshExists } from '@/lib/panorama/mesh'
-import { panWindowForFocus } from '@/lib/panorama/pitch-focus'
-import { hasMidline } from '@/lib/panorama/pitch-marks'
-import { parseMeshGeometry } from '@/lib/panorama/pitch-solver'
+import { resolveWatchPanorama } from '@/lib/panorama/surface'
 import WatchClient from './WatchClient'
 
 // Legacy /watch/<32-hex-share-token> URLs (still in admin clipboards and the
@@ -140,72 +137,12 @@ export default async function WatchPage({
     }
   }
 
-  // Panorama de-warp mesh (public, non-PII geometry). Availability keys off the
-  // Spiideo game (+ a published mesh), NOT content_type: a Spiideo recording's
-  // default view is the hosted Play production ('hosted_video'), but it still has
-  // a pannable raw panorama we can de-warp. Only offer "Explore the pitch" when a
-  // mesh actually EXISTS for this game — otherwise the de-warp would mount against
-  // 404ing mesh assets. meshExists is a cheap public HEAD; a null result keeps the
-  // watch page on the standard player.
-  let panoramaMeshUrl: string | null = null
-  if (recording.spiideo_game_id) {
-    const base = meshBaseUrl(recording.spiideo_game_id)
-    if (base && (await meshExists(recording.spiideo_game_id))) {
-      panoramaMeshUrl = base
-    }
-  }
-
-  // Half-pitch watch framing: pitch_focus resolves against the scene's
-  // CURRENT active calibration at watch time (never snapshotted onto the
-  // recording). Requires a midline. Mesh artifacts are mostly-stable but DO
-  // get regenerated on calibration refits (2026-07-12/13) — bound staleness
-  // to a day rather than caching forever. Any failure degrades to full
-  // framing — a broken calibration must never block the watch page.
-  let panWindow: { minRad: number; maxRad: number } | null = null
-  if (
-    panoramaMeshUrl &&
-    recording.pitch_focus &&
-    recording.pitch_focus !== 'full' &&
-    recording.spiideo_scene_id
-  ) {
-    try {
-      const { data: cal } = await serviceClient
-        .from('playhub_pitch_calibrations')
-        .select('marks, frame_width, frame_height')
-        .eq('scene_id', recording.spiideo_scene_id)
-        .eq('status', 'active')
-        .maybeSingle()
-      if (cal?.marks && hasMidline(cal.marks)) {
-        const [sceneRes, vertsRes, idxRes] = await Promise.all([
-          fetch(`${panoramaMeshUrl}/scene.json`, {
-            next: { revalidate: 86400 },
-          }),
-          fetch(`${panoramaMeshUrl}/vertices.bin`, {
-            next: { revalidate: 86400 },
-          }),
-          fetch(`${panoramaMeshUrl}/indices.bin`, {
-            next: { revalidate: 86400 },
-          }),
-        ])
-        if (sceneRes.ok && vertsRes.ok && idxRes.ok) {
-          const mesh = parseMeshGeometry(
-            await sceneRes.json(),
-            await vertsRes.arrayBuffer(),
-            await idxRes.arrayBuffer()
-          )
-          panWindow = panWindowForFocus(
-            mesh,
-            cal.marks,
-            Number(cal.frame_width) || 3840,
-            Number(cal.frame_height) || 2160,
-            recording.pitch_focus
-          )
-        }
-      }
-    } catch (err) {
-      console.error('pitch-focus window derivation failed:', err)
-    }
-  }
+  // Panorama de-warp mesh (public, non-PII geometry) + the half-pitch pan
+  // window implied by the scene's CURRENT active calibration. Shared with
+  // /recordings/[id] via resolveWatchPanorama so the two surfaces can't drift
+  // on availability; both values degrade to null on any failure.
+  const { meshBaseUrl: panoramaMeshUrl, panWindow } =
+    await resolveWatchPanorama(serviceClient, recording)
 
   // Fetch events. Public events show to everyone with access; private
   // events show only to their creator. Build the union manually since we
