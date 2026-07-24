@@ -2401,8 +2401,7 @@ export function VirtualPanoramaPlayer({
             // cross-fragment re-association hand-off (adopting a mate/pickup)
             // is a bigger identity guess and still renders SOLID — Tier-2b
             // territory, not covered here.
-            const inferred =
-              !lost && isBridged(track.objects[sel.index], clock)
+            const inferred = !lost && isBridged(track.objects[sel.index], clock)
             // Ring position is smoothed separately from the camera: raw 5 Hz
             // samples inside a smooth-damped frame read as wobble.
             if (ringSm.forIndex !== sel.index) {
@@ -2495,8 +2494,7 @@ export function VirtualPanoramaPlayer({
                 setNotice('watching')
                 setWatchN(slotWatchNumber(sel.slot))
               } else setNotice('searching') // unlabelled — caption the widening frame
-            }
-            else if (!spotlightRef.current) setNotice(null)
+            } else if (!spotlightRef.current) setNotice(null)
             else if (active.length === 0)
               setNotice('nodata') // untracked stretch — taps CAN'T work here
             else if (!sel) setNotice('hint')

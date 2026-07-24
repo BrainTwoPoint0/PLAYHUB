@@ -15,7 +15,8 @@ describe('portrait review transitions', () => {
     // 500 on an admin's click, discovered in production.
     for (const [action, t] of Object.entries(TRANSITIONS)) {
       expect(STATUSES, `${action} → ${t.to}`).toContain(t.to)
-      for (const from of t.from) expect(STATUSES, `${action} from`).toContain(from)
+      for (const from of t.from)
+        expect(STATUSES, `${action} from`).toContain(from)
     }
   })
 
@@ -72,7 +73,12 @@ describe('portrait review transitions', () => {
   it('does not resolve inherited Object properties as actions', () => {
     // `TRANSITIONS[String(action)]` would return a function for these, pass a
     // truthiness guard, and throw on `.from` — a 500 from any authenticated caller.
-    for (const key of ['constructor', 'toString', 'valueOf', 'hasOwnProperty']) {
+    for (const key of [
+      'constructor',
+      'toString',
+      'valueOf',
+      'hasOwnProperty',
+    ]) {
       expect(resolveTransition(key), key).toBeUndefined()
       expect(labelForAction(key), key).toBeUndefined()
     }

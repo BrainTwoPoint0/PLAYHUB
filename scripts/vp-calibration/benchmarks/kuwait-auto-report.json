@@ -144,10 +144,7 @@
       }
     ],
     "qualifying": 9,
-    "x_cols": [
-      3,
-      4
-    ],
+    "x_cols": [3, 4],
     "median_dev_deg": 5.579174571105715,
     "hard_gate_viable": false
   },
@@ -165,7 +162,5 @@
       "err_deg": 2.7387222611795465
     }
   },
-  "failures": [
-    "gate G: disc arc theta error +2.74 deg beyond +/-2.0"
-  ]
+  "failures": ["gate G: disc arc theta error +2.74 deg beyond +/-2.0"]
 }

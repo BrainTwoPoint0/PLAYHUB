@@ -141,7 +141,9 @@ for (const s0 of spd) {
       continue
     }
     files[key] = Buffer.from(await resp.arrayBuffer())
-    console.log(`  ✓ ${key}  ${files[key].length} bytes  <- ${url.slice(0, 90)}...`)
+    console.log(
+      `  ✓ ${key}  ${files[key].length} bytes  <- ${url.slice(0, 90)}...`
+    )
     got = true
   }
   if (!got) continue
@@ -173,7 +175,9 @@ for (const s0 of spd) {
         )
       } else {
         outChunks.push(raw)
-        console.log(`  · proj${pi} already trilist  ${raw.length} indices (nv=${nv})`)
+        console.log(
+          `  · proj${pi} already trilist  ${raw.length} indices (nv=${nv})`
+        )
       }
     }
     if (any) {

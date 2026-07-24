@@ -398,7 +398,15 @@ describe('bridged field (dashed inferred spans)', () => {
     // a mix keeps only the good pair
     const mix = parseTracklets({
       ...VALID,
-      objects: [{ ...OBJ_A, bridged: [[10.2, 10.5], [9, 9]] }],
+      objects: [
+        {
+          ...OBJ_A,
+          bridged: [
+            [10.2, 10.5],
+            [9, 9],
+          ],
+        },
+      ],
     })!.objects[0]
     expect(mix.bridged).toEqual([[10.2, 10.5]])
   })

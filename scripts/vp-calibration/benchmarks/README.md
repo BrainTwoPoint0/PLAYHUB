@@ -20,11 +20,11 @@ baseline, and line-bow / mark-reprojection < 0.3% of pitch span** (~10px at 4K).
 
 ## Frozen baselines
 
-| venue        | worst long-chord bow | GATE A wmed rms | GATE E marks             | coverage |
-|--------------|----------------------|-----------------|--------------------------|----------|
-| kuwait/Nazwa | 2.09% (near_touch)   | 5.9px           | 13.8px / 3118px = 0.44%  | 98.2%    |
-| footballplus | 1.64% (near_touch)   | 2.1px           | (no admin marks yet)     | 71.7%    |
-| hct          | 1.58% (laneA_2)      | 2.5px           | (no admin marks yet)     | 97.2%    |
+| venue        | worst long-chord bow | GATE A wmed rms | GATE E marks            | coverage |
+| ------------ | -------------------- | --------------- | ----------------------- | -------- |
+| kuwait/Nazwa | 2.09% (near_touch)   | 5.9px           | 13.8px / 3118px = 0.44% | 98.2%    |
+| footballplus | 1.64% (near_touch)   | 2.1px           | (no admin marks yet)    | 71.7%    |
+| hct          | 1.58% (laneA_2)      | 2.5px           | (no admin marks yet)    | 97.2%    |
 
 kuwait's baseline is the **ACCEPTED AUTO FIT** (disc-constrained, eyes-on
 2026-07-18 round 3 — see below); the fit is frozen at
@@ -61,6 +61,7 @@ env SITE=hct LINES=benchmarks/hct-lines.json MESH=../../public/vp-mesh-hct \
 ```
 
 Notes:
+
 - `benchmarks/meshes/nazwa-b923` is the DEPLOYED game mesh
   (panorama-meshes/b923d40f…) the saved admin calibration was marked through —
   score marks through it, not a regenerated local mesh, when comparing against
@@ -87,6 +88,7 @@ INTERIOR (hand lines + marks reach θ≈80), so every number improved while the
 rim extrapolated freely (refinement moved k1 0.001→−0.037 for the marks).
 
 Facts that shape the fix:
+
 - **The lens rim is strongly non-equidistant** (hand fit: +172px past r=Fθ at
   θ90, +715px at θ100) — so anchoring the rim to the solve's minimum-|k|
   curve is anchoring to the WRONG shape, and doing so contorted the optimizer
@@ -160,6 +162,7 @@ show no rim, so no second venue can corroborate. A different lens SKU must
 override (json `theta_deg` / env).
 
 **Two measured dead ends (do not re-attempt without new evidence):**
+
 - **Rim term in the FREE solve (calibrate.py DISC_W=1) flips the CY basin**:
   the solve ran to CX/CY (1682,860) — dragged toward the annotated circle's
   CENTRE, which is ~300px off the principal point (8-pt short-arc Taubin
@@ -186,6 +189,7 @@ pixels that render as the content boundary). Also note the frozen-baseline
 regression check passes: rim terms OFF reproduces 0.63/1.87/5.83 exactly.
 
 **GATE G (gates.py, ON by default for single-camera fits):**
+
 - incumbent mode (RIM_REF_FIT; auto_fit passes the hand fit automatically):
   reference-fit iso-theta sampling, Kabsch datum alignment on theta<=75,
   gates the theta 85-92 band median at RIM_MAX_DEG (2.0 provisional, 'off'
@@ -232,6 +236,7 @@ the measurement exactly: the annotated disc arc lives on the LEFT (az
 160-207 — the auto rim is pinned there), while the RIGHT side has NO rim
 observable (dark exterior, boundary invisible) and carries the residual CX
 slide (GATE G az 330-30 ~3.1 deg). Consequences applied:
+
 - accepted fit frozen at `baselines/kuwait-accepted-fit.json`; its report
   is the new `baselines/kuwait.json`; auto_fit's GATE G now references the
   accepted fit (RIM_MAX_DEG stays 2.0 — it measures drift from the
@@ -287,6 +292,7 @@ resolves the same way kuwait's did.
 
 Karim's cross-venue observation ("the same curve on the entire line close to
 the camera, Nazwa and Football Plus") is now diagnosed. Facts:
+
 - Both footballplus lens models (old + refit, 4.6 deg apart in ray field)
   render the same bow; both kuwait fits ditto (~2.1%). A residual that
   survives every refit is either world geometry or a model-FAMILY blind
@@ -314,7 +320,6 @@ calibration. The 0.3% GATE E target remains reachable (footballplus is at
 0.09%); the BOW_PCT 0.3 target is NOT reachable on crowned ground and the
 frozen bow baselines (1.67/2.09%) are the honest ceilings.
 
-
 ## Eyes-on round 4 (2026-07-18 eve): REG-SIFT candidate joins the podium — PROMOTED
 
 Karim rated `vp-mesh-kuwait-auto` (disc) and `vp-mesh-kuwait-regsift` as the
@@ -336,7 +341,6 @@ measurably broken 127px one, the stronger case) with aim-tracks + tracklets
 in lockstep. Footballplus regsift candidate (`vp-mesh-footballplus-regsift`)
 still awaits eyes-on.
 
-
 ## Eyes-on round 5 (2026-07-18 night): FP regsift PROMOTED; near-corner up-curl = NON-RADIAL model error
 
 Karim: "same with football plus" (regsift preferred) "but the edges on the
@@ -357,8 +361,9 @@ it. The scoped experiment (tangential p1/p2 constrained by the dense reg
 data, whole-WINDOW holdout — never by frame, adjacent dwell frames are
 near-identical) is running; if held-out bottom-corner residuals drop toward
 the floor, tangential support enters the model (fisheye_model + generate_mesh
-+ solver forward-model change); if not, the up-curl is real geometry like
-the near-line bow.
+
+- solver forward-model change); if not, the up-curl is real geometry like
+  the near-line bow.
 
 ## Open items (as of 2026-07-18 late)
 
@@ -390,12 +395,13 @@ the near-line bow.
 lines+marks refinement of CX/CY/k1..k4 → marks-homography mount → mesh →
 gates). Reports in `benchmarks/{site}-auto-report.json`.
 
-| venue        | marks % of span       | long-chord bow  | wmed rms        |
-|--------------|-----------------------|-----------------|-----------------|
-| kuwait       | **0.63** (base 1.02)  | **1.87** (2.14) | **5.83** (6.00) |
-| footballplus | (no marks yet)        | 1.64 (tie)      | 2.50 (2.13)     |
+| venue        | marks % of span      | long-chord bow  | wmed rms        |
+| ------------ | -------------------- | --------------- | --------------- |
+| kuwait       | **0.63** (base 1.02) | **1.87** (2.14) | **5.83** (6.00) |
+| footballplus | (no marks yet)       | 1.64 (tie)      | 2.50 (2.13)     |
 
 Notes:
+
 - The refinement's `x_scale` is load-bearing (px-scale params vs k's — default
   scaling froze CX/CY at the seed twice). Lines get elementwise soft-L1;
   marks stay LINEAR (a global robust loss saturated on their large initial
@@ -577,10 +583,11 @@ through the warped kuwait mesh is a wash (5 of 6 marks improve; midline_s
 
 **STAGED for eyes-on:** `public/vp-mesh-kuwait-flat` (accepted/regsift fit +
 kuwait-flatten.json) and `public/vp-mesh-footballplus-flat` (accepted refit
-+ footballplus-flatten.json, building-column lines excluded). Base-fit
-copies for regeneration: {site}-flatbase-fit.json. If accepted, the flatten
-field should be regenerated whenever a venue's accepted fit or snapped lines
-change (the targets are fit-relative).
+
+- footballplus-flatten.json, building-column lines excluded). Base-fit
+  copies for regeneration: {site}-flatbase-fit.json. If accepted, the flatten
+  field should be regenerated whenever a venue's accepted fit or snapped lines
+  change (the targets are fit-relative).
 
 Addendum (same night, this session's two negatives that complete the GROUND
 diagnosis): (1) tangential p1/p2 constrained by the FP reg data, whole-window
@@ -616,6 +623,7 @@ streaming video page).
 **Flattener VERDICT (2026-07-18 eve, Karim eyes-on round 3): REJECTED —
 approach retired, do not iterate a third time.** Two independent reasons,
 both structural:
+
 1. The displacement field BENDS UNSNAPPED STRAIGHT STRUCTURES: Karim's
    screenshot shows a large S-wave on the kuwait GOAL LINE — which is not in
    kuwait-lines.json — where the field around the snapped box/touchline
@@ -655,6 +663,7 @@ via playhub_panorama_scene_meshes (Nazwa 131777a6 -> b923d40f, FP b3595080
 games fan out the new mesh automatically.
 
 Per venue:
+
 1. BACK UP the canonical mesh folder (rollback = re-upload old files).
 2. Upload the new venue mesh over panorama-meshes/{source_game_id}/
    (service role; scene.json LAST — the presence gate keys off it).
@@ -678,7 +687,8 @@ Known windows/risks: CDN + next revalidate 86400 -> up to ~1 day of
 mixed old-mesh/new-artifact (or vice versa) per game; reads as a ~3 deg
 ring/aim offset until caches settle — accepted (same class as the
 aim-track republish staleness). Rollback at any point = restore canonical
-+ game folders from backup and re-reset the artifact columns.
+
+- game folders from backup and re-reset the artifact columns.
 
 ## TANGENTIAL (p1/p2) CAPACITY TEST (2026-07-18 late) — WINS on every axis, STAGED for eyes-on
 
@@ -687,21 +697,22 @@ from the 6 marks alone): refit CX/CY/k1..k4 + Brown p1/p2 (F frozen)
 against lines + marks(W20) + disc(W1.5) + reg train windows (W1), evaluated
 on held-out windows. Result: p1=-0.0067 p2=-0.0108, and the fit improves
 EVERY measured axis vs the accepted regsift baseline:
+
 - holdout arbiter: ALL 2.96->2.52 mrad; RIGHT rim>78 8.73->3.54 (the
   radial-model left/right asymmetry limit, closed); LEFT rim par.
 - line straightness: near_touch 10.73->8.33 (-22%, the predicted class),
   far_touch 1.95->1.36, others par.
 - marks ALL improve (max 8.99 vs 11.2 mrad), disc arc 88.07 vs 88.2
   (accepted read 88.59), r(theta) monotonic to 100 deg.
-Candidate frozen at benchmarks/kuwait-tangential-candidate-fit.json (P1/P2
-keys; marks mount re-solved through the tangential model: TILT 40.646 YAW
-0.961 ROLL -3.364). generate_mesh.py now applies P1/P2 when present (baked
-into UVs — the player needs no change). STAGED: public/vp-mesh-kuwait-
-tangential, A/B vs /vp-mesh-kuwait-regsift. ADOPTION COST if accepted:
-fisheye_model/gates/auto_fit/marks_solver do not yet understand P1/P2 —
-GATE A/G and future refits need the tangential unprojection plumbed
-(tangential.py has the reference implementation); mesh-mediated paths
-(GATE E, the product) work today.
+  Candidate frozen at benchmarks/kuwait-tangential-candidate-fit.json (P1/P2
+  keys; marks mount re-solved through the tangential model: TILT 40.646 YAW
+  0.961 ROLL -3.364). generate_mesh.py now applies P1/P2 when present (baked
+  into UVs — the player needs no change). STAGED: public/vp-mesh-kuwait-
+  tangential, A/B vs /vp-mesh-kuwait-regsift. ADOPTION COST if accepted:
+  fisheye_model/gates/auto_fit/marks_solver do not yet understand P1/P2 —
+  GATE A/G and future refits need the tangential unprojection plumbed
+  (tangential.py has the reference implementation); mesh-mediated paths
+  (GATE E, the product) work today.
 
 **Tangential ADOPTED as kuwait accepted baseline (2026-07-18 late).** Karim's
 eyes-on: tangential and regsift "both look good" — visual parity + strict
@@ -722,6 +733,7 @@ virtual framing (near_touch 60-64 of 159) — not an unprojection failure.
 ## PROD SWAP EXECUTED (2026-07-18, Karim "go")
 
 Both venues live on the accepted fits (swap_meshes.py, promoted here):
+
 - **Football Plus**: fresh mesh from baselines/footballplus-accepted-fit.json
   (regenerated + re-gated: marks 0.11% of span, PASS — NOTE the staged
   public/vp-mesh-footballplus-auto had drifted from the frozen fit and was
@@ -734,7 +746,7 @@ Both venues live on the accepted fits (swap_meshes.py, promoted here):
   game->variant map in benchmarks/meshes/nazwa-prod-mesh-20260718/ (FP:
   fp-prod-mesh-20260718/). Rollback = re-upload per the map.
 - Stale aim-track.json / tracklets.json artifacts DELETED (honest absence
-  beats a ~3 deg-wrong overlay); aim_track_*/tracklets_* columns reset on
+  beats a ~3 deg-wrong overlay); aim_track__/tracklets__ columns reset on
   all 32 recordings -> the existing sweeps rebuild against the new meshes
   (aim ~20 jobs at 4-7h, cap 2, ~3-5 days; tracklets ~2min/game).
 - REMAINING MANUAL: re-solve both venues' admin calibrations in the marking

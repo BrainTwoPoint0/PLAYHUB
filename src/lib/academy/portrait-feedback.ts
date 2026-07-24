@@ -12,7 +12,8 @@ import type { Database, Json } from '@/lib/supabase/types'
 import type { CropKeyframe } from '@/lib/editor/types'
 import { diffKeyframes, type KeyframeDiff } from '@/lib/editor/keyframe-diff'
 
-export type PortraitFeedbackAction = 'accepted' | 'rejected' | 'edited' | 'exported'
+export type PortraitFeedbackAction =
+  'accepted' | 'rejected' | 'edited' | 'exported'
 
 /**
  * Provenance of `keyframes_before`.

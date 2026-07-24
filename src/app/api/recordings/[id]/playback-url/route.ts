@@ -60,8 +60,7 @@ export async function GET(
   if (!(await hasRecordingAccess(rec, id, token, user)))
     return noStore({ error: 'not found', code: 'not_found' }, 404)
 
-  if (!rec.s3_key)
-    return noStore({ error: 'no video', code: 'no_video' }, 404)
+  if (!rec.s3_key) return noStore({ error: 'no video', code: 'no_video' }, 404)
 
   try {
     const url = await getPlaybackUrl(rec.s3_key, SIGNED_URL_TTL)

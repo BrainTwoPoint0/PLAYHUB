@@ -110,7 +110,10 @@ export async function PATCH(
     if (corrErr) {
       // Fail CLOSED here, unlike the listing's advisory marker: a missed check
       // writes a permanently wrong label into an append-only corpus.
-      console.error('[portrait-renders] correction check failed:', corrErr.message)
+      console.error(
+        '[portrait-renders] correction check failed:',
+        corrErr.message
+      )
       return NextResponse.json(
         { error: 'Update failed', code: 'update_failed' },
         { status: 500 }

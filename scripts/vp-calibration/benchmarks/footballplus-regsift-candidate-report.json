@@ -204,13 +204,7 @@
       }
     ],
     "qualifying": 11,
-    "x_cols": [
-      2,
-      3,
-      4,
-      5,
-      6
-    ],
+    "x_cols": [2, 3, 4, 5, 6],
     "median_dev_deg": 4.765128998979587,
     "hard_gate_viable": true
   },

@@ -79,9 +79,10 @@ export function FlatZoomPlayer({
   // (which must NOT go through the `src` prop). A prop change resyncs it below.
   const [currentSrc, setCurrentSrc] = useState(src)
   // Set just before a re-sign swap; restored on the next loadedmetadata.
-  const resumeAfterSwapRef = useRef<{ time: number; wasPaused: boolean } | null>(
-    null
-  )
+  const resumeAfterSwapRef = useRef<{
+    time: number
+    wasPaused: boolean
+  } | null>(null)
   const resigningRef = useRef(false)
   const lastResignAtRef = useRef(0)
   const resignRef = useRef<() => void>(() => {})
@@ -196,7 +197,10 @@ export function FlatZoomPlayer({
       const swap = resumeAfterSwapRef.current
       if (swap) {
         resumeAfterSwapRef.current = null
-        video.currentTime = Math.min(swap.time, Math.max(0, video.duration - 0.1))
+        video.currentTime = Math.min(
+          swap.time,
+          Math.max(0, video.duration - 0.1)
+        )
         if (!swap.wasPaused) void video.play().catch(() => {})
       }
     }

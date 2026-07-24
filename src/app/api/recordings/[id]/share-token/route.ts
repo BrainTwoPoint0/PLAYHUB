@@ -42,7 +42,8 @@ export async function POST(
   // /watch/<bearer> form keeps working — the watch route handles non-UUID
   // segments via a backward-compat redirect.
   const base = process.env.NEXT_PUBLIC_APP_URL || ''
-  const regenerate = (await request.json().catch(() => ({})))?.regenerate === true
+  const regenerate =
+    (await request.json().catch(() => ({})))?.regenerate === true
 
   // Get-or-create: return the existing token UNLESS the admin asked to
   // regenerate (which rotates it, killing any previously-shared links).

@@ -181,13 +181,10 @@ export function useVideoTransport({
     try {
       // Token in a header (not the query) so this repeatedly-polled endpoint
       // doesn't leak a non-expiring token into access logs.
-      const res = await fetch(
-        `/api/recordings/${recordingId}/playback-url`,
-        {
-          cache: 'no-store',
-          headers: shareToken ? { 'x-share-token': shareToken } : undefined,
-        }
-      )
+      const res = await fetch(`/api/recordings/${recordingId}/playback-url`, {
+        cache: 'no-store',
+        headers: shareToken ? { 'x-share-token': shareToken } : undefined,
+      })
       if (!res.ok) throw new Error(`resign HTTP ${res.status}`)
       const { url } = (await res.json()) as { url?: string }
       if (!url) throw new Error('resign: no url')

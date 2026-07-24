@@ -90,7 +90,11 @@ export async function POST(
   // Closes the simple-request CSRF path independently of the Origin check.
   const ctype = request.headers.get('content-type') ?? ''
   if (!ctype.toLowerCase().includes('application/json')) {
-    return fail(415, 'Content-Type must be application/json', 'bad_content_type')
+    return fail(
+      415,
+      'Content-Type must be application/json',
+      'bad_content_type'
+    )
   }
 
   const { user } = await getAuthUser()
@@ -141,7 +145,11 @@ export async function POST(
   if (body.keyframesAfter !== undefined && body.keyframesAfter !== null) {
     keyframesAfter = parseKeyframes(body.keyframesAfter)
     if (!keyframesAfter) {
-      return fail(400, 'keyframesAfter must be valid crop geometry', 'bad_request')
+      return fail(
+        400,
+        'keyframesAfter must be valid crop geometry',
+        'bad_request'
+      )
     }
   }
   if (action === 'edited' && !keyframesAfter) {
@@ -155,18 +163,29 @@ export async function POST(
   if (body.keyframesBefore !== undefined && body.keyframesBefore !== null) {
     clientBefore = parseKeyframes(body.keyframesBefore)
     if (!clientBefore) {
-      return fail(400, 'keyframesBefore must be valid crop geometry', 'bad_request')
+      return fail(
+        400,
+        'keyframesBefore must be valid crop geometry',
+        'bad_request'
+      )
     }
   }
 
   let sceneChanges: number[] | null = null
   if (body.sceneChanges !== undefined && body.sceneChanges !== null) {
-    if (!Array.isArray(body.sceneChanges) || body.sceneChanges.length > MAX_SCENE_CHANGES) {
+    if (
+      !Array.isArray(body.sceneChanges) ||
+      body.sceneChanges.length > MAX_SCENE_CHANGES
+    ) {
       return fail(400, 'sceneChanges invalid or too long', 'bad_request')
     }
     if (
       !body.sceneChanges.every(
-        (n) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= MAX_CLIP_SECONDS
+        (n) =>
+          typeof n === 'number' &&
+          Number.isFinite(n) &&
+          n >= 0 &&
+          n <= MAX_CLIP_SECONDS
       )
     ) {
       return fail(400, 'sceneChanges must be finite seconds', 'bad_request')
@@ -186,7 +205,8 @@ export async function POST(
       t.end > t.start &&
       t.end <= MAX_CLIP_SECONDS
     // A nonsense trim window in the corpus is worse than a rejected request.
-    if (!okTrim) return fail(400, 'trim must be {start>=0, end>start}', 'bad_request')
+    if (!okTrim)
+      return fail(400, 'trim must be {start>=0, end>start}', 'bad_request')
     trim = { start: t.start as number, end: t.end as number }
   }
 
@@ -230,7 +250,11 @@ export async function POST(
   }
   if ((existing ?? 0) >= MAX_ROWS_PER_RENDER) {
     // Permanent for this render — 409, not a retryable 429.
-    return fail(409, 'Feedback limit reached for this render', 'feedback_limit_reached')
+    return fail(
+      409,
+      'Feedback limit reached for this render',
+      'feedback_limit_reached'
+    )
   }
 
   // Prefer the FACT the draft was rendered with. `none` is a real outcome and must not
@@ -271,7 +295,9 @@ export async function POST(
       id,
       baselineOrigin,
       // A projection of the stored KeyframeDiff, not the whole thing.
-      diffSummary: diff ? { counts: diff.counts, maxAbsDx: diff.maxAbsDx } : null,
+      diffSummary: diff
+        ? { counts: diff.counts, maxAbsDx: diff.maxAbsDx }
+        : null,
     },
     { status: 201, headers: JSON_HEADERS }
   )

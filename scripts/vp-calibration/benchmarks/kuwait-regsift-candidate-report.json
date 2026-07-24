@@ -144,10 +144,7 @@
       }
     ],
     "qualifying": 9,
-    "x_cols": [
-      3,
-      4
-    ],
+    "x_cols": [3, 4],
     "median_dev_deg": 5.775578482813706,
     "hard_gate_viable": false
   },

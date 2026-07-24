@@ -74,7 +74,9 @@ export function resolveTransition(action: unknown): Transition | undefined {
   return Object.hasOwn(TRANSITIONS, key) ? TRANSITIONS[key] : undefined
 }
 
-export function labelForAction(action: unknown): 'accepted' | 'rejected' | undefined {
+export function labelForAction(
+  action: unknown
+): 'accepted' | 'rejected' | undefined {
   const key = String(action)
   return Object.hasOwn(LABEL_FOR, key) ? LABEL_FOR[key] : undefined
 }

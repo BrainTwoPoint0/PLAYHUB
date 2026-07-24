@@ -19,16 +19,16 @@ Candidate = every `ball_in_play` resumption; gold = nearest Veo restart within t
 `none`. Match-grouped 5-fold (a match never split across train/test), out-of-fold pooled.
 **Strictest ±1.0s window** (looser only helps):
 
-| class | precision | recall | F1 | gate (≥0.60) |
-|---|---|---|---|---|
-| corner | 0.84 | 0.87 | **0.86** | PASS |
-| goal_kick | 0.75 | 0.82 | **0.78** | PASS |
-| throw_in | 0.75 | 0.74 | **0.75** | PASS |
-| kick_off | 0.76 | 0.73 | **0.74** | PASS |
+| class     | precision | recall | F1       | gate (≥0.60) |
+| --------- | --------- | ------ | -------- | ------------ |
+| corner    | 0.84      | 0.87   | **0.86** | PASS         |
+| goal_kick | 0.75      | 0.82   | **0.78** | PASS         |
+| throw_in  | 0.75      | 0.74   | **0.75** | PASS         |
+| kick_off  | 0.76      | 0.73   | **0.74** | PASS         |
 
 **4/4 gated restart classes clear F1 ≥ 0.60.** The classification sub-problem — the novel, hard part —
 is solved from tracks alone. Its FEATURES (normalized coords + GK role) are provider-neutral, so
-classification *would* transfer — but the product does not (caveat 1), and every F1 here is agreement
+classification _would_ transfer — but the product does not (caveat 1), and every F1 here is agreement
 with a possibly-noisy teacher, not human truth (caveat 2). "4/4" is a Veo-parity claim, not a truth claim.
 
 ## Key findings
@@ -92,17 +92,18 @@ Shots/goals/penalty stay reported-not-gated; free_kick reported-not-gated until 
 
 `emit_events.py` runs the Phase-0 classifier over a match's `ball_in_play` candidates and emits the four
 gated restart classes as canonical events (`phase1_events.CanonicalEvent`; conf-gated; goals stay Veo-sourced
-+ period-FP-filtered; NO geometry adapters, NO DB — held until a persist target exists). Metric below is
-**emitted events vs VEO restart tags (±1s), NOT ground truth, NOT the per-class GroupKFold ceiling**; precision
-is a lower bound (a real restart Veo didn't tag scores as a FP).
+
+- period-FP-filtered; NO geometry adapters, NO DB — held until a persist target exists). Metric below is
+  **emitted events vs VEO restart tags (±1s), NOT ground truth, NOT the per-class GroupKFold ceiling**; precision
+  is a lower bound (a real restart Veo didn't tag scores as a FP).
 
 **STRATIFIED held-out (9 matches, 3 per pitch band, model trained on 227 without them):**
 
 | MIN_CONF | overall P/R | small <50m | medium 50–90m (9v9) | full ≥90m (11v11) |
-|---|---|---|---|---|
-| 0.50 | 0.79 / 0.69 | 0.71/0.60 | 0.85/0.75 | 0.77/0.70 |
-| 0.80 | 0.89 / 0.51 | 0.85/0.39 | **0.93/0.57** | 0.86/0.52 |
-| 0.90 | 0.92 / 0.35 | 0.88/0.24 | 0.94/0.37 | 0.91/0.40 |
+| -------- | ----------- | ---------- | ------------------- | ----------------- |
+| 0.50     | 0.79 / 0.69 | 0.71/0.60  | 0.85/0.75           | 0.77/0.70         |
+| 0.80     | 0.89 / 0.51 | 0.85/0.39  | **0.93/0.57**       | 0.86/0.52         |
+| 0.90     | 0.92 / 0.35 | 0.88/0.24  | 0.94/0.37           | 0.91/0.40         |
 
 - **The global P≥0.92 @ R~0.68 operating point does NOT exist** — at P0.92 (MIN_CONF 0.90), recall is 0.35.
   (An earlier non-stratified tail-5 run read 0.90/0.78 @ 0.50 — optimistic; stratifying corrected it to 0.79/0.69.)
@@ -151,12 +152,12 @@ argmax → (C) confidence gate. All numbers emit-vs-Veo-tags (±1s, precision a 
 over-gated at 0.80; throw_in is correctly gated; goal_kick is in between. Precision-first knees (P≥0.85 bar,
 from `cfa_perclass_sweep.py`):
 
-| class | knee | P | R | note |
-|---|---|---|---|---|
-| corner | **0.50** | 0.91 | 0.73 | precision-robust — 0.80 is pure waste (+0.12 R at ZERO precision cost) |
-| kick_off | **0.65** | 0.86 | 0.55 | +0.17 R over 0.80 |
-| goal_kick | **0.75** | 0.85 | 0.52 | +0.08 R |
-| throw_in | **0.80** (keep) | 0.83 | 0.48 | relaxing tanks precision; loss is classifier→none |
+| class     | knee            | P    | R    | note                                                                   |
+| --------- | --------------- | ---- | ---- | ---------------------------------------------------------------------- |
+| corner    | **0.50**        | 0.91 | 0.73 | precision-robust — 0.80 is pure waste (+0.12 R at ZERO precision cost) |
+| kick_off  | **0.65**        | 0.86 | 0.55 | +0.17 R over 0.80                                                      |
+| goal_kick | **0.75**        | 0.85 | 0.52 | +0.08 R                                                                |
+| throw_in  | **0.80** (keep) | 0.83 | 0.48 | relaxing tanks precision; loss is classifier→none                      |
 
 Blended per-class = **P0.86 / R0.55** vs uniform-0.80 **P0.87 / R0.48** — a clean Pareto gain (+7 R for −1 P),
 purely by RELAXING corner/kick_off, not touching throw_in. (A looser P≥0.80 bar → corner .50 / kick_off .50 /
@@ -192,9 +193,9 @@ free_kick feasibility is the next queued item.
 
 ## free_kick feasibility spike — VERDICT: NO-GO as a distinct/provider-indep class (2026-07-20)
 
-**Question:** can free_kick be spotted from player tracks *without* leaning on the `ball_in_play`
+**Question:** can free_kick be spotted from player tracks _without_ leaning on the `ball_in_play`
 resumption boundary (the crutch that carries the other four)? **Answer: no.** free_kick has no geometric
-signature and its off-boundary cases are unreachable without bip. It rides the bip crutch at *marginal*
+signature and its off-boundary cases are unreachable without bip. It rides the bip crutch at _marginal_
 quality, no better than the four and worse. Scripts: `fk_boundary.py` (split + signature), `fk_model.py`
 (5-class model + candidate ceiling), `fk_offboundary.py` (freeze recall + wall/cluster). 236 usable matches,
 1875 free_kick events. All numbers emit-vs-Veo-tags (precision a lower bound), NOT ground truth.
@@ -211,8 +212,8 @@ but tiny separation, not a discriminator.
 
 **3. Model — WITH the bip crutch (same basis as the four gated classes, GroupKFold, ±1.0s):**
 
-| class | prec | rec | F1 | |
-|---|---|---|---|---|
+| class     | prec | rec  | F1       |                                 |
+| --------- | ---- | ---- | -------- | ------------------------------- |
 | free_kick | 0.65 | 0.44 | **0.53** | marginal PASS (weakest of five) |
 
 Adding free_kick as a 5th class **does NOT regress the four** (throw_in 0.72/0.76, corner 0.83/0.88,
@@ -259,18 +260,19 @@ Causal chain: goal → ball out / celebration → centre kick_off. Measured agai
   **PRECISION 0.95 (1598/1674), per-match median 1.00; RECALL 0.96 (1610/1682 goals followed by such a kick_off).**
 
 **Honest caveats (why this is a ceiling, not a shipping number):**
+
 1. **Measured with Veo's OWN kick_off tags**, so 0.95/0.96 is partly Veo self-consistency (Veo may emit the
-   kick_off *because* it emitted the goal). Independence from the goal tag is unproven → this is **not yet a
+   kick_off _because_ it emitted the goal). Independence from the goal tag is unproven → this is **not yet a
    goal-RECALL booster on Veo** (it can't be assumed to catch goals Veo missed). The **76/1674 non-period
    kick_offs with NO goal in 90s** are the interesting residue (missed goals? mislabeled dropped-ball restarts?)
    — not inspected; too small to bank on.
-2. A **produced** corroborator would use the *classifier's* kick_off (P~0.75/R~0.73 @thr0.65), not Veo's, so
+2. A **produced** corroborator would use the _classifier's_ kick_off (P~~0.75/R~~0.73 @thr0.65), not Veo's, so
    real quality < the 0.95 concept ceiling.
 3. On Veo, goals are already source-of-truth → the corroborator's independent value is **mostly chaptering +
    reinforcing the period-FP filter**, not new goals. Don't over-invest here.
 
 **The real prize** this de-risks: on the provider-independent (Spiideo) path, "**track-derived stoppage +
-centre-restart kick_off**" is a goal PROXY with a 0.95/0.96 ceiling *given clean inputs*. It's gated on
+centre-restart kick_off**" is a goal PROXY with a 0.95/0.96 ceiling _given clean inputs_. It's gated on
 provider-independent stoppage detection (the freeze detector is ~0.3 precision today) — measure that compound
 before building. That is the Spiideo-goals workstream, roadmap-after-Veo, **not** more free_kick/throw_in.
 
@@ -280,7 +282,7 @@ before building. That is the Spiideo-goals workstream, roadmap-after-Veo, **not*
 (player tracklets + pitch geometry, optional aim-track), prove it recovers Veo goals held-out, THEN run on
 Spiideo. **Hard constraint — at inference NO Veo-only signals:** no `match-events`, no `ball_in_play`, no Veo
 ball track (role 6). This retires restart tagging as the goal path (`kickoff_goal_corrob` used bip + the Veo
-kick_off *tag* — both banned here; it stays a side quest). Script: `goal_transfer.py`.
+kick_off _tag_ — both banned here; it stays a side quest). Script: `goal_transfer.py`.
 
 **Label:** clean Veo goal (`phase1_events.clean_events`, period-boundary FPs dropped). 1670 goals / 236 matches.
 
@@ -291,10 +293,10 @@ P/R, GroupKFold by match (out-of-fold), detections merged @30s for a fair precis
 **Candidate-recall ceiling = 0.96** (a goal has a track resumption in +[1,90]s) → recall loss is the
 classifier/gate, NOT "goals have no track signal."
 
-| tier | features | thr0.5 P/R | thr0.7 P/R | thr0.8 P/R |
-|---|---|---|---|---|
+| tier             | features                                                 | thr0.5 P/R  | thr0.7 P/R      | thr0.8 P/R  |
+| ---------------- | -------------------------------------------------------- | ----------- | --------------- | ----------- |
 | **B (transfer)** | players (roles 0-3) + pitch geom, **ball-free bip-free** | 0.77 / 0.60 | **0.89 / 0.43** | 0.94 / 0.28 |
-| A (oracle) | + Veo ball (role 6) | 0.76 / 0.62 | 0.89 / 0.44 | 0.95 / 0.29 |
+| A (oracle)       | + Veo ball (role 6)                                      | 0.76 / 0.62 | 0.89 / 0.44     | 0.95 / 0.29 |
 
 **Tier B clears the P≥0.85 light-review bar at R~0.43 (thr 0.7), held-out, on Spiideo-shaped inputs — a real
 transfer GO, not a Veo crutch.** R0.43@P0.89 is assisted-auto grade (like the portrait pipeline), NOT full
@@ -307,7 +309,7 @@ post-goal RESET, not the scramble. That is exactly what you'd hope transfers to 
 
 **Ball oracle — honest framing (the tier-A feature was buggy first; fixed):** the raw "ball beyond the goal-line
 plane, central" signal is **P0.10 / R0.80** — in youth football the ball goes behind a goal line constantly
-(out-of-play, wide pitches, imperfect normalized scale), so it over-fires ~10×. Its *usable* information (goal vs
+(out-of-play, wide pitches, imperfect normalized scale), so it over-fires ~10×. Its _usable_ information (goal vs
 ball-went-out-behind) is only unlocked by the SAME stoppage→centre-restart context tier B already has → adding a
 proper ball feature (penetration depth + beyond flag, short pre-kickoff window) lifts tier A by **+0.01 recall**.
 So the Veo ball is a **teacher-quality lever at most, NOT a Spiideo requirement** — and as banked (2D foot-plane,
@@ -388,7 +390,7 @@ Ported the tier-B features (`goal_transfer.py`) onto ONE real Spiideo match — 
 NO team side and NO role. Public artifact = `{id, t, pan, tilt}` (camera angles); raw stream = `{uuid:[{timeOffset,x,y}]}`
 (opaque id + position only); `build_track.py` never assigns team. So the dominant Veo feature (`half_sep`,
 pos-rate 0.10→0.34) **cannot be computed**. This contradicts the RESULTS note above that "Spiideo tracklets carry
-team side from the H-solve" — the H-solve gives pitch *position*, not team *identity*. Getting team side would
+team side from the H-solve" — the H-solve gives pitch _position_, not team _identity_. Getting team side would
 need a new clustering step (kit colour off the raw panorama, or L/R attack-direction inference) — not in this pilot.
 
 **What the pilot runs instead (team-free tier-B subset):** candidates = motion resumptions (freeze-style
@@ -430,8 +432,9 @@ centre restart / the 2nd-half kickoff.
 stays as the runnable reference; the team-free path is parked, not deleted.
 
 **Next lever (in order):**
+
 1. **Restore team/side so `half_sep` can run** — kit-colour clustering off the raw panorama, or attack-direction
-   over a window. This is the *real* port of the Veo GO (NOT aim-track). Requires a new team-assignment step on the
+   over a window. This is the _real_ port of the Veo GO (NOT aim-track). Requires a new team-assignment step on the
    tracklets (the raw stream is `{uuid:[{t,x,y}]}` — no team; assignment must be derived).
 2. **Re-run this exact Nazwa pilot with `half_sep` live**, eyes-on the new shortlist.
 3. **Only if that still fails:** rethink — aim-track-near-box, ball vision, or accept Veo-only goals for the social
@@ -459,11 +462,12 @@ clusters are **yellow** (b≈150) vs **navy** (b≈126); territorial pan bias 13
 sanity `proj_check.jpg`: pan/tilt→ray→mesh→pixel lands on every player's feet.
 
 **Step 1 — real half_sep (metric projection + kit teams):** each detected player → team (kit centroid, GK/ref → other)
-+ pitch metres (`inv(H_local)` composed from artifact `pan/tilt` → world ray) → `goal_transfer.half_separation` over
-kit teams. Validated on frames: **1.00 at the opening kickoff** (5L yellow / 5R navy, textbook split), **0.5 at a
-goalmouth scramble** (both teams same half — correctly demoted), 0.6–0.75 mid-play.
 
-- **⚠️ Mesh-epoch gotcha (documented in the README):** the ACTIVE DB calibration (2.79 px) was marked on a DIFFERENT
+- pitch metres (`inv(H_local)` composed from artifact `pan/tilt` → world ray) → `goal_transfer.half_separation` over
+  kit teams. Validated on frames: **1.00 at the opening kickoff** (5L yellow / 5R navy, textbook split), **0.5 at a
+  goalmouth scramble** (both teams same half — correctly demoted), 0.6–0.75 mid-play.
+
+* **⚠️ Mesh-epoch gotcha (documented in the README):** the ACTIVE DB calibration (2.79 px) was marked on a DIFFERENT
   mesh epoch (2026-07-18-night tangential refit + re-mark) than the lockstep artifact/mesh — its homography does NOT
   round-trip the marks on the lockstep mesh (corners off 20–40 m). Fix: the mark PIXELS are physical (mesh-independent);
   `pitch_solve_local.py` re-solves the pitch homography from the 6 mark pixels through the lockstep mesh's barycentric
@@ -544,11 +548,12 @@ game (same gotcha as the v2 pilot).
 
 **NEXT:** (1) fresh eyes-on = regenerate the shortlist with deadctx live + the tau->0.35 recall probe scored
 by deadctx (recovers goals v3's gate dropped, at shortlist quality the 33%-precision version couldn't afford)
-+ Karim watch for the goal-count denominator; (2) if that passes, wire the composition (motion-resumption
-candidates x P_ko x deadctx x period filter) as the Spiideo goal producer behind the same review-first
-posture as portraits; (3) ball-label bootstrap (project Veo metric ball through alignment.veo into native
-panorama pixels; ~1M+ auto-labels; hand-label ~500-1k clean teacher frames; speed-gated co-teaching) stays
-the parallel strategic lever — direct evidence vs inferred context.
+
+- Karim watch for the goal-count denominator; (2) if that passes, wire the composition (motion-resumption
+  candidates x P_ko x deadctx x period filter) as the Spiideo goal producer behind the same review-first
+  posture as portraits; (3) ball-label bootstrap (project Veo metric ball through alignment.veo into native
+  panorama pixels; ~1M+ auto-labels; hand-label ~500-1k clean teacher frames; speed-gated co-teaching) stays
+  the parallel strategic lever — direct evidence vs inferred context.
 
 ## VEO FREEZE — frozen chain on held-out Veo, ship gate: GO (marginal, review-first) (2026-07-21)
 
@@ -565,12 +570,12 @@ camera_directions not banked). Labels = clean FootballGoal (`is_goal_period_fp` 
 goal->kickoff latency envelope). Success bar written and locked from the fold-1 smoke BEFORE the full run
 (scratchpad success-bar.md): medium recall90>=0.75 @ shortlist<=18, precision>=0.30, leak<=2%.
 
-| band | matches | goals | recall45 | recall90 | precision | shortlist med | P@8 | R@8 |
-|---|---|---|---|---|---|---|---|---|
-| **medium (product)** | 117 | 869 | 0.67 | **0.75** | **0.31** | 16 | 0.36 | 0.36 |
-| full | 42 | 270 | 0.59 | 0.76 | 0.30 | 18 | 0.40 | 0.35 |
-| small | 77 | 531 | 0.70 | 0.75 | 0.37 | 14 | 0.42 | 0.45 |
-| ALL | 236 | 1670 | 0.67 | 0.75 | 0.33 | 15 | 0.38 | 0.39 |
+| band                 | matches | goals | recall45 | recall90 | precision | shortlist med | P@8  | R@8  |
+| -------------------- | ------- | ----- | -------- | -------- | --------- | ------------- | ---- | ---- |
+| **medium (product)** | 117     | 869   | 0.67     | **0.75** | **0.31**  | 16            | 0.36 | 0.36 |
+| full                 | 42      | 270   | 0.59     | 0.76     | 0.30      | 18            | 0.40 | 0.35 |
+| small                | 77      | 531   | 0.70     | 0.75     | 0.37      | 14            | 0.42 | 0.45 |
+| ALL                  | 236     | 1670  | 0.67     | 0.75     | 0.33      | 15            | 0.38 | 0.39 |
 
 **Verdict vs the locked bar: GO — marginal, review-first only.** Medium recall90 0.748 (bar 0.75, binomial
 SE ±1.5% on 869 goals), precision 0.313 (bar 0.30), period-kickoff leak 1/2034 episodes. Duplicate-TP
@@ -579,6 +584,7 @@ recall90 med 0.75, p25 0.60, **p10 0.33** (1 in 10 matches gets a third of its g
 
 **What the audit says (all automatable on Veo; the 2-3-match human three-way watch stays queued,
 non-blocking):**
+
 - **Miss taxonomy (419/1670):** `no_dead_evidence` 187 (the 0.90 floor — set on Nazwa's SATURATED deadctx
   distribution — bites on Veo-native calibration; exactly RESULTS caveat (b) from the spike) ·
   `pko_below` 160 (best-P_ko med 0.30; the tau->0.35 probe would recover 61) · period_filter 28 ·
@@ -628,15 +634,15 @@ shortlist med<=18 AND leak<=2%). Engineering: the OOF P_ko/deadctx/evidence seri
 (`--series-dir`), so a floor re-decode costs ~1 min instead of a ~25-min refit; the refactor was verified to
 reproduce the 0.90 baseline **bit-for-bit (236/236 matches identical)** before the 0.80 decode ran.
 
-| medium (product band) | floor 0.90 | **floor 0.80** |
-|---|---|---|
-| recall45 | 0.673 | **0.754** |
-| recall90 | 0.748 | **0.812** |
-| precision | 0.313 | 0.309 |
-| shortlist med | 16 | 18 |
-| period leak | 1/2034 | 2/2224 (0.09%) |
-| per-match recall90 p10 | 0.33 | **0.50** |
-| P@8 / R@8 | 0.36 / 0.36 | 0.37 / 0.40 |
+| medium (product band)  | floor 0.90  | **floor 0.80** |
+| ---------------------- | ----------- | -------------- |
+| recall45               | 0.673       | **0.754**      |
+| recall90               | 0.748       | **0.812**      |
+| precision              | 0.313       | 0.309          |
+| shortlist med          | 16          | 18             |
+| period leak            | 1/2034      | 2/2224 (0.09%) |
+| per-match recall90 p10 | 0.33        | **0.50**       |
+| P@8 / R@8              | 0.36 / 0.36 | 0.37 / 0.40    |
 
 **All four adopt criteria pass → ADOPT.** The floor was the binding constraint exactly as diagnosed: +64pp
 recall45 / +64 goals recall90 for a precision cost of 0.004 and +2 clips/match. The tail matches benefit
@@ -730,6 +736,7 @@ public) → **"16:08 Goal" marker live on /watch**. The estimated event timestam
 landed **1 second** from the true goal moment.
 
 **Two VALIDATED product follow-ups from the E2E (queue in this order):**
+
 1. ~~Review clips from the raw panorama~~ **RETRACTED same night (frame-level evidence):** the
    autofollow did NOT hide the goal — same-instant frames from the strip clip (offset 71s), the
    produced video (t=969s), and the raw panorama all show the identical goal aftermath (keeper
@@ -1004,13 +1011,13 @@ baseline **bit-for-bit (236/236)** before any split ran.
 
 **Split-at-emission: NO (both variants fail bar axis 3, and the honesty check is worse).**
 
-| medium band | baseline (floor-080) | split=any | split=5s |
-|---|---|---|---|
-| recall45 / recall90 | 0.754 / 0.812 | 0.772 / 0.832 | 0.772 / 0.832 |
-| precision (harness) | 0.309 | 0.315 | 0.308 |
-| shortlist med | 18 | **32** | **30** |
-| collapse (ALL, 45s) | 94/1234 | 26 | 27 |
-| anchor−20 \|err\| med/p90 | 8.2s / 56.2s | 5.2s / 23.4s | 5.4s / 24.4s |
+| medium band               | baseline (floor-080) | split=any     | split=5s      |
+| ------------------------- | -------------------- | ------------- | ------------- |
+| recall45 / recall90       | 0.754 / 0.812        | 0.772 / 0.832 | 0.772 / 0.832 |
+| precision (harness)       | 0.309                | 0.315         | 0.308         |
+| shortlist med             | 18                   | **32**        | **30**        |
+| collapse (ALL, 45s)       | 94/1234              | 26            | 27            |
+| anchor−20 \|err\| med/p90 | 8.2s / 56.2s         | 5.2s / 23.4s  | 5.4s / 24.4s  |
 
 The card explosion (4183→7205 surviving episodes ALL-bands) is not benign: **duplicate-TP episodes
 explode 108→981** (every restart in a post-goal cluster reaches back <=90s to the same goal), so
@@ -1064,19 +1071,19 @@ without Veo or Spiideo AI.
 
 **Veo's sensor (clarified):** Veo match-events / player-tracking almost certainly come from the
 wide/panoramic tracking world, **not** the autofollow Play mp4 (follow render is a product of that
-world; measured worst for jersey crops). Same *shape* as Spiideo: raw wide → tracks → events.
+world; measured worst for jersey crops). Same _shape_ as Spiideo: raw wide → tracks → events.
 
 **Our chain also never eats pixels.** Production goal-detect = Spiideo tracklets → kickoff/dead/
 envelope chain. The Veo freeze = Veo mes-derived sidecars → **same chain** vs Veo clean goals
-(236 matches). That *is* the decision-layer baseline ("does our model recover what Veo tagged,
+(236 matches). That _is_ the decision-layer baseline ("does our model recover what Veo tagged,
 given Veo-quality tracks?"). Do not confuse it with a missing raw-`.ts` eval.
 
-| Layer | Spiideo prod | Veo freeze today | "Eval on Veo `.ts`" |
-|---|---|---|---|
-| Pixels | Spiideo raw VP | — | banked Veo `.ts` |
-| Tracks | Spiideo tracklets stream | Veo mes-derived sidecars | needs **our** tracker |
-| Decision | `chain.py` | same | same |
-| Labels | human review stamps | Veo goals | Veo goals |
+| Layer    | Spiideo prod             | Veo freeze today         | "Eval on Veo `.ts`"   |
+| -------- | ------------------------ | ------------------------ | --------------------- |
+| Pixels   | Spiideo raw VP           | —                        | banked Veo `.ts`      |
+| Tracks   | Spiideo tracklets stream | Veo mes-derived sidecars | needs **our** tracker |
+| Decision | `chain.py`               | same                     | same                  |
+| Labels   | human review stamps      | Veo goals                | Veo goals             |
 
 **Independence stack** (success = tag ANY 180° recording without Veo/Spiideo AI):
 
@@ -1122,6 +1129,7 @@ post-clamp. en/es/ar.
 
 **Review-driven invariants (4 specialists + 2 delta re-reviews; api + senior converged on the
 provenance one independently):**
+
 - **Chip stamps are NOT human labels.** They send strict-boolean `estimate: true` and record as
   `stamp_source='anchor_offset'` — `human_scrub` remains a human-precise label (the timing corpus).
   The repair-restamp branch writes the resolved source, so a later genuine scrub supersedes a chip
@@ -1177,13 +1185,13 @@ warm-up cards total).
 
 **Every variant fails the locked bar, on exactly the fold-1-sensitive axes:**
 
-| | recall90 (med) | early-goal r90 (P1+300s, n=162) | opening ≤45s | pre_match drops |
-|---|---|---|---|---|
-| baseline | 0.812 | 0.667 | 49.6% | 0 |
-| τ_open 0.7 | 0.804 | 0.611 | 42.8% | 0 |
-| τ_open 0.8 | 0.797 | 0.562 | 37.7% | 0 |
-| 0.7 + cut | 0.804 | 0.599 | 42.8% | 26 |
-| 0.8 + cut | 0.793 | 0.531 | 37.7% | 66 |
+|            | recall90 (med) | early-goal r90 (P1+300s, n=162) | opening ≤45s | pre_match drops |
+| ---------- | -------------- | ------------------------------- | ------------ | --------------- |
+| baseline   | 0.812          | 0.667                           | 49.6%        | 0               |
+| τ_open 0.7 | 0.804          | 0.611                           | 42.8%        | 0               |
+| τ_open 0.8 | 0.797          | 0.562                           | 37.7%        | 0               |
+| 0.7 + cut  | 0.804          | 0.599                           | 42.8%        | 26              |
+| 0.8 + cut  | 0.793          | 0.531                           | 37.7%        | 66              |
 
 Mechanism: true opening kickoffs are often WEAK peaks; a raised bar skips them and latches onto a
 later strong (often post-goal) kickoff → env0 moves late → the opening drop + pre-env cut eat real
@@ -1211,11 +1219,11 @@ offset is 17 but buys only 0.8s median (< the locked 2s adopt threshold) and wor
 the candidate-peak gate; the opening scan stays at 0.5 (the 07-22 opening measurement stands — the
 warm-up surface must not move). Default-off `--tau-peak` flag, baseline bit-for-bit verified.
 
-| medium | baseline | **0.45** | 0.40 | 0.35 |
-|---|---|---|---|---|
-| recall45 / recall90 | 0.754 / 0.812 | **0.772 / 0.837** | 0.796 / 0.848 | 0.814 / 0.869 |
-| precision | 0.309 | **0.302** | 0.298 ✗ | 0.295 ✗ |
-| shortlist med / leak | 18 / 0.09% | **19 / 0.21%** | 19 / 0.21% | 19 / 0.24% |
+| medium               | baseline      | **0.45**          | 0.40          | 0.35          |
+| -------------------- | ------------- | ----------------- | ------------- | ------------- |
+| recall45 / recall90  | 0.754 / 0.812 | **0.772 / 0.837** | 0.796 / 0.848 | 0.814 / 0.869 |
+| precision            | 0.309         | **0.302**         | 0.298 ✗       | 0.295 ✗       |
+| shortlist med / leak | 18 / 0.09%    | **19 / 0.21%**    | 19 / 0.21%    | 19 / 0.24%    |
 
 0.45 = +2.5pp recall90 (~+31 medium goals) for −0.7pp precision and +1 card/match; per-match p10
 holds at 0.50. 0.40/0.35 breach the 0.30 precision floor — out, per the locked rule.

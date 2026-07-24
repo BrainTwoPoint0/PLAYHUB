@@ -46,7 +46,9 @@ export interface KeyframeDiff {
   meanAbsDx: number
 }
 
-function clean(list: readonly CropKeyframe[] | null | undefined): CropKeyframe[] {
+function clean(
+  list: readonly CropKeyframe[] | null | undefined
+): CropKeyframe[] {
   if (!Array.isArray(list)) return []
   return list
     .filter((k) => k && Number.isFinite(k.time) && Number.isFinite(k.x))

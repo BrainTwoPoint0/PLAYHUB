@@ -204,13 +204,7 @@
       }
     ],
     "qualifying": 11,
-    "x_cols": [
-      2,
-      3,
-      4,
-      5,
-      6
-    ],
+    "x_cols": [2, 3, 4, 5, 6],
     "median_dev_deg": 4.830298242306589,
     "hard_gate_viable": true
   },
@@ -222,7 +216,5 @@
       "rim_p90_deg": 4.026866583924935
     }
   },
-  "failures": [
-    "gate G: rim ray-field median 3.21 deg > 2.0 vs incumbent"
-  ]
+  "failures": ["gate G: rim ray-field median 3.21 deg > 2.0 vs incumbent"]
 }

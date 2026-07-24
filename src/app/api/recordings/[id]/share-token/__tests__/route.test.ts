@@ -34,8 +34,7 @@ function stubSupabase(recording: unknown) {
 
 const post = (body: unknown = {}, id = ID) =>
   POST({ json: async () => body } as any, { params: Promise.resolve({ id }) })
-const del = (id = ID) =>
-  DELETE({} as any, { params: Promise.resolve({ id }) })
+const del = (id = ID) => DELETE({} as any, { params: Promise.resolve({ id }) })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -79,7 +78,11 @@ describe('POST share-token', () => {
 
   it('regenerate ROTATES an existing token (new value, old killed)', async () => {
     mockService.mockReturnValue(
-      stubSupabase({ id: ID, organization_id: 'org1', share_token: 'old-token' })
+      stubSupabase({
+        id: ID,
+        organization_id: 'org1',
+        share_token: 'old-token',
+      })
     )
     const res = await post({ regenerate: true })
     const body = await res.json()
